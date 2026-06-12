@@ -30,9 +30,9 @@
         <div class="metric-value">{{ report.transaction_count.toLocaleString() }}</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Period</div>
+        <div class="metric-label">Billing</div>
         <div class="metric-value metric-value-sm">
-          {{ formatDate(report.date_range[0]) }} – {{ formatDate(report.date_range[1]) }}
+          {{ billingPeriod || "—" }}
         </div>
       </div>
       <div class="metric-card">
@@ -73,12 +73,14 @@
 import { computed, ref } from "vue";
 import { COST_BUCKETS, categoriesForCostType, splitFixedVariable, type CostType } from "../categories";
 import type { SpendingReport } from "../types";
-import { formatDate, formatIls, roundMoney } from "../utils/format";
+import { formatBillingPeriod, formatIls, roundMoney } from "../utils/format";
 
 const props = defineProps<{ report: SpendingReport }>();
 const emit = defineEmits<{ selectCategory: [string] }>();
 
 const selectedBucket = ref<CostType | null>(null);
+
+const billingPeriod = computed(() => formatBillingPeriod(props.report.metadata));
 
 const split = computed(() => splitFixedVariable(props.report.by_category));
 const classifiedTotal = computed(() => roundMoney(split.value.fixed + split.value.variable));

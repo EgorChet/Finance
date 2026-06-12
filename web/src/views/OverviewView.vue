@@ -47,6 +47,7 @@
       "
       :show-category="!app.selectedCategory"
       :category-filter="app.selectedCategory || undefined"
+      :statement-billing="selectedMonth ? statementBilling : null"
     />
     <details style="margin-top: 1.5rem">
       <summary>Search or fix a label</summary>
@@ -109,7 +110,7 @@ import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
 import { TOP_PIE_CATEGORIES, SPENDING_CATEGORIES } from "../categories";
-import { formatIls, roundMoney } from "../utils/format";
+import { formatIls, monthLabelFromIso, roundMoney } from "../utils/format";
 
 const categories = SPENDING_CATEGORIES;
 
@@ -132,6 +133,11 @@ const selectedMonth = ref<string | null>(null);
 const search = ref("");
 const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
+
+const statementBilling = computed(() => {
+  const billing = report.value?.metadata.billing_date as string | undefined;
+  return billing ? monthLabelFromIso(billing) : null;
+});
 
 const filteredTxs = computed((): Transaction[] => {
   if (!report.value) return [];

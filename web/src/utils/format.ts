@@ -16,6 +16,16 @@ function parseIsoDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Format YYYY-MM-DD as "Mon YYYY" without timezone drift. */
+export function monthLabelFromIso(dateStr: string): string {
+  const [y, m] = dateStr.slice(0, 10).split("-");
+  const monthIndex = parseInt(m, 10) - 1;
+  if (monthIndex < 0 || monthIndex > 11 || !y) return dateStr;
+  return `${MONTHS[monthIndex]} ${y}`;
+}
+
 export function formatDate(dateStr: string): string {
   return parseIsoDate(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
@@ -26,6 +36,19 @@ export function formatTransactionDate(dateStr: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Billing month(s) for the selected view — not purchase-date span from split payments. */
+export function formatBillingPeriod(metadata: Record<string, unknown>): string {
+  const combined = metadata.combined_billing_dates as string[] | undefined;
+  if (combined?.length) {
+    const sorted = [...combined].sort();
+    if (sorted.length === 1) return monthLabelFromIso(sorted[0]);
+    return `${monthLabelFromIso(sorted[0])} – ${monthLabelFromIso(sorted[sorted.length - 1]!)}`;
+  }
+  const billing = metadata.billing_date as string | undefined;
+  if (billing) return monthLabelFromIso(billing);
+  return "";
 }
 
 export const CHART_COLORS = [
