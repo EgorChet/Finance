@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: finance-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ANALYZER_URL
+        fromService:
+          name: finance-analyzer
+          type: web
+          property: hostport
+      - key: AUTH_PASSWORD
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: STORAGE
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
+  - type: web
+    name: finance-analyzer
+    runtime: docker
+    dockerfilePath: ./analyzer_api/Dockerfile
+    dockerContext: .
+    plan: free

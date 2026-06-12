@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+output/
+
+# Bank exports (keep private)
+statements/*.xlsx
+*.xlsx
+
+# Personal finance data — use Supabase in production, never commit
+data/statements.json
+data/merchant_rules.json
+data/review_progress.json
+data/translation_cache.json
+
+node_modules/
+api/dist/
+web/dist/
+*.tsbuildinfo
+.env
+.env.local

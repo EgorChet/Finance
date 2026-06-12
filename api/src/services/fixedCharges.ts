@@ -1,0 +1,169 @@
+import { readFileSync } from "fs";
+import path from "path";
+import type { SpendingReport, Transaction } from "../types.js";
+import { monthLabelFromIso } from "../utils/dates.js";
+
+interface FixedCharge {
+  id: string;
+  name_en: string;
+  name_he?: string;
+  amount: number;
+  category_en: string;
+  from_month: string;
+  through_month: string;
+}
+
+interface FixedChargesFile {
+  charges: FixedCharge[];
+}
+
+const CHARGES_PATH = path.resolve(
+  process.env.DATA_DIR ? path.dirname(process.env.DATA_DIR) : path.join(process.cwd(), ".."),
+  "data",
+  "fixed_charges.json",
+);
+
+let cached: FixedCharge[] | null = null;
+
+function loadCharges(): FixedCharge[] {
+  if (cached) return cached;
+  try {
+    const raw = readFileSync(CHARGES_PATH, "utf-8");
+    const data = JSON.parse(raw) as FixedChargesFile;
+    cached = data.charges || [];
+  } catch {
+    cached = [];
+  }
+  return cached;
+}
+
+function monthKey(billingDate: string | undefined): string | null {
+  if (!billingDate) return null;
+  return billingDate.slice(0, 7);
+}
+
+function chargesForBilling(billingDate: string | undefined, charges: FixedCharge[]): FixedCharge[] {
+  const ym = monthKey(billingDate);
+  if (!ym) return [];
+  return charges.filter((c) => c.from_month <= ym && ym <= c.through_month);
+}
+
+function mergeCategorySummaries(report: SpendingReport): SpendingReport["by_category"] {
+  const totals = new Map<string, { total: number; count: number; he: string | null }>();
+  let grand = 0;
+  for (const tx of report.transactions) {
+    const cat = tx.category_en || "Uncategorized";
+    grand += tx.charge_amount;
+    const cur = totals.get(cat) || { total: 0, count: 0, he: tx.category_he };
+    cur.total += tx.charge_amount;
+    cur.count += 1;
+    totals.set(cat, cur);
+  }
+  return [...totals.entries()]
+    .map(([category_en, v]) => ({
+      category_en,
+      category_he: v.he,
+      total: v.total,
+      count: v.count,
+      share_pct: grand ? (v.total / grand) * 100 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+function topMerchants(report: SpendingReport): SpendingReport["top_merchants"] {
+  const totals = new Map<string, { total: number; count: number; he: string; cat: string }>();
+  for (const tx of report.transactions) {
+    const key = tx.merchant_en || tx.merchant_he;
+    const cur = totals.get(key) || {
+      total: 0,
+      count: 0,
+      he: tx.merchant_he,
+      cat: tx.category_en,
+    };
+    cur.total += tx.charge_amount;
+    cur.count += 1;
+    totals.set(key, cur);
+  }
+  return [...totals.entries()]
+    .map(([merchant_en, v]) => ({
+      merchant_en,
+      merchant_he: v.he,
+      category_en: v.cat,
+      total: v.total,
+      count: v.count,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 15);
+}
+
+export function augmentReport(report: SpendingReport): SpendingReport {
+  const billingDate = report.metadata.billing_date as string | undefined;
+  if (!billingDate) return report;
+
+  const charges = chargesForBilling(billingDate, loadCharges());
+  if (!charges.length) return report;
+
+  const chargeById = new Map(charges.map((c) => [c.id, c]));
+  const label = monthLabelFromIso(billingDate);
+
+  const transactions = report.transactions.map((tx) => {
+    if (!tx.notes?.startsWith("fixed_charge:")) return tx;
+    const id = tx.notes.slice("fixed_charge:".length);
+    const charge = chargeById.get(id);
+    if (!charge) return tx;
+    return {
+      ...tx,
+      merchant_he: charge.name_he || charge.name_en,
+      merchant_en: charge.name_en,
+      amount: charge.amount,
+      charge_amount: charge.amount,
+      category_en: charge.category_en,
+      billing_month: label,
+    };
+  });
+
+  const existingIds = new Set(
+    transactions
+      .filter((tx) => tx.notes?.startsWith("fixed_charge:"))
+      .map((tx) => tx.notes!.slice("fixed_charge:".length)),
+  );
+
+  const newTxs: Transaction[] = [];
+  for (const charge of charges) {
+    if (existingIds.has(charge.id)) continue;
+    newTxs.push({
+      date: billingDate,
+      merchant_he: charge.name_he || charge.name_en,
+      merchant_en: charge.name_en,
+      amount: charge.amount,
+      charge_amount: charge.amount,
+      transaction_type_he: "חיוב קבוע",
+      category_he: null,
+      category_en: charge.category_en,
+      notes: `fixed_charge:${charge.id}`,
+      merchant_known: true,
+      billing_month: label,
+    });
+  }
+
+  if (!newTxs.length && transactions === report.transactions) return report;
+
+  const merged = [...transactions, ...newTxs].sort((a, b) => b.date.localeCompare(a.date));
+  const dates = merged.map((t) => t.date).sort();
+  const total = merged.reduce((s, t) => s + t.charge_amount, 0);
+  const augmented: SpendingReport = {
+    ...report,
+    transactions: merged,
+    total_spent: total,
+    transaction_count: transactions.length,
+    date_range: dates.length ? [dates[0], dates[dates.length - 1]] : report.date_range,
+    by_category: [],
+    top_merchants: [],
+    unknown_merchants: report.unknown_merchants.filter(
+      (m) => !newTxs.some((tx) => tx.merchant_he === m),
+    ),
+  };
+  augmented.by_category = mergeCategorySummaries(augmented);
+  augmented.top_merchants = topMerchants(augmented);
+  return augmented;
+}
