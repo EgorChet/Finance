@@ -167,3 +167,21 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   augmented.top_merchants = topMerchants(augmented);
   return augmented;
 }
+
+/** Recompute totals and category/merchant summaries from current transactions. */
+export function rebuildReportSummaries(report: SpendingReport): SpendingReport {
+  const txs = report.transactions;
+  const dates = txs.map((t) => t.date).sort();
+  const total = txs.reduce((s, t) => s + t.charge_amount, 0);
+  const updated: SpendingReport = {
+    ...report,
+    total_spent: total,
+    transaction_count: txs.length,
+    date_range: dates.length ? [dates[0], dates[dates.length - 1]] : report.date_range,
+    by_category: [],
+    top_merchants: [],
+  };
+  updated.by_category = mergeCategorySummaries(updated);
+  updated.top_merchants = topMerchants(updated);
+  return updated;
+}

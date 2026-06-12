@@ -223,9 +223,8 @@ async function saveLabel(row: SearchMerchantRow) {
       },
       auth.token || undefined,
     );
-    searchHint.value = `Saved "${row.hebrew}" — reanalyzing statements…`;
     await refreshReport();
-    searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}. Refresh in ~30s for charts to update.`;
+    searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}. Charts updated.`;
   } catch (e) {
     searchHint.value = String(e);
   } finally {

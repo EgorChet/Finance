@@ -1,5 +1,6 @@
 import type {
   CategorySummary,
+  MerchantRules,
   MonthCatalogItem,
   SpendingReport,
   StatementEntry,
@@ -7,7 +8,7 @@ import type {
   Transaction,
 } from "../types.js";
 import { monthLabelFromIso } from "../utils/dates.js";
-import { augmentReport } from "./fixedCharges.js";
+import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 
 function billingKey(dateStr: string | undefined): string {
   if (!dateStr) return "unknown";
@@ -153,4 +154,25 @@ export function rememberReport(
 
 export function isCachedFile(data: StatementsData, hash: string): boolean {
   return Object.values(data.statements).some((e) => e.file_hash === hash);
+}
+
+/** Apply saved merchant rules to all statements and rebuild summaries (no Python call). */
+export function applyMerchantRules(data: StatementsData, rules: MerchantRules): number {
+  let changed = 0;
+  for (const entry of Object.values(data.statements)) {
+    for (const tx of entry.report.transactions) {
+      const rule = rules[tx.merchant_he];
+      if (!rule) continue;
+      if (rule.english && tx.merchant_en !== rule.english) {
+        tx.merchant_en = rule.english;
+        changed += 1;
+      }
+      if (rule.category && tx.category_en !== rule.category) {
+        tx.category_en = rule.category;
+        changed += 1;
+      }
+    }
+    entry.report = rebuildReportSummaries(augmentReport(entry.report));
+  }
+  return changed;
 }
