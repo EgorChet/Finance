@@ -34,6 +34,21 @@ import type { MerchantRules } from "../types.js";
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
+/** Reanalyze all statements in the background (avoids Render 30s timeout). */
+function scheduleReanalyze(): void {
+  void (async () => {
+    try {
+      const statements = await readStatements();
+      const rules = await readRules();
+      const result = await reanalyzeAll(statements, rules, false);
+      statements.statements = result.statements;
+      await writeStatements(statements);
+    } catch (err) {
+      console.error("Background reanalyze failed:", err);
+    }
+  })();
+}
+
 router.get("/health", async (_req, res) => {
   res.json({ status: "ok" });
 });
@@ -74,11 +89,8 @@ router.get("/rules", async (_req, res) => {
 router.put("/rules", async (req, res) => {
   const rules = req.body as MerchantRules;
   await writeRules(rules);
-  const statements = await readStatements();
-  const result = await reanalyzeAll(statements, rules, true);
-  statements.statements = result.statements;
-  await writeStatements(statements);
-  res.json({ saved: true, reanalyzed: result.updated_count });
+  scheduleReanalyze();
+  res.json({ saved: true, reanalyzing: true });
 });
 
 router.post("/rules/entry", async (req, res) => {
@@ -90,11 +102,8 @@ router.post("/rules/entry", async (req, res) => {
   const rules = await readRules();
   rules[hebrew] = { english, category: category || null };
   await writeRules(rules);
-  const statements = await readStatements();
-  const result = await reanalyzeAll(statements, rules, true);
-  statements.statements = result.statements;
-  await writeStatements(statements);
-  res.json({ ok: true });
+  scheduleReanalyze();
+  res.json({ ok: true, reanalyzing: true });
 });
 
 router.get("/merchants", async (req, res) => {

@@ -9,18 +9,21 @@ const PORT = Number(process.env.PORT || 3000);
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",")
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/$/, ""))
   .filter(Boolean);
+
+function originAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (!allowedOrigins.length) return true;
+  const normalized = origin.replace(/\/$/, "");
+  return allowedOrigins.includes(normalized);
+}
 
 const app = express();
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || !allowedOrigins.length) {
-        callback(null, true);
-        return;
-      }
-      callback(null, allowedOrigins.includes(origin));
+      callback(null, originAllowed(origin));
     },
   }),
 );

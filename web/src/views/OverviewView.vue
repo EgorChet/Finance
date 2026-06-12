@@ -225,7 +225,7 @@ async function saveLabel(row: SearchMerchantRow) {
     );
     searchHint.value = `Saved "${row.hebrew}" — reanalyzing statements…`;
     await refreshReport();
-    searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}`;
+    searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}. Refresh in ~30s for charts to update.`;
   } catch (e) {
     searchHint.value = String(e);
   } finally {
