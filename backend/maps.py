@@ -34,11 +34,7 @@ _HEBREW_RE = re.compile(r"[\u0590-\u05FF]")
 
 # Default English names for well-known chains (no saved rule yet).
 _MERCHANT_ENGLISH_HINTS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"ארקפה\s*פולג", re.IGNORECASE), "Arcaffe Polg"),
-    # Bank often mislabels Zara at Big Fashion Galilot as "ארקפה ביג גלילות"
     (re.compile(r"ארקפה\s*ביג\s*גלילות", re.IGNORECASE), "Zara Big Fashion Galilot"),
-    (re.compile(r"ארקפה\s*מעוז\s*אביב", re.IGNORECASE), "Arcaffe Maoz Aviv"),
-    (re.compile(r"ארקפה\s*רעננה", re.IGNORECASE), "Arcaffe Raanana"),
     (re.compile(r"ארקפה", re.IGNORECASE), "Arcaffe"),
 ]
 

@@ -58,6 +58,7 @@ import { fetchRules, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import { useAuthStore } from "../stores/auth";
 import { SPENDING_CATEGORIES } from "../categories";
+import { canonicalMerchantEnglish } from "../utils/merchantVendor";
 import type { MerchantRow } from "../types";
 
 const categories = SPENDING_CATEGORIES;
@@ -77,7 +78,10 @@ const newCategory = ref("");
 function rulesFromRows() {
   const rules: Record<string, { english: string; category?: string }> = {};
   for (const row of rows.value) {
-    rules[row.Hebrew] = { english: row.English, category: row.Category || undefined };
+    rules[row.Hebrew] = {
+      english: canonicalMerchantEnglish(row.English, row.Hebrew),
+      category: row.Category || undefined,
+    };
   }
   return rules;
 }
@@ -163,7 +167,10 @@ async function importJson(e: Event) {
     for (const [he, rule] of Object.entries(imported)) {
       const hebrew = he.trim();
       if (!hebrew || !rule || typeof rule !== "object") continue;
-      const english = typeof rule.english === "string" ? rule.english : "";
+      const english = canonicalMerchantEnglish(
+        typeof rule.english === "string" ? rule.english : "",
+        hebrew,
+      );
       const category = typeof rule.category === "string" ? rule.category : "";
       const existing = rows.value.find((r) => r.Hebrew === hebrew);
       if (existing) {

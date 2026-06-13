@@ -4,6 +4,7 @@ import re
 
 from maps import MapperStore, looks_hebrew, suggest_merchant_english
 from categorize import SUBSCRIPTIONS, normalize_subscription_vendor
+from merchant_vendors import canonical_merchant_english
 from models import Transaction
 
 
@@ -57,5 +58,7 @@ def translate_transactions(
         )
         if tx.category_en == SUBSCRIPTIONS and tx.merchant_en:
             tx.merchant_en = normalize_subscription_vendor(tx.merchant_en)
+        elif tx.merchant_en:
+            tx.merchant_en = canonical_merchant_english(tx.merchant_en, tx.merchant_he)
 
     return transactions

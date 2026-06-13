@@ -8,6 +8,7 @@ import type {
   Transaction,
 } from "../types.js";
 import { monthLabelFromIso } from "../utils/dates.js";
+import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
 
@@ -209,12 +210,20 @@ export function applyMerchantRules(data: StatementsData, rules: MerchantRules): 
   for (const entry of Object.values(data.statements)) {
     for (const tx of entry.report.transactions) {
       const rule = rules[tx.merchant_he];
-      if (!rule) continue;
-      if (rule.english && tx.merchant_en !== rule.english) {
-        tx.merchant_en = rule.english;
-        changed += 1;
+      if (rule?.english) {
+        const fromRule = canonicalMerchantEnglish(rule.english, tx.merchant_he);
+        if (tx.merchant_en !== fromRule) {
+          tx.merchant_en = fromRule;
+          changed += 1;
+        }
+      } else if (tx.merchant_en) {
+        const canon = canonicalMerchantEnglish(tx.merchant_en, tx.merchant_he);
+        if (tx.merchant_en !== canon) {
+          tx.merchant_en = canon;
+          changed += 1;
+        }
       }
-      if (rule.category && tx.category_en !== rule.category) {
+      if (rule?.category && tx.category_en !== rule.category) {
         tx.category_en = rule.category;
         changed += 1;
       }

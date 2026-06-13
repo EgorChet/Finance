@@ -11,6 +11,7 @@ import { GridComponent, TooltipComponent } from "echarts/components";
 import VChart from "vue-echarts";
 import type { Transaction } from "../types";
 import { subscriptionVendor } from "../utils/subscriptions";
+import { canonicalMerchantEnglish } from "../utils/merchantVendor";
 import { formatIls, roundMoney } from "../utils/format";
 import { useCompactLayout } from "../composables/useCompactLayout";
 
@@ -33,7 +34,7 @@ const merchants = computed(() => {
     } else if (groupSubscriptions.value) {
       name = subscriptionVendor(tx.merchant_en || tx.merchant_he);
     } else {
-      name = tx.merchant_en || tx.merchant_he;
+      name = canonicalMerchantEnglish(tx.merchant_en || tx.merchant_he, tx.merchant_he);
     }
     map.set(name, roundMoney((map.get(name) || 0) + tx.charge_amount));
   }

@@ -19,6 +19,7 @@ import {
   suggestEnglish,
   transactionKey as reviewTransactionKey,
 } from "../services/reviewService.js";
+import { canonicalMerchantEnglish, normalizeMerchantRules } from "../utils/merchantVendor.js";
 import {
   discoverXlsxFiles,
   fileHash,
@@ -158,7 +159,7 @@ router.post("/exclusions/remove", async (req, res) => {
 });
 
 router.put("/rules", async (req, res) => {
-  const rules = req.body as MerchantRules;
+  const rules = normalizeMerchantRules(req.body as MerchantRules);
   await writeRules(rules);
   const statements = await readStatements();
   const updated = applyMerchantRules(statements, rules);
@@ -173,7 +174,10 @@ router.post("/rules/entry", async (req, res) => {
     category?: string;
   };
   const rules = await readRules();
-  rules[hebrew] = { english, category: category || null };
+  rules[hebrew] = {
+    english: canonicalMerchantEnglish(english, hebrew),
+    category: category || null,
+  };
   await writeRules(rules);
   const statements = await readStatements();
   const updated = applyMerchantRules(statements, rules);
@@ -338,7 +342,10 @@ router.post("/review/confirm", async (req, res) => {
   };
 
   const rules = await readRules();
-  rules[hebrew] = { english, category: category || null };
+  rules[hebrew] = {
+    english: canonicalMerchantEnglish(english, hebrew),
+    category: category || null,
+  };
   await writeRules(rules);
 
   const statements = await readStatements();
