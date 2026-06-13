@@ -42,179 +42,79 @@
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid" :class="{ 'explorer-grid--no-pie': hidePieChart }">
       <div v-if="!hidePieChart" class="explorer-pie-col">
-        <CategoryPieChart :categories="displayCategories" :selected="app.selectedCategory" @select="onCategory" />
-        <p v-if="drillTitle" class="category-pie-note">Selected · {{ drillTitle }}</p>
+        <CategoryPieChart :categories="displayCategories" :selected="expandedTopLevelKey" @select="onCategory" />
       </div>
       <div class="explorer-legend-col">
-        <CategoryLegend v-if="!app.selectedCategory" :categories="displayCategories" @select="onCategory" />
-        <div v-else-if="isHomeView" class="category-drilldown">
-          <div class="category-drilldown-header">
-            <div>
-              <h3 class="category-drilldown-title">{{ HOME_LIVING }}</h3>
-              <p class="category-drilldown-total">{{ formatIls(homeTotal) }}</p>
-              <p class="category-drilldown-meta">Tap a section to see charges</p>
-            </div>
-            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
-          </div>
-          <button
-            v-for="row in homeSubsections"
-            :key="row.category_en"
-            type="button"
-            class="cost-breakdown-row"
-            @click="onCategory(row.category_en)"
-          >
-            <span>{{ homeSubsectionLabel(row.category_en) }}</span>
-            <span class="cost-breakdown-amount">
-              {{ formatIls(row.total) }}
-              <span class="cost-breakdown-pct">{{ homePct(row.total) }}%</span>
-            </span>
-          </button>
-        </div>
-        <div v-else-if="isSubscriptionsView" class="category-drilldown">
-          <div class="category-drilldown-header">
-            <div>
-              <h3 class="category-drilldown-title">Subscriptions</h3>
-              <p class="category-drilldown-total">{{ formatIls(subscriptionsTotal) }}</p>
-              <p class="category-drilldown-meta">Mobile, gym, apps &amp; streaming</p>
-            </div>
-            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
-          </div>
-          <button
-            v-for="row in subscriptionSubsectionRows"
-            :key="row.name"
-            type="button"
-            class="cost-breakdown-row"
-            @click="onCategory(row.name)"
-          >
-            <span>{{ row.name }}</span>
-            <span class="cost-breakdown-amount">
-              {{ formatIls(row.total) }}
-              <span class="cost-breakdown-pct">{{ subscriptionPct(row.total) }}%</span>
-            </span>
-          </button>
-        </div>
-        <div v-else-if="isOtherView" class="category-drilldown">
-          <div class="category-drilldown-header">
-            <div>
-              <h3 class="category-drilldown-title">Other · {{ otherCategories.length }} categories</h3>
-              <p class="category-drilldown-total">{{ formatIls(otherTotal) }}</p>
-              <p class="category-drilldown-meta">Tap a category to see merchants and charges</p>
-            </div>
-            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
-          </div>
-          <button
-            v-for="row in otherCategories"
-            :key="row.category_en"
-            type="button"
-            class="cost-breakdown-row"
-            @click="onCategory(row.category_en)"
-          >
-            <span>{{ row.category_en }}</span>
-            <span class="cost-breakdown-amount">
-              {{ formatIls(row.total) }}
-              <span class="cost-breakdown-pct">{{ otherPct(row.total) }}%</span>
-            </span>
-          </button>
-        </div>
-        <div v-else-if="selectedCategoryStats" class="category-drilldown">
-          <div class="category-drilldown-header">
-            <div>
-              <h3 class="category-drilldown-title">{{ selectedCategoryStats.title || app.selectedCategory }}</h3>
-              <p class="category-drilldown-total">{{ formatIls(selectedCategoryStats.total) }}</p>
-              <p class="category-drilldown-meta">
-                {{ selectedCategoryStats.sharePct }}% of total spending
-                · {{ selectedCategoryStats.count.toLocaleString() }}
-                {{ selectedCategoryStats.count === 1 ? "charge" : "charges" }}
-              </p>
-            </div>
-            <button type="button" class="btn btn-ghost" @click="goBack">{{ backLabel }}</button>
-          </div>
-          <TransactionList
-            class="category-drilldown-txs"
-            :transactions="filteredTxs"
-            title="Charges"
-            :show-category="false"
-            :statement-billing="selectedMonth ? statementBilling : null"
-            :excludeable="!auth.isDemo"
-            :excluding-key="excludingKey"
-            @exclude="excludeTransaction"
-          />
-        </div>
+        <CategoryAccordion
+          v-model:expanded-keys="expandedCategoryKeys"
+          :categories="displayCategories"
+          :transactions="report.transactions"
+          :total-spent="report.total_spent"
+          :statement-billing="selectedMonth ? statementBilling : null"
+          :excludeable="!auth.isDemo"
+          :excluding-key="excludingKey"
+          @exclude="excludeTransaction"
+        />
       </div>
     </div>
-    <TransactionList
-      v-if="!app.selectedCategory && !isOtherView && !isHomeView && !isSubscriptionsView"
-      :transactions="filteredTxs"
-      title="All charges"
-      show-category
-      :statement-billing="selectedMonth ? statementBilling : null"
-      :excludeable="!auth.isDemo"
-      :excluding-key="excludingKey"
-      @exclude="excludeTransaction"
-    />
     </template>
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       Category breakdown and transactions will appear once this cycle’s statement is uploaded.
     </p>
-    <details style="margin-top: 1.5rem">
-      <summary>Search or fix a label</summary>
-      <p v-if="auth.isDemo" style="color: var(--text-muted); font-size: 0.85rem; margin: 0.5rem 0 0">
-        Demo mode — search only. Sign in to save label fixes.
-      </p>
-      <input v-model="search" class="input" placeholder="Merchant, category, amount…" style="margin-top: 0.5rem" />
-      <div class="table-scroll">
-        <table v-if="searchMerchants.length" class="rules label-fix-table" style="margin-top: 0.75rem">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Hebrew</th>
-              <th>English</th>
-              <th>Category</th>
-              <th></th>
-              <th v-if="!auth.isDemo"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in searchMerchants" :key="row.key">
-              <td class="label-fix-date">{{ formatTransactionDate(row.date) }}</td>
-              <td class="label-fix-amount">{{ formatIls(row.amount) }}</td>
-              <td>{{ row.hebrew }}</td>
-              <td>
-                <input v-model="row.english" class="input" :readonly="auth.isDemo" />
-              </td>
-              <td>
-                <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
-              </td>
-              <td>
-                <button
-                  class="btn btn-primary"
-                  style="white-space: nowrap"
-                  :disabled="auth.isDemo || row.saving"
-                  @click="saveLabel(row)"
-                >
-                  {{ row.saving ? "Saving…" : "Save" }}
-                </button>
-              </td>
-              <td v-if="!auth.isDemo">
-                <button
-                  type="button"
-                  class="btn btn-ghost"
-                  style="white-space: nowrap"
-                  :disabled="excludingKey === row.key"
-                  @click="excludeFromSearch(row)"
-                >
-                  {{ excludingKey === row.key ? "…" : "Exclude" }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <details v-if="app.expertMode" class="label-fix-panel">
+      <summary class="label-fix-summary">Search or fix a label</summary>
+      <div class="label-fix-body">
+        <p v-if="auth.isDemo" class="label-fix-demo-note">
+          Demo mode — search only. Sign in to save label fixes.
+        </p>
+        <input
+          v-model="search"
+          class="input label-fix-search"
+          placeholder="Merchant, category, amount…"
+          enterkeyhint="search"
+        />
+        <p v-if="search.trim() && !searchMerchants.length" class="label-fix-empty">No matching charges.</p>
+        <div v-if="searchMerchants.length" class="label-fix-list">
+          <article v-for="row in searchMerchants" :key="row.key" class="label-fix-card">
+            <div class="label-fix-card-head">
+              <span class="label-fix-card-amount">{{ formatIls(row.amount) }}</span>
+              <span class="label-fix-card-date">{{ formatTransactionDate(row.date) }}</span>
+            </div>
+            <p class="label-fix-card-hebrew">{{ row.hebrew }}</p>
+            <label class="label-fix-field">
+              <span class="label-fix-field-label">English</span>
+              <input v-model="row.english" class="input" :readonly="auth.isDemo" />
+            </label>
+            <label class="label-fix-field">
+              <span class="label-fix-field-label">Category</span>
+              <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
+            </label>
+            <div class="label-fix-card-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="auth.isDemo || row.saving"
+                @click="saveLabel(row)"
+              >
+                {{ row.saving ? "Saving…" : "Save" }}
+              </button>
+              <button
+                v-if="!auth.isDemo"
+                type="button"
+                class="btn btn-ghost"
+                :disabled="excludingKey === row.key"
+                @click="excludeFromSearch(row)"
+              >
+                {{ excludingKey === row.key ? "…" : "Exclude" }}
+              </button>
+            </div>
+          </article>
+        </div>
+        <p v-if="searchHint" class="label-fix-hint">{{ searchHint }}</p>
+        <datalist id="overview-spending-cats">
+          <option v-for="c in categories" :key="c" :value="c" />
+        </datalist>
       </div>
-      <p v-if="searchHint" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem">{{ searchHint }}</p>
-      <datalist id="overview-spending-cats">
-        <option v-for="c in categories" :key="c" :value="c" />
-      </datalist>
     </details>
   </template>
 </template>
@@ -222,7 +122,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { addExclusion, fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
-import CategoryLegend from "../components/CategoryLegend.vue";
+import CategoryAccordion from "../components/CategoryAccordion.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
 import AppLoader from "../components/AppLoader.vue";
 import ErrorBanner from "../components/ErrorBanner.vue";
@@ -231,7 +131,6 @@ import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
 import PaceCard from "../components/PaceCard.vue";
 import PendingCycleCard from "../components/PendingCycleCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
-import TransactionList from "../components/TransactionList.vue";
 import { useCompactLayout } from "../composables/useCompactLayout";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
@@ -240,7 +139,6 @@ import {
   CATEGORY_PICKLIST,
   groupCategoriesForPie,
   HOME_LIVING,
-  homeSubsectionLabel,
   isHomeSubsection,
   isOtherBucketLabel,
   OTHER_BUCKET,
@@ -267,7 +165,6 @@ import {
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
 import { transactionKey } from "../utils/transactionKey";
-import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "../utils/subscriptionSections";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = CATEGORY_PICKLIST;
@@ -300,6 +197,7 @@ const search = ref("");
 const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
 const excludingKey = ref<string | null>(null);
+const expandedCategoryKeys = ref<string[]>([]);
 const cycleDay = ref(loadCycleDay());
 const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 
@@ -400,52 +298,14 @@ const showSummaryMetrics = computed(() => {
   return showCategoryExplorer.value;
 });
 
-const pieGroup = computed(() =>
-  report.value ? groupCategoriesForPie(report.value.by_category) : { top: [], other: [] },
-);
-
 const displayCategories = computed(() =>
   report.value ? rollupCategoriesForDisplay(report.value.by_category) : [],
 );
 
-const homeSubsections = computed(() => {
-  if (!report.value) return [];
-  return report.value.by_category
-    .filter((c) => isHomeSubsection(c.category_en) && c.category_en !== HOME_LIVING)
-    .sort((a, b) => b.total - a.total);
+const expandedTopLevelKey = computed(() => {
+  const top = expandedCategoryKeys.value.find((k) => !k.includes("::"));
+  return top ?? "";
 });
-
-const homeTotal = computed(() => roundMoney(homeSubsections.value.reduce((s, c) => s + c.total, 0)));
-
-const subscriptionTransactions = computed(() => {
-  if (!report.value) return [];
-  return report.value.transactions.filter((t) => rollupCategory(t.category_en) === "Subscriptions");
-});
-
-const subscriptionSubsectionRows = computed(() => subscriptionSubsectionTotals(subscriptionTransactions.value));
-
-const subscriptionsTotal = computed(() =>
-  roundMoney(subscriptionSubsectionRows.value.reduce((s, r) => s + r.total, 0)),
-);
-
-const isHomeView = computed(() => app.selectedCategory === HOME_LIVING);
-const isHomeChild = computed(() =>
-  homeSubsections.value.some((r) => r.category_en === app.selectedCategory),
-);
-
-const isSubscriptionsView = computed(() => app.selectedCategory === "Subscriptions");
-const isSubscriptionsChild = computed(() =>
-  subscriptionSubsectionRows.value.some((r) => r.name === app.selectedCategory),
-);
-
-const otherCategories = computed(() => pieGroup.value.other);
-const otherCategoryNames = computed(() => new Set(otherCategories.value.map((c) => c.category_en)));
-const otherTotal = computed(() => roundMoney(otherCategories.value.reduce((s, c) => s + c.total, 0)));
-
-const isOtherView = computed(() => app.selectedCategory === OTHER_BUCKET);
-const isOtherChild = computed(
-  () => !!app.selectedCategory && otherCategoryNames.value.has(app.selectedCategory),
-);
 
 const statementBilling = computed(() => {
   const meta = report.value?.metadata;
@@ -472,74 +332,66 @@ const partialTotalSpend = computed(() => {
 });
 
 
-const filteredTxs = computed((): Transaction[] => {
-  if (!report.value) return [];
-  if (!app.selectedCategory) return report.value.transactions;
-  if (isOtherView.value || isHomeView.value || isSubscriptionsView.value) return [];
-  if (isOtherChild.value) {
-    return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
-  }
-  if (isHomeChild.value) {
-    return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
-  }
-  if (isSubscriptionsChild.value) {
-    return report.value.transactions.filter(
-      (t) =>
-        rollupCategory(t.category_en) === "Subscriptions" &&
-        subscriptionSubsectionLabel(t) === app.selectedCategory,
-    );
-  }
-  if (app.selectedCategory.startsWith("Other")) {
-    const top = new Set(pieGroup.value.top.map((c) => c.category_en));
-    return report.value.transactions.filter((t) => !top.has(rollupCategory(t.category_en)));
-  }
-  return report.value.transactions.filter((t) => rollupCategory(t.category_en) === app.selectedCategory);
-});
+function categoryKey(name: string): string {
+  if (isOtherBucketLabel(name)) return OTHER_BUCKET;
+  return name;
+}
 
-const selectedCategoryStats = computed(() => {
-  if (!report.value || !app.selectedCategory || isOtherView.value || isHomeView.value || isSubscriptionsView.value) {
-    return null;
+function subCategoryKey(parent: string, child: string): string {
+  return `${parent}::${child}`;
+}
+
+function toggleCategoryKey(key: string) {
+  const next = new Set(expandedCategoryKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedCategoryKeys.value = [...next];
+}
+
+function onCategory(name: string) {
+  if (!report.value) return;
+
+  if (isOtherBucketLabel(name)) {
+    toggleCategoryKey(OTHER_BUCKET);
+    return;
   }
-  const txs = filteredTxs.value;
-  const rolled = rollupCategory(app.selectedCategory);
-  const summaryRow = displayCategories.value.find((c) => c.category_en === rolled);
-  const subsectionRow = isHomeChild.value
-    ? homeSubsections.value.find((c) => c.category_en === app.selectedCategory)
-    : isSubscriptionsChild.value
-      ? subscriptionSubsectionRows.value.find((r) => r.name === app.selectedCategory)
-      : null;
-  const total = roundMoney(
-    subsectionRow && "total" in subsectionRow
-      ? subsectionRow.total
-      : txs.reduce((sum, t) => sum + t.charge_amount, 0),
-  );
-  const sharePct = summaryRow
-    ? Math.round(summaryRow.share_pct)
-    : report.value.total_spent
-      ? Math.round((total / report.value.total_spent) * 100)
-      : 0;
-  return {
-    total,
-    count: txs.length,
-    sharePct,
-    title: isHomeChild.value
-      ? homeSubsectionLabel(app.selectedCategory)
-      : app.selectedCategory,
-  };
-});
 
-const drillTitle = computed(() => {
-  if (isOtherView.value) return formatIls(otherTotal.value);
-  if (selectedCategoryStats.value) return formatIls(selectedCategoryStats.value.total);
-  return "";
-});
+  const { top } = groupCategoriesForPie(report.value.by_category);
+  const topNames = new Set(top.map((c) => c.category_en));
 
-const backLabel = computed(() => {
-  if (isOtherChild.value) return "← Other";
-  if (isHomeChild.value) return `← ${HOME_LIVING}`;
-  if (isSubscriptionsChild.value) return "← Subscriptions";
-  return "← All categories";
-});
+  if (isHomeSubsection(name) && name !== HOME_LIVING) {
+    const sub = subCategoryKey(HOME_LIVING, name);
+    const next = new Set(expandedCategoryKeys.value);
+    next.add(HOME_LIVING);
+    if (next.has(sub)) next.delete(sub);
+    else next.add(sub);
+    expandedCategoryKeys.value = [...next];
+    return;
+  }
+
+  const rolled = rollupCategory(name);
+  if (rolled === "Subscriptions" && name !== "Subscriptions") {
+    const sub = subCategoryKey("Subscriptions", name);
+    const next = new Set(expandedCategoryKeys.value);
+    next.add("Subscriptions");
+    if (next.has(sub)) next.delete(sub);
+    else next.add(sub);
+    expandedCategoryKeys.value = [...next];
+    return;
+  }
+
+  if (!topNames.has(name) && !topNames.has(rolled)) {
+    const sub = subCategoryKey(OTHER_BUCKET, name);
+    const next = new Set(expandedCategoryKeys.value);
+    next.add(OTHER_BUCKET);
+    if (next.has(sub)) next.delete(sub);
+    else next.add(sub);
+    expandedCategoryKeys.value = [...next];
+    return;
+  }
+
+  toggleCategoryKey(categoryKey(name));
+}
 
 const searchResults = computed(() => {
   if (!report.value || !search.value.trim()) return [];
@@ -573,38 +425,6 @@ watch(searchResults, (txs) => {
       saving: false,
     }));
 });
-
-function homePct(amount: number): number {
-  return homeTotal.value ? Math.round((roundMoney(amount) / homeTotal.value) * 100) : 0;
-}
-
-function subscriptionPct(amount: number): number {
-  return subscriptionsTotal.value ? Math.round((roundMoney(amount) / subscriptionsTotal.value) * 100) : 0;
-}
-
-function otherPct(amount: number): number {
-  return otherTotal.value ? Math.round((roundMoney(amount) / otherTotal.value) * 100) : 0;
-}
-
-function onCategory(name: string) {
-  if (isOtherBucketLabel(name)) {
-    app.selectedCategory = app.selectedCategory === OTHER_BUCKET ? "" : OTHER_BUCKET;
-    return;
-  }
-  app.selectedCategory = app.selectedCategory === name ? "" : name;
-}
-
-function goBack() {
-  if (isOtherChild.value) {
-    app.selectedCategory = OTHER_BUCKET;
-  } else if (isHomeChild.value) {
-    app.selectedCategory = HOME_LIVING;
-  } else if (isSubscriptionsChild.value) {
-    app.selectedCategory = "Subscriptions";
-  } else {
-    app.clearCategory();
-  }
-}
 
 async function afterExclusionChange() {
   const demo = auth.isDemo;
@@ -747,7 +567,7 @@ async function refreshPaceReport() {
 
 async function onMonthSelected(month: string | null) {
   selectedMonth.value = month;
-  app.clearCategory();
+  expandedCategoryKeys.value = [];
   await refreshReport(month);
 }
 

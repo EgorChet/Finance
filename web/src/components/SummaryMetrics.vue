@@ -1,6 +1,14 @@
 <template>
   <div class="summary-metrics">
     <div class="metric-grid">
+      <div class="metric-card metric-card-budget" :class="budgetClass">
+        <div class="metric-label">Money left</div>
+        <div class="metric-value">{{ formatIls(budgetLeft) }}</div>
+        <div class="metric-sub">
+          {{ formatIls(MONTHLY_DISCRETIONARY_BUDGET) }} budget · {{ formatIls(budgetSpent) }} spent
+          <span class="metric-sub-note">excl. rent &amp; car loan</span>
+        </div>
+      </div>
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
         <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
@@ -74,6 +82,11 @@ import { computed, ref } from "vue";
 import { COST_BUCKETS, categoriesForCostType, splitFixedVariable, type CostType } from "../categories";
 import type { SpendingReport } from "../types";
 import { formatBillingPeriod, formatIls, roundMoney } from "../utils/format";
+import {
+  discretionarySpent,
+  moneyLeft,
+  MONTHLY_DISCRETIONARY_BUDGET,
+} from "../utils/householdBudget";
 
 const props = defineProps<{ report: SpendingReport }>();
 const emit = defineEmits<{ selectCategory: [string] }>();
@@ -81,6 +94,14 @@ const emit = defineEmits<{ selectCategory: [string] }>();
 const selectedBucket = ref<CostType | null>(null);
 
 const billingPeriod = computed(() => formatBillingPeriod(props.report.metadata));
+
+const budgetSpent = computed(() => discretionarySpent(props.report.transactions));
+const budgetLeft = computed(() => moneyLeft(props.report.transactions));
+const budgetClass = computed(() => {
+  if (budgetLeft.value < 0) return "metric-card-budget--over";
+  if (budgetLeft.value <= MONTHLY_DISCRETIONARY_BUDGET * 0.2) return "metric-card-budget--low";
+  return "metric-card-budget--ok";
+});
 
 const split = computed(() => splitFixedVariable(props.report.by_category));
 const classifiedTotal = computed(() => roundMoney(split.value.fixed + split.value.variable));
