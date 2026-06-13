@@ -527,10 +527,7 @@ export function mergeMonthsWithOpenCycles(
   const openItems = getOpenCycleMonthItems(cycleDay, latestBillingDate);
   if (!openItems.length) return months;
 
-  const toAdd = openItems.filter(
-    (open) =>
-      !months.some((m) => m.key === open.key || m.billing_date === open.billing_date),
-  );
+  const toAdd = openItems.filter((open) => !months.some((m) => m.key === open.key));
   if (!toAdd.length) return months;
   return [...toAdd, ...months];
 }
