@@ -35,6 +35,15 @@
       "category_en": "Transport",
       "from_month": "2026-02",
       "through_month": "2031-01"
+    },
+    {
+      "id": "ev-edge-other-bank-jun-2026",
+      "name_en": "EV Edge charging (other account)",
+      "name_he": "EV Edge",
+      "amount": 350,
+      "category_en": "Transport",
+      "from_month": "2026-06",
+      "through_month": "2026-06"
     }
   ]
 }

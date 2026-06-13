@@ -35,8 +35,10 @@ export interface MonthItem {
   key: string;
   label: string;
   billing_date: string;
-  /** In-progress billing cycle — no uploaded statement yet. */
+  /** Live billing cycle — pace tracking. */
   inProgress?: boolean;
+  /** Cycle ended; waiting for statement upload. */
+  pendingStatement?: boolean;
 }
 
 export interface MerchantRule {

@@ -776,6 +776,120 @@ table.rules select {
   text-align: right;
 }
 
+.pace-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1.25rem;
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-alt, color-mix(in srgb, var(--surface) 92%, var(--border)));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pace-toolbar-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.pace-toolbar-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.pace-toolbar-field-label {
+  white-space: nowrap;
+}
+
+.pace-toolbar-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+.pace-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pace-toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pace-toggle-track {
+  position: relative;
+  width: 2.4rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pace-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  transition: transform 0.15s ease;
+}
+
+.pace-toggle-input:checked + .pace-toggle-track {
+  background: var(--accent);
+}
+
+.pace-toggle-input:checked + .pace-toggle-track::after {
+  transform: translateX(1.05rem);
+}
+
+.pace-toggle-input:focus-visible + .pace-toggle-track {
+  outline: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 2px;
+}
+
+.pace-toggle-label {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.pace-cycle-pending-note {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pending-cycle-card .pending-cycle-note {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .pace-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -808,30 +922,6 @@ table.rules select {
   margin: 0.15rem 0 0;
   font-size: 0.78rem;
   color: var(--text-muted);
-}
-
-.pace-panel-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.pace-setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.pace-setting-row select {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 0.25rem 0.4rem;
-  font-size: 0.82rem;
 }
 
 .pace-panel-metrics {

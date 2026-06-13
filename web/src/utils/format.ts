@@ -26,6 +26,17 @@ export function monthLabelFromIso(dateStr: string): string {
   return `${MONTHS[monthIndex]} ${y}`;
 }
 
+/**
+ * User-facing billing cycle name (10th–10th).
+ * Statement / cycle keyed on the 10th is labeled as the previous month
+ * (e.g. 10 Apr–9 May → "Apr 2026", statement dated 10 May → "Apr 2026").
+ */
+export function billingCycleLabel(isoDateStr: string): string {
+  const d = parseIsoDate(isoDateStr);
+  d.setMonth(d.getMonth() - 1);
+  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 export function formatDate(dateStr: string): string {
   return parseIsoDate(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
@@ -40,18 +51,24 @@ export function formatTransactionDate(dateStr: string): string {
 
 /** Billing month(s) for the selected view — not purchase-date span from split payments. */
 export function formatBillingPeriod(metadata: Record<string, unknown>): string {
+  if (metadata.pending_statement) {
+    const billing = metadata.billing_date as string | undefined;
+    if (billing) return `${billingCycleLabel(billing)} · awaiting statement`;
+  }
   if (metadata.in_progress) {
     const label = metadata.month_label as string | undefined;
-    if (label) return `${label} · in progress`;
+    const billing = metadata.billing_date as string | undefined;
+    if (label && billing) return `${label} · in progress`;
+    if (billing) return `${billingCycleLabel(billing)} · in progress`;
   }
   const combined = metadata.combined_billing_dates as string[] | undefined;
   if (combined?.length) {
     const sorted = [...combined].sort();
-    if (sorted.length === 1) return monthLabelFromIso(sorted[0]);
-    return `${monthLabelFromIso(sorted[0])} – ${monthLabelFromIso(sorted[sorted.length - 1]!)}`;
+    if (sorted.length === 1) return billingCycleLabel(sorted[0]);
+    return `${billingCycleLabel(sorted[0])} – ${billingCycleLabel(sorted[sorted.length - 1]!)}`;
   }
   const billing = metadata.billing_date as string | undefined;
-  if (billing) return monthLabelFromIso(billing);
+  if (billing) return billingCycleLabel(billing);
   return "";
 }
 

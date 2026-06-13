@@ -2,7 +2,7 @@ import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
 import type { ConfiguredCharge } from "./fixedCharges";
 import { configuredChargesForCycle, sumConfiguredCharges } from "./fixedCharges";
-import { monthLabelFromIso, roundMoney } from "./format";
+import { billingCycleLabel, roundMoney } from "./format";
 
 export interface BillingCycle {
   start: Date;
@@ -269,7 +269,7 @@ export function computePace(
   const variableBreakdown = averageBreakdown(usedBuckets, cycle.dayIndex, "variable", cyclesUsed);
   const recentCycles: PaceCycleSnapshot[] = usedSnapshots.map((s) => ({
     cycleStart: isoDate(s.start),
-    label: monthLabelFromIso(isoDate(s.start)),
+    label: billingCycleLabel(isoDate(s.start)),
     totalAtDay: s.total,
     fixedAtDay: s.fixed,
     variableAtDay: roundMoney(s.total - s.fixed),
@@ -381,9 +381,9 @@ export type PaceAvgCycles = (typeof PACE_AVG_CYCLE_OPTIONS)[number];
 
 export function loadPaceAvgCycles(): PaceAvgCycles {
   const raw = localStorage.getItem(PACE_AVG_CYCLES_KEY);
-  if (raw === null || raw === "") return 0;
+  if (raw === null || raw === "") return 3;
   const n = parseInt(raw, 10);
-  return (PACE_AVG_CYCLE_OPTIONS as readonly number[]).includes(n) ? (n as PaceAvgCycles) : 0;
+  return (PACE_AVG_CYCLE_OPTIONS as readonly number[]).includes(n) ? (n as PaceAvgCycles) : 3;
 }
 
 export function savePaceAvgCycles(value: PaceAvgCycles): void {
@@ -445,13 +445,58 @@ export function currentCycleMonthKey(cycleDay: number, today = new Date()): stri
   return `${CYCLE_MONTH_PREFIX}${cycleStartForDate(norm, cycleDay)}`;
 }
 
+/** Statement for cycle starting `cycleStart` arrives on the next cycle's start date. */
+export function nextCycleStart(cycleStart: string, cycleDay = 10): string {
+  const d = parseIsoDate(cycleStart);
+  const next = new Date(d.getFullYear(), d.getMonth() + 1, cycleDay);
+  return isoDate(next);
+}
+
+/** True when no uploaded statement has closed this billing cycle yet. */
+export function cycleNeedsOpenTab(
+  latestBillingDate: string | null,
+  cycleStart: string,
+  cycleDay = 10,
+): boolean {
+  if (!latestBillingDate) return true;
+  return parseIsoDate(latestBillingDate) < parseIsoDate(nextCycleStart(cycleStart, cycleDay));
+}
+
 /** True when no uploaded statement covers this billing cycle yet. */
 export function shouldShowCurrentCycleMonth(
   latestBillingDate: string | null,
   cycleStart: string,
 ): boolean {
-  if (!latestBillingDate) return true;
-  return parseIsoDate(latestBillingDate) < parseIsoDate(cycleStart);
+  return cycleNeedsOpenTab(latestBillingDate, cycleStart);
+}
+
+export function getOpenCycleMonthItems(
+  cycleDay: number,
+  latestBillingDate: string | null,
+  today = new Date(),
+): MonthItem[] {
+  const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const currentStart = cycleStartForDate(norm, cycleDay);
+  const starts: string[] = [];
+  let start = currentStart;
+
+  while (cycleNeedsOpenTab(latestBillingDate, start, cycleDay)) {
+    starts.push(start);
+    const prev = parseIsoDate(start);
+    prev.setMonth(prev.getMonth() - 1);
+    start = isoDate(prev);
+    if (starts.length >= 3) break;
+  }
+
+  return starts
+    .sort((a, b) => b.localeCompare(a))
+    .map((s) => ({
+      key: `${CYCLE_MONTH_PREFIX}${s}`,
+      label: billingCycleLabel(s),
+      billing_date: s,
+      inProgress: s === currentStart,
+      pendingStatement: s !== currentStart,
+    }));
 }
 
 export function getCurrentCycleMonthItem(
@@ -462,26 +507,41 @@ export function getCurrentCycleMonthItem(
   const start = cycleStartForDate(norm, cycleDay);
   return {
     key: `${CYCLE_MONTH_PREFIX}${start}`,
-    label: monthLabelFromIso(start),
+    label: billingCycleLabel(start),
     billing_date: start,
     inProgress: true,
   };
 }
 
+export function isCycleEnded(cycleStart: string, cycleDay: number, today = new Date()): boolean {
+  const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const { end } = getCycleRangeForStart(cycleStart, cycleDay);
+  return norm > parseIsoDate(end);
+}
+
+export function mergeMonthsWithOpenCycles(
+  months: MonthItem[],
+  cycleDay: number,
+  latestBillingDate: string | null,
+): MonthItem[] {
+  const openItems = getOpenCycleMonthItems(cycleDay, latestBillingDate);
+  if (!openItems.length) return months;
+
+  const toAdd = openItems.filter(
+    (open) =>
+      !months.some((m) => m.key === open.key || m.billing_date === open.billing_date),
+  );
+  if (!toAdd.length) return months;
+  return [...toAdd, ...months];
+}
+
+/** @deprecated Use mergeMonthsWithOpenCycles */
 export function mergeMonthsWithCurrentCycle(
   months: MonthItem[],
   cycleDay: number,
   latestBillingDate: string | null,
 ): MonthItem[] {
-  const current = getCurrentCycleMonthItem(cycleDay);
-  if (!shouldShowCurrentCycleMonth(latestBillingDate, current.billing_date)) {
-    return months;
-  }
-  const exists = months.some(
-    (m) => m.key === current.key || m.billing_date === current.billing_date,
-  );
-  if (exists) return months;
-  return [current, ...months];
+  return mergeMonthsWithOpenCycles(months, cycleDay, latestBillingDate);
 }
 
 function transactionsInCycle(
@@ -524,8 +584,10 @@ export function buildCycleReport(
   const includeFixed = options.includeFixed ?? true;
   const today = options.today ?? new Date();
   const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const { end: cycleEndIso } = getCycleRangeForStart(cycleStart, 10);
+  const cycleEnded = todayNorm > parseIsoDate(cycleEndIso);
   const txs = transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed);
-  const label = monthLabelFromIso(cycleStart);
+  const label = billingCycleLabel(cycleStart);
 
   const catTotals = new Map<string, { total: number; count: number; he: string | null }>();
   let statementTotal = 0;
@@ -546,9 +608,9 @@ export function buildCycleReport(
   const configuredChargesTotal = sumConfiguredCharges(cycleStart, options.configuredCharges ?? []);
   const total =
     manualEveryday !== null
-      ? includeFixed
-        ? roundMoney(manualEveryday + configuredChargesTotal)
-        : manualEveryday
+      ? cycleEnded || !includeFixed
+        ? manualEveryday
+        : roundMoney(manualEveryday + configuredChargesTotal)
       : statementTotal;
 
   const by_category = [...catTotals.entries()]
@@ -566,7 +628,8 @@ export function buildCycleReport(
   return {
     metadata: {
       billing_date: cycleStart,
-      in_progress: true,
+      in_progress: !cycleEnded,
+      pending_statement: cycleEnded,
       cycle_end: cycleEnd,
       month_label: label,
     },

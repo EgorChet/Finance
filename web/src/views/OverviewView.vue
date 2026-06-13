@@ -8,14 +8,20 @@
     <h2 style="margin: 0 0 1rem">Spending overview</h2>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
-    <SummaryMetrics :report="report" @select-category="onCategory" />
+    <SummaryMetrics v-if="showSummaryMetrics" :report="report" @select-category="onCategory" />
     <PaceCard
-      v-if="isCurrentCycleSelected"
+      v-if="isLiveCycleSelected"
       :transactions="paceTransactions"
       :latest-billing-date="latestBillingDate"
       :configured-charges="configuredCharges"
       @settings-change="onPaceSettingsChange"
     />
+    <PendingCycleCard
+      v-if="isPendingCycleSelected && selectedCycleStart"
+      :cycle-start="selectedCycleStart"
+      @settings-change="onPaceSettingsChange"
+    />
+    <template v-if="showCategoryExplorer">
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid">
       <div>
@@ -74,6 +80,10 @@
       :category-filter="categoryFilter || undefined"
       :statement-billing="selectedMonth ? statementBilling : null"
     />
+    </template>
+    <p v-else-if="isCycleTabSelected" class="pace-cycle-pending-note">
+      Category breakdown and transactions will appear once this cycle’s statement is uploaded.
+    </p>
     <details style="margin-top: 1.5rem">
       <summary>Search or fix a label</summary>
       <p v-if="auth.isDemo" style="color: var(--text-muted); font-size: 0.85rem; margin: 0.5rem 0 0">
@@ -132,6 +142,7 @@ import MerchantBarChart from "../components/MerchantBarChart.vue";
 import MonthPicker from "../components/MonthPicker.vue";
 import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
 import PaceCard from "../components/PaceCard.vue";
+import PendingCycleCard from "../components/PendingCycleCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import TransactionList from "../components/TransactionList.vue";
 import { useAppStore } from "../stores/app";
@@ -152,9 +163,9 @@ import {
   loadCycleDay,
   loadManualCycleSpend,
   loadPaceIncludeFixed,
-  mergeMonthsWithCurrentCycle,
+  mergeMonthsWithOpenCycles,
 } from "../utils/pace";
-import { formatIls, monthLabelFromIso, roundMoney } from "../utils/format";
+import { billingCycleLabel, formatIls, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = SPENDING_CATEGORIES;
@@ -188,11 +199,45 @@ const latestBillingDate = computed(() => {
   return sorted[0]?.billing_date ?? null;
 });
 
-const displayMonths = computed(() =>
-  mergeMonthsWithCurrentCycle(months.value, cycleDay.value, latestBillingDate.value),
+const displayMonths = computed(() => {
+  const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, latestBillingDate.value);
+  return merged.map((m) => ({
+    ...m,
+    label: billingCycleLabel(m.billing_date),
+  }));
+});
+
+const selectedCycleStart = computed(() =>
+  isCycleMonthKey(selectedMonth.value) ? cycleStartFromMonthKey(selectedMonth.value!) : null,
 );
 
-const isCurrentCycleSelected = computed(() => isCycleMonthKey(selectedMonth.value));
+const selectedOpenCycle = computed(() =>
+  displayMonths.value.find((m) => m.key === selectedMonth.value) ?? null,
+);
+
+const isLiveCycleSelected = computed(() => selectedOpenCycle.value?.inProgress === true);
+const isPendingCycleSelected = computed(() => selectedOpenCycle.value?.pendingStatement === true);
+const isCycleTabSelected = computed(() => isCycleMonthKey(selectedMonth.value));
+
+const isInProgressCycle = computed(
+  () => !!report.value?.metadata?.in_progress && !report.value?.metadata?.pending_statement,
+);
+
+const showCategoryExplorer = computed(() => {
+  if (!report.value) return false;
+  if (!isInProgressCycle.value) return true;
+  if (report.value.metadata?.pending_statement) return false;
+  return report.value.transactions.length > 0;
+});
+
+const showSummaryMetrics = computed(() => {
+  if (!report.value) return false;
+  if (!isInProgressCycle.value) return true;
+  if (report.value.metadata?.pending_statement) {
+    return report.value.total_spent > 0;
+  }
+  return showCategoryExplorer.value;
+});
 
 const pieGroup = computed(() =>
   report.value ? groupCategoriesForPie(report.value.by_category) : { top: [], other: [] },
@@ -209,10 +254,11 @@ const isOtherChild = computed(
 
 const statementBilling = computed(() => {
   const meta = report.value?.metadata;
+  const billing = meta?.billing_date as string | undefined;
+  if (billing) return billingCycleLabel(billing);
   const label = meta?.month_label as string | undefined;
   if (label) return label;
-  const billing = meta?.billing_date as string | undefined;
-  return billing ? monthLabelFromIso(billing) : null;
+  return null;
 });
 
 const paceTransactions = computed(() => paceReport.value?.transactions ?? []);
@@ -427,12 +473,15 @@ async function loadMonths() {
     const token = auth.token || undefined;
     const m = await fetchMonths(demo, token);
     months.value = m.months;
-    summary.value = m.summary;
+    summary.value = m.summary.map((row) => ({
+      ...row,
+      month: billingCycleLabel(row.billing_date),
+    }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
     const latest = m.months.length
       ? [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]!.billing_date
       : null;
-    const merged = mergeMonthsWithCurrentCycle(m.months, cycleDay.value, latest);
+    const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value, latest);
     const currentKey = currentCycleMonthKey(cycleDay.value);
     const hasCurrent = merged.some((x) => x.key === currentKey);
     const initial = hasCurrent ? currentKey : m.months[0]?.key ?? null;

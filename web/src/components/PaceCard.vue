@@ -5,7 +5,9 @@
         <h3 class="pace-card-title">
           Cycle pace · day {{ cycleInfo.dayIndex }} of {{ cycleInfo.cycleLength }}
         </h3>
-        <p class="pace-card-sub">{{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}</p>
+        <p class="pace-card-sub">
+          {{ billingCycleLabel(cycleInfo.cycleStart) }} · {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
+        </p>
       </div>
       <div class="pace-progress-wrap">
         <div class="pace-progress-bar" role="progressbar" :aria-valuenow="cycleInfo.dayIndex" :aria-valuemax="cycleInfo.cycleLength">
@@ -15,8 +17,26 @@
       </div>
     </header>
 
+    <div class="pace-toolbar">
+      <label class="pace-toggle">
+        <input v-model="includeFixed" type="checkbox" class="pace-toggle-input" @change="persistFixed" />
+        <span class="pace-toggle-track" aria-hidden="true" />
+        <span class="pace-toggle-label">Include rent &amp; loans in total</span>
+      </label>
+      <label class="pace-toolbar-field">
+        <span class="pace-toolbar-field-label">Compare to</span>
+        <select v-model.number="avgCycles" class="pace-toolbar-select" @change="persistAvgCycles">
+          <option :value="3">Last 3 cycles</option>
+          <option :value="6">Last 6 cycles</option>
+          <option :value="12">Last 12 cycles</option>
+          <option :value="0">All past cycles</option>
+        </select>
+      </label>
+      <p class="pace-toolbar-hint">{{ compareToHint }}</p>
+    </div>
+
     <div class="pace-layout">
-      <section class="pace-panel pace-panel-input">
+      <section class="pace-panel pace-panel-input pace-panel-wide">
         <label class="pace-manual-label" for="pace-manual-input">
           Everyday spending so far (₪)
         </label>
@@ -58,29 +78,6 @@
         </ul>
       </section>
 
-      <section class="pace-panel pace-panel-settings">
-        <p class="pace-panel-title">Settings</p>
-        <label class="pace-setting-row">
-          <input v-model="includeFixed" type="checkbox" @change="persistFixed" />
-          Include monthly bills
-        </label>
-        <label class="pace-setting-row">
-          <span>Average over</span>
-          <select v-model.number="avgCycles" @change="persistAvgCycles">
-            <option :value="3">Last 3 cycles</option>
-            <option :value="6">Last 6 cycles</option>
-            <option :value="12">Last 12 cycles</option>
-            <option :value="0">All ({{ pace?.cyclesAvailable ?? "—" }})</option>
-          </select>
-        </label>
-        <label class="pace-setting-row">
-          <span>Cycle starts</span>
-          <select v-model.number="cycleDay" @change="onCycleDayChange">
-            <option v-for="d in cycleDays" :key="d" :value="d">{{ d }}{{ ordinal(d) }}</option>
-          </select>
-        </label>
-      </section>
-
       <template v-if="pace">
         <section class="pace-panel pace-panel-metrics">
           <div class="pace-metrics">
@@ -115,8 +112,7 @@
           <div class="pace-panel-head">
             <p class="pace-panel-title">Usually bills by day {{ cycleInfo.dayIndex }}</p>
             <p class="pace-panel-hint">
-              {{ formatIls(pace.historicalAvgFixedAtDay) }} total · configured charges land on the
-              {{ cycleDay }}{{ ordinal(cycleDay) }}
+              {{ formatIls(pace.historicalAvgFixedAtDay) }} total · bills land on the 10th
             </p>
           </div>
           <div class="pace-breakdown-list">
@@ -125,10 +121,7 @@
                 {{ row.label }}
                 <span v-if="row.configured" class="pace-tag">configured</span>
               </span>
-              <span class="pace-breakdown-amount">
-                {{ formatIls(row.amount) }}
-                <span class="pace-breakdown-meta">in {{ row.cyclesWith }}/{{ pace.cyclesUsed }}</span>
-              </span>
+              <span class="pace-breakdown-amount">{{ formatIls(row.amount) }}</span>
             </div>
           </div>
         </section>
@@ -141,10 +134,7 @@
           <div class="pace-breakdown-list">
             <div v-for="row in pace.variableBreakdown.slice(0, 8)" :key="row.label" class="pace-breakdown-row">
               <span class="pace-breakdown-label">{{ row.label }}</span>
-              <span class="pace-breakdown-amount">
-                {{ formatIls(row.amount) }}
-                <span class="pace-breakdown-meta">in {{ row.cyclesWith }}/{{ pace.cyclesUsed }}</span>
-              </span>
+              <span class="pace-breakdown-amount">{{ formatIls(row.amount) }}</span>
             </div>
           </div>
         </section>
@@ -187,7 +177,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
-import { formatIls, roundMoney } from "../utils/format";
+import { billingCycleLabel, formatIls, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import { sumConfiguredCharges } from "../utils/fixedCharges";
 import {
@@ -195,15 +185,16 @@ import {
   cycleStartForDate,
   getBillingCycle,
   getCycleRangeForStart,
-  loadCycleDay,
   loadManualCycleSpend,
   loadPaceAvgCycles,
   loadPaceIncludeFixed,
-  saveCycleDay,
   saveManualCycleSpend,
   savePaceAvgCycles,
   savePaceIncludeFixed,
 } from "../utils/pace";
+
+/** Billing cycle always starts on the 10th (Leumi Visa). */
+const CYCLE_DAY = 10;
 
 const props = defineProps<{
   transactions: Transaction[];
@@ -213,17 +204,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "settings-change": [] }>();
 
-const cycleDay = ref(loadCycleDay());
+const cycleDay = CYCLE_DAY;
 const includeFixed = ref(loadPaceIncludeFixed());
 const avgCycles = ref(loadPaceAvgCycles());
-const cycleDays = Array.from({ length: 28 }, (_, i) => i + 1);
 
 const cycleInfo = computed(() => {
   const today = new Date();
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const cycle = getBillingCycle(norm, cycleDay.value);
-  const start = cycleStartForDate(norm, cycleDay.value);
-  const { end } = getCycleRangeForStart(start, cycleDay.value);
+  const cycle = getBillingCycle(norm, cycleDay);
+  const start = cycleStartForDate(norm, cycleDay);
+  const { end } = getCycleRangeForStart(start, cycleDay);
   return {
     dayIndex: cycle.dayIndex,
     cycleLength: cycle.cycleLength,
@@ -258,7 +248,7 @@ const manualSpend = computed((): number | null => {
 
 const pace = computed(() =>
   computePace(props.transactions, {
-    cycleDay: cycleDay.value,
+    cycleDay,
     includeFixed: includeFixed.value,
     latestBillingDate: props.latestBillingDate ?? null,
     manualSpend: manualSpend.value,
@@ -273,12 +263,14 @@ const expectedConfiguredTotal = computed(() =>
 
 const avgCyclesLabel = computed(() => {
   if (!pace.value) return "";
-  const { cyclesUsed, cyclesAvailable, avgCycles: window } = pace.value;
-  if (window === 0) return `${cyclesUsed} completed cycles`;
-  if (cyclesAvailable > cyclesUsed) {
-    return `last ${cyclesUsed} of ${cyclesAvailable} completed cycles`;
-  }
-  return `last ${cyclesUsed} completed cycles`;
+  const { cyclesUsed, avgCycles: window } = pace.value;
+  if (window === 0) return `all ${cyclesUsed} past billing cycles`;
+  return `your last ${cyclesUsed} billing cycles`;
+});
+
+const compareToHint = computed(() => {
+  if (avgCycles.value === 0) return "Averaging all completed cycles at this day of the month";
+  return `Averaging the last ${avgCycles.value} completed cycles at this day of the month`;
 });
 
 const displaySpend = computed(() => pace.value?.currentSpend ?? 0);
@@ -351,12 +343,6 @@ const scoreClass = computed(() => {
   return "warn";
 });
 
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-}
-
 function formatCycleRange(start: string, end: string): string {
   const s = new Date(start + "T12:00:00");
   const e = new Date(end + "T12:00:00");
@@ -367,12 +353,6 @@ function formatCycleRange(start: string, end: string): string {
 
 function persistManual() {
   saveManualCycleSpend(cycleStart.value, manualSpend.value);
-  emit("settings-change");
-}
-
-function onCycleDayChange() {
-  saveCycleDay(cycleDay.value);
-  loadManualForCycle();
   emit("settings-change");
 }
 

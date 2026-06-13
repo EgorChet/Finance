@@ -5,10 +5,10 @@
       :key="m.key"
       type="button"
       class="pill"
-      :class="{ active: modelValue === m.key, 'pill-current': m.inProgress }"
+      :class="{ active: modelValue === m.key, 'pill-current': m.inProgress, 'pill-pending': m.pendingStatement }"
       @click="$emit('update:modelValue', m.key)"
     >
-      {{ m.label }}<span v-if="m.inProgress" class="pill-now"> · now</span>
+      {{ m.label }}<span v-if="m.inProgress" class="pill-now"> · now</span><span v-else-if="m.pendingStatement" class="pill-pending-tag"> · pending</span>
     </button>
     <button
       type="button"
@@ -33,7 +33,12 @@ defineEmits<{ "update:modelValue": [string | null] }>();
   border-style: dashed;
 }
 
-.pill-now {
+.pill-pending {
+  border-style: dotted;
+}
+
+.pill-now,
+.pill-pending-tag {
   font-size: 0.82em;
   opacity: 0.9;
 }

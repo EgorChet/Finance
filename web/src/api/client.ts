@@ -56,7 +56,7 @@ export async function login(password: string) {
 export async function fetchMonths(demo: boolean, token?: string) {
   return get<{
     months: MonthItem[];
-    summary: { month: string; total: number; transactions: number }[];
+    summary: { month: string; billing_date: string; total: number; transactions: number }[];
   }>(`${prefix(demo)}/months`, token);
 }
 
