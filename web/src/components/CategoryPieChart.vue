@@ -36,7 +36,18 @@ const pieData = computed(() => {
   return items;
 });
 
-const option = computed(() => ({
+function chartTextColor(): string {
+  if (typeof document === "undefined") return "#f9fafb";
+  return getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#f9fafb";
+}
+
+function shortLabel(name: string): string {
+  return name.length > 18 ? `${name.slice(0, 16)}…` : name;
+}
+
+const option = computed(() => {
+  const textColor = chartTextColor();
+  return {
   tooltip: {
     trigger: "item",
     formatter: (p: { name?: string; value?: number; percent?: number }) => {
@@ -48,21 +59,47 @@ const option = computed(() => ({
   series: [
     {
       type: "pie",
-      radius: ["44%", "92%"],
+      radius: ["38%", "72%"],
       center: ["50%", "50%"],
       data: pieData.value,
       selectedMode: "single",
-      label: { show: false },
-      labelLine: { show: false },
+      minShowLabelAngle: 6,
+      avoidLabelOverlap: true,
+      label: {
+        show: true,
+        position: "outside",
+        alignTo: "edge",
+        edgeDistance: "8%",
+        formatter: (p: { name?: string; percent?: number }) => {
+          const pct = typeof p.percent === "number" ? p.percent.toFixed(0) : "0";
+          return `${shortLabel(p.name || "")}\n${pct}%`;
+        },
+        color: textColor,
+        fontSize: 11,
+        lineHeight: 14,
+      },
+      labelLine: {
+        show: true,
+        length: 10,
+        length2: 8,
+        smooth: true,
+        lineStyle: { color: textColor, opacity: 0.4 },
+      },
+      labelLayout: {
+        hideOverlap: true,
+        moveOverlap: "shiftY",
+      },
       itemStyle: {
         color: (p: { dataIndex: number }) => CHART_COLORS[p.dataIndex % CHART_COLORS.length],
       },
       emphasis: {
+        label: { show: true, fontSize: 12, fontWeight: "bold" },
         itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.3)" },
       },
     },
   ],
-}));
+};
+});
 
 function onClick(params: { name?: string }) {
   if (params.name) emit("select", params.name);
