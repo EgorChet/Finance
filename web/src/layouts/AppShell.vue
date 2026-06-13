@@ -1,13 +1,22 @@
 <template>
   <div class="app-layout">
     <header class="app-header">
+      <button
+        type="button"
+        class="btn btn-icon mobile-nav-toggle"
+        aria-label="Open menu"
+        :aria-expanded="navOpen"
+        @click="navOpen = !navOpen"
+      >
+        <span class="hamburger-icon" :class="{ 'hamburger-icon--open': navOpen }">
+          <span /><span /><span />
+        </span>
+      </button>
       <h1 class="app-title">Finance</h1>
-      <nav class="app-nav">
-        <RouterLink class="nav-tab" to="/app/overview">Overview</RouterLink>
-        <RouterLink class="nav-tab" to="/app/mappings">Mappings</RouterLink>
-        <RouterLink class="nav-tab" to="/app/review">Review</RouterLink>
-        <RouterLink class="nav-tab" to="/app/excluded">Excluded</RouterLink>
-        <RouterLink class="nav-tab" to="/app/recurring">Recurring</RouterLink>
+      <nav class="app-nav" aria-label="Main">
+        <RouterLink v-for="item in navItems" :key="item.to" class="nav-tab" :to="item.to">
+          {{ item.label }}
+        </RouterLink>
       </nav>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
@@ -55,6 +64,30 @@
         </div>
       </div>
     </header>
+
+    <Teleport to="body">
+      <template v-if="navOpen">
+        <div class="mobile-nav-backdrop" aria-hidden="true" @click="closeNav" />
+        <nav class="mobile-nav-drawer" aria-label="Main navigation">
+          <div class="mobile-nav-drawer-head">
+            <span class="mobile-nav-drawer-title">Menu</span>
+            <button type="button" class="btn btn-icon mobile-nav-close" aria-label="Close menu" @click="closeNav">
+              ×
+            </button>
+          </div>
+          <RouterLink
+            v-for="item in navItems"
+            :key="item.to"
+            class="mobile-nav-link"
+            :to="item.to"
+            @click="closeNav"
+          >
+            {{ item.label }}
+          </RouterLink>
+        </nav>
+      </template>
+    </Teleport>
+
     <main class="main">
       <RouterView />
     </main>
@@ -99,8 +132,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
 import { syncStatements, uploadStatement } from "../api/client";
 import { useAppStore } from "../stores/app";
@@ -122,8 +155,19 @@ const SYNC_STEPS = [
   "Saving updates",
 ];
 
+const NAV_ITEMS = [
+  { to: "/app/overview", label: "Overview" },
+  { to: "/app/mappings", label: "Mappings" },
+  { to: "/app/review", label: "Review" },
+  { to: "/app/excluded", label: "Excluded" },
+  { to: "/app/recurring", label: "Recurring" },
+] as const;
+
+const navItems = NAV_ITEMS;
+
 const app = useAppStore();
 const auth = useAuthStore();
+const route = useRoute();
 const router = useRouter();
 const processing = ref(false);
 const processTitle = ref("");
@@ -137,12 +181,29 @@ const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const menuOpen = ref(false);
+const navOpen = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
+
+function closeNav() {
+  navOpen.value = false;
+}
+
+watch(
+  () => route.path,
+  () => {
+    navOpen.value = false;
+  },
+);
+
+watch(navOpen, (open) => {
+  document.body.style.overflow = open ? "hidden" : "";
+});
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
 onUnmounted(() => {
   clearStepTimer();
+  document.body.style.overflow = "";
 });
 
 function clearStepTimer() {
