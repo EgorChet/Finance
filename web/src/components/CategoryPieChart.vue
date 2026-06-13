@@ -42,7 +42,7 @@ function chartTextColor(): string {
 }
 
 function shortLabel(name: string): string {
-  return name.length > 18 ? `${name.slice(0, 16)}…` : name;
+  return name.length > 24 ? `${name.slice(0, 22)}…` : name;
 }
 
 const option = computed(() => {
@@ -63,13 +63,13 @@ const option = computed(() => {
       center: ["50%", "50%"],
       data: pieData.value,
       selectedMode: "single",
-      minShowLabelAngle: 6,
+      minShowLabelAngle: 4,
       avoidLabelOverlap: true,
       label: {
         show: true,
         position: "outside",
-        alignTo: "edge",
-        edgeDistance: "8%",
+        alignTo: "labelLine",
+        bleedMargin: 4,
         formatter: (p: { name?: string; percent?: number }) => {
           const pct = typeof p.percent === "number" ? p.percent.toFixed(0) : "0";
           return `${shortLabel(p.name || "")}\n${pct}%`;
@@ -80,13 +80,13 @@ const option = computed(() => {
       },
       labelLine: {
         show: true,
-        length: 10,
-        length2: 8,
+        length: 14,
+        length2: 10,
         smooth: true,
         lineStyle: { color: textColor, opacity: 0.4 },
       },
       labelLayout: {
-        hideOverlap: true,
+        hideOverlap: false,
         moveOverlap: "shiftY",
       },
       itemStyle: {
