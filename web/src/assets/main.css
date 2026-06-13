@@ -234,6 +234,14 @@ button {
   line-height: 1.45;
 }
 
+.category-drilldown-txs {
+  margin-top: 0.75rem;
+}
+
+.category-drilldown-txs .tx-list-header {
+  margin-bottom: 0.5rem;
+}
+
 .pill-row {
   display: flex;
   flex-wrap: wrap;
@@ -305,6 +313,14 @@ button {
 .demo-banner.import-error {
   background: color-mix(in srgb, #f87171 12%, var(--surface));
   border-color: #f87171;
+}
+
+.demo-banner-showcase {
+  line-height: 1.45;
+}
+
+.demo-banner-showcase strong {
+  color: var(--text);
 }
 
 .app-layout {
@@ -1293,16 +1309,31 @@ table.rules select {
   border-radius: 12px;
   padding: 2rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .login-card h1 {
   margin: 0 0 0.5rem;
 }
 
+.login-lead {
+  color: var(--text-muted);
+  margin: 0 0 1.25rem;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
 .login-card p {
   color: var(--text-muted);
   margin: 0 0 1.5rem;
+}
+
+.login-features {
+  margin: 1.25rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .login-actions {
@@ -1742,6 +1773,31 @@ table.rules select {
 
 .pace-score-row {
   margin-top: 0.65rem;
+}
+
+.pace-simple-status {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.pace-simple-status.pace-delta-good {
+  background: color-mix(in srgb, #34d399 12%, var(--surface));
+}
+
+.pace-simple-status.pace-delta-bad {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+}
+
+.pace-stat-meta.pace-delta-good {
+  color: #34d399;
+}
+
+.pace-stat-meta.pace-delta-bad {
+  color: var(--danger);
 }
 
 .pace-score {

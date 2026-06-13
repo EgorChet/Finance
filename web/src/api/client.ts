@@ -70,6 +70,7 @@ export async function fetchMonths(demo: boolean, token?: string) {
   return get<{
     months: MonthItem[];
     summary: { month: string; billing_date: string; total: number; transactions: number }[];
+    demo_as_of?: string;
   }>(`${prefix(demo)}/months`, token);
 }
 

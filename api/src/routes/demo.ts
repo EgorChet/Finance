@@ -1,5 +1,8 @@
 import { Router } from "express";
 import {
+  DEMO_AS_OF,
+  demoExclusions,
+  demoFixedCharges,
   demoMerchants,
   demoMonthCatalog,
   demoReviewQueue,
@@ -15,6 +18,7 @@ router.get("/months", (_req, res) => {
     months: demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key)),
     summary: demoSummaryRows(),
     demo: true,
+    demo_as_of: DEMO_AS_OF,
   });
 });
 
@@ -28,7 +32,7 @@ router.get("/rules", (_req, res) => {
 });
 
 router.get("/fixed-charges", (_req, res) => {
-  res.json({ charges: [] });
+  res.json(demoFixedCharges());
 });
 
 router.put("/fixed-charges", (_req, res) => {
@@ -48,11 +52,16 @@ router.get("/review/progress", (_req, res) => {
 });
 
 router.post("/sync", (_req, res) => {
-  res.json({ synced: [], total_months: 4, demo: true, message: "Demo mode — sync disabled" });
+  res.json({
+    synced: [],
+    total_months: demoMonthCatalog().length,
+    demo: true,
+    message: "Demo mode — upload your own Leumi xlsx after sign-in",
+  });
 });
 
 router.post("/upload", (_req, res) => {
-  res.status(403).json({ error: "Upload disabled in demo mode" });
+  res.status(403).json({ error: "Upload disabled in demo mode — sign in to use your statements" });
 });
 
 router.put("/rules", (_req, res) => {
@@ -64,7 +73,7 @@ router.post("/review/confirm", (_req, res) => {
 });
 
 router.get("/exclusions", (_req, res) => {
-  res.json({ entries: [], total: 0, demo: true });
+  res.json({ ...demoExclusions(), demo: true });
 });
 
 router.post("/exclusions", (_req, res) => {

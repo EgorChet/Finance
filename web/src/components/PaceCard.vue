@@ -105,24 +105,32 @@
               <div class="pace-stat-label">Spent so far</div>
               <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
             </div>
+            <div v-if="paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
+              <div class="pace-stat-label">Vs usual</div>
+              <div class="pace-stat-value" :class="deltaClass">{{ deltaLabel }}</div>
+              <div class="pace-stat-meta">{{ deltaHint }}</div>
+            </div>
             <div v-if="app.expertMode && paceCompareAvg > 0" class="pace-metric">
               <div class="pace-stat-label">Usually by day {{ cycleInfo.dayIndex }}</div>
               <div class="pace-stat-value">{{ formatIls(paceCompareAvg) }}</div>
               <div class="pace-stat-meta">{{ avgCyclesLabel }}</div>
             </div>
-            <div v-if="app.expertMode && paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
-              <div class="pace-stat-label">Vs usual</div>
-              <div class="pace-stat-value" :class="deltaClass">{{ deltaLabel }}</div>
-              <div class="pace-stat-meta">{{ deltaHint }}</div>
-            </div>
             <div v-if="displaySpend > 0" class="pace-metric">
               <div class="pace-stat-label">Projected full cycle</div>
               <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
-              <div v-if="app.expertMode && paceCompareAvg > 0" class="pace-stat-meta">
-                usual pace ~{{ formatIls(projectedAtUsualPace) }}
+              <div v-if="paceCompareAvg > 0" class="pace-stat-meta" :class="projectedDeltaClass">
+                {{ projectedDeltaHint }}
               </div>
+              <div v-else-if="projectionIncludesBills" class="pace-stat-meta">includes rent &amp; recurring bills</div>
             </div>
           </div>
+          <p
+            v-if="!app.expertMode && paceCompareAvg > 0 && displaySpend > 0"
+            class="pace-simple-status"
+            :class="deltaClass"
+          >
+            {{ simplePaceMessage }}
+          </p>
           <div v-if="app.expertMode && displaySpend > 0" class="pace-score-row">
             <span class="pace-score" :class="scoreClass">{{ displayScore }} · {{ displayScoreLabel }}</span>
           </div>
@@ -222,6 +230,11 @@ const props = defineProps<{
   latestBillingDate?: string | null;
   configuredCharges?: ConfiguredCharge[];
   partialStatementActive?: boolean;
+  /** Everyday portion from the partial export (matches SummaryMetrics). */
+  partialVariableSpend?: number | null;
+  partialTotalSpend?: number | null;
+  /** Pin demo pace to sample “today” (Jun 13 2026). */
+  referenceDate?: Date;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -234,7 +247,7 @@ const avgCycles = ref(loadPaceAvgCycles());
 const effectiveIncludeFixed = computed(() => app.expertMode && includeFixed.value);
 
 const cycleInfo = computed(() => {
-  const today = new Date();
+  const today = props.referenceDate ?? new Date();
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const cycle = getBillingCycle(norm, cycleDay);
   const start = cycleStartForDate(norm, cycleDay);
@@ -271,6 +284,15 @@ const manualSpend = computed((): number | null => {
   return n;
 });
 
+const statementSpendOverride = computed(() => {
+  if (!props.partialStatementActive) return undefined;
+  if (effectiveIncludeFixed.value && props.partialTotalSpend != null) {
+    return props.partialTotalSpend;
+  }
+  if (props.partialVariableSpend != null) return props.partialVariableSpend;
+  return undefined;
+});
+
 const pace = computed(() =>
   computePace(props.transactions, {
     cycleDay,
@@ -279,6 +301,9 @@ const pace = computed(() =>
     manualSpend: props.partialStatementActive ? null : manualSpend.value,
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
+    statementSpendOverride: statementSpendOverride.value,
+    statementVariableOverride: props.partialStatementActive ? props.partialVariableSpend : undefined,
+    today: props.referenceDate,
   }),
 );
 
@@ -317,6 +342,41 @@ const paceCompareAvg = computed(() => {
 });
 
 const projectedAtUsualPace = computed(() => pace.value?.projectedAtUsualPace ?? 0);
+
+const projectionIncludesBills = computed(
+  () => !effectiveIncludeFixed.value && (pace.value?.configuredChargesTotal ?? 0) > 0,
+);
+
+const projectedVsUsualDelta = computed(() => {
+  if (!paceCompareAvg.value || !displaySpend.value) return 0;
+  return roundMoney(projectedTotal.value - projectedAtUsualPace.value);
+});
+
+const projectedDeltaHint = computed(() => {
+  if (!paceCompareAvg.value) return "";
+  if (app.expertMode) {
+    return `usual pace ~${formatIls(projectedAtUsualPace.value)}`;
+  }
+  const d = projectedVsUsualDelta.value;
+  if (d === 0) return "On usual pace if you keep spending like this";
+  const abs = formatIls(Math.abs(d));
+  return d > 0 ? `${abs} over usual pace at month end` : `${abs} under usual pace at month end`;
+});
+
+const projectedDeltaClass = computed(() => {
+  const d = projectedVsUsualDelta.value;
+  if (d > 0) return "pace-delta-bad";
+  if (d < 0) return "pace-delta-good";
+  return "";
+});
+
+const simplePaceMessage = computed(() => {
+  const delta = pace.value?.vsAvgDelta ?? 0;
+  if (delta === 0) return "Spending matches your usual pace for this point in the cycle.";
+  const abs = formatIls(Math.abs(delta));
+  if (delta > 0) return `Overspending by ${abs} compared to your usual pace.`;
+  return `Saving ${abs} compared to your usual pace.`;
+});
 
 const deltaLabel = computed(() => {
   const delta = pace.value?.vsAvgDelta ?? 0;

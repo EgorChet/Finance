@@ -7,6 +7,7 @@ const TOKEN_KEY = "finance_auth_token";
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
   const isDemo = ref(!token.value);
+  const demoAsOf = ref<string | null>(null);
   const authRequired = ref(false);
   const loading = ref(false);
   const error = ref("");
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore("auth", () => {
       const res = await apiLogin(password);
       token.value = res.token;
       isDemo.value = false;
+      demoAsOf.value = null;
       localStorage.setItem(TOKEN_KEY, res.token);
     } catch {
       error.value = "Wrong password";
@@ -40,18 +42,21 @@ export const useAuthStore = defineStore("auth", () => {
   function enterDemo() {
     token.value = null;
     isDemo.value = true;
+    demoAsOf.value = null;
     localStorage.removeItem(TOKEN_KEY);
   }
 
   function logout() {
     token.value = null;
     isDemo.value = true;
+    demoAsOf.value = null;
     localStorage.removeItem(TOKEN_KEY);
   }
 
   return {
     token,
     isDemo,
+    demoAsOf,
     authRequired,
     loading,
     error,

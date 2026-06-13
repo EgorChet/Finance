@@ -12,8 +12,8 @@
     @dismiss="error = ''"
   />
   <template v-else-if="report">
-    <div v-if="auth.isDemo" class="demo-banner">
-      Demo mode — sample spending data. Sign in to see your real statements.
+    <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
+      <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <h2 class="overview-page-title">Spending overview</h2>
     <div v-if="partialCycleBanner" class="demo-banner partial-statement-banner">
@@ -28,6 +28,9 @@
       :latest-billing-date="latestFinalBillingDate"
       :configured-charges="configuredCharges"
       :partial-statement-active="partialStatementActive"
+      :partial-variable-spend="partialVariableSpend"
+      :partial-total-spend="partialTotalSpend"
+      :reference-date="refDate"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -49,7 +52,7 @@
             <div>
               <h3 class="category-drilldown-title">{{ HOME_LIVING }}</h3>
               <p class="category-drilldown-total">{{ formatIls(homeTotal) }}</p>
-              <p class="category-drilldown-meta">Tap a section to see merchants and charges</p>
+              <p class="category-drilldown-meta">Tap a section to see charges</p>
             </div>
             <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
           </div>
@@ -122,22 +125,28 @@
                 {{ selectedCategoryStats.sharePct }}% of total spending
                 · {{ selectedCategoryStats.count.toLocaleString() }}
                 {{ selectedCategoryStats.count === 1 ? "charge" : "charges" }}
-                · {{ selectedCategoryStats.merchantCount.toLocaleString() }}
-                {{ selectedCategoryStats.merchantCount === 1 ? "merchant" : "merchants" }}
               </p>
             </div>
             <button type="button" class="btn btn-ghost" @click="goBack">{{ backLabel }}</button>
           </div>
-          <MerchantBarChart :transactions="filteredTxs" :category="app.selectedCategory" />
+          <TransactionList
+            class="category-drilldown-txs"
+            :transactions="filteredTxs"
+            title="Charges"
+            :show-category="false"
+            :statement-billing="selectedMonth ? statementBilling : null"
+            :excludeable="!auth.isDemo"
+            :excluding-key="excludingKey"
+            @exclude="excludeTransaction"
+          />
         </div>
       </div>
     </div>
     <TransactionList
-      v-if="!isOtherView && !isHomeView && !isSubscriptionsView"
+      v-if="!app.selectedCategory && !isOtherView && !isHomeView && !isSubscriptionsView"
       :transactions="filteredTxs"
-      :title="transactionTitle"
-      :show-category="!app.selectedCategory"
-      :category-filter="categoryFilter || undefined"
+      title="All charges"
+      show-category
       :statement-billing="selectedMonth ? statementBilling : null"
       :excludeable="!auth.isDemo"
       :excluding-key="excludingKey"
@@ -217,7 +226,6 @@ import CategoryLegend from "../components/CategoryLegend.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
 import AppLoader from "../components/AppLoader.vue";
 import ErrorBanner from "../components/ErrorBanner.vue";
-import MerchantBarChart from "../components/MerchantBarChart.vue";
 import MonthPicker from "../components/MonthPicker.vue";
 import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
 import PaceCard from "../components/PaceCard.vue";
@@ -238,6 +246,7 @@ import {
   OTHER_BUCKET,
   rollupCategoriesForDisplay,
   rollupCategory,
+  splitFixedVariable,
 } from "../categories";
 import {
   buildCycleReport,
@@ -255,6 +264,7 @@ import {
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
+import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
 import { transactionKey } from "../utils/transactionKey";
 import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "../utils/subscriptionSections";
@@ -295,9 +305,11 @@ const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 
 const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.value));
 
+const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
+
 const displayMonths = computed(() => {
-  const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value);
-  const todayStart = cycleStartForDate(new Date(), cycleDay.value);
+  const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
+  const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
   return merged.map((m) => {
     if (m.inProgress || m.pendingStatement) {
       return { ...m, label: openCycleTabLabel(m.billing_date) };
@@ -330,7 +342,7 @@ const isLiveCycleSelected = computed(() => {
   if (isCycleMonthKey(selectedMonth.value!)) {
     return selectedOpenCycle.value?.inProgress === true;
   }
-  return start === cycleStartForDate(new Date(), cycleDay.value);
+  return start === cycleStartForDate(refDate.value, cycleDay.value);
 });
 
 const isPartialForOpenCycle = computed(() => {
@@ -444,13 +456,23 @@ const statementBilling = computed(() => {
   return null;
 });
 
-const paceTransactions = computed(() => paceReport.value?.transactions ?? []);
-
-const categoryFilter = computed(() => {
-  if (!app.selectedCategory || isOtherView.value || isHomeView.value || isSubscriptionsView.value) return null;
-  if (isSubscriptionsChild.value) return null;
-  return app.selectedCategory;
+const paceTransactions = computed(() => {
+  if (isPartialForOpenCycle.value && report.value) {
+    return report.value.transactions;
+  }
+  return paceReport.value?.transactions ?? [];
 });
+
+const partialVariableSpend = computed(() => {
+  if (!isPartialForOpenCycle.value || !report.value) return null;
+  return splitFixedVariable(report.value.by_category).variable;
+});
+
+const partialTotalSpend = computed(() => {
+  if (!isPartialForOpenCycle.value || !report.value) return null;
+  return report.value.total_spent;
+});
+
 
 const filteredTxs = computed((): Transaction[] => {
   if (!report.value) return [];
@@ -498,12 +520,10 @@ const selectedCategoryStats = computed(() => {
     : report.value.total_spent
       ? Math.round((total / report.value.total_spent) * 100)
       : 0;
-  const merchantCount = new Set(txs.map((t) => t.merchant_en || t.merchant_he)).size;
   return {
     total,
     count: txs.length,
     sharePct,
-    merchantCount,
     title: isHomeChild.value
       ? homeSubsectionLabel(app.selectedCategory)
       : app.selectedCategory,
@@ -514,14 +534,6 @@ const drillTitle = computed(() => {
   if (isOtherView.value) return formatIls(otherTotal.value);
   if (selectedCategoryStats.value) return formatIls(selectedCategoryStats.value.total);
   return "";
-});
-
-const transactionTitle = computed(() => {
-  if (app.selectedCategory && selectedCategoryStats.value) {
-    const label = selectedCategoryStats.value.title || app.selectedCategory;
-    return `Transactions · ${label} · ${formatIls(selectedCategoryStats.value.total)}`;
-  }
-  return "Transactions";
 });
 
 const backLabel = computed(() => {
@@ -760,6 +772,7 @@ async function loadMonths() {
     const token = auth.token || undefined;
     const m = await fetchMonths(demo, token);
     months.value = m.months;
+    if (demo && m.demo_as_of) auth.demoAsOf = m.demo_as_of;
     partialReportCache.value.clear();
     summary.value = m.summary
       .filter((row) => !m.months.some((month) => month.billing_date === row.billing_date && month.partial))
@@ -768,7 +781,7 @@ async function loadMonths() {
         month: billingCycleLabel(row.billing_date),
       }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
-    const initial = defaultOverviewMonthKey(m.months, cycleDay.value);
+    const initial = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     selectedMonth.value = initial;
     await refreshReport(initial);
   } catch (e) {

@@ -1,8 +1,10 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1>Finance Analyzer</h1>
-      <p>View your monthly Visa spending, or try the demo with sample data.</p>
+      <h1>Finance</h1>
+      <p class="login-lead">
+        Track Leumi Visa spending in English — categories, cycle pace, merchant rules, and monthly trends.
+      </p>
 
       <template v-if="auth.authRequired">
         <label>Password</label>
@@ -18,16 +20,22 @@
           <button class="btn btn-primary" :disabled="auth.loading" @click="doLogin">
             {{ auth.loading ? "Signing in…" : "Sign in — my spending" }}
           </button>
-          <button class="btn btn-ghost" @click="tryDemo">Try demo (sample data)</button>
+          <button class="btn btn-ghost" @click="tryDemo">Try demo first</button>
         </div>
       </template>
 
       <template v-else>
         <div class="login-actions">
-          <button class="btn btn-primary" @click="goApp">Open app</button>
-          <button class="btn btn-ghost" @click="tryDemo">View demo data</button>
+          <button class="btn btn-primary" @click="tryDemo">Explore demo</button>
+          <button class="btn btn-ghost" @click="goApp">Open app</button>
         </div>
       </template>
+
+      <ul class="login-features">
+        <li>Hebrew statements → English categories</li>
+        <li>Cycle pace vs your usual spending</li>
+        <li>Partial mid-month snapshots</li>
+      </ul>
     </div>
   </div>
 </template>

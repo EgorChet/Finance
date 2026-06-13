@@ -210,6 +210,10 @@ export function computePace(
     /** Most recent completed cycles to average; 0 = all available. */
     avgCycles?: number;
     configuredCharges?: ConfiguredCharge[];
+    /** When set (e.g. partial export totals), replaces cycle-bucket statement spend. */
+    statementSpendOverride?: number | null;
+    /** Everyday portion for projection when override total includes fixed categories. */
+    statementVariableOverride?: number | null;
   } = {},
 ): PaceResult | null {
   const cycleDay = options.cycleDay ?? 10;
@@ -221,12 +225,19 @@ export function computePace(
   const currentKey = cycleKey(cycle.start);
 
   const byCycle = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
+  const byCycleAll = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
 
   for (const tx of transactions) {
-    if (!includeTransaction(tx, includeFixed)) continue;
     const d = parseIsoDate(tx.date);
     const txCycle = getBillingCycle(d, cycleDay);
     const key = cycleKey(txCycle.start);
+    let bucketAll = byCycleAll.get(key);
+    if (!bucketAll) {
+      bucketAll = { start: txCycle.start, end: txCycle.end, txs: [] };
+      byCycleAll.set(key, bucketAll);
+    }
+    bucketAll.txs.push(tx);
+    if (!includeTransaction(tx, includeFixed)) continue;
     let bucket = byCycle.get(key);
     if (!bucket) {
       bucket = { start: txCycle.start, end: txCycle.end, txs: [] };
@@ -235,27 +246,29 @@ export function computePace(
     bucket.txs.push(tx);
   }
 
-  const historicalSnapshots: {
-    start: Date;
-    bucket: CycleBucket;
-    total: number;
-    fixed: number;
-  }[] = [];
-  for (const [key, bucket] of byCycle.entries()) {
-    if (key === currentKey) continue;
-    if (bucket.end >= todayNorm) continue;
-    const atDay = spendAtDay(bucket, cycle.dayIndex);
-    if (atDay.total > 0 || bucket.txs.length > 0) {
-      historicalSnapshots.push({
-        start: bucket.start,
-        bucket,
-        total: atDay.total,
-        fixed: atDay.fixed,
-      });
+  function historicalSnapshotsFrom(
+    buckets: Map<string, { start: Date; end: Date; txs: Transaction[] }>,
+  ) {
+    const rows: { start: Date; bucket: CycleBucket; total: number; fixed: number }[] = [];
+    for (const [key, bucket] of buckets.entries()) {
+      if (key === currentKey) continue;
+      if (bucket.end >= todayNorm) continue;
+      const atDay = spendAtDay(bucket, cycle.dayIndex);
+      if (atDay.total > 0 || bucket.txs.length > 0) {
+        rows.push({
+          start: bucket.start,
+          bucket,
+          total: atDay.total,
+          fixed: atDay.fixed,
+        });
+      }
     }
+    rows.sort((a, b) => b.start.getTime() - a.start.getTime());
+    return rows;
   }
 
-  historicalSnapshots.sort((a, b) => b.start.getTime() - a.start.getTime());
+  const historicalSnapshots = historicalSnapshotsFrom(byCycle);
+  const historicalSnapshotsAll = historicalSnapshotsFrom(byCycleAll);
   const cyclesAvailable = historicalSnapshots.length;
   const avgCycles = options.avgCycles ?? 0;
   const usedSnapshots =
@@ -286,6 +299,19 @@ export function computePace(
   }
   statementSpend = roundMoney(statementSpend);
 
+  const manualEveryday =
+    options.manualSpend != null && options.manualSpend >= 0
+      ? roundMoney(options.manualSpend)
+      : null;
+
+  if (
+    manualEveryday === null &&
+    options.statementSpendOverride != null &&
+    options.statementSpendOverride >= 0
+  ) {
+    statementSpend = roundMoney(options.statementSpendOverride);
+  }
+
   const cycleStartIso = isoDate(cycle.start);
   const configuredList = options.configuredCharges ?? [];
   const configuredCharges = configuredChargesForCycle(cycleStartIso, configuredList).map((c) => ({
@@ -294,16 +320,17 @@ export function computePace(
   }));
   const configuredChargesTotal = sumConfiguredCharges(cycleStartIso, configuredList);
 
-  const manualEveryday =
-    options.manualSpend != null && options.manualSpend >= 0
-      ? roundMoney(options.manualSpend)
-      : null;
-
   let currentSpend = statementSpend;
   if (manualEveryday !== null) {
     currentSpend = includeFixed
       ? roundMoney(manualEveryday + configuredChargesTotal)
       : manualEveryday;
+  } else if (
+    includeFixed &&
+    options.statementSpendOverride != null &&
+    configuredChargesTotal > 0
+  ) {
+    currentSpend = roundMoney(statementSpend + configuredChargesTotal);
   }
 
   const historicalAvgAtDay =
@@ -328,6 +355,19 @@ export function computePace(
   if (manualEveryday !== null) {
     currentVariableAtDay = manualEveryday;
     currentFixedAtDay = includeFixed ? configuredChargesTotal : 0;
+  } else if (options.statementVariableOverride != null) {
+    currentVariableAtDay = roundMoney(options.statementVariableOverride);
+    currentFixedAtDay = includeFixed
+      ? roundMoney(Math.max(0, statementSpend - currentVariableAtDay))
+      : 0;
+  } else if (options.statementSpendOverride != null) {
+    if (includeFixed) {
+      currentFixedAtDay = roundMoney(Math.max(0, statementSpend - configuredChargesTotal));
+      currentVariableAtDay = roundMoney(statementSpend - currentFixedAtDay);
+    } else {
+      currentVariableAtDay = statementSpend;
+      currentFixedAtDay = 0;
+    }
   } else if (currentBucket) {
     const atDay = spendAtDay(currentBucket, cycle.dayIndex);
     currentFixedAtDay = atDay.fixed;
@@ -347,20 +387,31 @@ export function computePace(
       ? roundMoney((currentVariableAtDay / cycle.dayIndex) * cycle.cycleLength)
       : currentVariableAtDay;
 
-  const projectedTotal = includeFixed
-    ? roundMoney(fullCycleFixed + projectedVariable)
-    : projectedVariable;
+  const usedFullSnapshots =
+    avgCycles > 0 ? historicalSnapshotsAll.slice(0, avgCycles) : historicalSnapshotsAll;
+  const historicalFullAvgFixedAtDay =
+    usedFullSnapshots.length > 0
+      ? roundMoney(
+          usedFullSnapshots.reduce((s, row) => s + row.fixed, 0) / usedFullSnapshots.length,
+        )
+      : 0;
+
+  function extrapolateToFullCycle(spendAtDay: number): number {
+    return cycle.dayIndex > 0
+      ? roundMoney((spendAtDay / cycle.dayIndex) * cycle.cycleLength)
+      : spendAtDay;
+  }
+
+  /** Recurring bills (rent, loans) still land this cycle — include in month-end projection. */
+  const projectionFixed = includeFixed
+    ? fullCycleFixed
+    : Math.max(configuredChargesTotal, historicalFullAvgFixedAtDay);
+
+  const projectedTotal = roundMoney(projectionFixed + projectedVariable);
 
   const projectedAtUsualPace = includeFixed
-    ? roundMoney(
-        historicalAvgFixedAtDay +
-          (cycle.dayIndex > 0
-            ? (historicalAvgVariableAtDay / cycle.dayIndex) * cycle.cycleLength
-            : historicalAvgVariableAtDay),
-      )
-    : cycle.dayIndex > 0
-      ? roundMoney((historicalAvgVariableAtDay / cycle.dayIndex) * cycle.cycleLength)
-      : historicalAvgVariableAtDay;
+    ? roundMoney(historicalAvgFixedAtDay + extrapolateToFullCycle(historicalAvgVariableAtDay))
+    : roundMoney(projectionFixed + extrapolateToFullCycle(historicalAvgVariableAtDay));
 
   let score = 50;
   if (compareAvg > 0 && currentSpend > 0) {
@@ -608,8 +659,12 @@ export function isCycleEnded(cycleStart: string, cycleDay: number, today = new D
   return norm > parseIsoDate(end);
 }
 
-export function mergeMonthsWithOpenCycles(months: MonthItem[], cycleDay: number): MonthItem[] {
-  const openItems = getOpenCycleMonthItems(cycleDay, months);
+export function mergeMonthsWithOpenCycles(
+  months: MonthItem[],
+  cycleDay: number,
+  today = new Date(),
+): MonthItem[] {
+  const openItems = getOpenCycleMonthItems(cycleDay, months, today);
   if (!openItems.length) return months;
 
   const toAdd = openItems.filter((open) => {
@@ -622,9 +677,13 @@ export function mergeMonthsWithOpenCycles(months: MonthItem[], cycleDay: number)
 }
 
 /** Which month pill to select on load — newest activity first, partial counts as latest. */
-export function defaultOverviewMonthKey(months: MonthItem[], cycleDay: number): string | null {
-  const merged = mergeMonthsWithOpenCycles(months, cycleDay);
-  const todayStart = cycleStartForDate(new Date(), cycleDay);
+export function defaultOverviewMonthKey(
+  months: MonthItem[],
+  cycleDay: number,
+  today = new Date(),
+): string | null {
+  const merged = mergeMonthsWithOpenCycles(months, cycleDay, today);
+  const todayStart = cycleStartForDate(today, cycleDay);
 
   if (cycleNeedsOpenTab(todayStart, cycleDay, months)) {
     const partial = findPartialMonth(months, todayStart, cycleDay);

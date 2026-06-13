@@ -1,5 +1,101 @@
 import type { MerchantRules, MonthCatalogItem, SpendingReport, Transaction } from "../types.js";
 
+/** Fixed “today” so demo always opens on the Jun 2026 partial cycle. */
+export const DEMO_AS_OF = "2026-06-13";
+
+const FINAL_BILLINGS = [
+  "2025-10-10",
+  "2025-11-10",
+  "2025-12-10",
+  "2026-01-10",
+  "2026-02-10",
+  "2026-03-10",
+  "2026-04-10",
+  "2026-05-10",
+  "2026-06-10",
+] as const;
+
+const PARTIAL_BILLING = "2026-07-10";
+
+const TARGET_TOTALS: Record<string, number> = {
+  "2025-10-10": 17_850,
+  "2025-11-10": 18_420,
+  "2025-12-10": 21_300,
+  "2026-01-10": 19_150,
+  "2026-02-10": 18_680,
+  "2026-03-10": 20_100,
+  "2026-04-10": 19_540,
+  "2026-05-10": 20_850,
+  "2026-06-10": 19_200,
+  [PARTIAL_BILLING]: 4_720,
+};
+
+type MerchantTemplate = {
+  he: string;
+  en: string;
+  cat: string;
+  typical: number;
+};
+
+const MERCHANT_POOL: MerchantTemplate[] = [
+  { he: "ארקפה רמת אביב", en: "Arcaffe", cat: "Coffee", typical: 52 },
+  { he: "ארקפה הרצליה", en: "Arcaffe", cat: "Coffee", typical: 48 },
+  { he: "סופר פארם", en: "Super Pharm", cat: "Groceries", typical: 165 },
+  { he: "טיב טעם", en: "Tiv Taam", cat: "Groceries", typical: 420 },
+  { he: "שופרסל שלי", en: "Shufersal", cat: "Groceries", typical: 380 },
+  { he: "WOLT", en: "Wolt", cat: "Eating out", typical: 145 },
+  { he: "מסעדת עלמה", en: "Alma Restaurant", cat: "Eating out", typical: 320 },
+  { he: "GETT", en: "Gett", cat: "Transport", typical: 78 },
+  { he: "פז YELLOW", en: "Paz", cat: "Transport", typical: 290 },
+  { he: "נטפליקס", en: "Netflix", cat: "Subscriptions", typical: 49.9 },
+  { he: "SPOTIFY", en: "Spotify", cat: "Subscriptions", typical: 29.9 },
+  { he: "HOT mobile", en: "Hot Mobile", cat: "Subscriptions", typical: 49 },
+  { he: "מכבי כושר", en: "Gym", cat: "Fitness", typical: 299 },
+  { he: "זארה", en: "Zara", cat: "Clothes", typical: 380 },
+  { he: "H&M", en: "H&M", cat: "Clothes", typical: 220 },
+  { he: "KSP", en: "KSP", cat: "Home & Furniture", typical: 540 },
+  { he: "IKEA", en: "IKEA", cat: "Home & Furniture", typical: 890 },
+  { he: "איקאה ק. ביאליק", en: "IKEA", cat: "Home & Furniture", typical: 650 },
+  { he: "חשמל", en: "Electricity", cat: "Housing", typical: 410 },
+  { he: "גוד פארם", en: "Good Pharm", cat: "Groceries", typical: 95 },
+  { he: "AMPM", en: "AM:PM", cat: "Groceries", typical: 38 },
+  { he: "סushi רמת אביב", en: "Sushi Shop", cat: "Eating out", typical: 185 },
+  { he: "OPENAI", en: "OpenAI", cat: "Subscriptions", typical: 75 },
+  { he: "CURSOR", en: "Cursor", cat: "Subscriptions", typical: 80 },
+  { he: "BIT העברה", en: "Bit transfer", cat: "Bit", typical: 200 },
+  { he: "דמי כרטיס", en: "Bank fees", cat: "Bank fees", typical: 18 },
+];
+
+function parseIso(dateStr: string): Date {
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(iso: string, days: number): string {
+  const d = parseIso(iso);
+  d.setDate(d.getDate() + days);
+  return isoDate(d);
+}
+
+function cycleStartForBilling(billingDate: string): string {
+  const [y, m] = billingDate.slice(0, 10).split("-").map(Number);
+  return isoDate(new Date(y, m - 2, 10));
+}
+
+function billingCycleLabel(billingDate: string): string {
+  const d = parseIso(billingDate);
+  d.setMonth(d.getMonth() - 1);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function tx(
   date: string,
   merchantHe: string,
@@ -8,12 +104,13 @@ function tx(
   category: string,
   month: string,
 ): Transaction {
+  const rounded = Math.round(amount * 100) / 100;
   return {
     date,
     merchant_he: merchantHe,
     merchant_en: merchantEn,
-    amount,
-    charge_amount: amount,
+    amount: rounded,
+    charge_amount: rounded,
     transaction_type_he: "רגילה",
     category_he: null,
     notes: null,
@@ -23,15 +120,79 @@ function tx(
   };
 }
 
-const DEMO_MONTHS = [
-  { key: "2025-11-01", label: "Nov 2025" },
-  { key: "2025-12-01", label: "Dec 2025" },
-  { key: "2026-01-01", label: "Jan 2026" },
-  { key: "2026-02-01", label: "Feb 2026" },
-];
+function seededAmount(billingKey: string, index: number, typical: number): number {
+  const seed = billingKey.split("").reduce((s, c) => s + c.charCodeAt(0), 0) + index * 17;
+  const jitter = 0.72 + (seed % 45) / 100;
+  return Math.round(typical * jitter * 100) / 100;
+}
 
-function buildMonthReport(monthKey: string, label: string, txs: Transaction[]): SpendingReport {
-  const total = txs.reduce((s, t) => s + t.charge_amount, 0);
+function generateCycleTransactions(
+  billingKey: string,
+  targetTotal: number,
+  maxDayOffset = 28,
+): Transaction[] {
+  const cycleStart = cycleStartForBilling(billingKey);
+  const label = billingCycleLabel(billingKey);
+  const txs: Transaction[] = [];
+  let total = 0;
+  let day = 0;
+  let i = 0;
+
+  while (total < targetTotal * 0.92 && day <= maxDayOffset && i < 120) {
+    const m = MERCHANT_POOL[i % MERCHANT_POOL.length];
+    let amount = seededAmount(billingKey, i, m.typical);
+    const remaining = targetTotal - total;
+    if (amount > remaining) amount = Math.max(18, Math.round(remaining * 100) / 100);
+    if (amount < 12) break;
+
+    txs.push(tx(addDays(cycleStart, day), m.he, m.en, amount, m.cat, label));
+    total += amount;
+    day += 1 + (i % 2);
+    i += 1;
+  }
+
+  if (total < targetTotal && txs.length) {
+    const last = txs[txs.length - 1]!;
+    const bump = Math.round((targetTotal - total) * 100) / 100;
+    last.amount = Math.round((last.amount + bump) * 100) / 100;
+    last.charge_amount = last.amount;
+  }
+
+  return txs;
+}
+
+function topMerchantsFromTxs(txs: Transaction[]): SpendingReport["top_merchants"] {
+  const map = new Map<string, { merchant_he: string; category_en: string; total: number; count: number }>();
+  for (const t of txs) {
+    const key = t.merchant_en || t.merchant_he;
+    const cur = map.get(key) || {
+      merchant_he: t.merchant_he,
+      category_en: t.category_en,
+      total: 0,
+      count: 0,
+    };
+    cur.total += t.charge_amount;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+  return [...map.entries()]
+    .map(([merchant_en, v]) => ({
+      merchant_en,
+      merchant_he: v.merchant_he,
+      category_en: v.category_en,
+      total: Math.round(v.total * 100) / 100,
+      count: v.count,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 12);
+}
+
+function buildMonthReport(
+  billingKey: string,
+  txs: Transaction[],
+  options: { partial?: boolean } = {},
+): SpendingReport {
+  const total = Math.round(txs.reduce((s, t) => s + t.charge_amount, 0) * 100) / 100;
   const byCat = new Map<string, { total: number; count: number }>();
   for (const t of txs) {
     const c = byCat.get(t.category_en) || { total: 0, count: 0 };
@@ -42,87 +203,67 @@ function buildMonthReport(monthKey: string, label: string, txs: Transaction[]): 
   const dates = txs.map((t) => t.date).sort();
   return {
     metadata: {
-      billing_date: monthKey,
-      source_file: `demo-${monthKey.slice(0, 7)}.xlsx`,
+      billing_date: billingKey,
+      source_file: options.partial
+        ? `demo-partial-${billingKey.slice(0, 7)}.xlsx`
+        : `demo-${billingKey.slice(0, 7)}.xlsx`,
       demo: true,
+      provisional: options.partial === true,
     },
     total_spent: total,
     transaction_count: txs.length,
-    date_range: [dates[0], dates[dates.length - 1]],
+    date_range: [dates[0] ?? billingKey, dates[dates.length - 1] ?? billingKey],
     by_category: [...byCat.entries()]
       .map(([category_en, v]) => ({
         category_en,
         category_he: null,
-        total: v.total,
+        total: Math.round(v.total * 100) / 100,
         count: v.count,
-        share_pct: (v.total / total) * 100,
+        share_pct: total ? (v.total / total) * 100 : 0,
       }))
       .sort((a, b) => b.total - a.total),
-    top_merchants: [],
+    top_merchants: topMerchantsFromTxs(txs),
     unknown_merchants: [],
-    transactions: txs,
+    transactions: txs.sort((a, b) => b.date.localeCompare(a.date)),
   };
 }
 
-const novTxs = [
-  tx("2025-11-05", "סופר יוחננוף", "Yochananof", 420, "Groceries", "Nov 2025"),
-  tx("2025-11-08", "ארקפה", "Arcaffe", 58, "Coffee", "Nov 2025"),
-  tx("2025-11-10", "GETT", "Gett", 89, "Transport", "Nov 2025"),
-  tx("2025-11-12", "נטפליקס", "Netflix", 49.9, "Subscriptions", "Nov 2025"),
-  tx("2025-11-15", "זארה", "Zara", 310, "Clothes", "Nov 2025"),
-  tx("2025-11-18", "WOLT", "Wolt", 125, "Eating out", "Nov 2025"),
-  tx("2025-11-22", "פז", "Paz", 280, "Transport", "Nov 2025"),
-];
+const monthReports = new Map<string, SpendingReport>();
 
-const decTxs = [
-  tx("2025-12-03", "שופרסל", "Shufersal", 512, "Groceries", "Dec 2025"),
-  tx("2025-12-07", "סטארבקס", "Starbucks", 42, "Coffee", "Dec 2025"),
-  tx("2025-12-10", "אמזון", "Amazon", 189, "Miscellaneous", "Dec 2025"),
-  tx("2025-12-14", "ספotify", "Spotify", 29.9, "Subscriptions", "Dec 2025"),
-  tx("2025-12-20", "מסעדת לולה", "Lola Restaurant", 340, "Eating out", "Dec 2025"),
-  tx("2025-12-24", "KSP", "KSP", 890, "Electronics & computers", "Dec 2025"),
-];
+for (const billing of FINAL_BILLINGS) {
+  const txs = generateCycleTransactions(billing, TARGET_TOTALS[billing] ?? 19_000);
+  monthReports.set(billing, buildMonthReport(billing, txs));
+}
 
-const janTxs = [
-  tx("2026-01-05", "רמי לוי", "Rami Levy", 385, "Groceries", "Jan 2026"),
-  tx("2026-01-09", "ארקפה", "Arcaffe", 62, "Coffee", "Jan 2026"),
-  tx("2026-01-12", "UBER", "Uber", 76, "Transport", "Jan 2026"),
-  tx("2026-01-18", "חשמל", "Electric Co", 420, "Housing", "Jan 2026"),
-  tx("2026-01-25", "IKEA", "IKEA", 650, "Home & Furniture", "Jan 2026"),
-];
-
-const febTxs = [
-  tx("2026-02-02", "סופר יוחננוף", "Yochananof", 445, "Groceries", "Feb 2026"),
-  tx("2026-02-08", "WOLT", "Wolt", 98, "Eating out", "Feb 2026"),
-  tx("2026-02-14", "זארה", "Zara", 275, "Clothes", "Feb 2026"),
-  tx("2026-02-20", "נטפליקס", "Netflix", 49.9, "Subscriptions", "Feb 2026"),
-  tx("2026-02-28", "פז", "Paz", 310, "Transport", "Feb 2026"),
-];
-
-const monthReports = new Map<string, SpendingReport>([
-  ["2025-11-01", buildMonthReport("2025-11-01", "Nov 2025", novTxs)],
-  ["2025-12-01", buildMonthReport("2025-12-01", "Dec 2025", decTxs)],
-  ["2026-01-01", buildMonthReport("2026-01-01", "Jan 2026", janTxs)],
-  ["2026-02-01", buildMonthReport("2026-02-01", "Feb 2026", febTxs)],
-]);
+const partialTxs = generateCycleTransactions(PARTIAL_BILLING, TARGET_TOTALS[PARTIAL_BILLING], 3);
+monthReports.set(PARTIAL_BILLING, buildMonthReport(PARTIAL_BILLING, partialTxs, { partial: true }));
 
 export function demoMonthCatalog(): MonthCatalogItem[] {
-  return DEMO_MONTHS.map((m) => ({
-    key: m.key,
-    label: m.label,
-    billing_date: m.key,
+  const finals: MonthCatalogItem[] = FINAL_BILLINGS.map((billing) => ({
+    key: billing,
+    label: billingCycleLabel(billing),
+    billing_date: billing,
+    partial: false,
   }));
+  finals.push({
+    key: PARTIAL_BILLING,
+    label: `${billingCycleLabel(PARTIAL_BILLING)} · partial`,
+    billing_date: PARTIAL_BILLING,
+    partial: true,
+  });
+  return finals;
 }
 
 export function demoSummaryRows() {
-  return DEMO_MONTHS.map((m) => {
-    const r = monthReports.get(m.key)!;
+  return [...FINAL_BILLINGS, PARTIAL_BILLING].map((billing) => {
+    const r = monthReports.get(billing)!;
     return {
-      month: m.label,
-      billing_date: m.key,
+      month: billing === PARTIAL_BILLING ? billingCycleLabel(billing) : billingCycleLabel(billing),
+      billing_date: billing,
       total: r.total_spent,
       transactions: r.transaction_count,
-      source_file: r.metadata.source_file,
+      source_file: String(r.metadata.source_file),
+      partial: billing === PARTIAL_BILLING,
     };
   });
 }
@@ -131,8 +272,8 @@ export function getDemoReport(month?: string): SpendingReport {
   if (month && monthReports.has(month)) {
     return monthReports.get(month)!;
   }
-  const allTxs = [...novTxs, ...decTxs, ...janTxs, ...febTxs];
-  const total = allTxs.reduce((s, t) => s + t.charge_amount, 0);
+  const allTxs = [...monthReports.values()].flatMap((r) => r.transactions);
+  const total = Math.round(allTxs.reduce((s, t) => s + t.charge_amount, 0) * 100) / 100;
   const byCat = new Map<string, { total: number; count: number }>();
   for (const t of allTxs) {
     const c = byCat.get(t.category_en) || { total: 0, count: 0 };
@@ -141,11 +282,12 @@ export function getDemoReport(month?: string): SpendingReport {
     byCat.set(t.category_en, c);
   }
   const dates = allTxs.map((t) => t.date).sort();
+  const billingDates = [...FINAL_BILLINGS, PARTIAL_BILLING];
   return {
     metadata: {
-      combined_label: "Nov 2025 – Feb 2026 (4 months)",
-      combined_billing_dates: DEMO_MONTHS.map((m) => m.key),
-      statement_count: 4,
+      combined_label: `${billingCycleLabel(FINAL_BILLINGS[0])} – ${billingCycleLabel(PARTIAL_BILLING)}`,
+      combined_billing_dates: billingDates,
+      statement_count: billingDates.length,
       demo: true,
     },
     total_spent: total,
@@ -155,21 +297,66 @@ export function getDemoReport(month?: string): SpendingReport {
       .map(([category_en, v]) => ({
         category_en,
         category_he: null,
-        total: v.total,
+        total: Math.round(v.total * 100) / 100,
         count: v.count,
-        share_pct: (v.total / total) * 100,
+        share_pct: total ? (v.total / total) * 100 : 0,
       }))
       .sort((a, b) => b.total - a.total),
-    top_merchants: [],
+    top_merchants: topMerchantsFromTxs(allTxs).slice(0, 15),
     unknown_merchants: [],
     transactions: allTxs.sort((a, b) => b.date.localeCompare(a.date)),
   };
 }
 
+export function demoFixedCharges() {
+  return {
+    charges: [
+      {
+        id: "rent",
+        name_en: "Rent",
+        name_he: "שכירות",
+        amount: 5200,
+        category_en: "Housing",
+        from_month: "2024-01",
+        through_month: "2035-12",
+      },
+      {
+        id: "car-loan",
+        name_en: "Car loan",
+        name_he: "הלוואת רכב",
+        amount: 980,
+        category_en: "Housing",
+        from_month: "2023-06",
+        through_month: "2028-06",
+      },
+    ],
+  };
+}
+
 export function demoRules(): MerchantRules {
   return {
-    "ארקפה": { english: "Arcaffe", category: "Coffee" },
-    "סופר יוחננוף": { english: "Yochananof", category: "Groceries" },
+    "ארקפה רמת אביב": { english: "Arcaffe", category: "Coffee" },
+    "ארקפה הרצליה": { english: "Arcaffe", category: "Coffee" },
+    "סופר פארם": { english: "Super Pharm", category: "Groceries" },
+    "טיב טעם": { english: "Tiv Taam", category: "Groceries" },
+    "שופרסל שלי": { english: "Shufersal", category: "Groceries" },
+    "גוד פארם": { english: "Good Pharm", category: "Groceries" },
+    WOLT: { english: "Wolt", category: "Eating out" },
+    "מסעדת עלמה": { english: "Alma Restaurant", category: "Eating out" },
+    GETT: { english: "Gett", category: "Transport" },
+    "פז YELLOW": { english: "Paz", category: "Transport" },
+    "נטפליקס": { english: "Netflix", category: "Subscriptions" },
+    SPOTIFY: { english: "Spotify", category: "Subscriptions" },
+    "HOT mobile": { english: "Hot Mobile", category: "Subscriptions" },
+    "מכבי כושר": { english: "Gym", category: "Fitness" },
+    "זארה": { english: "Zara", category: "Clothes" },
+    "H&M": { english: "H&M", category: "Clothes" },
+    KSP: { english: "KSP", category: "Home & Furniture" },
+    IKEA: { english: "IKEA", category: "Home & Furniture" },
+    "איקאה ק. ביאליק": { english: "IKEA", category: "Home & Furniture" },
+    "חשמל": { english: "Electricity", category: "Housing" },
+    OPENAI: { english: "OpenAI", category: "Subscriptions" },
+    CURSOR: { english: "Cursor", category: "Subscriptions" },
   };
 }
 
@@ -177,14 +364,43 @@ export function demoReviewQueue() {
   return {
     queue: [
       {
-        key: "demo|2026-02-28|חנות חדשה|120.00",
-        transaction: tx("2026-02-28", "חנות חדשה", "", 120, "Uncategorized", "Feb 2026"),
+        key: "demo|2026-06-12|מספרה חדשה|180.00",
+        transaction: tx("2026-06-12", "מספרה חדשה", "", 180, "Uncategorized", "Jun 2026"),
+        display_english: "",
+        occurrence_count: 2,
+      },
+      {
+        key: "demo|2026-06-11|CHARGES.COM|42.00",
+        transaction: tx("2026-06-11", "CHARGES.COM", "", 42, "Uncategorized", "Jun 2026"),
+        display_english: "",
+        occurrence_count: 1,
+      },
+      {
+        key: "demo|2026-05-28|קפה לא מזוהה|38.00",
+        transaction: tx("2026-05-28", "קפה לא מזוהה", "", 38, "Uncategorized", "May 2026"),
         display_english: "",
         occurrence_count: 1,
       },
     ],
-    total: 1,
+    total: 3,
     reviewed_count: 0,
+  };
+}
+
+export function demoExclusions() {
+  return {
+    entries: [
+      {
+        key: "2026-05-15|OPENAI|75.00",
+        date: "2026-05-15",
+        merchant_he: "OPENAI",
+        merchant_en: "OpenAI",
+        amount: 75,
+        category_en: "Subscriptions",
+        reason: "Work account — reimbursed",
+      },
+    ],
+    total: 1,
   };
 }
 
@@ -200,5 +416,5 @@ export function demoMerchants() {
       });
     }
   }
-  return [...seen.values()];
+  return [...seen.values()].sort((a, b) => a.English.localeCompare(b.English));
 }
