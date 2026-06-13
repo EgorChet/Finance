@@ -2,7 +2,7 @@ import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
 import type { ConfiguredCharge } from "./fixedCharges";
 import { configuredChargesForCycle, sumConfiguredCharges } from "./fixedCharges";
-import { billingCycleLabel, roundMoney } from "./format";
+import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
 
 export interface BillingCycle {
   start: Date;
@@ -492,7 +492,7 @@ export function getOpenCycleMonthItems(
     .sort((a, b) => b.localeCompare(a))
     .map((s) => ({
       key: `${CYCLE_MONTH_PREFIX}${s}`,
-      label: billingCycleLabel(s),
+      label: openCycleTabLabel(s),
       billing_date: s,
       inProgress: s === currentStart,
       pendingStatement: s !== currentStart,
@@ -507,7 +507,7 @@ export function getCurrentCycleMonthItem(
   const start = cycleStartForDate(norm, cycleDay);
   return {
     key: `${CYCLE_MONTH_PREFIX}${start}`,
-    label: billingCycleLabel(start),
+    label: openCycleTabLabel(start),
     billing_date: start,
     inProgress: true,
   };
@@ -587,7 +587,7 @@ export function buildCycleReport(
   const { end: cycleEndIso } = getCycleRangeForStart(cycleStart, 10);
   const cycleEnded = todayNorm > parseIsoDate(cycleEndIso);
   const txs = transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed);
-  const label = billingCycleLabel(cycleStart);
+  const label = openCycleTabLabel(cycleStart);
 
   const catTotals = new Map<string, { total: number; count: number; he: string | null }>();
   let statementTotal = 0;

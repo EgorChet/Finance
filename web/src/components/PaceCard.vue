@@ -1,12 +1,12 @@
 <template>
   <div class="pace-card">
     <header class="pace-header">
-      <div>
+      <div class="pace-header-title">
         <h3 class="pace-card-title">
           Cycle pace · day {{ cycleInfo.dayIndex }} of {{ cycleInfo.cycleLength }}
         </h3>
         <p class="pace-card-sub">
-          {{ billingCycleLabel(cycleInfo.cycleStart) }} · {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
+          {{ openCycleTabLabel(cycleInfo.cycleStart) }} · {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
         </p>
       </div>
       <div class="pace-progress-wrap">
@@ -15,67 +15,79 @@
         </div>
         <span class="pace-progress-label">{{ progressPct }}% through cycle</span>
       </div>
+      <div class="pace-header-controls">
+        <div class="pace-toolbar-controls">
+          <label class="pace-toggle">
+            <input v-model="includeFixed" type="checkbox" class="pace-toggle-input" @change="persistFixed" />
+            <span class="pace-toggle-track" aria-hidden="true" />
+            <span class="pace-toggle-label">Include rent &amp; loans</span>
+          </label>
+          <label class="pace-toolbar-field">
+            <span class="pace-toolbar-field-label">Compare to</span>
+            <select v-model.number="avgCycles" class="pace-toolbar-select" @change="persistAvgCycles">
+              <option :value="3">Last 3 cycles</option>
+              <option :value="6">Last 6 cycles</option>
+              <option :value="12">Last 12 cycles</option>
+              <option :value="0">All past cycles</option>
+            </select>
+          </label>
+        </div>
+        <p class="pace-toolbar-hint">{{ compareToHint }}</p>
+      </div>
     </header>
 
-    <div class="pace-toolbar">
-      <label class="pace-toggle">
-        <input v-model="includeFixed" type="checkbox" class="pace-toggle-input" @change="persistFixed" />
-        <span class="pace-toggle-track" aria-hidden="true" />
-        <span class="pace-toggle-label">Include rent &amp; loans in total</span>
-      </label>
-      <label class="pace-toolbar-field">
-        <span class="pace-toolbar-field-label">Compare to</span>
-        <select v-model.number="avgCycles" class="pace-toolbar-select" @change="persistAvgCycles">
-          <option :value="3">Last 3 cycles</option>
-          <option :value="6">Last 6 cycles</option>
-          <option :value="12">Last 12 cycles</option>
-          <option :value="0">All past cycles</option>
-        </select>
-      </label>
-      <p class="pace-toolbar-hint">{{ compareToHint }}</p>
-    </div>
-
     <div class="pace-layout">
-      <section class="pace-panel pace-panel-input pace-panel-wide">
-        <label class="pace-manual-label" for="pace-manual-input">
-          Everyday spending so far (₪)
-        </label>
-        <input
-          id="pace-manual-input"
-          v-model="manualInput"
-          class="input pace-manual-input"
-          type="text"
-          inputmode="decimal"
-          placeholder="e.g. 2000"
-          @blur="persistManual"
-        />
-        <p class="pace-manual-hint">
-          <template v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
-            {{ formatIls(pace.manualEverydaySpend) }} everyday
-            + {{ formatIls(pace.configuredChargesTotal) }} bills
-            = <strong>{{ formatIls(pace.currentSpend) }}</strong> total
-          </template>
-          <template v-else-if="pace && pace.manualEverydaySpend !== null">
-            Using your entry as total spending for this cycle.
-          </template>
-          <template v-else-if="pace && pace.statementSpend > 0">
-            From statements: {{ formatIls(pace.statementSpend) }}
-          </template>
-          <template v-else-if="includeFixed && expectedConfiguredTotal > 0">
-            Enter card spending only — we'll add {{ formatIls(expectedConfiguredTotal) }} in rent &amp; loans automatically.
-          </template>
-          <template v-else>
-            Enter your spending from the bank app for this cycle.
-          </template>
-        </p>
-        <ul
-          v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredCharges.length"
-          class="pace-configured-list"
-        >
-          <li v-for="charge in pace.configuredCharges" :key="charge.name_en">
-            + {{ formatIls(charge.amount) }} {{ charge.name_en }}
-          </li>
-        </ul>
+      <section class="pace-panel pace-panel-entry pace-panel-wide">
+        <div class="pace-entry-grid">
+          <div class="pace-entry-main">
+            <label class="pace-manual-label" for="pace-manual-input">
+              Everyday spending so far (₪)
+            </label>
+            <input
+              id="pace-manual-input"
+              v-model="manualInput"
+              class="input pace-manual-input"
+              type="text"
+              inputmode="decimal"
+              placeholder="e.g. 2000"
+              @blur="persistManual"
+            />
+            <p class="pace-manual-hint">
+              <template v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
+                {{ formatIls(pace.manualEverydaySpend) }} everyday
+                + {{ formatIls(pace.configuredChargesTotal) }} bills
+                = <strong>{{ formatIls(pace.currentSpend) }}</strong> total
+              </template>
+              <template v-else-if="pace && pace.manualEverydaySpend !== null">
+                Using your entry as total spending for this cycle.
+              </template>
+              <template v-else-if="pace && pace.statementSpend > 0">
+                From statements: {{ formatIls(pace.statementSpend) }}
+              </template>
+              <template v-else-if="includeFixed && expectedConfiguredTotal > 0">
+                Card spending only — we add rent &amp; loans automatically.
+              </template>
+              <template v-else>
+                Enter your spending from the bank app for this cycle.
+              </template>
+            </p>
+          </div>
+          <div
+            v-if="includeFixed && (pace?.configuredCharges.length || expectedConfiguredTotal > 0)"
+            class="pace-entry-bills"
+          >
+            <p class="pace-entry-bills-title">
+              Bills added automatically
+              <span class="pace-entry-bills-total">{{ formatIls(pace?.configuredChargesTotal ?? expectedConfiguredTotal) }}</span>
+            </p>
+            <ul class="pace-configured-grid">
+              <li v-for="charge in (pace?.configuredCharges.length ? pace.configuredCharges : configuredChargesPreview)" :key="charge.name_en">
+                <span>{{ charge.name_en }}</span>
+                <span>{{ formatIls(charge.amount) }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <template v-if="pace">
@@ -177,9 +189,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
-import { billingCycleLabel, formatIls, roundMoney } from "../utils/format";
+import { formatIls, openCycleTabLabel, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
-import { sumConfiguredCharges } from "../utils/fixedCharges";
+import { configuredChargesForCycle, sumConfiguredCharges } from "../utils/fixedCharges";
 import {
   computePace,
   cycleStartForDate,
@@ -259,6 +271,13 @@ const pace = computed(() =>
 
 const expectedConfiguredTotal = computed(() =>
   sumConfiguredCharges(cycleStart.value, props.configuredCharges ?? []),
+);
+
+const configuredChargesPreview = computed(() =>
+  configuredChargesForCycle(cycleStart.value, props.configuredCharges ?? []).map((c) => ({
+    name_en: c.name_en,
+    amount: c.amount,
+  })),
 );
 
 const avgCyclesLabel = computed(() => {

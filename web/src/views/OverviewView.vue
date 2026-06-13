@@ -165,7 +165,7 @@ import {
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
-import { billingCycleLabel, formatIls, roundMoney } from "../utils/format";
+import { billingCycleLabel, formatIls, openCycleTabLabel, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = SPENDING_CATEGORIES;
@@ -203,7 +203,9 @@ const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, latestBillingDate.value);
   return merged.map((m) => ({
     ...m,
-    label: billingCycleLabel(m.billing_date),
+    label: m.inProgress || m.pendingStatement
+      ? openCycleTabLabel(m.billing_date)
+      : billingCycleLabel(m.billing_date),
   }));
 });
 

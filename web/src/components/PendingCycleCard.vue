@@ -3,7 +3,8 @@
     <h3 class="pace-card-title">{{ cycleLabel }} · awaiting statement</h3>
     <p class="pace-card-sub">{{ cycleRange }}</p>
     <p class="pending-cycle-note">
-      This cycle is finished but the Visa statement isn't uploaded yet. Enter your final total from the bank app.
+      The 10th has passed — this cycle is closed but the Visa statement isn't uploaded yet.
+      You can enter your overall spend manually below; uploading the real statement is better for categories and merchants.
     </p>
     <label class="pace-manual-label" for="pending-cycle-input">Total spent this cycle (₪)</label>
     <input
@@ -23,7 +24,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { billingCycleLabel, formatIls } from "../utils/format";
+import { formatIls, openCycleTabLabel } from "../utils/format";
 import {
   getCycleRangeForStart,
   loadManualCycleSpend,
@@ -55,7 +56,7 @@ const savedTotal = computed((): number | null => {
   return n;
 });
 
-const cycleLabel = computed(() => billingCycleLabel(props.cycleStart));
+const cycleLabel = computed(() => openCycleTabLabel(props.cycleStart));
 
 const cycleRange = computed(() => {
   const { start, end } = getCycleRangeForStart(props.cycleStart, CYCLE_DAY);

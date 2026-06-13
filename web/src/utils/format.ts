@@ -27,8 +27,16 @@ export function monthLabelFromIso(dateStr: string): string {
 }
 
 /**
- * User-facing billing cycle name (10th–10th).
- * Statement / cycle keyed on the 10th is labeled as the previous month
+ * Tab label for a live or pending open cycle (no statement yet).
+ * Uses the calendar month the cycle starts in (e.g. 10 Jun → "Jun 2026").
+ */
+export function openCycleTabLabel(cycleStartIso: string): string {
+  return monthLabelFromIso(cycleStartIso);
+}
+
+/**
+ * User-facing billing cycle name for uploaded statements (10th–10th).
+ * Statement billing date is labeled as the previous month
  * (e.g. 10 Apr–9 May → "Apr 2026", statement dated 10 May → "Apr 2026").
  */
 export function billingCycleLabel(isoDateStr: string): string {
@@ -53,13 +61,13 @@ export function formatTransactionDate(dateStr: string): string {
 export function formatBillingPeriod(metadata: Record<string, unknown>): string {
   if (metadata.pending_statement) {
     const billing = metadata.billing_date as string | undefined;
-    if (billing) return `${billingCycleLabel(billing)} · awaiting statement`;
+    if (billing) return `${openCycleTabLabel(billing)} · awaiting statement`;
   }
   if (metadata.in_progress) {
     const label = metadata.month_label as string | undefined;
     const billing = metadata.billing_date as string | undefined;
     if (label && billing) return `${label} · in progress`;
-    if (billing) return `${billingCycleLabel(billing)} · in progress`;
+    if (billing) return `${openCycleTabLabel(billing)} · in progress`;
   }
   const combined = metadata.combined_billing_dates as string[] | undefined;
   if (combined?.length) {
