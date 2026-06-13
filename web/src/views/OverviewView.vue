@@ -437,8 +437,16 @@ async function afterExclusionChange() {
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
+function confirmExclude(label: string): boolean {
+  return window.confirm(
+    `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
+  );
+}
+
 async function excludeTransaction(tx: Transaction) {
   if (auth.isDemo) return;
+  const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
+  if (!confirmExclude(label)) return;
   const key = transactionKey(tx);
   excludingKey.value = key;
   searchHint.value = "";
@@ -456,6 +464,8 @@ async function excludeTransaction(tx: Transaction) {
 
 async function excludeFromSearch(row: SearchMerchantRow) {
   if (auth.isDemo) return;
+  const label = `${formatIls(row.amount)} · ${row.english || row.hebrew}`;
+  if (!confirmExclude(label)) return;
   excludingKey.value = row.key;
   searchHint.value = "";
   try {

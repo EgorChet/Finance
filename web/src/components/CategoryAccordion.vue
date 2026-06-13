@@ -160,7 +160,8 @@ import {
   groupCategoriesForPie,
   HOME_LIVING,
   homeSubsectionLabel,
-  isHomeSubsection,
+  homeSubsectionKey,
+  homeSubsectionTotals,
   isOtherBucketLabel,
   OTHER_BUCKET,
   otherBucketLabel,
@@ -189,9 +190,9 @@ const colors = CHART_COLORS;
 const pieGroup = computed(() => groupCategoriesForPie(props.categories));
 
 const homeSubsections = computed(() =>
-  props.categories
-    .filter((c) => isHomeSubsection(c.category_en) && c.category_en !== HOME_LIVING)
-    .sort((a, b) => b.total - a.total),
+  homeSubsectionTotals(
+    props.transactions.filter((t) => rollupCategory(t.category_en) === HOME_LIVING),
+  ),
 );
 
 const homeTotal = computed(() => roundMoney(homeSubsections.value.reduce((s, c) => s + c.total, 0)));
@@ -281,7 +282,7 @@ function txsForLeaf(category: string): Transaction[] {
 }
 
 function txsForHomeSub(categoryEn: string): Transaction[] {
-  return props.transactions.filter((t) => t.category_en === categoryEn);
+  return props.transactions.filter((t) => homeSubsectionKey(t.category_en) === categoryEn);
 }
 
 function txsForSubscriptionSub(name: string): Transaction[] {

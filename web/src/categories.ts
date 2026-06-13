@@ -85,6 +85,29 @@ export function homeSubsectionLabel(category: string): string {
   return HOME_SUBSECTION_LABELS[category] || category;
 }
 
+/** Canonical key when grouping home subsections (merges legacy aliases). */
+export function homeSubsectionKey(category: string): string {
+  const cat = category.trim() || "Uncategorized";
+  if (cat === "Home & Electronics") return HOME_LIVING;
+  return cat;
+}
+
+export function homeSubsectionTotals(
+  transactions: { category_en: string; charge_amount: number }[],
+): { category_en: string; total: number }[] {
+  const map = new Map<string, number>();
+  for (const tx of transactions) {
+    const cat = tx.category_en?.trim() || "Uncategorized";
+    if (!isHomeSubsection(cat)) continue;
+    const key = homeSubsectionKey(cat);
+    map.set(key, (map.get(key) || 0) + tx.charge_amount);
+  }
+  return [...map.entries()]
+    .map(([category_en, total]) => ({ category_en, total: Math.round(total * 100) / 100 }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
 export function rollupCategoriesForDisplay(
   categories: { category_en: string; total: number; count?: number; share_pct?: number; category_he?: string | null }[],
 ): { category_en: string; total: number; count: number; share_pct: number; category_he: string | null }[] {
