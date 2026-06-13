@@ -10,7 +10,7 @@
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics :report="report" @select-category="onCategory" />
     <PaceCard
-      v-if="isCurrentCycleSelected && paceTransactions.length"
+      v-if="isCurrentCycleSelected"
       :transactions="paceTransactions"
       :latest-billing-date="latestBillingDate"
       @settings-change="onPaceSettingsChange"

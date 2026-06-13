@@ -164,8 +164,6 @@ export function computePace(
     ? parseIsoDate(latestBilling) < cycle.start
     : false;
 
-  if (historicalAtDay.length === 0 && currentSpend === 0 && manual === null) return null;
-
   return {
     currentSpend,
     statementSpend,

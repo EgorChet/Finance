@@ -1,10 +1,10 @@
 <template>
-  <div v-if="pace" class="pace-card">
+  <div class="pace-card">
     <h3 class="pace-card-title">
-      Cycle pace · day {{ pace.dayIndex }} of {{ pace.cycleLength }}
+      Cycle pace · day {{ cycleInfo.dayIndex }} of {{ cycleInfo.cycleLength }}
     </h3>
     <p class="pace-card-sub">
-      {{ formatCycleRange(pace.cycleStart, pace.cycleEnd) }}
+      {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
     </p>
 
     <div class="pace-manual">
@@ -13,19 +13,16 @@
         id="pace-manual-input"
         v-model="manualInput"
         class="input pace-manual-input"
-        type="number"
-        min="0"
-        step="1"
+        type="text"
         inputmode="decimal"
         placeholder="e.g. 1500"
-        @change="persistManual"
         @blur="persistManual"
       />
       <p class="pace-manual-hint">
-        <template v-if="pace.statementSpend > 0 && pace.manualSpend !== null">
+        <template v-if="pace && pace.statementSpend > 0 && pace.manualSpend !== null">
           From statements: {{ formatIls(pace.statementSpend) }} · using your entry above
         </template>
-        <template v-else-if="pace.statementSpend > 0">
+        <template v-else-if="pace && pace.statementSpend > 0">
           From statements: {{ formatIls(pace.statementSpend) }}
         </template>
         <template v-else>
@@ -34,23 +31,27 @@
       </p>
     </div>
 
-    <div class="pace-stats">
-      <div>
-        <div class="pace-stat-label">Spent so far</div>
-        <div class="pace-stat-value">{{ formatIls(pace.currentSpend) }}</div>
+    <template v-if="pace">
+      <div class="pace-stats">
+        <div>
+          <div class="pace-stat-label">Spent so far</div>
+          <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
+        </div>
+        <div v-if="pace.historicalAvgAtDay > 0">
+          <div class="pace-stat-label">Usually by now</div>
+          <div class="pace-stat-value">{{ formatIls(pace.historicalAvgAtDay) }}</div>
+          <div class="pace-stat-label">avg of {{ pace.cyclesUsed }} cycles</div>
+        </div>
+        <div v-if="displaySpend > 0">
+          <div class="pace-stat-label">Projected</div>
+          <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
+        </div>
       </div>
-      <div v-if="pace.historicalAvgAtDay > 0">
-        <div class="pace-stat-label">Usually by now</div>
-        <div class="pace-stat-value">{{ formatIls(pace.historicalAvgAtDay) }}</div>
-        <div class="pace-stat-label">avg of {{ pace.cyclesUsed }} cycles</div>
-      </div>
-      <div>
-        <div class="pace-stat-label">Projected</div>
-        <div class="pace-stat-value">{{ formatIls(pace.projectedTotal) }}</div>
-      </div>
-    </div>
-    <span class="pace-score" :class="scoreClass">{{ pace.score }} · {{ pace.scoreLabel }}</span>
-    <p v-if="pace.dataStale && pace.manualSpend === null" class="pace-warning">
+      <span v-if="displaySpend > 0" class="pace-score" :class="scoreClass">
+        {{ displayScore }} · {{ displayScoreLabel }}
+      </span>
+    </template>
+    <p v-if="pace?.dataStale && !manualSpend" class="pace-warning">
       Upload your latest bill or enter current spending above — this cycle isn't on your statements yet.
     </p>
     <div class="pace-settings">
@@ -71,17 +72,18 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
-import { formatIls } from "../utils/format";
+import { formatIls, roundMoney } from "../utils/format";
 import {
   computePace,
   cycleStartForDate,
+  getBillingCycle,
+  getCycleRangeForStart,
   loadCycleDay,
   loadManualCycleSpend,
   loadPaceIncludeFixed,
   saveCycleDay,
   saveManualCycleSpend,
   savePaceIncludeFixed,
-  type PaceResult,
 } from "../utils/pace";
 
 const props = defineProps<{
@@ -95,11 +97,21 @@ const cycleDay = ref(loadCycleDay());
 const includeFixed = ref(loadPaceIncludeFixed());
 const cycleDays = Array.from({ length: 28 }, (_, i) => i + 1);
 
-const cycleStart = computed(() => {
+const cycleInfo = computed(() => {
   const today = new Date();
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return cycleStartForDate(norm, cycleDay.value);
+  const cycle = getBillingCycle(norm, cycleDay.value);
+  const start = cycleStartForDate(norm, cycleDay.value);
+  const { end } = getCycleRangeForStart(start, cycleDay.value);
+  return {
+    dayIndex: cycle.dayIndex,
+    cycleLength: cycle.cycleLength,
+    cycleStart: start,
+    cycleEnd: end,
+  };
 });
+
+const cycleStart = computed(() => cycleInfo.value.cycleStart);
 
 const manualInput = ref("");
 
@@ -111,14 +123,14 @@ function loadManualForCycle() {
 loadManualForCycle();
 
 const manualSpend = computed((): number | null => {
-  const raw = manualInput.value.trim();
+  const raw = String(manualInput.value ?? "").trim().replace(/,/g, "");
   if (!raw) return null;
   const n = parseFloat(raw);
   if (Number.isNaN(n) || n < 0) return null;
   return n;
 });
 
-const pace = computed((): PaceResult | null =>
+const pace = computed(() =>
   computePace(props.transactions, {
     cycleDay: cycleDay.value,
     includeFixed: includeFixed.value,
@@ -127,10 +139,39 @@ const pace = computed((): PaceResult | null =>
   }),
 );
 
+const displaySpend = computed(() => {
+  if (manualSpend.value !== null) return roundMoney(manualSpend.value);
+  return pace.value?.currentSpend ?? 0;
+});
+
+const projectedTotal = computed(() => {
+  const spend = displaySpend.value;
+  const day = cycleInfo.value.dayIndex;
+  const len = cycleInfo.value.cycleLength;
+  if (!spend || !day) return 0;
+  return roundMoney((spend / day) * len);
+});
+
+const displayScore = computed(() => {
+  const avg = pace.value?.historicalAvgAtDay ?? 0;
+  const spend = displaySpend.value;
+  if (!avg || !spend) return 50;
+  return Math.round(Math.min(100, Math.max(0, 50 * (avg / spend))));
+});
+
+const displayScoreLabel = computed(() => {
+  const score = displayScore.value;
+  if (score >= 60) return "Under pace";
+  if (score <= 40) return "Above pace";
+  if (score >= 55) return "Slightly under pace";
+  if (score <= 45) return "Slightly above pace";
+  return "On pace";
+});
+
 const scoreClass = computed(() => {
-  if (!pace.value) return "";
-  if (pace.value.score >= 55) return "good";
-  if (pace.value.score <= 45) return "bad";
+  const score = displayScore.value;
+  if (score >= 55) return "good";
+  if (score <= 45) return "bad";
   return "warn";
 });
 
@@ -149,8 +190,7 @@ function formatCycleRange(start: string, end: string): string {
 }
 
 function persistManual() {
-  const n = manualSpend.value;
-  saveManualCycleSpend(cycleStart.value, n);
+  saveManualCycleSpend(cycleStart.value, manualSpend.value);
   emit("settings-change");
 }
 
@@ -165,5 +205,9 @@ function persistFixed() {
   emit("settings-change");
 }
 
-watch(cycleStart, loadManualForCycle);
+watch(cycleStart, () => {
+  if (document.activeElement?.id !== "pace-manual-input") {
+    loadManualForCycle();
+  }
+});
 </script>
