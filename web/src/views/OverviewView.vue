@@ -101,18 +101,21 @@
       </p>
       <input v-model="search" class="input" placeholder="Merchant, category, amount…" style="margin-top: 0.5rem" />
       <div class="table-scroll">
-        <table v-if="searchMerchants.length" class="rules" style="margin-top: 0.75rem">
+        <table v-if="searchMerchants.length" class="rules label-fix-table" style="margin-top: 0.75rem">
           <thead>
             <tr>
+              <th>Date</th>
+              <th>Amount</th>
               <th>Hebrew</th>
               <th>English</th>
               <th>Category</th>
-              <th>Charges</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in searchMerchants" :key="row.hebrew">
+            <tr v-for="row in searchMerchants" :key="row.key">
+              <td class="label-fix-date">{{ formatTransactionDate(row.date) }}</td>
+              <td class="label-fix-amount">{{ formatIls(row.amount) }}</td>
               <td>{{ row.hebrew }}</td>
               <td>
                 <input v-model="row.english" class="input" :readonly="auth.isDemo" />
@@ -120,7 +123,6 @@
               <td>
                 <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
               </td>
-              <td style="color: var(--text-muted); white-space: nowrap">{{ row.count }}</td>
               <td>
                 <button
                   class="btn btn-primary"
@@ -177,16 +179,18 @@ import {
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
-import { billingCycleLabel, formatIls, openCycleTabLabel, roundMoney } from "../utils/format";
+import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = SPENDING_CATEGORIES;
 
 interface SearchMerchantRow {
+  key: string;
+  date: string;
+  amount: number;
   hebrew: string;
   english: string;
   category: string;
-  count: number;
   saving: boolean;
 }
 
@@ -350,22 +354,17 @@ watch(searchResults, (txs) => {
     searchMerchants.value = [];
     return;
   }
-  const byHebrew = new Map<string, SearchMerchantRow>();
-  for (const t of txs) {
-    const existing = byHebrew.get(t.merchant_he);
-    if (existing) {
-      existing.count += 1;
-      continue;
-    }
-    byHebrew.set(t.merchant_he, {
+  searchMerchants.value = [...txs]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.charge_amount - a.charge_amount)
+    .map((t) => ({
+      key: `${t.date}|${t.merchant_he}|${t.charge_amount}`,
+      date: t.date,
+      amount: t.charge_amount,
       hebrew: t.merchant_he,
       english: t.merchant_en || "",
       category: t.category_en || "",
-      count: 1,
       saving: false,
-    });
-  }
-  searchMerchants.value = [...byHebrew.values()].sort((a, b) => b.count - a.count);
+    }));
 });
 
 function otherPct(amount: number): number {

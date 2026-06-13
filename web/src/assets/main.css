@@ -764,6 +764,18 @@ table.rules select {
   width: 100%;
 }
 
+.label-fix-table .label-fix-date {
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.label-fix-table .label-fix-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .login-page {
   min-height: 100vh;
   display: flex;
