@@ -13,6 +13,17 @@ function prefix(demo: boolean): string {
   return demo ? `${BASE}/api/demo` : `${BASE}/api`;
 }
 
+async function readApiError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text) as { error?: string };
+    if (parsed.error) return parsed.error;
+  } catch {
+    /* plain text */
+  }
+  return text || `Request failed (${res.status})`;
+}
+
 function headers(token?: string): HeadersInit {
   const h: HeadersInit = { "Content-Type": "application/json" };
   if (token) h.Authorization = `Bearer ${token}`;
@@ -21,7 +32,7 @@ function headers(token?: string): HeadersInit {
 
 async function get<T>(url: string, token?: string): Promise<T> {
   const res = await fetch(url, { headers: headers(token) });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<T>;
 }
 
@@ -31,7 +42,7 @@ async function post<T>(url: string, body?: unknown, token?: string): Promise<T> 
     headers: headers(token),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<T>;
 }
 
@@ -41,7 +52,7 @@ async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
     headers: headers(token),
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<T>;
 }
 
@@ -110,16 +121,7 @@ export async function uploadStatement(file: File, token?: string, autoTranslate 
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
-  if (!res.ok) {
-    let message = await res.text();
-    try {
-      const parsed = JSON.parse(message) as { error?: string };
-      if (parsed.error) message = parsed.error;
-    } catch {
-      /* plain text */
-    }
-    throw new Error(message || `Upload failed (${res.status})`);
-  }
+  if (!res.ok) throw new Error(await readApiError(res));
   return res.json();
 }
 

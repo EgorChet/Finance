@@ -13,9 +13,11 @@
       {{ reviewedCount }} reviewed · {{ queue.length }} in queue
       <span v-if="index > 0"> · card {{ index + 1 }}</span>
     </p>
-    <div v-if="loading" style="color: var(--text-muted); margin-top: 2rem; text-align: center">
-      Loading queue…
-    </div>
+    <AppLoader
+      v-if="loading"
+      title="Loading review queue"
+      subtitle="Finding merchants that need labels"
+    />
     <div v-else-if="queue.length === 0" style="color: var(--text-muted); margin-top: 2rem; text-align: center">
       Queue empty — all merchants have saved labels.
     </div>
@@ -64,6 +66,7 @@ import {
   fetchReviewSuggestion,
   resetReviewProgress,
 } from "../api/client";
+import AppLoader from "../components/AppLoader.vue";
 import { useAuthStore } from "../stores/auth";
 import type { ReviewQueueItem } from "../types";
 import { SPENDING_CATEGORIES } from "../categories";

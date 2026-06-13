@@ -2,6 +2,12 @@
   <div>
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
     <h2 style="margin: 0 0 1rem">Merchant mappings</h2>
+    <AppLoader
+      v-if="loading"
+      title="Loading merchant mappings"
+      subtitle="Fetching your saved labels and categories"
+    />
+    <template v-else>
     <div v-if="!auth.isDemo" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap">
       <input v-model="newHebrew" class="input" placeholder="Hebrew" style="max-width: 180px" />
       <input v-model="newEnglish" class="input" placeholder="English" style="max-width: 180px" />
@@ -39,12 +45,14 @@
     <datalist id="spending-cats">
       <option v-for="c in categories" :key="c" :value="c" />
     </datalist>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { fetchMerchants, fetchRules, saveRules } from "../api/client";
+import { fetchMerchants, saveRules } from "../api/client";
+import AppLoader from "../components/AppLoader.vue";
 import { useAuthStore } from "../stores/auth";
 import { SPENDING_CATEGORIES } from "../categories";
 import type { MerchantRow } from "../types";
@@ -53,13 +61,19 @@ const categories = SPENDING_CATEGORIES;
 
 const auth = useAuthStore();
 const rows = ref<MerchantRow[]>([]);
+const loading = ref(true);
 const saving = ref(false);
 const newHebrew = ref("");
 const newEnglish = ref("");
 const newCategory = ref("");
 
 async function load() {
-  rows.value = await fetchMerchants(auth.isDemo, null, auth.token || undefined);
+  loading.value = true;
+  try {
+    rows.value = await fetchMerchants(auth.isDemo, null, auth.token || undefined);
+  } finally {
+    loading.value = false;
+  }
 }
 
 function addRule() {

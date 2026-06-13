@@ -1,6 +1,16 @@
 <template>
-  <div v-if="loading">Loading…</div>
-  <div v-else-if="error">{{ error }}</div>
+  <AppLoader
+    v-if="loading"
+    title="Loading spending overview"
+    subtitle="Fetching your statements and cycle data"
+  />
+  <ErrorBanner
+    v-else-if="error"
+    title="Could not load overview"
+    :message="error"
+    dismissible
+    @dismiss="error = ''"
+  />
   <template v-else-if="report">
     <div v-if="auth.isDemo" class="demo-banner">
       Demo mode — sample spending data. Sign in to see your real statements.
@@ -138,6 +148,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
 import CategoryLegend from "../components/CategoryLegend.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
+import AppLoader from "../components/AppLoader.vue";
+import ErrorBanner from "../components/ErrorBanner.vue";
 import MerchantBarChart from "../components/MerchantBarChart.vue";
 import MonthPicker from "../components/MonthPicker.vue";
 import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
