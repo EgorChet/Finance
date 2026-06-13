@@ -35,7 +35,7 @@
           <td v-if="excludeable" class="tx-actions">
             <button
               type="button"
-              class="btn btn-ghost btn-compact"
+              class="tx-exclude-btn"
               :disabled="excludingKey === row.key"
               @click="emitExclude(row.tx)"
             >
@@ -53,18 +53,20 @@
           <div class="tx-row-amount">{{ formatIls(row.amount) }}</div>
         </div>
         <div class="tx-row-meta">
-          {{ row.dateLabel }}
-          <span v-if="showCategory && row.category"> · {{ row.category }}</span>
+          <span class="tx-row-meta-text">
+            {{ row.dateLabel }}
+            <span v-if="showCategory && row.category"> · {{ row.category }}</span>
+          </span>
+          <button
+            v-if="excludeable"
+            type="button"
+            class="tx-exclude-btn"
+            :disabled="excludingKey === row.key"
+            @click="emitExclude(row.tx)"
+          >
+            {{ excludingKey === row.key ? "…" : "Exclude" }}
+          </button>
         </div>
-        <button
-          v-if="excludeable"
-          type="button"
-          class="btn btn-ghost btn-compact tx-row-exclude"
-          :disabled="excludingKey === row.key"
-          @click="emitExclude(row.tx)"
-        >
-          {{ excludingKey === row.key ? "Excluding…" : "Exclude" }}
-        </button>
       </div>
     </div>
 

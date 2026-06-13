@@ -13,7 +13,7 @@
             {{ openCycleTabLabel(cycleInfo.cycleStart) }} · {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
           </template>
           <template v-else>
-            {{ progressPct }}% of the month gone · {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
+            {{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}
           </template>
         </p>
       </div>
@@ -23,7 +23,7 @@
         </div>
         <span class="pace-progress-label">
           <template v-if="app.expertMode">{{ progressPct }}% through cycle</template>
-          <template v-else>{{ progressPct }}% of the month</template>
+          <template v-else>Day {{ cycleInfo.dayIndex }} of {{ cycleInfo.cycleLength }}</template>
         </span>
       </div>
       <div v-if="app.expertMode" class="pace-header-controls">
@@ -277,7 +277,7 @@
 import { computed, ref, watch } from "vue";
 import { useAppStore } from "../stores/app";
 import type { Transaction } from "../types";
-import { formatIls, openCycleTabLabel, roundMoney } from "../utils/format";
+import { formatIls, formatAboutIls, openCycleTabLabel, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import { configuredChargesForCycle, sumConfiguredCharges } from "../utils/fixedCharges";
 import {
@@ -450,15 +450,14 @@ const projectedDeltaClass = computed(() => {
 
 const simpleHeroLine = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
-  const abs = formatIls(Math.abs(monthGap));
 
   if (Math.abs(monthGap) < 50) {
-    return "Looks fine — this month is tracking close to your normal spending.";
+    return "You're doing fine — this month looks normal.";
   }
   if (monthGap > 0) {
-    return `Yes — on track for about ${abs} extra this month if you keep going.`;
+    return `You're spending too fast — about ${formatAboutIls(monthGap)} more than a normal month.`;
   }
-  return `No — on track to spend about ${abs} less than your normal month.`;
+  return `You're spending slower than usual — about ${formatAboutIls(Math.abs(monthGap))} less than a normal month.`;
 });
 
 const simpleHeroSub = computed(() => {
@@ -466,15 +465,22 @@ const simpleHeroSub = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
 
   if (Math.abs(monthGap) < 50) {
-    return nowGap > 50
-      ? "Everyday spending is a bit high already, but the full month still looks OK."
-      : "";
+    if (nowGap > 50) {
+      return `Day-to-day spending is a bit high, but the full month still looks OK.`;
+    }
+    if (nowGap < -50) {
+      return `You've spent less than usual so far — nice.`;
+    }
+    return "";
   }
-  if (monthGap > 0 && Math.abs(nowGap) >= 50) {
-    const abs = formatIls(Math.abs(nowGap));
-    return nowGap > 0
-      ? `Already ${abs} above your normal everyday spending at this point.`
-      : `Everyday spending is ${abs} below normal so far, but the month-end estimate is still high.`;
+  if (monthGap > 0 && nowGap > 50) {
+    return `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
+  }
+  if (monthGap > 0 && nowGap < -50) {
+    return `Spending is low so far, but the month-end total still looks high (bills add up).`;
+  }
+  if (monthGap < 0 && nowGap < -50) {
+    return `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;
   }
   return "";
 });

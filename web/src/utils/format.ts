@@ -10,6 +10,19 @@ export function formatIls(amount: number): string {
   })}`;
 }
 
+/** Softer amounts for sentences — ~₪1,700 not ₪1,720.62. */
+export function formatAboutIls(amount: number): string {
+  const sign = amount < 0 ? -1 : 1;
+  const abs = Math.abs(amount);
+  let rounded = abs;
+  if (abs >= 2000) rounded = Math.round(abs / 100) * 100;
+  else if (abs >= 200) rounded = Math.round(abs / 50) * 50;
+  else if (abs >= 20) rounded = Math.round(abs / 10) * 10;
+  else rounded = Math.round(abs);
+  const n = sign * rounded;
+  return `₪${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
 /** Parse YYYY-MM-DD as a local calendar date (avoids UTC off-by-one). */
 function parseIsoDate(dateStr: string): Date {
   const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);

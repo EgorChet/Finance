@@ -146,6 +146,42 @@ button {
   color: var(--danger);
 }
 
+.metric-budget-formula {
+  margin: 0.35rem 0 0.65rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.metric-budget-breakdown {
+  list-style: none;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.metric-budget-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.metric-budget-breakdown li span:last-child {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-card-budget .metric-sub-note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 @media (min-width: 640px) {
   .metric-card-budget {
     grid-column: span 2;
@@ -1255,8 +1291,7 @@ button {
   padding: 0.5rem 0.65rem 0.35rem;
 }
 
-.category-accordion-txs .tx-table,
-.category-accordion-txs .tx-row-mobile {
+.category-accordion-txs .tx-table {
   font-size: 0.85rem;
 }
 
@@ -1488,10 +1523,6 @@ table.rules select {
   width: 1%;
   white-space: nowrap;
   text-align: right;
-}
-
-.tx-row-exclude {
-  margin-top: 0.45rem;
 }
 
 .recurring-header {
@@ -1824,21 +1855,61 @@ table.rules select {
 }
 
 .tx-row-amount {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .tx-row-merchant {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  line-height: 1.35;
   word-break: break-word;
 }
 
 .tx-row-meta {
-  margin-top: 0.25rem;
-  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+.tx-row-meta-text {
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.tx-exclude-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--danger);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tx-exclude-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
+  border-color: var(--danger);
+}
+
+.tx-exclude-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tx-row-meta .tx-exclude-btn {
+  min-height: 36px;
 }
 
 .pace-manual {
@@ -2519,6 +2590,15 @@ table.rules select {
 
   .tx-row-mobile {
     display: block;
+    margin-top: 0.5rem;
+  }
+
+  .tx-row {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .category-accordion-txs .tx-row {
+    padding: 0.75rem 0.65rem;
   }
 }
 

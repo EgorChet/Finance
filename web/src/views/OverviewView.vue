@@ -21,7 +21,7 @@
     </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
-    <SummaryMetrics v-if="showSummaryMetrics" :report="report" @select-category="onCategory" />
+    <SummaryMetrics v-if="showSummaryMetrics" :report="report" />
     <PaceCard
       v-if="showPaceCard"
       :transactions="paceTransactions"
