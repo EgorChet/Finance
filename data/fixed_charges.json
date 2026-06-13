@@ -7,7 +7,7 @@
       "amount": 6500,
       "category_en": "Housing",
       "from_month": "2025-01",
-      "through_month": "2026-04"
+      "through_month": "2026-03"
     },
     {
       "id": "flat-rent",
@@ -15,7 +15,7 @@
       "name_he": "שכירות דירה",
       "amount": 6900,
       "category_en": "Housing",
-      "from_month": "2026-05",
+      "from_month": "2026-04",
       "through_month": "2035-12"
     },
     {
