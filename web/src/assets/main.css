@@ -1901,12 +1901,36 @@ table.rules select {
 }
 
 .pace-simple-status {
-  margin: 0.75rem 0 0;
+  margin: 0;
   padding: 0.65rem 0.85rem;
   border-radius: var(--radius);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  font-weight: 600;
   line-height: 1.45;
   background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.pace-simple-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.pace-simple-meta {
+  margin: 0;
+  padding: 0 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.pace-simple-meta-muted {
+  margin-top: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pace-metrics--simple {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .pace-simple-status.pace-delta-good {

@@ -37,7 +37,7 @@
     </header>
 
     <div class="pace-layout">
-      <section class="pace-panel pace-panel-entry pace-panel-wide">
+      <section v-if="showEntryPanel" class="pace-panel pace-panel-entry pace-panel-wide">
         <div class="pace-entry-grid">
           <div class="pace-entry-main">
             <label v-if="!partialStatementActive" class="pace-manual-label" for="pace-manual-input">
@@ -100,40 +100,56 @@
 
       <template v-if="pace">
         <section class="pace-panel pace-panel-metrics">
-          <div class="pace-metrics">
-            <div class="pace-metric">
-              <div class="pace-stat-label">Spent so far</div>
-              <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
-            </div>
-            <div v-if="paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
-              <div class="pace-stat-label">Vs usual</div>
-              <div class="pace-stat-value" :class="deltaClass">{{ deltaLabel }}</div>
-              <div class="pace-stat-meta">{{ deltaHint }}</div>
-            </div>
-            <div v-if="app.expertMode && paceCompareAvg > 0" class="pace-metric">
-              <div class="pace-stat-label">Usually by day {{ cycleInfo.dayIndex }}</div>
-              <div class="pace-stat-value">{{ formatIls(paceCompareAvg) }}</div>
-              <div class="pace-stat-meta">{{ avgCyclesLabel }}</div>
-            </div>
-            <div v-if="displaySpend > 0" class="pace-metric">
-              <div class="pace-stat-label">Projected full cycle</div>
-              <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
-              <div v-if="paceCompareAvg > 0" class="pace-stat-meta" :class="projectedDeltaClass">
-                {{ projectedDeltaHint }}
+          <template v-if="app.expertMode">
+            <div class="pace-metrics">
+              <div class="pace-metric">
+                <div class="pace-stat-label">Spent so far</div>
+                <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
               </div>
-              <div v-else-if="projectionIncludesBills" class="pace-stat-meta">includes rent &amp; recurring bills</div>
+              <div v-if="paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
+                <div class="pace-stat-label">Vs usual</div>
+                <div class="pace-stat-value" :class="deltaClass">{{ deltaLabel }}</div>
+                <div class="pace-stat-meta">{{ deltaHint }}</div>
+              </div>
+              <div v-if="paceCompareAvg > 0" class="pace-metric">
+                <div class="pace-stat-label">Usually by day {{ cycleInfo.dayIndex }}</div>
+                <div class="pace-stat-value">{{ formatIls(paceCompareAvg) }}</div>
+                <div class="pace-stat-meta">{{ avgCyclesLabel }}</div>
+              </div>
+              <div v-if="displaySpend > 0" class="pace-metric">
+                <div class="pace-stat-label">Projected full cycle</div>
+                <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
+                <div v-if="paceCompareAvg > 0" class="pace-stat-meta" :class="projectedDeltaClass">
+                  {{ projectedDeltaHint }}
+                </div>
+                <div v-else-if="projectionIncludesBills" class="pace-stat-meta">includes rent &amp; recurring bills</div>
+              </div>
             </div>
-          </div>
-          <p
-            v-if="!app.expertMode && paceCompareAvg > 0 && displaySpend > 0"
-            class="pace-simple-status"
-            :class="deltaClass"
-          >
-            {{ simplePaceMessage }}
-          </p>
-          <div v-if="app.expertMode && displaySpend > 0" class="pace-score-row">
-            <span class="pace-score" :class="scoreClass">{{ displayScore }} · {{ displayScoreLabel }}</span>
-          </div>
+            <div v-if="displaySpend > 0" class="pace-score-row">
+              <span class="pace-score" :class="scoreClass">{{ displayScore }} · {{ displayScoreLabel }}</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="pace-metrics pace-metrics--simple">
+              <div class="pace-metric">
+                <div class="pace-stat-label">Spent so far</div>
+                <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
+                <div v-if="partialStatementActive" class="pace-stat-meta">from partial statement</div>
+              </div>
+              <div v-if="displaySpend > 0" class="pace-metric">
+                <div class="pace-stat-label">Projected full cycle</div>
+                <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
+                <div v-if="projectionIncludesBills" class="pace-stat-meta">includes rent &amp; recurring bills</div>
+              </div>
+            </div>
+            <div v-if="paceCompareAvg > 0 && displaySpend > 0" class="pace-simple-summary">
+              <p class="pace-simple-status" :class="deltaClass">{{ simplePaceMessage }}</p>
+              <p class="pace-simple-meta" :class="projectedDeltaClass">{{ projectedDeltaHint }}</p>
+            </div>
+            <p v-else-if="displaySpend > 0" class="pace-simple-meta pace-simple-meta-muted">
+              Not enough past cycles to compare your pace yet.
+            </p>
+          </template>
         </section>
 
         <section v-if="app.expertMode && includeFixed && pace.fixedBreakdown.length" class="pace-panel">
@@ -332,6 +348,13 @@ const compareToHint = computed(() => {
 
 const displaySpend = computed(() => pace.value?.currentSpend ?? 0);
 
+const showEntryPanel = computed(() => {
+  if (app.expertMode) return true;
+  if (props.partialStatementActive) return false;
+  if (displaySpend.value > 0 && manualSpend.value === null) return false;
+  return true;
+});
+
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => {
@@ -372,10 +395,11 @@ const projectedDeltaClass = computed(() => {
 
 const simplePaceMessage = computed(() => {
   const delta = pace.value?.vsAvgDelta ?? 0;
-  if (delta === 0) return "Spending matches your usual pace for this point in the cycle.";
+  const usual = formatIls(paceCompareAvg.value);
+  if (delta === 0) return `On your usual pace — typically ${usual} by day ${cycleInfo.value.dayIndex}.`;
   const abs = formatIls(Math.abs(delta));
-  if (delta > 0) return `Overspending by ${abs} compared to your usual pace.`;
-  return `Saving ${abs} compared to your usual pace.`;
+  if (delta > 0) return `Overspending by ${abs} — usually ${usual} by day ${cycleInfo.value.dayIndex}.`;
+  return `Underspending by ${abs} — usually ${usual} by day ${cycleInfo.value.dayIndex}.`;
 });
 
 const deltaLabel = computed(() => {

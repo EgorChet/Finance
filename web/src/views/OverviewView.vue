@@ -457,10 +457,8 @@ const statementBilling = computed(() => {
 });
 
 const paceTransactions = computed(() => {
-  if (isPartialForOpenCycle.value && report.value) {
-    return report.value.transactions;
-  }
-  return paceReport.value?.transactions ?? [];
+  // Keep full history for pace averages; partial totals come from partialVariableSpend overrides.
+  return paceReport.value?.transactions ?? report.value?.transactions ?? [];
 });
 
 const partialVariableSpend = computed(() => {
