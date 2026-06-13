@@ -16,8 +16,12 @@
             <span>Dev Institute</span>
             <span>{{ formatIls(budgetDevInstitute) }}</span>
           </li>
+          <li v-if="budgetCarLoan > 0">
+            <span>Car loan</span>
+            <span>{{ formatIls(budgetCarLoan) }}</span>
+          </li>
         </ul>
-        <p class="metric-sub-note">Rent &amp; car loan are not counted — paid outside this ₪12k.</p>
+        <p class="metric-sub-note">Rent is not counted — paid outside this ₪12k.</p>
       </div>
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
@@ -73,6 +77,7 @@ const budgetBreakdown = computed(() => budgetSpendBreakdown(props.report.transac
 const budgetSpent = computed(() => budgetBreakdown.value.spent);
 const budgetEveryday = computed(() => budgetBreakdown.value.everyday);
 const budgetDevInstitute = computed(() => budgetBreakdown.value.devInstitute);
+const budgetCarLoan = computed(() => budgetBreakdown.value.carLoan);
 const budgetLeft = computed(() => moneyLeft(props.report.transactions));
 const budgetClass = computed(() => {
   if (budgetLeft.value < 0) return "metric-card-budget--over";
