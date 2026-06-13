@@ -41,6 +41,8 @@ export interface MonthItem {
   pendingStatement?: boolean;
   /** Mid-cycle snapshot upload for this billing period. */
   partial?: boolean;
+  /** Partial tab for the live open cycle (single-tab UX). */
+  isCurrentCycle?: boolean;
 }
 
 export interface MerchantRule {

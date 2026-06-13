@@ -15,7 +15,7 @@
         </div>
         <span class="pace-progress-label">{{ progressPct }}% through cycle</span>
       </div>
-      <div class="pace-header-controls">
+      <div v-if="app.expertMode" class="pace-header-controls">
         <div class="pace-toolbar-controls">
           <label class="pace-toggle">
             <input v-model="includeFixed" type="checkbox" class="pace-toggle-input" @change="persistFixed" />
@@ -56,12 +56,12 @@
             <p class="pace-manual-hint">
               <template v-if="partialStatementActive && pace && pace.statementSpend > 0">
                 From partial statement: <strong>{{ formatIls(pace.statementSpend) }}</strong>
-                <span v-if="includeFixed && pace.configuredChargesTotal > 0">
+                <span v-if="effectiveIncludeFixed && pace.configuredChargesTotal > 0">
                   + {{ formatIls(pace.configuredChargesTotal) }} bills
                   = <strong>{{ formatIls(pace.currentSpend) }}</strong>
                 </span>
               </template>
-              <template v-else-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
+              <template v-else-if="pace && pace.manualEverydaySpend !== null && effectiveIncludeFixed && pace.configuredChargesTotal > 0">
                 {{ formatIls(pace.manualEverydaySpend) }} everyday
                 + {{ formatIls(pace.configuredChargesTotal) }} bills
                 = <strong>{{ formatIls(pace.currentSpend) }}</strong> total
@@ -72,7 +72,7 @@
               <template v-else-if="pace && pace.statementSpend > 0">
                 From statements: {{ formatIls(pace.statementSpend) }}
               </template>
-              <template v-else-if="includeFixed && expectedConfiguredTotal > 0">
+              <template v-else-if="effectiveIncludeFixed && expectedConfiguredTotal > 0">
                 Card spending only — we add rent &amp; loans automatically.
               </template>
               <template v-else>
@@ -81,7 +81,7 @@
             </p>
           </div>
           <div
-            v-if="includeFixed && (pace?.configuredCharges.length || expectedConfiguredTotal > 0)"
+            v-if="app.expertMode && includeFixed && (pace?.configuredCharges.length || expectedConfiguredTotal > 0)"
             class="pace-entry-bills"
           >
             <p class="pace-entry-bills-title">
@@ -105,12 +105,12 @@
               <div class="pace-stat-label">Spent so far</div>
               <div class="pace-stat-value">{{ formatIls(displaySpend) }}</div>
             </div>
-            <div v-if="paceCompareAvg > 0" class="pace-metric">
+            <div v-if="app.expertMode && paceCompareAvg > 0" class="pace-metric">
               <div class="pace-stat-label">Usually by day {{ cycleInfo.dayIndex }}</div>
               <div class="pace-stat-value">{{ formatIls(paceCompareAvg) }}</div>
               <div class="pace-stat-meta">{{ avgCyclesLabel }}</div>
             </div>
-            <div v-if="paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
+            <div v-if="app.expertMode && paceCompareAvg > 0 && displaySpend > 0" class="pace-metric">
               <div class="pace-stat-label">Vs usual</div>
               <div class="pace-stat-value" :class="deltaClass">{{ deltaLabel }}</div>
               <div class="pace-stat-meta">{{ deltaHint }}</div>
@@ -118,17 +118,17 @@
             <div v-if="displaySpend > 0" class="pace-metric">
               <div class="pace-stat-label">Projected full cycle</div>
               <div class="pace-stat-value">{{ formatIls(projectedTotal) }}</div>
-              <div v-if="paceCompareAvg > 0" class="pace-stat-meta">
+              <div v-if="app.expertMode && paceCompareAvg > 0" class="pace-stat-meta">
                 usual pace ~{{ formatIls(projectedAtUsualPace) }}
               </div>
             </div>
           </div>
-          <div v-if="displaySpend > 0" class="pace-score-row">
+          <div v-if="app.expertMode && displaySpend > 0" class="pace-score-row">
             <span class="pace-score" :class="scoreClass">{{ displayScore }} · {{ displayScoreLabel }}</span>
           </div>
         </section>
 
-        <section v-if="includeFixed && pace.fixedBreakdown.length" class="pace-panel">
+        <section v-if="app.expertMode && includeFixed && pace.fixedBreakdown.length" class="pace-panel">
           <div class="pace-panel-head">
             <p class="pace-panel-title">Usually bills by day {{ cycleInfo.dayIndex }}</p>
             <p class="pace-panel-hint">
@@ -146,7 +146,7 @@
           </div>
         </section>
 
-        <section v-if="pace.variableBreakdown.length" class="pace-panel">
+        <section v-if="app.expertMode && pace.variableBreakdown.length" class="pace-panel">
           <div class="pace-panel-head">
             <p class="pace-panel-title">Usually everyday by day {{ cycleInfo.dayIndex }}</p>
             <p class="pace-panel-hint">{{ formatIls(pace.historicalAvgVariableAtDay) }} total</p>
@@ -159,7 +159,7 @@
           </div>
         </section>
 
-        <section v-if="pace.recentCycles.length" class="pace-panel pace-panel-wide">
+        <section v-if="app.expertMode && pace.recentCycles.length" class="pace-panel pace-panel-wide">
           <div class="pace-panel-head">
             <p class="pace-panel-title">Cycles in this average</p>
             <p class="pace-panel-hint">{{ avgCyclesLabel }}</p>
@@ -196,6 +196,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useAppStore } from "../stores/app";
 import type { Transaction } from "../types";
 import { formatIls, openCycleTabLabel, roundMoney } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
@@ -225,9 +226,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "settings-change": [] }>();
 
+const app = useAppStore();
 const cycleDay = CYCLE_DAY;
 const includeFixed = ref(loadPaceIncludeFixed());
 const avgCycles = ref(loadPaceAvgCycles());
+
+const effectiveIncludeFixed = computed(() => app.expertMode && includeFixed.value);
 
 const cycleInfo = computed(() => {
   const today = new Date();
@@ -270,7 +274,7 @@ const manualSpend = computed((): number | null => {
 const pace = computed(() =>
   computePace(props.transactions, {
     cycleDay,
-    includeFixed: includeFixed.value,
+    includeFixed: effectiveIncludeFixed.value,
     latestBillingDate: props.latestBillingDate ?? null,
     manualSpend: props.partialStatementActive ? null : manualSpend.value,
     avgCycles: avgCycles.value,
@@ -307,7 +311,7 @@ const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => {
   if (!pace.value) return 0;
-  return includeFixed.value
+  return effectiveIncludeFixed.value
     ? pace.value.historicalAvgAtDay
     : pace.value.historicalAvgVariableAtDay;
 });

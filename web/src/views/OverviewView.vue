@@ -23,11 +23,11 @@
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics v-if="showSummaryMetrics" :report="report" @select-category="onCategory" />
     <PaceCard
-      v-if="isLiveCycleSelected"
+      v-if="showPaceCard"
       :transactions="paceTransactions"
       :latest-billing-date="latestFinalBillingDate"
       :configured-charges="configuredCharges"
-      :partial-statement-active="currentCyclePartial"
+      :partial-statement-active="partialStatementActive"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -37,8 +37,8 @@
     />
     <template v-if="showCategoryExplorer">
     <p class="section-title">Where did the money go?</p>
-    <div class="explorer-grid">
-      <div class="explorer-pie-col">
+    <div class="explorer-grid" :class="{ 'explorer-grid--no-pie': hidePieChart }">
+      <div v-if="!hidePieChart" class="explorer-pie-col">
         <CategoryPieChart :categories="displayCategories" :selected="app.selectedCategory" @select="onCategory" />
         <p v-if="drillTitle" class="category-pie-note">Selected · {{ drillTitle }}</p>
       </div>
@@ -144,7 +144,7 @@
       @exclude="excludeTransaction"
     />
     </template>
-    <p v-else-if="isCycleTabSelected" class="pace-cycle-pending-note">
+    <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       Category breakdown and transactions will appear once this cycle’s statement is uploaded.
     </p>
     <details style="margin-top: 1.5rem">
@@ -224,6 +224,7 @@ import PaceCard from "../components/PaceCard.vue";
 import PendingCycleCard from "../components/PendingCycleCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import TransactionList from "../components/TransactionList.vue";
+import { useCompactLayout } from "../composables/useCompactLayout";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
@@ -240,7 +241,10 @@ import {
 } from "../categories";
 import {
   buildCycleReport,
+  cycleStartForDate,
+  cycleStartForStatementBilling,
   cycleStartFromMonthKey,
+  cycleNeedsOpenTab,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
@@ -256,6 +260,10 @@ import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "../ut
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = CATEGORY_PICKLIST;
+
+const { isCompact } = useCompactLayout(768);
+/** Phone / narrow layout: category list only — pie is hard to read on small screens. */
+const hidePieChart = isCompact;
 
 interface SearchMerchantRow {
   key: string;
@@ -288,30 +296,59 @@ const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.v
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value);
+  const todayStart = cycleStartForDate(new Date(), cycleDay.value);
   return merged.map((m) => {
     if (m.inProgress || m.pendingStatement) {
       return { ...m, label: openCycleTabLabel(m.billing_date) };
     }
     const base = billingCycleLabel(m.billing_date);
-    return { ...m, label: m.partial ? `${base} · partial` : base };
+    if (m.partial) {
+      const cycleStart = cycleStartForStatementBilling(m.billing_date, cycleDay.value);
+      const isCurrentCycle =
+        cycleStart === todayStart && cycleNeedsOpenTab(cycleStart, cycleDay.value, months.value);
+      return { ...m, label: `${base} · partial`, isCurrentCycle };
+    }
+    return { ...m, label: base };
   });
 });
 
-const selectedCycleStart = computed(() =>
-  isCycleMonthKey(selectedMonth.value) ? cycleStartFromMonthKey(selectedMonth.value!) : null,
-);
-
-const currentCyclePartial = computed(() => {
-  if (!selectedCycleStart.value) return false;
-  return !!findPartialMonth(months.value, selectedCycleStart.value, cycleDay.value);
+const activeCycleStart = computed((): string | null => {
+  const key = selectedMonth.value;
+  if (!key) return null;
+  if (isCycleMonthKey(key)) return cycleStartFromMonthKey(key);
+  const month = months.value.find((m) => m.key === key);
+  if (month?.partial) return cycleStartForStatementBilling(month.billing_date, cycleDay.value);
+  return null;
 });
 
-const partialCycleBanner = computed(() => {
-  if (isLiveCycleSelected.value && currentCyclePartial.value) {
-    return "Partial statement loaded — pace and categories use your latest export. Re-upload anytime; choose Final only when the bill is complete (often a few days after the 10th).";
+const selectedCycleStart = activeCycleStart;
+
+const isLiveCycleSelected = computed(() => {
+  const start = activeCycleStart.value;
+  if (!start || !cycleNeedsOpenTab(start, cycleDay.value, months.value)) return false;
+  if (isCycleMonthKey(selectedMonth.value!)) {
+    return selectedOpenCycle.value?.inProgress === true;
   }
-  if (report.value?.metadata?.provisional) {
-    return "Partial snapshot — cycle still in progress. Use the · now tab for pace, or upload the final statement when it arrives.";
+  return start === cycleStartForDate(new Date(), cycleDay.value);
+});
+
+const isPartialForOpenCycle = computed(() => {
+  const month = months.value.find((m) => m.key === selectedMonth.value);
+  if (!month?.partial) return false;
+  const start = cycleStartForStatementBilling(month.billing_date, cycleDay.value);
+  return cycleNeedsOpenTab(start, cycleDay.value, months.value);
+});
+
+const showPaceCard = computed(() => isLiveCycleSelected.value || isPartialForOpenCycle.value);
+
+const partialStatementActive = computed(() => isPartialForOpenCycle.value);
+
+const partialCycleBanner = computed(() => {
+  if (partialStatementActive.value) {
+    return "Partial snapshot for this cycle — pace and categories from your latest export. Re-upload anytime; choose Final when the bill is complete.";
+  }
+  if (isLiveCycleSelected.value && !findPartialMonth(months.value, activeCycleStart.value!, cycleDay.value)) {
+    return "No statement yet — enter spending below or upload a partial export from the bank.";
   }
   return "";
 });
@@ -320,8 +357,10 @@ const selectedOpenCycle = computed(() =>
   displayMonths.value.find((m) => m.key === selectedMonth.value) ?? null,
 );
 
-const isLiveCycleSelected = computed(() => selectedOpenCycle.value?.inProgress === true);
-const isPendingCycleSelected = computed(() => selectedOpenCycle.value?.pendingStatement === true);
+const isPendingCycleSelected = computed(() => {
+  if (!isCycleMonthKey(selectedMonth.value)) return false;
+  return selectedOpenCycle.value?.pendingStatement === true;
+});
 const isCycleTabSelected = computed(() => isCycleMonthKey(selectedMonth.value));
 
 const isInProgressCycle = computed(
@@ -330,6 +369,9 @@ const isInProgressCycle = computed(
 
 const showCategoryExplorer = computed(() => {
   if (!report.value) return false;
+  if (isPartialForOpenCycle.value) {
+    return report.value.transactions.length > 0;
+  }
   if (!isInProgressCycle.value) return true;
   if (report.value.metadata?.pending_statement) return false;
   return report.value.transactions.length > 0;
@@ -337,6 +379,7 @@ const showCategoryExplorer = computed(() => {
 
 const showSummaryMetrics = computed(() => {
   if (!report.value) return false;
+  if (isPartialForOpenCycle.value) return report.value.total_spent > 0;
   if (!isInProgressCycle.value) return true;
   if (report.value.metadata?.pending_statement) {
     return report.value.total_spent > 0;
@@ -699,8 +742,12 @@ async function onMonthSelected(month: string | null) {
 
 function onPaceSettingsChange() {
   cycleDay.value = loadCycleDay();
-  if (isCycleMonthKey(selectedMonth.value)) {
-    void refreshReport(selectedMonth.value);
+  if (showPaceCard.value) {
+    if (isCycleMonthKey(selectedMonth.value)) {
+      void refreshReport(selectedMonth.value);
+    } else if (partialStatementActive.value) {
+      void refreshReport(selectedMonth.value);
+    }
   }
 }
 
@@ -721,11 +768,14 @@ async function loadMonths() {
       }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
     const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value);
+    const todayStart = cycleStartForDate(new Date(), cycleDay.value);
+    const partialCurrent = findPartialMonth(m.months, todayStart, cycleDay.value);
     const openCurrent = merged.find((x) => x.inProgress);
     const sortedFinal = [...m.months]
       .filter((month) => !month.partial)
       .sort((a, b) => b.billing_date.localeCompare(a.billing_date));
-    const initial = openCurrent?.key ?? sortedFinal[0]?.key ?? merged[0]?.key ?? null;
+    const initial =
+      partialCurrent?.key ?? openCurrent?.key ?? sortedFinal[0]?.key ?? merged[0]?.key ?? null;
     selectedMonth.value = initial;
     await refreshReport(initial);
   } catch (e) {

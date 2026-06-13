@@ -5,7 +5,7 @@
       :key="m.key"
       type="button"
       class="pill"
-      :class="{ active: modelValue === m.key, 'pill-current': m.inProgress, 'pill-pending': m.pendingStatement, 'pill-partial': m.partial && !m.inProgress && !m.pendingStatement }"
+      :class="{ active: modelValue === m.key, 'pill-current': m.inProgress || m.isCurrentCycle, 'pill-pending': m.pendingStatement, 'pill-partial': m.partial && !m.inProgress && !m.pendingStatement && !m.isCurrentCycle }"
       @click="$emit('update:modelValue', m.key)"
     >
       {{ m.label }}<span v-if="m.inProgress" class="pill-now"> · now</span><span v-else-if="m.pendingStatement" class="pill-pending-tag"> · pending</span>

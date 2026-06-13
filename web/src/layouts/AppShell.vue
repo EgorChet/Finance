@@ -17,6 +17,10 @@
             <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
             Light mode
           </label>
+          <label class="app-menu-item">
+            <input type="checkbox" :checked="app.expertMode" @change="app.toggleExpertMode()" />
+            Expert mode
+          </label>
           <template v-if="!auth.isDemo">
             <button
               v-if="showLocalSync"

@@ -496,6 +496,13 @@ export function statementBillingDateForCycle(cycleStart: string, cycleDay = 10):
   return nextCycleStart(cycleStart, cycleDay);
 }
 
+/** Inverse of `statementBillingDateForCycle` — which cycle a statement bill belongs to. */
+export function cycleStartForStatementBilling(billingDate: string, cycleDay = 10): string {
+  const d = parseIsoDate(billingDate);
+  const prev = new Date(d.getFullYear(), d.getMonth() - 1, cycleDay);
+  return isoDate(prev);
+}
+
 export function findPartialMonth(
   months: MonthItem[],
   cycleStart: string,
@@ -503,6 +510,16 @@ export function findPartialMonth(
 ): MonthItem | undefined {
   const billing = statementBillingDateForCycle(cycleStart, cycleDay);
   return months.find((m) => !isCycleMonthKey(m.key) && m.billing_date === billing && m.partial);
+}
+
+/** Skip the synthetic · now tab when a partial statement already covers that cycle. */
+export function openCycleTabRedundant(
+  openCycle: MonthItem,
+  months: MonthItem[],
+  cycleDay = 10,
+): boolean {
+  if (!openCycle.inProgress) return false;
+  return !!findPartialMonth(months, openCycle.billing_date, cycleDay);
 }
 
 export function cycleHasFinalStatement(
@@ -595,7 +612,11 @@ export function mergeMonthsWithOpenCycles(months: MonthItem[], cycleDay: number)
   const openItems = getOpenCycleMonthItems(cycleDay, months);
   if (!openItems.length) return months;
 
-  const toAdd = openItems.filter((open) => !months.some((m) => m.key === open.key));
+  const toAdd = openItems.filter((open) => {
+    if (months.some((m) => m.key === open.key)) return false;
+    if (openCycleTabRedundant(open, months, cycleDay)) return false;
+    return true;
+  });
   if (!toAdd.length) return months;
   return [...toAdd, ...months];
 }

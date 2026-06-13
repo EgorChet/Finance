@@ -692,6 +692,16 @@ button {
   min-height: 100%;
 }
 
+.explorer-grid--no-pie {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 900px) {
+  .explorer-grid--no-pie .explorer-legend-col {
+    order: 0;
+  }
+}
+
 @media (max-width: 900px) {
   .explorer-grid {
     display: flex;
