@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
-import { analyzeFileBuffer, reanalyzeAll, translateMerchant } from "../services/analyzerClient.js";
+import { analyzeFileBuffer, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
 import { augmentReport } from "../services/fixedCharges.js";
 import {
   getCombinedReport,
@@ -35,9 +35,20 @@ import type { MerchantRules } from "../types.js";
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
-router.get("/health", async (_req, res) => {
-  res.json({ status: "ok" });
+router.get("/health", async (req, res) => {
+  const deep = req.query.deep === "1" || req.query.deep === "true";
+  if (!deep) {
+    res.json({ status: "ok" });
+    return;
+  }
+  const analyzer = await warmAnalyzer();
+  res.json({ status: "ok", analyzer });
 });
+
+function sanitizeUploadFilename(name: string): string {
+  const base = path.basename(name).replace(/[^\w.\- ]+/g, "").trim() || "upload.xlsx";
+  return base.toLowerCase().endsWith(".xlsx") ? base : `${base}.xlsx`;
+}
 
 router.get("/months", async (_req, res) => {
   const data = await readStatements();
@@ -147,21 +158,38 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     return;
   }
   const autoTranslate = req.body?.auto_translate !== "false";
-  const filename = req.file.originalname || "upload.xlsx";
+  const filename = sanitizeUploadFilename(req.file.originalname || "upload.xlsx");
   const buffer = req.file.buffer;
   const hash = fileHash(buffer);
 
-  const data = await readStatements();
-  if (isCachedFile(data, hash)) {
-    res.json({ skipped: true, reason: "unchanged" });
-    return;
-  }
+  try {
+    const data = await readStatements();
+    if (isCachedFile(data, hash)) {
+      res.json({ skipped: true, reason: "unchanged" });
+      return;
+    }
 
-  const report = await analyzeFileBuffer(buffer, filename, autoTranslate);
-  const savedPath = await saveUploadedXlsx(filename, buffer);
-  const key = rememberReport(data, report, savedPath, filename, hash);
-  await writeStatements(data);
-  res.json({ key, report: augmentReport(report) });
+    const rules = await readRules();
+    const report = await analyzeFileBuffer(buffer, filename, autoTranslate);
+    const savedPath = await saveUploadedXlsx(filename, buffer);
+    const key = rememberReport(data, report, savedPath, filename, hash);
+    applyMerchantRules(data, rules);
+    await writeStatements(data);
+    res.json({ key, report: augmentReport(data.statements[key]!.report) });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const warming =
+      message.includes("abort") ||
+      message.includes("fetch failed") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("Analyzer error");
+    console.error("Upload failed:", message);
+    res.status(warming ? 503 : 500).json({
+      error: warming
+        ? "Analyzer is waking up (Render free tier). Wait ~30 seconds and try again."
+        : message,
+    });
+  }
 });
 
 router.get("/review/progress", async (_req, res) => {

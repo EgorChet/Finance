@@ -81,6 +81,9 @@ export async function discoverXlsxFiles(): Promise<string[]> {
 }
 
 export async function saveUploadedXlsx(filename: string, buffer: Buffer): Promise<string> {
+  if (process.env.STORAGE === "supabase") {
+    return `upload:${filename}`;
+  }
   await fs.mkdir(STATEMENTS_DIR, { recursive: true });
   const dest = path.join(STATEMENTS_DIR, filename);
   await fs.writeFile(dest, buffer);

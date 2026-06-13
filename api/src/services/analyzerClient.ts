@@ -1,16 +1,45 @@
 import type { MerchantRules, SpendingReport, StatementsData } from "../types.js";
 
 const ANALYZER_URL = process.env.ANALYZER_URL || "http://127.0.0.1:8001";
+const ANALYZER_TIMEOUT_MS = Number(process.env.ANALYZER_TIMEOUT_MS || 120_000);
+const ANALYZER_WARMUP_ATTEMPTS = Number(process.env.ANALYZER_WARMUP_ATTEMPTS || 3);
+
+async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYZER_TIMEOUT_MS);
+  try {
+    return await fetch(`${ANALYZER_URL}${path}`, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Wake the Python analyzer (Render free tier sleeps both services). */
+export async function warmAnalyzer(): Promise<boolean> {
+  for (let attempt = 0; attempt < ANALYZER_WARMUP_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetchAnalyzer("/health");
+      if (res.ok) return true;
+    } catch {
+      /* retry */
+    }
+    if (attempt < ANALYZER_WARMUP_ATTEMPTS - 1) {
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
+  return false;
+}
 
 export async function analyzeFileBuffer(
   buffer: Buffer,
   filename: string,
   autoTranslate = true,
 ): Promise<SpendingReport> {
+  await warmAnalyzer();
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(buffer)]), filename);
-  const url = `${ANALYZER_URL}/analyze-file?auto_translate=${autoTranslate}`;
-  const res = await fetch(url, { method: "POST", body: form });
+  const url = `/analyze-file?auto_translate=${autoTranslate}`;
+  const res = await fetchAnalyzer(url, { method: "POST", body: form });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Analyzer error ${res.status}: ${text}`);
@@ -21,7 +50,7 @@ export async function analyzeFileBuffer(
 export async function translateMerchant(hebrew: string): Promise<string> {
   const q = encodeURIComponent(hebrew.trim());
   if (!q) return "";
-  const res = await fetch(`${ANALYZER_URL}/translate-merchant?q=${q}`);
+  const res = await fetchAnalyzer(`/translate-merchant?q=${q}`);
   if (!res.ok) return "";
   const data = (await res.json()) as { english: string };
   return data.english || "";
@@ -32,7 +61,7 @@ export async function reanalyzeAll(
   rules: MerchantRules,
   autoTranslate = true,
 ): Promise<{ statements: StatementsData["statements"]; updated_count: number }> {
-  const res = await fetch(`${ANALYZER_URL}/reanalyze-all`, {
+  const res = await fetchAnalyzer("/reanalyze-all", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -50,7 +79,7 @@ export async function reanalyzeAll(
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetch(`${ANALYZER_URL}/health`);
+    const res = await fetchAnalyzer("/health");
     return res.ok;
   } catch {
     return false;

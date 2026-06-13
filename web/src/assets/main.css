@@ -414,6 +414,12 @@ button {
   white-space: nowrap;
 }
 
+.app-menu-error {
+  color: var(--danger);
+  white-space: normal;
+  line-height: 1.35;
+}
+
 .main {
   padding: 1rem var(--gutter-x) 1.5rem;
   padding-left: max(var(--gutter-x), env(safe-area-inset-left));

@@ -35,6 +35,7 @@
               {{ uploading ? "Uploading…" : "Upload statement" }}
             </button>
             <p v-if="uploadName" class="app-menu-note">{{ uploadName }}</p>
+            <p v-if="uploadError" class="app-menu-note app-menu-error">{{ uploadError }}</p>
           </template>
           <button
             v-if="auth.authRequired && auth.isAuthenticated"
@@ -59,7 +60,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { syncStatements, uploadStatement } from "../api/client";
+import { syncStatements, uploadStatement, warmApi } from "../api/client";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 
@@ -69,6 +70,7 @@ const router = useRouter();
 const syncing = ref(false);
 const uploading = ref(false);
 const uploadName = ref("");
+const uploadError = ref("");
 const uploadInput = ref<HTMLInputElement | null>(null);
 const menuOpen = ref(false);
 
@@ -92,12 +94,17 @@ async function onUpload(e: Event) {
   if (!file) return;
   uploading.value = true;
   uploadName.value = file.name;
+  uploadError.value = "";
   try {
+    uploadName.value = "Waking server…";
+    await warmApi(auth.token || undefined);
+    uploadName.value = file.name;
     await uploadStatement(file, auth.token || undefined);
     window.location.reload();
-  } catch {
+  } catch (err) {
     uploading.value = false;
-    uploadName.value = "";
+    uploadName.value = file.name;
+    uploadError.value = err instanceof Error ? err.message : String(err);
     input.value = "";
   }
 }

@@ -97,6 +97,10 @@ export async function syncStatements(token?: string, autoTranslate = true) {
   );
 }
 
+export async function warmApi(token?: string) {
+  return get<{ status: string; analyzer?: boolean }>(`${prefix(false)}/health?deep=1`, token);
+}
+
 export async function uploadStatement(file: File, token?: string, autoTranslate = true) {
   const form = new FormData();
   form.append("file", file);
@@ -106,7 +110,16 @@ export async function uploadStatement(file: File, token?: string, autoTranslate 
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    let message = await res.text();
+    try {
+      const parsed = JSON.parse(message) as { error?: string };
+      if (parsed.error) message = parsed.error;
+    } catch {
+      /* plain text */
+    }
+    throw new Error(message || `Upload failed (${res.status})`);
+  }
   return res.json();
 }
 

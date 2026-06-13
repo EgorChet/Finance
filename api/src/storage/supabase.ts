@@ -39,11 +39,15 @@ export async function writeStatements(data: StatementsData): Promise<void> {
     return;
   }
   data.updated_at = new Date().toISOString();
-  await supabaseFetch("app_state", {
+  const res = await supabaseFetch("app_state", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "statements", data }),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
 }
 
 export async function readRules(): Promise<MerchantRules> {
