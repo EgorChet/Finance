@@ -17,27 +17,45 @@
 
     <div class="pace-layout">
       <section class="pace-panel pace-panel-input">
-        <label class="pace-manual-label" for="pace-manual-input">Current cycle spending (₪)</label>
+        <label class="pace-manual-label" for="pace-manual-input">
+          Everyday spending so far (₪)
+        </label>
         <input
           id="pace-manual-input"
           v-model="manualInput"
           class="input pace-manual-input"
           type="text"
           inputmode="decimal"
-          placeholder="e.g. 1500"
+          placeholder="e.g. 2000"
           @blur="persistManual"
         />
         <p class="pace-manual-hint">
-          <template v-if="pace && pace.statementSpend > 0 && pace.manualSpend !== null">
-            From statements: {{ formatIls(pace.statementSpend) }} · using your entry
+          <template v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
+            {{ formatIls(pace.manualEverydaySpend) }} everyday
+            + {{ formatIls(pace.configuredChargesTotal) }} bills
+            = <strong>{{ formatIls(pace.currentSpend) }}</strong> total
+          </template>
+          <template v-else-if="pace && pace.manualEverydaySpend !== null">
+            Using your entry as total spending for this cycle.
           </template>
           <template v-else-if="pace && pace.statementSpend > 0">
             From statements: {{ formatIls(pace.statementSpend) }}
           </template>
+          <template v-else-if="includeFixed && expectedConfiguredTotal > 0">
+            Enter card spending only — we'll add {{ formatIls(expectedConfiguredTotal) }} in rent &amp; loans automatically.
+          </template>
           <template v-else>
-            This cycle isn't on your statements yet — enter your total from the bank app.
+            Enter your spending from the bank app for this cycle.
           </template>
         </p>
+        <ul
+          v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredCharges.length"
+          class="pace-configured-list"
+        >
+          <li v-for="charge in pace.configuredCharges" :key="charge.name_en">
+            + {{ formatIls(charge.amount) }} {{ charge.name_en }}
+          </li>
+        </ul>
       </section>
 
       <section class="pace-panel pace-panel-settings">
@@ -170,6 +188,8 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, roundMoney } from "../utils/format";
+import type { ConfiguredCharge } from "../utils/fixedCharges";
+import { sumConfiguredCharges } from "../utils/fixedCharges";
 import {
   computePace,
   cycleStartForDate,
@@ -188,6 +208,7 @@ import {
 const props = defineProps<{
   transactions: Transaction[];
   latestBillingDate?: string | null;
+  configuredCharges?: ConfiguredCharge[];
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -242,7 +263,12 @@ const pace = computed(() =>
     latestBillingDate: props.latestBillingDate ?? null,
     manualSpend: manualSpend.value,
     avgCycles: avgCycles.value,
+    configuredCharges: props.configuredCharges ?? [],
   }),
+);
+
+const expectedConfiguredTotal = computed(() =>
+  sumConfiguredCharges(cycleStart.value, props.configuredCharges ?? []),
 );
 
 const avgCyclesLabel = computed(() => {
@@ -255,10 +281,7 @@ const avgCyclesLabel = computed(() => {
   return `last ${cyclesUsed} completed cycles`;
 });
 
-const displaySpend = computed(() => {
-  if (manualSpend.value !== null) return roundMoney(manualSpend.value);
-  return pace.value?.currentSpend ?? 0;
-});
+const displaySpend = computed(() => pace.value?.currentSpend ?? 0);
 
 const projectedTotal = computed(() => {
   const spend = displaySpend.value;

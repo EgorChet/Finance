@@ -13,6 +13,7 @@
       v-if="isCurrentCycleSelected"
       :transactions="paceTransactions"
       :latest-billing-date="latestBillingDate"
+      :configured-charges="configuredCharges"
       @settings-change="onPaceSettingsChange"
     />
     <p class="section-title">Where did the money go?</p>
@@ -124,7 +125,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
+import { fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
 import CategoryLegend from "../components/CategoryLegend.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
 import MerchantBarChart from "../components/MerchantBarChart.vue";
@@ -154,6 +155,7 @@ import {
   mergeMonthsWithCurrentCycle,
 } from "../utils/pace";
 import { formatIls, monthLabelFromIso, roundMoney } from "../utils/format";
+import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = SPENDING_CATEGORIES;
 
@@ -171,6 +173,7 @@ const loading = ref(true);
 const error = ref("");
 const report = ref<SpendingReport | null>(null);
 const paceReport = ref<SpendingReport | null>(null);
+const configuredCharges = ref<ConfiguredCharge[]>([]);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
@@ -357,6 +360,7 @@ function buildLocalCycleReport(monthKey: string): SpendingReport {
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
     manualSpend: loadManualCycleSpend(start),
+    configuredCharges: configuredCharges.value,
   });
 }
 
@@ -378,6 +382,17 @@ async function refreshReport(month: string | null = selectedMonth.value) {
   } catch (e) {
     if (reqId !== reportRequestId) return;
     error.value = String(e);
+  }
+}
+
+async function refreshConfiguredCharges() {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  try {
+    const data = await fetchFixedCharges(demo, token);
+    configuredCharges.value = data.charges;
+  } catch {
+    configuredCharges.value = [];
   }
 }
 
@@ -413,7 +428,7 @@ async function loadMonths() {
     const m = await fetchMonths(demo, token);
     months.value = m.months;
     summary.value = m.summary;
-    await refreshPaceReport();
+    await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
     const latest = m.months.length
       ? [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]!.billing_date
       : null;

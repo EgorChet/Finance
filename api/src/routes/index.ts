@@ -72,6 +72,11 @@ router.get("/rules", async (_req, res) => {
   res.json(await readRules());
 });
 
+router.get("/fixed-charges", async (_req, res) => {
+  const { loadFixedCharges } = await import("../services/fixedCharges.js");
+  res.json({ charges: loadFixedCharges() });
+});
+
 router.put("/rules", async (req, res) => {
   const rules = req.body as MerchantRules;
   await writeRules(rules);

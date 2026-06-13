@@ -981,6 +981,18 @@ table.rules select {
   border-bottom: none;
 }
 
+.pace-configured-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.pace-configured-list li {
+  margin: 0.1rem 0;
+}
+
 .pace-warning {
   margin: 0;
   font-size: 0.82rem;

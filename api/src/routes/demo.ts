@@ -27,6 +27,10 @@ router.get("/rules", (_req, res) => {
   res.json(demoRules());
 });
 
+router.get("/fixed-charges", (_req, res) => {
+  res.json({ charges: [] });
+});
+
 router.get("/merchants", (_req, res) => {
   res.json(demoMerchants());
 });

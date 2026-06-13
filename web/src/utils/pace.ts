@@ -1,5 +1,7 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
+import type { ConfiguredCharge } from "./fixedCharges";
+import { configuredChargesForCycle, sumConfiguredCharges } from "./fixedCharges";
 import { monthLabelFromIso, roundMoney } from "./format";
 
 export interface BillingCycle {
@@ -24,10 +26,18 @@ export interface PaceCycleSnapshot {
   variableAtDay: number;
 }
 
+export interface PaceConfiguredCharge {
+  name_en: string;
+  amount: number;
+}
+
 export interface PaceResult {
   currentSpend: number;
   statementSpend: number;
   manualSpend: number | null;
+  manualEverydaySpend: number | null;
+  configuredChargesTotal: number;
+  configuredCharges: PaceConfiguredCharge[];
   dayIndex: number;
   cycleLength: number;
   historicalAvgAtDay: number;
@@ -198,6 +208,7 @@ export function computePace(
     manualSpend?: number | null;
     /** Most recent completed cycles to average; 0 = all available. */
     avgCycles?: number;
+    configuredCharges?: ConfiguredCharge[];
   } = {},
 ): PaceResult | null {
   const cycleDay = options.cycleDay ?? 10;
@@ -274,11 +285,25 @@ export function computePace(
   }
   statementSpend = roundMoney(statementSpend);
 
-  const manual =
+  const cycleStartIso = isoDate(cycle.start);
+  const configuredList = options.configuredCharges ?? [];
+  const configuredCharges = configuredChargesForCycle(cycleStartIso, configuredList).map((c) => ({
+    name_en: c.name_en,
+    amount: c.amount,
+  }));
+  const configuredChargesTotal = sumConfiguredCharges(cycleStartIso, configuredList);
+
+  const manualEveryday =
     options.manualSpend != null && options.manualSpend >= 0
       ? roundMoney(options.manualSpend)
       : null;
-  const currentSpend = manual !== null ? manual : statementSpend;
+
+  let currentSpend = statementSpend;
+  if (manualEveryday !== null) {
+    currentSpend = includeFixed
+      ? roundMoney(manualEveryday + configuredChargesTotal)
+      : manualEveryday;
+  }
 
   const historicalAvgAtDay =
     historicalAtDay.length > 0
@@ -320,7 +345,10 @@ export function computePace(
   return {
     currentSpend,
     statementSpend,
-    manualSpend: manual,
+    manualSpend: manualEveryday,
+    manualEverydaySpend: manualEveryday,
+    configuredChargesTotal,
+    configuredCharges,
     dayIndex: cycle.dayIndex,
     cycleLength: cycle.cycleLength,
     historicalAvgAtDay,
@@ -490,6 +518,7 @@ export function buildCycleReport(
     includeFixed?: boolean;
     manualSpend?: number | null;
     today?: Date;
+    configuredCharges?: ConfiguredCharge[];
   } = {},
 ): SpendingReport {
   const includeFixed = options.includeFixed ?? true;
@@ -510,11 +539,17 @@ export function buildCycleReport(
   }
   statementTotal = roundMoney(statementTotal);
 
-  const manual =
+  const manualEveryday =
     options.manualSpend != null && options.manualSpend >= 0
       ? roundMoney(options.manualSpend)
       : null;
-  const total = manual !== null ? manual : statementTotal;
+  const configuredChargesTotal = sumConfiguredCharges(cycleStart, options.configuredCharges ?? []);
+  const total =
+    manualEveryday !== null
+      ? includeFixed
+        ? roundMoney(manualEveryday + configuredChargesTotal)
+        : manualEveryday
+      : statementTotal;
 
   const by_category = [...catTotals.entries()]
     .map(([category_en, v]) => ({

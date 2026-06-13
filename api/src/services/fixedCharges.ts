@@ -52,6 +52,20 @@ function loadCharges(): FixedCharge[] {
   return cached;
 }
 
+export function loadFixedCharges(): FixedCharge[] {
+  return loadCharges();
+}
+
+export function configuredChargesForMonth(billingYm: string): FixedCharge[] {
+  const byId = new Map<string, FixedCharge>();
+  for (const charge of loadCharges()) {
+    if (charge.from_month <= billingYm && billingYm <= charge.through_month) {
+      byId.set(charge.id, charge);
+    }
+  }
+  return [...byId.values()];
+}
+
 function monthKey(billingDate: string | undefined): string | null {
   if (!billingDate) return null;
   return billingDate.slice(0, 7);

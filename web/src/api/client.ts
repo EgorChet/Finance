@@ -5,6 +5,7 @@ import type {
   ReviewQueueItem,
   SpendingReport,
 } from "../types";
+import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const BASE = import.meta.env.VITE_API_URL || "";
 
@@ -62,6 +63,10 @@ export async function fetchMonths(demo: boolean, token?: string) {
 export async function fetchReport(demo: boolean, month: string | null, token?: string) {
   const q = month ? `?month=${encodeURIComponent(month)}` : "";
   return get<SpendingReport>(`${prefix(demo)}/report${q}`, token);
+}
+
+export async function fetchFixedCharges(demo: boolean, token?: string) {
+  return get<{ charges: ConfiguredCharge[] }>(`${prefix(demo)}/fixed-charges`, token);
 }
 
 export async function fetchRules(demo: boolean, token?: string) {
