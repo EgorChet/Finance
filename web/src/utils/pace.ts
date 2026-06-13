@@ -621,6 +621,27 @@ export function mergeMonthsWithOpenCycles(months: MonthItem[], cycleDay: number)
   return [...toAdd, ...months];
 }
 
+/** Which month pill to select on load — newest activity first, partial counts as latest. */
+export function defaultOverviewMonthKey(months: MonthItem[], cycleDay: number): string | null {
+  const merged = mergeMonthsWithOpenCycles(months, cycleDay);
+  const todayStart = cycleStartForDate(new Date(), cycleDay);
+
+  if (cycleNeedsOpenTab(todayStart, cycleDay, months)) {
+    const partial = findPartialMonth(months, todayStart, cycleDay);
+    if (partial) return partial.key;
+    const openTab = merged.find((m) => m.inProgress);
+    if (openTab) return openTab.key;
+  }
+
+  const statements = months.filter((m) => !isCycleMonthKey(m.key));
+  if (statements.length) {
+    const latest = [...statements].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0];
+    if (latest) return latest.key;
+  }
+
+  return merged[0]?.key ?? null;
+}
+
 /** @deprecated Use mergeMonthsWithOpenCycles(months, cycleDay) */
 export function mergeMonthsWithCurrentCycle(
   months: MonthItem[],

@@ -245,6 +245,7 @@ import {
   cycleStartForStatementBilling,
   cycleStartFromMonthKey,
   cycleNeedsOpenTab,
+  defaultOverviewMonthKey,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
@@ -767,15 +768,7 @@ async function loadMonths() {
         month: billingCycleLabel(row.billing_date),
       }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
-    const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value);
-    const todayStart = cycleStartForDate(new Date(), cycleDay.value);
-    const partialCurrent = findPartialMonth(m.months, todayStart, cycleDay.value);
-    const openCurrent = merged.find((x) => x.inProgress);
-    const sortedFinal = [...m.months]
-      .filter((month) => !month.partial)
-      .sort((a, b) => b.billing_date.localeCompare(a.billing_date));
-    const initial =
-      partialCurrent?.key ?? openCurrent?.key ?? sortedFinal[0]?.key ?? merged[0]?.key ?? null;
+    const initial = defaultOverviewMonthKey(m.months, cycleDay.value);
     selectedMonth.value = initial;
     await refreshReport(initial);
   } catch (e) {
