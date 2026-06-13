@@ -12,5 +12,7 @@ export function subscriptionVendor(name: string): string {
   if (/microsoft|office\s*365/i.test(n)) return "Microsoft";
   if (/adobe/i.test(n)) return "Adobe";
   if (/disney/i.test(n)) return "Disney";
+  if (/fitness|\bgym\b|כושר|raybo|רייבו/i.test(n)) return "Fitness";
+  if (/\bcellcom\b|hot\s*mobile|pelephone|פלאפון|סלקום/i.test(n)) return "Mobile phone";
   return n;
 }

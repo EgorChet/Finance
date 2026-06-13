@@ -294,13 +294,7 @@ const compareToHint = computed(() => {
 
 const displaySpend = computed(() => pace.value?.currentSpend ?? 0);
 
-const projectedTotal = computed(() => {
-  const spend = displaySpend.value;
-  const day = cycleInfo.value.dayIndex;
-  const len = cycleInfo.value.cycleLength;
-  if (!spend || !day) return 0;
-  return roundMoney((spend / day) * len);
-});
+const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => {
   if (!pace.value) return 0;
@@ -309,14 +303,7 @@ const paceCompareAvg = computed(() => {
     : pace.value.historicalAvgVariableAtDay;
 });
 
-const projectedAtUsualPace = computed(() => {
-  if (!pace.value) return 0;
-  const avg = paceCompareAvg.value;
-  const day = cycleInfo.value.dayIndex;
-  const len = cycleInfo.value.cycleLength;
-  if (!avg || !day) return 0;
-  return roundMoney((avg / day) * len);
-});
+const projectedAtUsualPace = computed(() => pace.value?.projectedAtUsualPace ?? 0);
 
 const deltaLabel = computed(() => {
   const delta = pace.value?.vsAvgDelta ?? 0;

@@ -35,11 +35,57 @@
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid">
       <div class="explorer-pie-col">
-        <CategoryPieChart :categories="report.by_category" :selected="app.selectedCategory" @select="onCategory" />
+        <CategoryPieChart :categories="displayCategories" :selected="app.selectedCategory" @select="onCategory" />
         <p v-if="drillTitle" class="category-pie-note">Selected · {{ drillTitle }}</p>
       </div>
       <div class="explorer-legend-col">
-        <CategoryLegend v-if="!app.selectedCategory" :categories="report.by_category" @select="onCategory" />
+        <CategoryLegend v-if="!app.selectedCategory" :categories="displayCategories" @select="onCategory" />
+        <div v-else-if="isHomeView" class="category-drilldown">
+          <div class="category-drilldown-header">
+            <div>
+              <h3 class="category-drilldown-title">{{ HOME_ELECTRONICS }}</h3>
+              <p class="category-drilldown-total">{{ formatIls(homeTotal) }}</p>
+              <p class="category-drilldown-meta">Tap a section to see merchants and charges</p>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
+          </div>
+          <button
+            v-for="row in homeSubsections"
+            :key="row.category_en"
+            type="button"
+            class="cost-breakdown-row"
+            @click="onCategory(row.category_en)"
+          >
+            <span>{{ homeSubsectionLabel(row.category_en) }}</span>
+            <span class="cost-breakdown-amount">
+              {{ formatIls(row.total) }}
+              <span class="cost-breakdown-pct">{{ homePct(row.total) }}%</span>
+            </span>
+          </button>
+        </div>
+        <div v-else-if="isSubscriptionsView" class="category-drilldown">
+          <div class="category-drilldown-header">
+            <div>
+              <h3 class="category-drilldown-title">Subscriptions</h3>
+              <p class="category-drilldown-total">{{ formatIls(subscriptionsTotal) }}</p>
+              <p class="category-drilldown-meta">Mobile, gym, apps &amp; streaming</p>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
+          </div>
+          <button
+            v-for="row in subscriptionSubsectionRows"
+            :key="row.name"
+            type="button"
+            class="cost-breakdown-row"
+            @click="onCategory(row.name)"
+          >
+            <span>{{ row.name }}</span>
+            <span class="cost-breakdown-amount">
+              {{ formatIls(row.total) }}
+              <span class="cost-breakdown-pct">{{ subscriptionPct(row.total) }}%</span>
+            </span>
+          </button>
+        </div>
         <div v-else-if="isOtherView" class="category-drilldown">
           <div class="category-drilldown-header">
             <div>
@@ -66,7 +112,7 @@
         <div v-else-if="selectedCategoryStats" class="category-drilldown">
           <div class="category-drilldown-header">
             <div>
-              <h3 class="category-drilldown-title">{{ app.selectedCategory }}</h3>
+              <h3 class="category-drilldown-title">{{ selectedCategoryStats.title || app.selectedCategory }}</h3>
               <p class="category-drilldown-total">{{ formatIls(selectedCategoryStats.total) }}</p>
               <p class="category-drilldown-meta">
                 {{ selectedCategoryStats.sharePct }}% of total spending
@@ -83,7 +129,7 @@
       </div>
     </div>
     <TransactionList
-      v-if="!isOtherView"
+      v-if="!isOtherView && !isHomeView && !isSubscriptionsView"
       :transactions="filteredTxs"
       :title="transactionTitle"
       :show-category="!app.selectedCategory"
@@ -178,10 +224,15 @@ import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
 import {
+  CATEGORY_PICKLIST,
   groupCategoriesForPie,
+  HOME_ELECTRONICS,
+  homeSubsectionLabel,
+  isHomeSubsection,
   isOtherBucketLabel,
   OTHER_BUCKET,
-  SPENDING_CATEGORIES,
+  rollupCategoriesForDisplay,
+  rollupCategory,
 } from "../categories";
 import {
   buildCycleReport,
@@ -196,9 +247,10 @@ import {
 } from "../utils/pace";
 import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
 import { transactionKey } from "../utils/transactionKey";
+import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "../utils/subscriptionSections";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
-const categories = SPENDING_CATEGORIES;
+const categories = CATEGORY_PICKLIST;
 
 interface SearchMerchantRow {
   key: string;
@@ -278,6 +330,40 @@ const pieGroup = computed(() =>
   report.value ? groupCategoriesForPie(report.value.by_category) : { top: [], other: [] },
 );
 
+const displayCategories = computed(() =>
+  report.value ? rollupCategoriesForDisplay(report.value.by_category) : [],
+);
+
+const homeSubsections = computed(() => {
+  if (!report.value) return [];
+  return report.value.by_category
+    .filter((c) => isHomeSubsection(c.category_en) && c.category_en !== HOME_ELECTRONICS)
+    .sort((a, b) => b.total - a.total);
+});
+
+const homeTotal = computed(() => roundMoney(homeSubsections.value.reduce((s, c) => s + c.total, 0)));
+
+const subscriptionTransactions = computed(() => {
+  if (!report.value) return [];
+  return report.value.transactions.filter((t) => rollupCategory(t.category_en) === "Subscriptions");
+});
+
+const subscriptionSubsectionRows = computed(() => subscriptionSubsectionTotals(subscriptionTransactions.value));
+
+const subscriptionsTotal = computed(() =>
+  roundMoney(subscriptionSubsectionRows.value.reduce((s, r) => s + r.total, 0)),
+);
+
+const isHomeView = computed(() => app.selectedCategory === HOME_ELECTRONICS);
+const isHomeChild = computed(() =>
+  homeSubsections.value.some((r) => r.category_en === app.selectedCategory),
+);
+
+const isSubscriptionsView = computed(() => app.selectedCategory === "Subscriptions");
+const isSubscriptionsChild = computed(() =>
+  subscriptionSubsectionRows.value.some((r) => r.name === app.selectedCategory),
+);
+
 const otherCategories = computed(() => pieGroup.value.other);
 const otherCategoryNames = computed(() => new Set(otherCategories.value.map((c) => c.category_en)));
 const otherTotal = computed(() => roundMoney(otherCategories.value.reduce((s, c) => s + c.total, 0)));
@@ -299,29 +385,52 @@ const statementBilling = computed(() => {
 const paceTransactions = computed(() => paceReport.value?.transactions ?? []);
 
 const categoryFilter = computed(() => {
-  if (!app.selectedCategory || isOtherView.value) return null;
+  if (!app.selectedCategory || isOtherView.value || isHomeView.value || isSubscriptionsView.value) return null;
+  if (isSubscriptionsChild.value) return null;
   return app.selectedCategory;
 });
 
 const filteredTxs = computed((): Transaction[] => {
   if (!report.value) return [];
   if (!app.selectedCategory) return report.value.transactions;
-  if (isOtherView.value) return [];
+  if (isOtherView.value || isHomeView.value || isSubscriptionsView.value) return [];
   if (isOtherChild.value) {
     return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
   }
+  if (isHomeChild.value) {
+    return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
+  }
+  if (isSubscriptionsChild.value) {
+    return report.value.transactions.filter(
+      (t) =>
+        rollupCategory(t.category_en) === "Subscriptions" &&
+        subscriptionSubsectionLabel(t) === app.selectedCategory,
+    );
+  }
   if (app.selectedCategory.startsWith("Other")) {
     const top = new Set(pieGroup.value.top.map((c) => c.category_en));
-    return report.value.transactions.filter((t) => !top.has(t.category_en));
+    return report.value.transactions.filter((t) => !top.has(rollupCategory(t.category_en)));
   }
-  return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
+  return report.value.transactions.filter((t) => rollupCategory(t.category_en) === app.selectedCategory);
 });
 
 const selectedCategoryStats = computed(() => {
-  if (!report.value || !app.selectedCategory || isOtherView.value) return null;
+  if (!report.value || !app.selectedCategory || isOtherView.value || isHomeView.value || isSubscriptionsView.value) {
+    return null;
+  }
   const txs = filteredTxs.value;
-  const summaryRow = report.value.by_category.find((c) => c.category_en === app.selectedCategory);
-  const total = roundMoney(summaryRow?.total ?? txs.reduce((sum, t) => sum + t.charge_amount, 0));
+  const rolled = rollupCategory(app.selectedCategory);
+  const summaryRow = displayCategories.value.find((c) => c.category_en === rolled);
+  const subsectionRow = isHomeChild.value
+    ? homeSubsections.value.find((c) => c.category_en === app.selectedCategory)
+    : isSubscriptionsChild.value
+      ? subscriptionSubsectionRows.value.find((r) => r.name === app.selectedCategory)
+      : null;
+  const total = roundMoney(
+    subsectionRow && "total" in subsectionRow
+      ? subsectionRow.total
+      : txs.reduce((sum, t) => sum + t.charge_amount, 0),
+  );
   const sharePct = summaryRow
     ? Math.round(summaryRow.share_pct)
     : report.value.total_spent
@@ -330,9 +439,12 @@ const selectedCategoryStats = computed(() => {
   const merchantCount = new Set(txs.map((t) => t.merchant_en || t.merchant_he)).size;
   return {
     total,
-    count: summaryRow?.count ?? txs.length,
+    count: txs.length,
     sharePct,
     merchantCount,
+    title: isHomeChild.value
+      ? homeSubsectionLabel(app.selectedCategory)
+      : app.selectedCategory,
   };
 });
 
@@ -344,12 +456,18 @@ const drillTitle = computed(() => {
 
 const transactionTitle = computed(() => {
   if (app.selectedCategory && selectedCategoryStats.value) {
-    return `Transactions · ${app.selectedCategory} · ${formatIls(selectedCategoryStats.value.total)}`;
+    const label = selectedCategoryStats.value.title || app.selectedCategory;
+    return `Transactions · ${label} · ${formatIls(selectedCategoryStats.value.total)}`;
   }
   return "Transactions";
 });
 
-const backLabel = computed(() => (isOtherChild.value ? "← Other" : "← All categories"));
+const backLabel = computed(() => {
+  if (isOtherChild.value) return "← Other";
+  if (isHomeChild.value) return `← ${HOME_ELECTRONICS}`;
+  if (isSubscriptionsChild.value) return "← Subscriptions";
+  return "← All categories";
+});
 
 const searchResults = computed(() => {
   if (!report.value || !search.value.trim()) return [];
@@ -384,6 +502,14 @@ watch(searchResults, (txs) => {
     }));
 });
 
+function homePct(amount: number): number {
+  return homeTotal.value ? Math.round((roundMoney(amount) / homeTotal.value) * 100) : 0;
+}
+
+function subscriptionPct(amount: number): number {
+  return subscriptionsTotal.value ? Math.round((roundMoney(amount) / subscriptionsTotal.value) * 100) : 0;
+}
+
 function otherPct(amount: number): number {
   return otherTotal.value ? Math.round((roundMoney(amount) / otherTotal.value) * 100) : 0;
 }
@@ -399,6 +525,10 @@ function onCategory(name: string) {
 function goBack() {
   if (isOtherChild.value) {
     app.selectedCategory = OTHER_BUCKET;
+  } else if (isHomeChild.value) {
+    app.selectedCategory = HOME_ELECTRONICS;
+  } else if (isSubscriptionsChild.value) {
+    app.selectedCategory = "Subscriptions";
   } else {
     app.clearCategory();
   }

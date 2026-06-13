@@ -45,6 +45,8 @@ function shortLabel(name: string): string {
   return name.length > 24 ? `${name.slice(0, 22)}…` : name;
 }
 
+const MIN_LABEL_PERCENT = 4;
+
 const option = computed(() => {
   const textColor = chartTextColor();
   return {
@@ -59,19 +61,21 @@ const option = computed(() => {
   series: [
     {
       type: "pie",
-      radius: ["38%", "72%"],
+      radius: ["40%", "76%"],
       center: ["50%", "50%"],
       data: pieData.value,
       selectedMode: "single",
-      minShowLabelAngle: 4,
+      minShowLabelAngle: 14,
       avoidLabelOverlap: true,
       label: {
         show: true,
         position: "outside",
-        alignTo: "labelLine",
-        bleedMargin: 4,
+        alignTo: "edge",
+        edgeDistance: "12%",
         formatter: (p: { name?: string; percent?: number }) => {
-          const pct = typeof p.percent === "number" ? p.percent.toFixed(0) : "0";
+          const percent = p.percent ?? 0;
+          if (percent < MIN_LABEL_PERCENT) return "";
+          const pct = percent.toFixed(0);
           return `${shortLabel(p.name || "")}\n${pct}%`;
         },
         color: textColor,
@@ -80,20 +84,28 @@ const option = computed(() => {
       },
       labelLine: {
         show: true,
-        length: 14,
+        length: 12,
         length2: 10,
         smooth: true,
-        lineStyle: { color: textColor, opacity: 0.4 },
+        lineStyle: { color: textColor, opacity: 0.35 },
       },
       labelLayout: {
-        hideOverlap: false,
+        hideOverlap: true,
         moveOverlap: "shiftY",
       },
       itemStyle: {
         color: (p: { dataIndex: number }) => CHART_COLORS[p.dataIndex % CHART_COLORS.length],
       },
       emphasis: {
-        label: { show: true, fontSize: 12, fontWeight: "bold" },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: "bold",
+          formatter: (p: { name?: string; percent?: number }) => {
+            const pct = typeof p.percent === "number" ? p.percent.toFixed(0) : "0";
+            return `${p.name || ""}\n${pct}%`;
+          },
+        },
         itemStyle: { shadowBlur: 10, shadowColor: "rgba(0,0,0,0.3)" },
       },
     },

@@ -11,8 +11,25 @@ import { monthLabelFromIso } from "../utils/dates.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
 
+/** Retired categories merged into another for display and totals. */
+const CATEGORY_ALIASES: Record<string, string> = {
+  "Sibus Flexi": "Groceries",
+};
+
+function remapLegacyCategories(report: SpendingReport): SpendingReport {
+  let changed = false;
+  const transactions = report.transactions.map((tx) => {
+    const mapped = CATEGORY_ALIASES[tx.category_en];
+    if (!mapped) return tx;
+    changed = true;
+    return { ...tx, category_en: mapped };
+  });
+  if (!changed) return report;
+  return rebuildReportSummaries({ ...report, transactions });
+}
+
 export function finalizeReport(report: SpendingReport): SpendingReport {
-  return applyExclusions(augmentReport(report));
+  return applyExclusions(augmentReport(remapLegacyCategories(report)));
 }
 
 function billingKey(dateStr: string | undefined): string {

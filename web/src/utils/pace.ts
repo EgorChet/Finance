@@ -44,6 +44,7 @@ export interface PaceResult {
   historicalAvgFixedAtDay: number;
   historicalAvgVariableAtDay: number;
   projectedTotal: number;
+  projectedAtUsualPace: number;
   score: number;
   scoreLabel: string;
   cyclesUsed: number;
@@ -321,8 +322,45 @@ export function computePace(
   const compareAvg = includeFixed ? historicalAvgAtDay : historicalAvgVariableAtDay;
   const vsAvgDelta = roundMoney(currentSpend - compareAvg);
 
-  const projectedTotal =
-    cycle.dayIndex > 0 ? roundMoney((currentSpend / cycle.dayIndex) * cycle.cycleLength) : currentSpend;
+  // Fixed bills (rent, loans) land at cycle start — extrapolate variable spend only.
+  let currentFixedAtDay = 0;
+  let currentVariableAtDay = 0;
+  if (manualEveryday !== null) {
+    currentVariableAtDay = manualEveryday;
+    currentFixedAtDay = includeFixed ? configuredChargesTotal : 0;
+  } else if (currentBucket) {
+    const atDay = spendAtDay(currentBucket, cycle.dayIndex);
+    currentFixedAtDay = atDay.fixed;
+    currentVariableAtDay = roundMoney(atDay.total - atDay.fixed);
+  } else {
+    currentVariableAtDay = currentSpend;
+  }
+
+  const fullCycleFixed = includeFixed
+    ? manualEveryday !== null
+      ? configuredChargesTotal
+      : Math.max(currentFixedAtDay, configuredChargesTotal)
+    : 0;
+
+  const projectedVariable =
+    cycle.dayIndex > 0
+      ? roundMoney((currentVariableAtDay / cycle.dayIndex) * cycle.cycleLength)
+      : currentVariableAtDay;
+
+  const projectedTotal = includeFixed
+    ? roundMoney(fullCycleFixed + projectedVariable)
+    : projectedVariable;
+
+  const projectedAtUsualPace = includeFixed
+    ? roundMoney(
+        historicalAvgFixedAtDay +
+          (cycle.dayIndex > 0
+            ? (historicalAvgVariableAtDay / cycle.dayIndex) * cycle.cycleLength
+            : historicalAvgVariableAtDay),
+      )
+    : cycle.dayIndex > 0
+      ? roundMoney((historicalAvgVariableAtDay / cycle.dayIndex) * cycle.cycleLength)
+      : historicalAvgVariableAtDay;
 
   let score = 50;
   if (compareAvg > 0 && currentSpend > 0) {
@@ -355,6 +393,7 @@ export function computePace(
     historicalAvgFixedAtDay,
     historicalAvgVariableAtDay,
     projectedTotal,
+    projectedAtUsualPace,
     score,
     scoreLabel,
     cyclesUsed: historicalAtDay.length,

@@ -8,9 +8,7 @@ FOOD_CATEGORY_HE = frozenset({"מסעדות", "מזון מהיר", "מזון ו�
 COFFEE = "Coffee"
 EATING_OUT = "Eating out"
 GROCERIES = "Groceries"
-SIBUS_FLEXI = "Sibus Flexi"
 SUBSCRIPTIONS = "Subscriptions"
-MOBILE_PHONE = "Mobile phone"
 TRANSPORT = "Transport"
 EDUCATION = "Education"
 HOUSING = "Housing"
@@ -19,7 +17,6 @@ CLOTHES = "Clothes"
 BIT = "BIT"
 NAILS = "Nails"
 HOOKAH = "Hookah"
-FITNESS = "Fitness"
 PETS = "Pets"
 BANK_FEES = "Bank fees"
 
@@ -27,9 +24,7 @@ CUSTOM_SPENDING_CATEGORIES = (
     COFFEE,
     EATING_OUT,
     GROCERIES,
-    SIBUS_FLEXI,
     SUBSCRIPTIONS,
-    MOBILE_PHONE,
     TRANSPORT,
     EDUCATION,
     HOUSING,
@@ -38,7 +33,6 @@ CUSTOM_SPENDING_CATEGORIES = (
     BIT,
     NAILS,
     HOOKAH,
-    FITNESS,
     PETS,
     BANK_FEES,
 )
@@ -562,7 +556,7 @@ def classify_food_spending(
     text = _merchant_text(merchant_he, merchant_en)
 
     if _SIBUS_RE.search(text):
-        return SIBUS_FLEXI
+        return GROCERIES
     if _WOLT_GROCERY_RE.search(text) or (
         re.search(r"wolt|וולט", text, re.IGNORECASE) and _GROCERY_RE.search(text)
     ):
@@ -623,7 +617,7 @@ def classify_merchant(
     if _HOME_INTERNET_RE.search(text):
         return HOUSING
     if _MOBILE_PHONE_RE.search(text):
-        return MOBILE_PHONE
+        return SUBSCRIPTIONS
     if _EDUCATION_RE.search(text):
         return EDUCATION
     if _TRANSPORT_RE.search(text):
@@ -633,7 +627,7 @@ def classify_merchant(
     if _ELECTRONICS_RE.search(text):
         return ELECTRONICS
     if _FITNESS_RE.search(text):
-        return FITNESS
+        return SUBSCRIPTIONS
     if _PETS_RE.search(text):
         return PETS
 
