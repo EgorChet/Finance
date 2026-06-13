@@ -9,6 +9,11 @@ import type {
 } from "../types.js";
 import { monthLabelFromIso } from "../utils/dates.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
+import { applyExclusions } from "./exclusions.js";
+
+export function finalizeReport(report: SpendingReport): SpendingReport {
+  return applyExclusions(augmentReport(report));
+}
 
 function billingKey(dateStr: string | undefined): string {
   if (!dateStr) return "unknown";
@@ -36,7 +41,7 @@ export function monthCatalog(data: StatementsData): MonthCatalogItem[] {
 export function summaryRows(data: StatementsData) {
   return monthCatalog(data).map((m) => {
     const entry = data.statements[m.key];
-    const report = augmentReport(entry.report);
+    const report = finalizeReport(entry.report);
     return {
       month: m.label,
       billing_date: m.billing_date,
@@ -120,13 +125,13 @@ export function getCombinedReport(
   }
   if (!selected.length) return null;
   if (selected.length === 1) {
-    return augmentReport(selected[0].report);
+    return finalizeReport(selected[0].report);
   }
 
   const labels = selected.map((e) => e.month_label);
   const label = `${labels[0]} – ${labels[labels.length - 1]} (${selected.length} months)`;
   return combineReports(
-    selected.map((e) => augmentReport(e.report)),
+    selected.map((e) => finalizeReport(e.report)),
     label,
   );
 }
@@ -172,7 +177,7 @@ export function applyMerchantRules(data: StatementsData, rules: MerchantRules): 
         changed += 1;
       }
     }
-    entry.report = rebuildReportSummaries(augmentReport(entry.report));
+    entry.report = rebuildReportSummaries(finalizeReport(entry.report));
   }
   return changed;
 }

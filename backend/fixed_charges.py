@@ -65,13 +65,15 @@ def _parse_billing_date(billing: date | str | None) -> date | None:
 
 
 def augment_report(report: SpendingReport) -> SpendingReport:
+    from exclusions import apply_exclusions
+
     billing_date = _parse_billing_date(report.metadata.get("billing_date"))
     if billing_date is None:
-        return report
+        return apply_exclusions(report)
 
     applicable = charges_for_billing(billing_date)
     if not applicable:
-        return report
+        return apply_exclusions(report)
 
     charge_by_id = {c["id"]: c for c in applicable}
     charge_date = fixed_charge_date_for_billing(billing_date)
@@ -126,6 +128,7 @@ def augment_report(report: SpendingReport) -> SpendingReport:
         )
 
     if not new_txs and updated_txs == list(report.transactions):
-        return report
+        return apply_exclusions(report)
 
-    return analyze_spending(updated_txs + new_txs, dict(report.metadata))
+    result = analyze_spending(updated_txs + new_txs, dict(report.metadata))
+    return apply_exclusions(result)

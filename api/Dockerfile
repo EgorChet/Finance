@@ -5,6 +5,7 @@ RUN npm install
 COPY api/tsconfig.json ./
 COPY api/src ./src
 COPY data/fixed_charges.json ./data/fixed_charges.json
+COPY data/excluded_transactions.json ./data/excluded_transactions.json
 RUN npm run build
 ENV DATA_DIR=/app/data
 ENV PORT=3000

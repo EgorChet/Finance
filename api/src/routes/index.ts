@@ -3,7 +3,7 @@ import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
 import { analyzeFileBuffer, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
-import { augmentReport } from "../services/fixedCharges.js";
+import { finalizeReport } from "../services/reportService.js";
 import {
   getCombinedReport,
   isCachedFile,
@@ -175,7 +175,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const key = rememberReport(data, report, savedPath, filename, hash);
     applyMerchantRules(data, rules);
     await writeStatements(data);
-    res.json({ key, report: augmentReport(data.statements[key]!.report) });
+    res.json({ key, report: finalizeReport(data.statements[key]!.report) });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const warming =
