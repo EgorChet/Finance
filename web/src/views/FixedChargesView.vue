@@ -7,7 +7,7 @@
       <div>
         <h2 style="margin: 0 0 0.35rem">Recurring bills</h2>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0">
-          Rent, loans, and other monthly charges added to statement totals and pace. Set amount and date range per period — add a new segment when a payment changes or ends.
+          Rent, loans, and other monthly charges added to statement totals and pace. Set amount and date range per period — tick No end when a bill has no finish date.
         </p>
       </div>
       <button
@@ -64,6 +64,7 @@
                   <th>Amount</th>
                   <th>From</th>
                   <th>Through</th>
+                  <th class="recurring-ongoing-col">Ongoing</th>
                   <th>Status</th>
                   <th v-if="!auth.isDemo"></th>
                 </tr>
@@ -74,7 +75,7 @@
                     <input
                       v-if="!auth.isDemo"
                       v-model.number="seg.amount"
-                      class="input recurring-amount-input"
+                      class="input input-compact recurring-amount-input"
                       type="number"
                       min="0"
                       step="0.01"
@@ -86,31 +87,35 @@
                     <input
                       v-if="!auth.isDemo"
                       v-model="seg.from_month"
-                      class="input recurring-month-input"
+                      class="input input-compact recurring-month-input"
                       type="month"
                       @input="markDirty"
                     />
                     <span v-else>{{ ymToLabel(seg.from_month) }}</span>
                   </td>
                   <td>
-                    <div v-if="!auth.isDemo" class="recurring-through-cell">
-                      <input
-                        v-model="seg.through_month"
-                        class="input recurring-month-input"
-                        type="month"
-                        :disabled="isOngoingThrough(seg.through_month)"
-                        @input="markDirty"
-                      />
-                      <label class="recurring-ongoing">
-                        <input
-                          type="checkbox"
-                          :checked="isOngoingThrough(seg.through_month)"
-                          @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
-                        />
-                        Ongoing
-                      </label>
-                    </div>
+                    <input
+                      v-if="!auth.isDemo"
+                      v-model="seg.through_month"
+                      class="input input-compact recurring-month-input"
+                      type="month"
+                      :disabled="isOngoingThrough(seg.through_month)"
+                      @input="markDirty"
+                    />
                     <span v-else>{{ throughLabel(seg.through_month) }}</span>
+                  </td>
+                  <td v-if="!auth.isDemo" class="recurring-ongoing-cell">
+                    <label class="recurring-ongoing" :title="'No end date — runs every month'">
+                      <input
+                        type="checkbox"
+                        :checked="isOngoingThrough(seg.through_month)"
+                        @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
+                      />
+                      <span class="recurring-ongoing-text">No end</span>
+                    </label>
+                  </td>
+                  <td v-else class="recurring-ongoing-cell">
+                    <span class="recurring-ongoing-readonly">{{ isOngoingThrough(seg.through_month) ? "Yes" : "—" }}</span>
                   </td>
                   <td>
                     <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
@@ -141,24 +146,22 @@
       <section v-if="!auth.isDemo" class="recurring-add">
         <h3 style="margin: 0 0 0.75rem">Add recurring bill</h3>
         <div class="recurring-add-grid">
-          <input v-model="newCharge.name_en" class="input" placeholder="Name (English)" />
-          <input v-model="newCharge.name_he" class="input" placeholder="Name (Hebrew, optional)" />
-          <input v-model="newCharge.category_en" class="input" list="recurring-cats" placeholder="Category" />
-          <input v-model.number="newCharge.amount" class="input" type="number" min="0" step="0.01" placeholder="Amount ₪" />
-          <input v-model="newCharge.from_month" class="input" type="month" />
-          <div class="recurring-through-cell">
-            <input
-              v-model="newCharge.through_month"
-              class="input"
-              type="month"
-              :disabled="newOngoing"
-            />
-            <label class="recurring-ongoing">
-              <input v-model="newOngoing" type="checkbox" />
-              Ongoing
-            </label>
-          </div>
-          <button type="button" class="btn btn-primary" @click="addCharge">Add bill</button>
+          <input v-model="newCharge.name_en" class="input input-compact" placeholder="Name (English)" />
+          <input v-model="newCharge.name_he" class="input input-compact" placeholder="Name (Hebrew, optional)" />
+          <input v-model="newCharge.category_en" class="input input-compact" list="recurring-cats" placeholder="Category" />
+          <input v-model.number="newCharge.amount" class="input input-compact" type="number" min="0" step="0.01" placeholder="Amount ₪" />
+          <input v-model="newCharge.from_month" class="input input-compact recurring-month-input" type="month" />
+          <input
+            v-model="newCharge.through_month"
+            class="input input-compact recurring-month-input"
+            type="month"
+            :disabled="newOngoing"
+          />
+          <label class="recurring-ongoing recurring-add-ongoing" title="No end date — runs every month">
+            <input v-model="newOngoing" type="checkbox" />
+            <span class="recurring-ongoing-text">No end</span>
+          </label>
+          <button type="button" class="btn btn-primary recurring-add-btn" @click="addCharge">Add bill</button>
         </div>
         <datalist id="recurring-cats">
           <option v-for="c in categories" :key="c" :value="c" />

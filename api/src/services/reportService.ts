@@ -14,6 +14,7 @@ import { applyExclusions } from "./exclusions.js";
 /** Retired categories merged into another for display and totals. */
 const CATEGORY_ALIASES: Record<string, string> = {
   "Sibus Flexi": "Groceries",
+  "Home & Electronics": "Home & Furniture",
 };
 
 function remapLegacyCategories(report: SpendingReport): SpendingReport {

@@ -43,7 +43,7 @@
         <div v-else-if="isHomeView" class="category-drilldown">
           <div class="category-drilldown-header">
             <div>
-              <h3 class="category-drilldown-title">{{ HOME_ELECTRONICS }}</h3>
+              <h3 class="category-drilldown-title">{{ HOME_LIVING }}</h3>
               <p class="category-drilldown-total">{{ formatIls(homeTotal) }}</p>
               <p class="category-drilldown-meta">Tap a section to see merchants and charges</p>
             </div>
@@ -226,7 +226,7 @@ import type { MonthItem, SpendingReport, Transaction } from "../types";
 import {
   CATEGORY_PICKLIST,
   groupCategoriesForPie,
-  HOME_ELECTRONICS,
+  HOME_LIVING,
   homeSubsectionLabel,
   isHomeSubsection,
   isOtherBucketLabel,
@@ -237,7 +237,6 @@ import {
 import {
   buildCycleReport,
   cycleStartFromMonthKey,
-  currentCycleMonthKey,
   getCycleRangeForStart,
   isCycleMonthKey,
   loadCycleDay,
@@ -337,7 +336,7 @@ const displayCategories = computed(() =>
 const homeSubsections = computed(() => {
   if (!report.value) return [];
   return report.value.by_category
-    .filter((c) => isHomeSubsection(c.category_en) && c.category_en !== HOME_ELECTRONICS)
+    .filter((c) => isHomeSubsection(c.category_en) && c.category_en !== HOME_LIVING)
     .sort((a, b) => b.total - a.total);
 });
 
@@ -354,7 +353,7 @@ const subscriptionsTotal = computed(() =>
   roundMoney(subscriptionSubsectionRows.value.reduce((s, r) => s + r.total, 0)),
 );
 
-const isHomeView = computed(() => app.selectedCategory === HOME_ELECTRONICS);
+const isHomeView = computed(() => app.selectedCategory === HOME_LIVING);
 const isHomeChild = computed(() =>
   homeSubsections.value.some((r) => r.category_en === app.selectedCategory),
 );
@@ -464,7 +463,7 @@ const transactionTitle = computed(() => {
 
 const backLabel = computed(() => {
   if (isOtherChild.value) return "← Other";
-  if (isHomeChild.value) return `← ${HOME_ELECTRONICS}`;
+  if (isHomeChild.value) return `← ${HOME_LIVING}`;
   if (isSubscriptionsChild.value) return "← Subscriptions";
   return "← All categories";
 });
@@ -526,7 +525,7 @@ function goBack() {
   if (isOtherChild.value) {
     app.selectedCategory = OTHER_BUCKET;
   } else if (isHomeChild.value) {
-    app.selectedCategory = HOME_ELECTRONICS;
+    app.selectedCategory = HOME_LIVING;
   } else if (isSubscriptionsChild.value) {
     app.selectedCategory = "Subscriptions";
   } else {
@@ -682,13 +681,10 @@ async function loadMonths() {
       month: billingCycleLabel(row.billing_date),
     }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
-    const latest = m.months.length
-      ? [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]!.billing_date
-      : null;
+    const sortedMonths = [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
+    const latest = sortedMonths[0]?.billing_date ?? null;
     const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value, latest);
-    const currentKey = currentCycleMonthKey(cycleDay.value);
-    const hasCurrent = merged.some((x) => x.key === currentKey);
-    const initial = hasCurrent ? currentKey : m.months[0]?.key ?? null;
+    const initial = sortedMonths[0]?.key ?? merged[0]?.key ?? null;
     selectedMonth.value = initial;
     await refreshReport(initial);
   } catch (e) {

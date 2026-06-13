@@ -295,6 +295,11 @@ button {
   font-size: 0.9rem;
 }
 
+.demo-banner.import-error {
+  background: color-mix(in srgb, #f87171 12%, var(--surface));
+  border-color: #f87171;
+}
+
 .app-layout {
   min-height: 100vh;
   min-height: 100dvh;
@@ -893,27 +898,102 @@ table.rules select {
   flex-wrap: wrap;
 }
 
+.recurring-table td,
+.recurring-table th {
+  vertical-align: middle;
+  padding: 0.45rem 0.35rem;
+}
+
+.recurring-table .input-compact,
+.recurring-table input[type="month"],
+.recurring-table input[type="number"] {
+  height: 2.125rem;
+  min-height: 2.125rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  margin: 0;
+}
+
 .recurring-table .recurring-amount-input {
-  width: 6.5rem;
+  width: 6.75rem;
+  min-width: 6.75rem;
 }
 
 .recurring-month-input {
-  width: 9.5rem;
+  width: 10.25rem;
+  min-width: 10.25rem;
+  max-width: 100%;
 }
 
-.recurring-through-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+/* Month picker icon — visible on dark surfaces */
+.recurring-table input[type="month"],
+.recurring-add-grid input[type="month"] {
+  color-scheme: dark;
+}
+
+[data-theme="light"] .recurring-table input[type="month"],
+[data-theme="light"] .recurring-add-grid input[type="month"] {
+  color-scheme: light;
+}
+
+.recurring-table input[type="month"]::-webkit-calendar-picker-indicator,
+.recurring-add-grid input[type="month"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: invert(0.85);
+}
+
+[data-theme="light"] .recurring-table input[type="month"]::-webkit-calendar-picker-indicator,
+[data-theme="light"] .recurring-add-grid input[type="month"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.55;
+}
+
+.recurring-table input[type="month"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.recurring-ongoing-col {
+  width: 4.5rem;
+  text-align: center;
+}
+
+.recurring-ongoing-cell {
+  text-align: center;
+  width: 4.5rem;
 }
 
 .recurring-ongoing {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
+  margin: 0;
   font-size: 0.8rem;
   color: var(--text-muted);
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.recurring-ongoing input[type="checkbox"] {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.recurring-ongoing-text {
+  line-height: 1;
+}
+
+.recurring-ongoing-readonly {
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .recurring-status {
@@ -947,9 +1027,27 @@ table.rules select {
 
 .recurring-add-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
   gap: 0.5rem;
   align-items: end;
+}
+
+.recurring-add-grid .input-compact {
+  height: 2.125rem;
+  min-height: 2.125rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.recurring-add-ongoing {
+  height: 2.125rem;
+  padding: 0 0.25rem;
+  align-self: end;
+}
+
+.recurring-add-btn {
+  height: 2.125rem;
+  align-self: end;
 }
 
 .login-page {

@@ -9,9 +9,8 @@ export const SPENDING_CATEGORIES = [
   "Government & Institutions",
   "Groceries",
   "Health & Medical",
-  "Home & Electronics",
+  "Home & Living",
   "Housing",
-  "Hookah",
   "Kids",
   "Leisure & Entertainment",
   "Miscellaneous",
@@ -23,16 +22,21 @@ export const SPENDING_CATEGORIES = [
   "Uncategorized",
 ] as const;
 
-/** Umbrella category for home, furniture, electronics, beauty, and pets. */
-export const HOME_ELECTRONICS = "Home & Electronics";
+/** Umbrella category for home, furniture, electronics, beauty, pets, and hookah. */
+export const HOME_LIVING = "Home & Living";
 
-/** Fine-grained labels stored on transactions; rolled up to HOME_ELECTRONICS in charts. */
+/** @deprecated alias — rolled up to Home & Living */
+export const HOME_ELECTRONICS = HOME_LIVING;
+
+/** Fine-grained labels stored on transactions; rolled up to HOME_LIVING in charts. */
 export const HOME_SUBSECTIONS = new Set([
-  HOME_ELECTRONICS,
+  HOME_LIVING,
   "Home & Furniture",
   "Electronics & computers",
   "Beauty & Personal Care",
   "Pets",
+  "Hookah",
+  "Home & Electronics",
 ]);
 
 export const HOME_SUBSECTION_LABELS: Record<string, string> = {
@@ -40,7 +44,9 @@ export const HOME_SUBSECTION_LABELS: Record<string, string> = {
   "Electronics & computers": "Electronics",
   "Beauty & Personal Care": "Beauty & personal care",
   Pets: "Pets",
-  [HOME_ELECTRONICS]: "General",
+  Hookah: "Hookah",
+  [HOME_LIVING]: "General",
+  "Home & Electronics": "General",
 };
 
 /** Fine-grained labels rolled up to Subscriptions in charts. */
@@ -62,7 +68,7 @@ export function isOtherBucketLabel(name: string): boolean {
 
 export function rollupCategory(category: string): string {
   const cat = category.trim() || "Uncategorized";
-  if (HOME_SUBSECTIONS.has(cat)) return HOME_ELECTRONICS;
+  if (HOME_SUBSECTIONS.has(cat)) return HOME_LIVING;
   if (SUBSCRIPTION_SUBSECTIONS.has(cat)) return "Subscriptions";
   return cat;
 }
@@ -125,6 +131,7 @@ export const CATEGORY_PICKLIST = [
   "Electronics & computers",
   "Fitness",
   "Home & Furniture",
+  "Hookah",
   "Mobile phone",
   "Pets",
 ] as const;
