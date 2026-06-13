@@ -1,8 +1,21 @@
 import type { MerchantRules, SpendingReport, StatementsData } from "../types.js";
 
-const ANALYZER_URL = process.env.ANALYZER_URL || "http://127.0.0.1:8001";
+/** Render `hostport` is `hostname:port` without a scheme — Node fetch needs http:// */
+export function normalizeAnalyzerUrl(raw: string | undefined): string {
+  const fallback = "http://127.0.0.1:8001";
+  if (!raw?.trim()) return fallback;
+  let url = raw.trim();
+  if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+  return url.replace(/\/$/, "");
+}
+
+const ANALYZER_URL = normalizeAnalyzerUrl(process.env.ANALYZER_URL);
 const ANALYZER_TIMEOUT_MS = Number(process.env.ANALYZER_TIMEOUT_MS || 120_000);
 const ANALYZER_WARMUP_ATTEMPTS = Number(process.env.ANALYZER_WARMUP_ATTEMPTS || 3);
+
+if (process.env.NODE_ENV !== "test") {
+  console.log(`Analyzer URL: ${ANALYZER_URL}`);
+}
 
 async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
