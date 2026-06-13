@@ -6,13 +6,14 @@
       Demo mode — sample spending data. Sign in to see your real statements.
     </div>
     <h2 style="margin: 0 0 1rem">Spending overview</h2>
-    <MonthPicker :model-value="selectedMonth" :months="months" @update:model-value="onMonthSelected" />
+    <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics :report="report" @select-category="onCategory" />
     <PaceCard
-      v-if="paceTransactions.length"
+      v-if="isCurrentCycleSelected && paceTransactions.length"
       :transactions="paceTransactions"
       :latest-billing-date="latestBillingDate"
+      @settings-change="onPaceSettingsChange"
     />
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid">
@@ -141,6 +142,17 @@ import {
   OTHER_BUCKET,
   SPENDING_CATEGORIES,
 } from "../categories";
+import {
+  buildCycleReport,
+  cycleStartFromMonthKey,
+  currentCycleMonthKey,
+  getCycleRangeForStart,
+  isCycleMonthKey,
+  loadCycleDay,
+  loadManualCycleSpend,
+  loadPaceIncludeFixed,
+  mergeMonthsWithCurrentCycle,
+} from "../utils/pace";
 import { formatIls, monthLabelFromIso, roundMoney } from "../utils/format";
 
 const categories = SPENDING_CATEGORIES;
@@ -165,6 +177,19 @@ const selectedMonth = ref<string | null>(null);
 const search = ref("");
 const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
+const cycleDay = ref(loadCycleDay());
+
+const latestBillingDate = computed(() => {
+  if (!months.value.length) return null;
+  const sorted = [...months.value].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
+  return sorted[0]?.billing_date ?? null;
+});
+
+const displayMonths = computed(() =>
+  mergeMonthsWithCurrentCycle(months.value, cycleDay.value, latestBillingDate.value),
+);
+
+const isCurrentCycleSelected = computed(() => isCycleMonthKey(selectedMonth.value));
 
 const pieGroup = computed(() =>
   report.value ? groupCategoriesForPie(report.value.by_category) : { top: [], other: [] },
@@ -180,14 +205,11 @@ const isOtherChild = computed(
 );
 
 const statementBilling = computed(() => {
-  const billing = report.value?.metadata.billing_date as string | undefined;
+  const meta = report.value?.metadata;
+  const label = meta?.month_label as string | undefined;
+  if (label) return label;
+  const billing = meta?.billing_date as string | undefined;
   return billing ? monthLabelFromIso(billing) : null;
-});
-
-const latestBillingDate = computed(() => {
-  if (!months.value.length) return null;
-  const sorted = [...months.value].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
-  return sorted[0]?.billing_date ?? null;
 });
 
 const paceTransactions = computed(() => paceReport.value?.transactions ?? []);
@@ -328,7 +350,23 @@ async function saveLabel(row: SearchMerchantRow) {
 
 let reportRequestId = 0;
 
+function buildLocalCycleReport(monthKey: string): SpendingReport {
+  const txs = paceReport.value?.transactions ?? [];
+  const start = cycleStartFromMonthKey(monthKey);
+  const { end } = getCycleRangeForStart(start, cycleDay.value);
+  return buildCycleReport(txs, start, end, {
+    includeFixed: loadPaceIncludeFixed(),
+    manualSpend: loadManualCycleSpend(start),
+  });
+}
+
 async function refreshReport(month: string | null = selectedMonth.value) {
+  if (month && isCycleMonthKey(month)) {
+    if (!paceReport.value) await refreshPaceReport();
+    report.value = buildLocalCycleReport(month);
+    error.value = "";
+    return;
+  }
   const reqId = ++reportRequestId;
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -359,6 +397,13 @@ async function onMonthSelected(month: string | null) {
   await refreshReport(month);
 }
 
+function onPaceSettingsChange() {
+  cycleDay.value = loadCycleDay();
+  if (isCycleMonthKey(selectedMonth.value)) {
+    void refreshReport(selectedMonth.value);
+  }
+}
+
 async function loadMonths() {
   loading.value = true;
   error.value = "";
@@ -368,9 +413,16 @@ async function loadMonths() {
     const m = await fetchMonths(demo, token);
     months.value = m.months;
     summary.value = m.summary;
-    const initial = m.months[0]?.key ?? null;
+    await refreshPaceReport();
+    const latest = m.months.length
+      ? [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]!.billing_date
+      : null;
+    const merged = mergeMonthsWithCurrentCycle(m.months, cycleDay.value, latest);
+    const currentKey = currentCycleMonthKey(cycleDay.value);
+    const hasCurrent = merged.some((x) => x.key === currentKey);
+    const initial = hasCurrent ? currentKey : m.months[0]?.key ?? null;
     selectedMonth.value = initial;
-    await Promise.all([refreshReport(initial), refreshPaceReport()]);
+    await refreshReport(initial);
   } catch (e) {
     error.value = String(e);
   } finally {

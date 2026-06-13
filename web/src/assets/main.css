@@ -249,6 +249,11 @@ button {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+.pill-current.active {
+  border-style: solid;
+  font-weight: 600;
+}
+
 .charge-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -293,6 +298,13 @@ button {
 .app-layout {
   min-height: 100vh;
   min-height: 100dvh;
+  --gutter-x: 0.65rem;
+}
+
+@media (min-width: 768px) {
+  .app-layout {
+    --gutter-x: 1rem;
+  }
 }
 
 .app-header {
@@ -302,8 +314,10 @@ button {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 1rem;
+  padding: 0.65rem var(--gutter-x);
   padding-top: max(0.65rem, env(safe-area-inset-top));
+  padding-left: max(var(--gutter-x), env(safe-area-inset-left));
+  padding-right: max(var(--gutter-x), env(safe-area-inset-right));
   background: var(--sidebar);
   border-bottom: 1px solid var(--border);
 }
@@ -401,10 +415,18 @@ button {
 }
 
 .main {
-  padding: 1.25rem 1.75rem 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  padding: 1rem var(--gutter-x) 1.5rem;
+  padding-left: max(var(--gutter-x), env(safe-area-inset-left));
+  padding-right: max(var(--gutter-x), env(safe-area-inset-right));
   width: 100%;
+  max-width: none;
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding-top: 1.25rem;
+    padding-bottom: 2rem;
+  }
 }
 
 .explorer-grid {
@@ -420,10 +442,6 @@ button {
 }
 
 @media (max-width: 640px) {
-  .main {
-    padding: 1rem 1rem 1.5rem;
-  }
-
   .btn {
     padding: 0.65rem 1rem;
     min-height: 44px;
@@ -477,21 +495,23 @@ button {
   .category-drilldown-total {
     font-size: 1.35rem;
   }
+}
 
-  .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 -1rem;
-    padding: 0 1rem;
-  }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-left: calc(-1 * var(--gutter-x));
+  margin-right: calc(-1 * var(--gutter-x));
+  padding-left: var(--gutter-x);
+  padding-right: var(--gutter-x);
+}
 
-  .table-scroll table.rules th:first-child,
-  .table-scroll table.rules td:first-child {
-    position: sticky;
-    left: 0;
-    background: var(--surface);
-    z-index: 1;
-  }
+.table-scroll table.rules th:first-child,
+.table-scroll table.rules td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
 }
 
 .legend-btn {
@@ -671,6 +691,29 @@ table.rules select {
   margin-top: 0.25rem;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.pace-manual {
+  margin-bottom: 0.85rem;
+}
+
+.pace-manual-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.pace-manual-input {
+  max-width: 100%;
+  width: min(100%, 240px);
+}
+
+.pace-manual-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .pace-card {

@@ -40,6 +40,10 @@ export function formatTransactionDate(dateStr: string): string {
 
 /** Billing month(s) for the selected view — not purchase-date span from split payments. */
 export function formatBillingPeriod(metadata: Record<string, unknown>): string {
+  if (metadata.in_progress) {
+    const label = metadata.month_label as string | undefined;
+    if (label) return `${label} · in progress`;
+  }
   const combined = metadata.combined_billing_dates as string[] | undefined;
   if (combined?.length) {
     const sorted = [...combined].sort();
