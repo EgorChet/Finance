@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import { warmAnalyzer, normalizeAnalyzerUrl } from "./services/analyzerClient.js";
 import { requireAuth } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
@@ -29,8 +30,19 @@ app.use(
 );
 app.use(express.json({ limit: "50mb" }));
 
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+app.get("/health", async (req, res) => {
+  const deep = req.query.deep === "1" || req.query.deep === "true";
+  if (!deep) {
+    res.json({ status: "ok" });
+    return;
+  }
+  const analyzer = await warmAnalyzer();
+  res.json({
+    status: "ok",
+    analyzer,
+    analyzer_url: normalizeAnalyzerUrl(process.env.ANALYZER_URL),
+    analyzer_env_set: !!process.env.ANALYZER_URL?.trim(),
+  });
 });
 
 app.use("/api/auth", authRoutes);

@@ -79,6 +79,34 @@ Re-run after big local changes if you want production to match.
 4. Wait for both services (API + analyzer) to go green.
 5. Copy the API URL, e.g. `https://finance-api-xxxx.onrender.com`.
 
+**Verify API ↔ analyzer link** (no login needed):
+
+```bash
+curl "https://YOUR_API.onrender.com/health?deep=1"
+```
+
+You want:
+
+```json
+{ "status": "ok", "analyzer": true, "analyzer_env_set": true, "analyzer_url": "http://finance-analyzer-xxxx:10000" }
+```
+
+If `analyzer_env_set` is **false** → `ANALYZER_URL` was never wired. Re-apply the Blueprint or set it manually (see troubleshooting below).
+
+If `analyzer` is **false** → API cannot reach the Python service (wrong port, analyzer asleep, or not deployed).
+
+**Render dashboard checklist**
+
+| Check | Where | Expected |
+|-------|--------|----------|
+| Two web services | Dashboard | `finance-api` **and** `finance-analyzer` |
+| Same Blueprint | Both service pages | Created from `render.yaml` together |
+| `ANALYZER_URL` on API | finance-api → Environment | Value like `finance-analyzer-xxxx:10000` (from **Link service**) |
+| Analyzer healthy | finance-analyzer → Logs | `Uvicorn running on 0.0.0.0:10000` |
+| API log on start | finance-api → Logs | `Analyzer URL: http://finance-analyzer-...` |
+
+To link manually if Blueprint missed it: **finance-api** → **Environment** → add `ANALYZER_URL` → **Add from** → select **finance-analyzer** → **Host and port**.
+
 **First request after idle** may take ~30s (Render free tier cold start).
 
 ---
