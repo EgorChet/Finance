@@ -42,7 +42,7 @@ router.get("/health", async (req, res) => {
     return;
   }
   const analyzer = await warmAnalyzer();
-  res.json({ status: "ok", analyzer });
+  res.json({ status: "ok", analyzer, analyzer_url: process.env.ANALYZER_URL ? "set" : "missing" });
 });
 
 function sanitizeUploadFilename(name: string): string {
@@ -182,6 +182,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       message.includes("abort") ||
       message.includes("fetch failed") ||
       message.includes("ECONNREFUSED") ||
+      message.includes("Analyzer unreachable") ||
+      message.includes("Analyzer not ready") ||
       message.includes("Analyzer error");
     console.error("Upload failed:", message);
     res.status(warming ? 503 : 500).json({

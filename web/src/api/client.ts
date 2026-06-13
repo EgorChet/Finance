@@ -116,11 +116,18 @@ export async function uploadStatement(file: File, token?: string, autoTranslate 
   const form = new FormData();
   form.append("file", file);
   form.append("auto_translate", String(autoTranslate));
-  const res = await fetch(`${prefix(false)}/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${prefix(false)}/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the API. If you just opened the app, wait ~30 seconds for Render to wake up and try again.",
+    );
+  }
   if (!res.ok) throw new Error(await readApiError(res));
   return res.json();
 }

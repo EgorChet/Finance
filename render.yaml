@@ -31,3 +31,4 @@ services:
     dockerfilePath: ./analyzer_api/Dockerfile
     dockerContext: .
     plan: free
+    healthCheckPath: /health

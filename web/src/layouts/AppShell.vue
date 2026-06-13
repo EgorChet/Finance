@@ -79,7 +79,7 @@
 import { computed, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import { syncStatements, uploadStatement, warmApi } from "../api/client";
+import { syncStatements, uploadStatement } from "../api/client";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 
@@ -169,8 +169,6 @@ async function runUpload(file: File) {
   beginProcess("Processing statement", file.name, UPLOAD_STEPS);
   try {
     processStep.value = 0;
-    await warmApi(auth.token || undefined);
-    processStep.value = 1;
     startStepTimer(UPLOAD_STEPS.length - 2);
     await uploadStatement(file, auth.token || undefined);
     clearStepTimer();

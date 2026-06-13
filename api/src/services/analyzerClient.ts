@@ -22,6 +22,10 @@ async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response
   const timer = setTimeout(() => controller.abort(), ANALYZER_TIMEOUT_MS);
   try {
     return await fetch(`${ANALYZER_URL}${path}`, { ...init, signal: controller.signal });
+  } catch (e) {
+    const cause = e instanceof Error && "cause" in e ? String((e as Error & { cause?: unknown }).cause) : "";
+    const detail = cause ? ` (${cause})` : "";
+    throw new Error(`Analyzer unreachable at ${ANALYZER_URL}${path}${detail}`);
   } finally {
     clearTimeout(timer);
   }
@@ -48,7 +52,10 @@ export async function analyzeFileBuffer(
   filename: string,
   autoTranslate = true,
 ): Promise<SpendingReport> {
-  await warmAnalyzer();
+  const ready = await warmAnalyzer();
+  if (!ready) {
+    throw new Error(`Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT.`);
+  }
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(buffer)]), filename);
   const url = `/analyze-file?auto_translate=${autoTranslate}`;
