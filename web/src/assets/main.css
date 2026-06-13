@@ -1054,6 +1054,35 @@ button {
     padding: 0.55rem 0.65rem;
   }
 
+  .category-accordion-trigger {
+    min-height: 3.5rem;
+    padding: 0.85rem 0.95rem;
+    font-size: 1.05rem;
+  }
+
+  .category-accordion-trigger .legend-btn-name {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 1.05rem;
+  }
+
+  .category-accordion-trigger .legend-btn-amount {
+    font-size: 1.05rem;
+  }
+
+  .category-accordion-trigger .legend-btn-right {
+    min-width: 5rem;
+  }
+
+  .category-accordion-nested-trigger {
+    min-height: 3rem;
+    padding: 0.8rem 0.85rem;
+    font-size: 1rem;
+  }
+
   .legend-btn-name {
     white-space: normal;
     line-height: 1.25;
@@ -1194,7 +1223,7 @@ button {
 .category-accordion-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .category-accordion-item {
@@ -1217,10 +1246,38 @@ button {
 .category-accordion-trigger {
   margin-bottom: 0;
   border-radius: 10px;
+  min-height: 3.25rem;
+  padding: 0.75rem 0.9rem;
+  font-size: 1rem;
+}
+
+.category-accordion-trigger .legend-btn-left {
+  gap: 0.65rem;
+}
+
+.category-accordion-trigger .legend-btn-name {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.category-accordion-trigger .legend-btn-amount {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.category-accordion-trigger .legend-btn-pct {
+  font-size: 0.82rem;
+}
+
+.category-accordion-trigger .swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
 }
 
 .category-accordion-chevron {
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
   margin-left: 0.35rem;
 }
@@ -1260,12 +1317,14 @@ button {
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.55rem 0.65rem;
+  min-height: 2.85rem;
+  padding: 0.7rem 0.8rem;
   border: none;
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
