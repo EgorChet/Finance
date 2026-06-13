@@ -18,7 +18,7 @@
 import { computed } from "vue";
 import type { CategorySummary } from "../types";
 import { CHART_COLORS, formatIls, roundMoney } from "../utils/format";
-import { TOP_PIE_CATEGORIES } from "../categories";
+import { groupCategoriesForPie, otherBucketLabel } from "../categories";
 
 const props = defineProps<{ categories: CategorySummary[] }>();
 defineEmits<{ select: [string] }>();
@@ -26,14 +26,12 @@ defineEmits<{ select: [string] }>();
 const colors = CHART_COLORS;
 
 const items = computed(() => {
-  const sorted = [...props.categories].sort((a, b) => b.total - a.total);
-  const top = sorted.slice(0, TOP_PIE_CATEGORIES);
-  const rest = sorted.slice(TOP_PIE_CATEGORIES);
+  const { top, other } = groupCategoriesForPie(props.categories);
   const result = top.map((c) => ({ name: c.category_en, value: roundMoney(c.total) }));
-  if (rest.length) {
+  if (other.length) {
     result.push({
-      name: `Other (${rest.length} categories)`,
-      value: roundMoney(rest.reduce((s, c) => s + c.total, 0)),
+      name: otherBucketLabel(other.length),
+      value: roundMoney(other.reduce((s, c) => s + c.total, 0)),
     });
   }
   return result;

@@ -32,6 +32,27 @@ export const SPENDING_CATEGORIES = [
 /** How many categories get their own pie slice before the rest roll into "Other". */
 export const TOP_PIE_CATEGORIES = 14;
 
+/** Internal key for the "Other" bucket drill-down view. */
+export const OTHER_BUCKET = "__other__";
+
+export function otherBucketLabel(count: number): string {
+  return `Other (${count} categories)`;
+}
+
+export function isOtherBucketLabel(name: string): boolean {
+  return name.startsWith("Other (");
+}
+
+export function groupCategoriesForPie(
+  categories: { category_en: string; total: number; count?: number; share_pct?: number }[],
+) {
+  const sorted = [...categories].sort((a, b) => b.total - a.total);
+  return {
+    top: sorted.slice(0, TOP_PIE_CATEGORIES),
+    other: sorted.slice(TOP_PIE_CATEGORIES),
+  };
+}
+
 /** Recurring bills and obligations — everything else counts as variable spending. */
 export const FIXED_COST_CATEGORIES = new Set<string>([
   "Bank fees",

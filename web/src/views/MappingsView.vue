@@ -14,7 +14,8 @@
         <input type="file" accept=".json" hidden @change="importJson" />
       </label>
     </div>
-    <table class="rules">
+    <div class="table-scroll">
+      <table class="rules">
       <thead>
         <tr>
           <th>Hebrew</th>
@@ -34,6 +35,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
     <datalist id="spending-cats">
       <option v-for="c in categories" :key="c" :value="c" />
     </datalist>

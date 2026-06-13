@@ -1,43 +1,55 @@
 <template>
-  <div class="layout">
-    <aside class="sidebar">
-      <h1>Finance</h1>
-      <RouterLink class="nav-link" to="/app/overview">Overview</RouterLink>
-      <RouterLink class="nav-link" to="/app/mappings">Mappings</RouterLink>
-      <RouterLink class="nav-link" to="/app/review">Review</RouterLink>
-      <hr style="border-color: var(--border); margin: 1rem 0" />
-      <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--text-muted)">
-        <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
-        Light mode
-      </label>
-      <template v-if="!auth.isDemo">
-        <button
-          v-if="showLocalSync"
-          class="btn"
-          style="width: 100%; margin-top: 1rem"
-          :disabled="syncing"
-          @click="sync"
-        >
-          {{ syncing ? "Syncing…" : "Sync .xlsx files" }}
-        </button>
-        <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
-        <button
-          class="btn"
-          style="width: 100%; margin-top: 0.5rem"
-          :disabled="uploading"
-          @click="uploadInput?.click()"
-        >
-          {{ uploading ? "Uploading…" : "Upload statement" }}
-        </button>
-        <p v-if="uploadName" class="sidebar-note">{{ uploadName }}</p>
-      </template>
-      <button v-if="auth.authRequired && auth.isAuthenticated" class="btn" style="width: 100%; margin-top: 1rem" @click="logout">
-        Sign out
-      </button>
-      <button v-if="auth.isDemo" class="btn" style="width: 100%; margin-top: 1rem" @click="goLogin">
-        Sign in for real data
-      </button>
-    </aside>
+  <div class="app-layout">
+    <header class="app-header">
+      <h1 class="app-title">Finance</h1>
+      <nav class="app-nav">
+        <RouterLink class="nav-tab" to="/app/overview">Overview</RouterLink>
+        <RouterLink class="nav-tab" to="/app/mappings">Mappings</RouterLink>
+        <RouterLink class="nav-tab" to="/app/review">Review</RouterLink>
+      </nav>
+      <div class="app-header-actions">
+        <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
+        <div v-if="menuOpen" class="app-menu-backdrop" @click="menuOpen = false" />
+        <div v-if="menuOpen" class="app-menu">
+          <label class="app-menu-item">
+            <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
+            Light mode
+          </label>
+          <template v-if="!auth.isDemo">
+            <button
+              v-if="showLocalSync"
+              type="button"
+              class="app-menu-item btn"
+              :disabled="syncing"
+              @click="sync"
+            >
+              {{ syncing ? "Syncing…" : "Sync .xlsx files" }}
+            </button>
+            <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
+            <button
+              type="button"
+              class="app-menu-item btn"
+              :disabled="uploading"
+              @click="uploadInput?.click()"
+            >
+              {{ uploading ? "Uploading…" : "Upload statement" }}
+            </button>
+            <p v-if="uploadName" class="app-menu-note">{{ uploadName }}</p>
+          </template>
+          <button
+            v-if="auth.authRequired && auth.isAuthenticated"
+            type="button"
+            class="app-menu-item btn"
+            @click="logout"
+          >
+            Sign out
+          </button>
+          <button v-if="auth.isDemo" type="button" class="app-menu-item btn" @click="goLogin">
+            Sign in for real data
+          </button>
+        </div>
+      </div>
+    </header>
     <main class="main">
       <RouterView />
     </main>
@@ -58,11 +70,12 @@ const syncing = ref(false);
 const uploading = ref(false);
 const uploadName = ref("");
 const uploadInput = ref<HTMLInputElement | null>(null);
+const menuOpen = ref(false);
 
-/** Sync reads local `statements/` folder — only available when the UI talks to localhost. */
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
 async function sync() {
+  menuOpen.value = false;
   syncing.value = true;
   try {
     await syncStatements(auth.token || undefined);
@@ -73,6 +86,7 @@ async function sync() {
 }
 
 async function onUpload(e: Event) {
+  menuOpen.value = false;
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
@@ -89,11 +103,13 @@ async function onUpload(e: Event) {
 }
 
 function logout() {
+  menuOpen.value = false;
   auth.logout();
   router.push("/");
 }
 
 function goLogin() {
+  menuOpen.value = false;
   router.push("/");
 }
 </script>

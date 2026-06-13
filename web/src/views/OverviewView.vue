@@ -9,16 +9,42 @@
     <MonthPicker :model-value="selectedMonth" :months="months" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics :report="report" @select-category="onCategory" />
+    <PaceCard
+      v-if="paceTransactions.length"
+      :transactions="paceTransactions"
+      :latest-billing-date="latestBillingDate"
+    />
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid">
       <div>
         <CategoryPieChart :categories="report.by_category" :selected="app.selectedCategory" @select="onCategory" />
-        <p v-if="app.selectedCategory && selectedCategoryStats" class="category-pie-note">
-          Selected · {{ formatIls(selectedCategoryStats.total) }}
-        </p>
+        <p v-if="drillTitle" class="category-pie-note">Selected · {{ drillTitle }}</p>
       </div>
       <div>
         <CategoryLegend v-if="!app.selectedCategory" :categories="report.by_category" @select="onCategory" />
+        <div v-else-if="isOtherView" class="category-drilldown">
+          <div class="category-drilldown-header">
+            <div>
+              <h3 class="category-drilldown-title">Other · {{ otherCategories.length }} categories</h3>
+              <p class="category-drilldown-total">{{ formatIls(otherTotal) }}</p>
+              <p class="category-drilldown-meta">Tap a category to see merchants and charges</p>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
+          </div>
+          <button
+            v-for="row in otherCategories"
+            :key="row.category_en"
+            type="button"
+            class="cost-breakdown-row"
+            @click="onCategory(row.category_en)"
+          >
+            <span>{{ row.category_en }}</span>
+            <span class="cost-breakdown-amount">
+              {{ formatIls(row.total) }}
+              <span class="cost-breakdown-pct">{{ otherPct(row.total) }}%</span>
+            </span>
+          </button>
+        </div>
         <div v-else-if="selectedCategoryStats" class="category-drilldown">
           <div class="category-drilldown-header">
             <div>
@@ -32,21 +58,18 @@
                 {{ selectedCategoryStats.merchantCount === 1 ? "merchant" : "merchants" }}
               </p>
             </div>
-            <button type="button" class="btn btn-ghost" @click="app.clearCategory()">← All categories</button>
+            <button type="button" class="btn btn-ghost" @click="goBack">{{ backLabel }}</button>
           </div>
           <MerchantBarChart :transactions="filteredTxs" :category="app.selectedCategory" />
         </div>
       </div>
     </div>
-    <ChargeGrid
+    <TransactionList
+      v-if="!isOtherView"
       :transactions="filteredTxs"
-      :title="
-        app.selectedCategory && selectedCategoryStats
-          ? `Recent charges · ${app.selectedCategory} · ${formatIls(selectedCategoryStats.total)}`
-          : 'Recent charges'
-      "
+      :title="transactionTitle"
       :show-category="!app.selectedCategory"
-      :category-filter="app.selectedCategory || undefined"
+      :category-filter="categoryFilter || undefined"
       :statement-billing="selectedMonth ? statementBilling : null"
     />
     <details style="margin-top: 1.5rem">
@@ -55,39 +78,41 @@
         Demo mode — search only. Sign in to save label fixes.
       </p>
       <input v-model="search" class="input" placeholder="Merchant, category, amount…" style="margin-top: 0.5rem" />
-      <table v-if="searchMerchants.length" class="rules" style="margin-top: 0.75rem">
-        <thead>
-          <tr>
-            <th>Hebrew</th>
-            <th>English</th>
-            <th>Category</th>
-            <th>Charges</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in searchMerchants" :key="row.hebrew">
-            <td>{{ row.hebrew }}</td>
-            <td>
-              <input v-model="row.english" class="input" :readonly="auth.isDemo" />
-            </td>
-            <td>
-              <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
-            </td>
-            <td style="color: var(--text-muted); white-space: nowrap">{{ row.count }}</td>
-            <td>
-              <button
-                class="btn btn-primary"
-                style="white-space: nowrap"
-                :disabled="auth.isDemo || row.saving"
-                @click="saveLabel(row)"
-              >
-                {{ row.saving ? "Saving…" : "Save" }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-scroll">
+        <table v-if="searchMerchants.length" class="rules" style="margin-top: 0.75rem">
+          <thead>
+            <tr>
+              <th>Hebrew</th>
+              <th>English</th>
+              <th>Category</th>
+              <th>Charges</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in searchMerchants" :key="row.hebrew">
+              <td>{{ row.hebrew }}</td>
+              <td>
+                <input v-model="row.english" class="input" :readonly="auth.isDemo" />
+              </td>
+              <td>
+                <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
+              </td>
+              <td style="color: var(--text-muted); white-space: nowrap">{{ row.count }}</td>
+              <td>
+                <button
+                  class="btn btn-primary"
+                  style="white-space: nowrap"
+                  :disabled="auth.isDemo || row.saving"
+                  @click="saveLabel(row)"
+                >
+                  {{ row.saving ? "Saving…" : "Save" }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <p v-if="searchHint" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem">{{ searchHint }}</p>
       <datalist id="overview-spending-cats">
         <option v-for="c in categories" :key="c" :value="c" />
@@ -101,15 +126,21 @@ import { computed, onMounted, ref, watch } from "vue";
 import { fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
 import CategoryLegend from "../components/CategoryLegend.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
-import ChargeGrid from "../components/ChargeGrid.vue";
 import MerchantBarChart from "../components/MerchantBarChart.vue";
 import MonthPicker from "../components/MonthPicker.vue";
 import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
+import PaceCard from "../components/PaceCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
+import TransactionList from "../components/TransactionList.vue";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
-import { TOP_PIE_CATEGORIES, SPENDING_CATEGORIES } from "../categories";
+import {
+  groupCategoriesForPie,
+  isOtherBucketLabel,
+  OTHER_BUCKET,
+  SPENDING_CATEGORIES,
+} from "../categories";
 import { formatIls, monthLabelFromIso, roundMoney } from "../utils/format";
 
 const categories = SPENDING_CATEGORIES;
@@ -127,6 +158,7 @@ const app = useAppStore();
 const loading = ref(true);
 const error = ref("");
 const report = ref<SpendingReport | null>(null);
+const paceReport = ref<SpendingReport | null>(null);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
@@ -134,49 +166,84 @@ const search = ref("");
 const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
 
+const pieGroup = computed(() =>
+  report.value ? groupCategoriesForPie(report.value.by_category) : { top: [], other: [] },
+);
+
+const otherCategories = computed(() => pieGroup.value.other);
+const otherCategoryNames = computed(() => new Set(otherCategories.value.map((c) => c.category_en)));
+const otherTotal = computed(() => roundMoney(otherCategories.value.reduce((s, c) => s + c.total, 0)));
+
+const isOtherView = computed(() => app.selectedCategory === OTHER_BUCKET);
+const isOtherChild = computed(
+  () => !!app.selectedCategory && otherCategoryNames.value.has(app.selectedCategory),
+);
+
 const statementBilling = computed(() => {
   const billing = report.value?.metadata.billing_date as string | undefined;
   return billing ? monthLabelFromIso(billing) : null;
 });
 
+const latestBillingDate = computed(() => {
+  if (!months.value.length) return null;
+  const sorted = [...months.value].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
+  return sorted[0]?.billing_date ?? null;
+});
+
+const paceTransactions = computed(() => paceReport.value?.transactions ?? []);
+
+const categoryFilter = computed(() => {
+  if (!app.selectedCategory || isOtherView.value) return null;
+  return app.selectedCategory;
+});
+
 const filteredTxs = computed((): Transaction[] => {
   if (!report.value) return [];
   if (!app.selectedCategory) return report.value.transactions;
+  if (isOtherView.value) return [];
+  if (isOtherChild.value) {
+    return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
+  }
   if (app.selectedCategory.startsWith("Other")) {
-    const top = new Set(
-      [...report.value.by_category]
-        .sort((a, b) => b.total - a.total)
-        .slice(0, TOP_PIE_CATEGORIES)
-        .map((c) => c.category_en),
-    );
+    const top = new Set(pieGroup.value.top.map((c) => c.category_en));
     return report.value.transactions.filter((t) => !top.has(t.category_en));
   }
   return report.value.transactions.filter((t) => t.category_en === app.selectedCategory);
 });
 
 const selectedCategoryStats = computed(() => {
-  if (!report.value || !app.selectedCategory) return null;
+  if (!report.value || !app.selectedCategory || isOtherView.value) return null;
   const txs = filteredTxs.value;
-  const isOther = app.selectedCategory.startsWith("Other");
-  const summary = isOther
-    ? null
-    : report.value.by_category.find((c) => c.category_en === app.selectedCategory);
-  const total = roundMoney(
-    summary?.total ?? txs.reduce((sum, t) => sum + t.charge_amount, 0),
-  );
-  const sharePct = summary
-    ? Math.round(summary.share_pct)
+  const summaryRow = report.value.by_category.find((c) => c.category_en === app.selectedCategory);
+  const total = roundMoney(summaryRow?.total ?? txs.reduce((sum, t) => sum + t.charge_amount, 0));
+  const sharePct = summaryRow
+    ? Math.round(summaryRow.share_pct)
     : report.value.total_spent
       ? Math.round((total / report.value.total_spent) * 100)
       : 0;
   const merchantCount = new Set(txs.map((t) => t.merchant_en || t.merchant_he)).size;
   return {
     total,
-    count: summary?.count ?? txs.length,
+    count: summaryRow?.count ?? txs.length,
     sharePct,
     merchantCount,
   };
 });
+
+const drillTitle = computed(() => {
+  if (isOtherView.value) return formatIls(otherTotal.value);
+  if (selectedCategoryStats.value) return formatIls(selectedCategoryStats.value.total);
+  return "";
+});
+
+const transactionTitle = computed(() => {
+  if (app.selectedCategory && selectedCategoryStats.value) {
+    return `Transactions · ${app.selectedCategory} · ${formatIls(selectedCategoryStats.value.total)}`;
+  }
+  return "Transactions";
+});
+
+const backLabel = computed(() => (isOtherChild.value ? "← Other" : "← All categories"));
 
 const searchResults = computed(() => {
   if (!report.value || !search.value.trim()) return [];
@@ -216,6 +283,26 @@ watch(searchResults, (txs) => {
   searchMerchants.value = [...byHebrew.values()].sort((a, b) => b.count - a.count);
 });
 
+function otherPct(amount: number): number {
+  return otherTotal.value ? Math.round((roundMoney(amount) / otherTotal.value) * 100) : 0;
+}
+
+function onCategory(name: string) {
+  if (isOtherBucketLabel(name)) {
+    app.selectedCategory = app.selectedCategory === OTHER_BUCKET ? "" : OTHER_BUCKET;
+    return;
+  }
+  app.selectedCategory = app.selectedCategory === name ? "" : name;
+}
+
+function goBack() {
+  if (isOtherChild.value) {
+    app.selectedCategory = OTHER_BUCKET;
+  } else {
+    app.clearCategory();
+  }
+}
+
 async function saveLabel(row: SearchMerchantRow) {
   if (auth.isDemo) return;
   row.saving = true;
@@ -230,16 +317,13 @@ async function saveLabel(row: SearchMerchantRow) {
       auth.token || undefined,
     );
     await refreshReport();
+    await refreshPaceReport();
     searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}. Charts updated.`;
   } catch (e) {
     searchHint.value = String(e);
   } finally {
     row.saving = false;
   }
-}
-
-function onCategory(name: string) {
-  app.selectedCategory = app.selectedCategory === name ? "" : name;
 }
 
 let reportRequestId = 0;
@@ -256,6 +340,16 @@ async function refreshReport(month: string | null = selectedMonth.value) {
   } catch (e) {
     if (reqId !== reportRequestId) return;
     error.value = String(e);
+  }
+}
+
+async function refreshPaceReport() {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  try {
+    paceReport.value = await fetchReport(demo, null, token);
+  } catch {
+    paceReport.value = null;
   }
 }
 
@@ -276,7 +370,7 @@ async function loadMonths() {
     summary.value = m.summary;
     const initial = m.months[0]?.key ?? null;
     selectedMonth.value = initial;
-    await refreshReport(initial);
+    await Promise.all([refreshReport(initial), refreshPaceReport()]);
   } catch (e) {
     error.value = String(e);
   } finally {
