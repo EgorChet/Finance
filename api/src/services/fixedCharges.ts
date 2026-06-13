@@ -23,6 +23,21 @@ const CHARGES_PATH = path.resolve(
   "fixed_charges.json",
 );
 
+/** Matches default pace card cycle start; configured charges land on this day each month. */
+export const DEFAULT_BILLING_CYCLE_DAY = 10;
+
+/** Pin recurring charges to the billing cycle start (e.g. 10th), not the statement close date. */
+export function fixedChargeDateForBilling(
+  billingDate: string,
+  cycleDay = DEFAULT_BILLING_CYCLE_DAY,
+): string {
+  const [y, m] = billingDate.slice(0, 7).split("-").map(Number);
+  const day = Math.min(Math.max(cycleDay, 1), 28);
+  const lastDay = new Date(y, m, 0).getDate();
+  const safeDay = Math.min(day, lastDay);
+  return `${y}-${String(m).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
 let cached: FixedCharge[] | null = null;
 
 function loadCharges(): FixedCharge[] {
@@ -105,6 +120,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
 
   const chargeById = new Map(charges.map((c) => [c.id, c]));
   const label = monthLabelFromIso(billingDate);
+  const chargeDate = fixedChargeDateForBilling(billingDate);
 
   const transactions = report.transactions.map((tx) => {
     if (!tx.notes?.startsWith("fixed_charge:")) return tx;
@@ -113,6 +129,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
     if (!charge) return tx;
     return {
       ...tx,
+      date: chargeDate,
       merchant_he: charge.name_he || charge.name_en,
       merchant_en: charge.name_en,
       amount: charge.amount,
@@ -132,7 +149,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   for (const charge of charges) {
     if (existingIds.has(charge.id)) continue;
     newTxs.push({
-      date: billingDate,
+      date: chargeDate,
       merchant_he: charge.name_he || charge.name_en,
       merchant_en: charge.name_en,
       amount: charge.amount,
@@ -146,7 +163,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
     });
   }
 
-  if (!newTxs.length && transactions === report.transactions) return report;
+  if (!newTxs.length && transactions.every((tx, i) => tx === report.transactions[i])) return report;
 
   const merged = [...transactions, ...newTxs].sort((a, b) => b.date.localeCompare(a.date));
   const dates = merged.map((t) => t.date).sort();

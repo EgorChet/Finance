@@ -9,6 +9,21 @@ export interface BillingCycle {
   cycleLength: number;
 }
 
+export interface PaceBreakdownLine {
+  label: string;
+  amount: number;
+  cyclesWith: number;
+  configured: boolean;
+}
+
+export interface PaceCycleSnapshot {
+  cycleStart: string;
+  label: string;
+  totalAtDay: number;
+  fixedAtDay: number;
+  variableAtDay: number;
+}
+
 export interface PaceResult {
   currentSpend: number;
   statementSpend: number;
@@ -16,10 +31,18 @@ export interface PaceResult {
   dayIndex: number;
   cycleLength: number;
   historicalAvgAtDay: number;
+  historicalAvgFixedAtDay: number;
+  historicalAvgVariableAtDay: number;
   projectedTotal: number;
   score: number;
   scoreLabel: string;
   cyclesUsed: number;
+  cyclesAvailable: number;
+  avgCycles: number;
+  vsAvgDelta: number;
+  fixedBreakdown: PaceBreakdownLine[];
+  variableBreakdown: PaceBreakdownLine[];
+  recentCycles: PaceCycleSnapshot[];
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -76,6 +99,95 @@ function includeTransaction(tx: Transaction, includeFixed: boolean): boolean {
   return costTypeForCategory(tx.category_en || "Uncategorized") !== "fixed";
 }
 
+function isFixedChargeTx(tx: Transaction): boolean {
+  return costTypeForCategory(tx.category_en || "Uncategorized") === "fixed";
+}
+
+function isConfiguredCharge(tx: Transaction): boolean {
+  return !!tx.notes?.startsWith("fixed_charge:");
+}
+
+interface CycleBucket {
+  start: Date;
+  end: Date;
+  txs: Transaction[];
+}
+
+function spendAtDay(
+  bucket: CycleBucket,
+  dayIndex: number,
+): {
+  total: number;
+  fixed: number;
+  fixedByMerchant: Map<string, { amount: number; configured: boolean }>;
+  variableByCategory: Map<string, number>;
+} {
+  let total = 0;
+  let fixed = 0;
+  const fixedByMerchant = new Map<string, { amount: number; configured: boolean }>();
+  const variableByCategory = new Map<string, number>();
+
+  for (const tx of bucket.txs) {
+    const d = parseIsoDate(tx.date);
+    const day = daysBetween(bucket.start, d) + 1;
+    if (day > dayIndex) continue;
+    total += tx.charge_amount;
+    if (isFixedChargeTx(tx)) {
+      fixed += tx.charge_amount;
+      const label = tx.merchant_en || tx.merchant_he || "Unknown";
+      const cur = fixedByMerchant.get(label) || { amount: 0, configured: isConfiguredCharge(tx) };
+      cur.amount += tx.charge_amount;
+      cur.configured = cur.configured || isConfiguredCharge(tx);
+      fixedByMerchant.set(label, cur);
+    } else {
+      const cat = tx.category_en || "Uncategorized";
+      variableByCategory.set(cat, (variableByCategory.get(cat) || 0) + tx.charge_amount);
+    }
+  }
+
+  return {
+    total: roundMoney(total),
+    fixed: roundMoney(fixed),
+    fixedByMerchant,
+    variableByCategory,
+  };
+}
+
+function averageBreakdown(
+  buckets: CycleBucket[],
+  dayIndex: number,
+  kind: "fixed" | "variable",
+  cyclesUsed: number,
+): PaceBreakdownLine[] {
+  const totals = new Map<string, { amount: number; cyclesWith: number; configured: boolean }>();
+
+  for (const bucket of buckets) {
+    const atDay = spendAtDay(bucket, dayIndex);
+    const source =
+      kind === "fixed" ? atDay.fixedByMerchant : atDay.variableByCategory;
+
+    for (const [label, value] of source.entries()) {
+      const amount = typeof value === "number" ? value : value.amount;
+      const configured = typeof value === "number" ? false : value.configured;
+      const cur = totals.get(label) || { amount: 0, cyclesWith: 0, configured: false };
+      if (amount > 0) cur.cyclesWith += 1;
+      cur.amount += amount;
+      cur.configured = cur.configured || configured;
+      totals.set(label, cur);
+    }
+  }
+
+  return [...totals.entries()]
+    .map(([label, v]) => ({
+      label,
+      amount: cyclesUsed ? roundMoney(v.amount / cyclesUsed) : 0,
+      cyclesWith: v.cyclesWith,
+      configured: v.configured,
+    }))
+    .filter((row) => row.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+}
+
 export function computePace(
   transactions: Transaction[],
   options: {
@@ -84,6 +196,8 @@ export function computePace(
     today?: Date;
     latestBillingDate?: string | null;
     manualSpend?: number | null;
+    /** Most recent completed cycles to average; 0 = all available. */
+    avgCycles?: number;
   } = {},
 ): PaceResult | null {
   const cycleDay = options.cycleDay ?? 10;
@@ -109,18 +223,46 @@ export function computePace(
     bucket.txs.push(tx);
   }
 
-  const historicalAtDay: number[] = [];
+  const historicalSnapshots: {
+    start: Date;
+    bucket: CycleBucket;
+    total: number;
+    fixed: number;
+  }[] = [];
   for (const [key, bucket] of byCycle.entries()) {
     if (key === currentKey) continue;
     if (bucket.end >= todayNorm) continue;
-    let cum = 0;
-    for (const tx of bucket.txs) {
-      const d = parseIsoDate(tx.date);
-      const day = daysBetween(bucket.start, d) + 1;
-      if (day <= cycle.dayIndex) cum += tx.charge_amount;
+    const atDay = spendAtDay(bucket, cycle.dayIndex);
+    if (atDay.total > 0 || bucket.txs.length > 0) {
+      historicalSnapshots.push({
+        start: bucket.start,
+        bucket,
+        total: atDay.total,
+        fixed: atDay.fixed,
+      });
     }
-    if (cum > 0 || bucket.txs.length > 0) historicalAtDay.push(roundMoney(cum));
   }
+
+  historicalSnapshots.sort((a, b) => b.start.getTime() - a.start.getTime());
+  const cyclesAvailable = historicalSnapshots.length;
+  const avgCycles = options.avgCycles ?? 0;
+  const usedSnapshots =
+    avgCycles > 0 ? historicalSnapshots.slice(0, avgCycles) : historicalSnapshots;
+  const usedBuckets = usedSnapshots.map((s) => s.bucket);
+  const cyclesUsed = usedSnapshots.length;
+  const historicalAtDay = usedSnapshots.map((s) => s.total);
+  const historicalFixedAtDay = usedSnapshots.map((s) => s.fixed);
+  const historicalVariableAtDay = usedSnapshots.map((s) => roundMoney(s.total - s.fixed));
+
+  const fixedBreakdown = averageBreakdown(usedBuckets, cycle.dayIndex, "fixed", cyclesUsed);
+  const variableBreakdown = averageBreakdown(usedBuckets, cycle.dayIndex, "variable", cyclesUsed);
+  const recentCycles: PaceCycleSnapshot[] = usedSnapshots.map((s) => ({
+    cycleStart: isoDate(s.start),
+    label: monthLabelFromIso(isoDate(s.start)),
+    totalAtDay: s.total,
+    fixedAtDay: s.fixed,
+    variableAtDay: roundMoney(s.total - s.fixed),
+  }));
 
   const currentBucket = byCycle.get(currentKey);
   let statementSpend = 0;
@@ -142,14 +284,25 @@ export function computePace(
     historicalAtDay.length > 0
       ? roundMoney(historicalAtDay.reduce((s, v) => s + v, 0) / historicalAtDay.length)
       : 0;
+  const historicalAvgFixedAtDay =
+    historicalFixedAtDay.length > 0
+      ? roundMoney(historicalFixedAtDay.reduce((s, v) => s + v, 0) / historicalFixedAtDay.length)
+      : 0;
+  const historicalAvgVariableAtDay =
+    historicalVariableAtDay.length > 0
+      ? roundMoney(historicalVariableAtDay.reduce((s, v) => s + v, 0) / historicalVariableAtDay.length)
+      : 0;
+
+  const compareAvg = includeFixed ? historicalAvgAtDay : historicalAvgVariableAtDay;
+  const vsAvgDelta = roundMoney(currentSpend - compareAvg);
 
   const projectedTotal =
     cycle.dayIndex > 0 ? roundMoney((currentSpend / cycle.dayIndex) * cycle.cycleLength) : currentSpend;
 
   let score = 50;
-  if (historicalAvgAtDay > 0 && currentSpend > 0) {
-    score = Math.round(Math.min(100, Math.max(0, 50 * (historicalAvgAtDay / currentSpend))));
-  } else if (historicalAvgAtDay > 0 && currentSpend === 0) {
+  if (compareAvg > 0 && currentSpend > 0) {
+    score = Math.round(Math.min(100, Math.max(0, 50 * (compareAvg / currentSpend))));
+  } else if (compareAvg > 0 && currentSpend === 0) {
     score = 100;
   }
 
@@ -171,10 +324,18 @@ export function computePace(
     dayIndex: cycle.dayIndex,
     cycleLength: cycle.cycleLength,
     historicalAvgAtDay,
+    historicalAvgFixedAtDay,
+    historicalAvgVariableAtDay,
     projectedTotal,
     score,
     scoreLabel,
     cyclesUsed: historicalAtDay.length,
+    cyclesAvailable,
+    avgCycles,
+    vsAvgDelta,
+    fixedBreakdown,
+    variableBreakdown,
+    recentCycles,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,
@@ -184,6 +345,22 @@ export function computePace(
 
 export const CYCLE_DAY_KEY = "finance-cycle-day";
 export const PACE_INCLUDE_FIXED_KEY = "finance-pace-include-fixed";
+export const PACE_AVG_CYCLES_KEY = "finance-pace-avg-cycles";
+
+/** 0 = average over all completed cycles. */
+export const PACE_AVG_CYCLE_OPTIONS = [3, 6, 12, 0] as const;
+export type PaceAvgCycles = (typeof PACE_AVG_CYCLE_OPTIONS)[number];
+
+export function loadPaceAvgCycles(): PaceAvgCycles {
+  const raw = localStorage.getItem(PACE_AVG_CYCLES_KEY);
+  if (raw === null || raw === "") return 0;
+  const n = parseInt(raw, 10);
+  return (PACE_AVG_CYCLE_OPTIONS as readonly number[]).includes(n) ? (n as PaceAvgCycles) : 0;
+}
+
+export function savePaceAvgCycles(value: PaceAvgCycles): void {
+  localStorage.setItem(PACE_AVG_CYCLES_KEY, String(value));
+}
 
 export function manualSpendKey(cycleStart: string): string {
   return `finance-pace-manual-${cycleStart}`;
