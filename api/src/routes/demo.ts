@@ -31,6 +31,10 @@ router.get("/fixed-charges", (_req, res) => {
   res.json({ charges: [] });
 });
 
+router.put("/fixed-charges", (_req, res) => {
+  res.status(403).json({ error: "Fixed charges disabled in demo mode" });
+});
+
 router.get("/merchants", (_req, res) => {
   res.json(demoMerchants());
 });
@@ -57,6 +61,18 @@ router.put("/rules", (_req, res) => {
 
 router.post("/review/confirm", (_req, res) => {
   res.json({ ok: true, demo: true });
+});
+
+router.get("/exclusions", (_req, res) => {
+  res.json({ entries: [], total: 0, demo: true });
+});
+
+router.post("/exclusions", (_req, res) => {
+  res.status(403).json({ error: "Exclusions disabled in demo mode" });
+});
+
+router.post("/exclusions/remove", (_req, res) => {
+  res.status(403).json({ error: "Exclusions disabled in demo mode" });
 });
 
 export default router;

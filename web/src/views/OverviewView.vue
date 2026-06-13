@@ -34,11 +34,11 @@
     <template v-if="showCategoryExplorer">
     <p class="section-title">Where did the money go?</p>
     <div class="explorer-grid">
-      <div>
+      <div class="explorer-pie-col">
         <CategoryPieChart :categories="report.by_category" :selected="app.selectedCategory" @select="onCategory" />
         <p v-if="drillTitle" class="category-pie-note">Selected · {{ drillTitle }}</p>
       </div>
-      <div>
+      <div class="explorer-legend-col">
         <CategoryLegend v-if="!app.selectedCategory" :categories="report.by_category" @select="onCategory" />
         <div v-else-if="isOtherView" class="category-drilldown">
           <div class="category-drilldown-header">
@@ -89,6 +89,9 @@
       :show-category="!app.selectedCategory"
       :category-filter="categoryFilter || undefined"
       :statement-billing="selectedMonth ? statementBilling : null"
+      :excludeable="!auth.isDemo"
+      :excluding-key="excludingKey"
+      @exclude="excludeTransaction"
     />
     </template>
     <p v-else-if="isCycleTabSelected" class="pace-cycle-pending-note">
@@ -110,6 +113,7 @@
               <th>English</th>
               <th>Category</th>
               <th></th>
+              <th v-if="!auth.isDemo"></th>
             </tr>
           </thead>
           <tbody>
@@ -133,6 +137,17 @@
                   {{ row.saving ? "Saving…" : "Save" }}
                 </button>
               </td>
+              <td v-if="!auth.isDemo">
+                <button
+                  type="button"
+                  class="btn btn-ghost"
+                  style="white-space: nowrap"
+                  :disabled="excludingKey === row.key"
+                  @click="excludeFromSearch(row)"
+                >
+                  {{ excludingKey === row.key ? "…" : "Exclude" }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -147,7 +162,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
+import { addExclusion, fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
 import CategoryLegend from "../components/CategoryLegend.vue";
 import CategoryPieChart from "../components/CategoryPieChart.vue";
 import AppLoader from "../components/AppLoader.vue";
@@ -180,6 +195,7 @@ import {
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
 import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
+import { transactionKey } from "../utils/transactionKey";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
 const categories = SPENDING_CATEGORIES;
@@ -207,6 +223,7 @@ const selectedMonth = ref<string | null>(null);
 const search = ref("");
 const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
+const excludingKey = ref<string | null>(null);
 const cycleDay = ref(loadCycleDay());
 
 const latestBillingDate = computed(() => {
@@ -357,7 +374,7 @@ watch(searchResults, (txs) => {
   searchMerchants.value = [...txs]
     .sort((a, b) => b.date.localeCompare(a.date) || b.charge_amount - a.charge_amount)
     .map((t) => ({
-      key: `${t.date}|${t.merchant_he}|${t.charge_amount}`,
+      key: transactionKey(t),
       date: t.date,
       amount: t.charge_amount,
       hebrew: t.merchant_he,
@@ -384,6 +401,50 @@ function goBack() {
     app.selectedCategory = OTHER_BUCKET;
   } else {
     app.clearCategory();
+  }
+}
+
+async function afterExclusionChange() {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const m = await fetchMonths(demo, token);
+  summary.value = m.summary.map((row) => ({
+    ...row,
+    month: billingCycleLabel(row.billing_date),
+  }));
+  await Promise.all([refreshReport(), refreshPaceReport()]);
+}
+
+async function excludeTransaction(tx: Transaction) {
+  if (auth.isDemo) return;
+  const key = transactionKey(tx);
+  excludingKey.value = key;
+  searchHint.value = "";
+  try {
+    await addExclusion({ transaction: tx, note: "Not my spend" }, auth.token || undefined);
+    searchMerchants.value = searchMerchants.value.filter((r) => r.key !== key);
+    await afterExclusionChange();
+    searchHint.value = "Charge excluded from totals. See Excluded tab to restore.";
+  } catch (e) {
+    searchHint.value = String(e);
+  } finally {
+    excludingKey.value = null;
+  }
+}
+
+async function excludeFromSearch(row: SearchMerchantRow) {
+  if (auth.isDemo) return;
+  excludingKey.value = row.key;
+  searchHint.value = "";
+  try {
+    await addExclusion({ key: row.key, note: "Not my spend" }, auth.token || undefined);
+    searchMerchants.value = searchMerchants.value.filter((r) => r.key !== row.key);
+    await afterExclusionChange();
+    searchHint.value = "Charge excluded from totals. See Excluded tab to restore.";
+  } catch (e) {
+    searchHint.value = String(e);
+  } finally {
+    excludingKey.value = null;
   }
 }
 

@@ -14,3 +14,7 @@ export const readRules = store.readRules;
 export const writeRules = store.writeRules;
 export const readReviewProgress = store.readReviewProgress;
 export const writeReviewProgress = store.writeReviewProgress;
+export const readExclusions = store.readExclusions;
+export const writeExclusions = store.writeExclusions;
+export const readFixedCharges = store.readFixedCharges;
+export const writeFixedCharges = store.writeFixedCharges;

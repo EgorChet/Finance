@@ -23,6 +23,7 @@
           <th @click="setSort('merchant')">Merchant</th>
           <th v-if="showCategory" @click="setSort('category')">Category</th>
           <th class="tx-amount" @click="setSort('amount')">Amount</th>
+          <th v-if="excludeable" class="tx-actions"></th>
         </tr>
       </thead>
       <tbody>
@@ -31,6 +32,16 @@
           <td>{{ row.merchant }}</td>
           <td v-if="showCategory">{{ row.category }}</td>
           <td class="tx-amount">{{ formatIls(row.amount) }}</td>
+          <td v-if="excludeable" class="tx-actions">
+            <button
+              type="button"
+              class="btn btn-ghost btn-compact"
+              :disabled="excludingKey === row.key"
+              @click="emitExclude(row.tx)"
+            >
+              {{ excludingKey === row.key ? "…" : "Exclude" }}
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -45,6 +56,15 @@
           {{ row.dateLabel }}
           <span v-if="showCategory && row.category"> · {{ row.category }}</span>
         </div>
+        <button
+          v-if="excludeable"
+          type="button"
+          class="btn btn-ghost btn-compact tx-row-exclude"
+          :disabled="excludingKey === row.key"
+          @click="emitExclude(row.tx)"
+        >
+          {{ excludingKey === row.key ? "Excluding…" : "Exclude" }}
+        </button>
       </div>
     </div>
 
@@ -76,6 +96,7 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatTransactionDate, monthLabelFromIso } from "../utils/format";
+import { transactionKey } from "../utils/transactionKey";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
 
@@ -88,6 +109,8 @@ const props = withDefaults(
     defaultLimit?: number;
     statementBilling?: string | null;
     showSort?: boolean;
+    excludeable?: boolean;
+    excludingKey?: string | null;
   }>(),
   {
     title: "Transactions",
@@ -95,8 +118,14 @@ const props = withDefaults(
     defaultLimit: 25,
     statementBilling: null,
     showSort: true,
+    excludeable: false,
+    excludingKey: null,
   },
 );
+
+const emit = defineEmits<{
+  exclude: [tx: Transaction];
+}>();
 
 const showAll = ref(false);
 const sortKey = ref<SortKey>("date");
@@ -144,13 +173,18 @@ const total = computed(() => sorted.value.length);
 const visibleRows = computed(() => {
   const txs = showAll.value ? sorted.value : sorted.value.slice(0, props.defaultLimit);
   return txs.map((t) => ({
-    key: `${t.date}|${t.merchant_he}|${t.charge_amount}`,
+    key: transactionKey(t),
+    tx: t,
     dateLabel: formatChargeDate(t),
     merchant: t.merchant_en || t.merchant_he,
     category: t.category_en || "Uncategorized",
     amount: t.charge_amount,
   }));
 });
+
+function emitExclude(tx: Transaction) {
+  emit("exclude", tx);
+}
 
 function formatChargeDate(tx: Transaction): string {
   const purchase = formatTransactionDate(tx.date);

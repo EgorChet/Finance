@@ -1,5 +1,7 @@
 <template>
-  <v-chart class="chart" :option="option" autoresize @click="onClick" />
+  <div class="pie-chart-shell">
+    <v-chart class="chart" :option="option" autoresize @click="onClick" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -46,9 +48,12 @@ const option = computed(() => ({
   series: [
     {
       type: "pie",
-      radius: ["32%", "70%"],
+      radius: ["44%", "92%"],
+      center: ["50%", "50%"],
       data: pieData.value,
       selectedMode: "single",
+      label: { show: false },
+      labelLine: { show: false },
       itemStyle: {
         color: (p: { dataIndex: number }) => CHART_COLORS[p.dataIndex % CHART_COLORS.length],
       },
@@ -65,8 +70,14 @@ function onClick(params: { name?: string }) {
 </script>
 
 <style scoped>
-.chart {
-  height: 420px;
+.pie-chart-shell {
   width: 100%;
+  height: 100%;
+  min-height: 320px;
+}
+
+.chart {
+  width: 100%;
+  height: 100%;
 }
 </style>

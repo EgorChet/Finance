@@ -60,3 +60,14 @@ export interface MerchantRow {
   English: string;
   Category: string;
 }
+
+export interface ExcludedItem {
+  key: string;
+  note?: string;
+  added_at?: string;
+  source?: "builtin" | "user";
+  date?: string;
+  merchant_he?: string;
+  amount?: number;
+  can_restore: boolean;
+}

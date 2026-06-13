@@ -8,8 +8,11 @@
       class="legend-btn"
       @click="$emit('select', item.name)"
     >
-      <span class="swatch" :style="{ background: colors[idx % colors.length] }" />
-      <span>{{ item.name }} · {{ formatIls(item.value) }}</span>
+      <span class="legend-btn-left">
+        <span class="swatch" :style="{ background: colors[idx % colors.length] }" />
+        <span class="legend-btn-name">{{ item.name }}</span>
+      </span>
+      <span class="legend-btn-amount">{{ formatIls(item.value) }}</span>
     </button>
   </div>
 </template>

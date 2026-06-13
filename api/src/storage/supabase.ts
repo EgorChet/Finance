@@ -2,7 +2,7 @@
  * Supabase storage adapter — set STORAGE=supabase and configure env vars.
  * Falls back to local files when not configured.
  */
-import type { MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
+import type { ExclusionsData, FixedChargesData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
 import * as local from "./local.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -88,6 +88,62 @@ export async function writeReviewProgress(data: ReviewProgressData): Promise<voi
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "review", data }),
   });
+}
+
+export async function readExclusions(): Promise<ExclusionsData> {
+  if (!supabaseConfigured()) return local.readExclusions();
+  const res = await supabaseFetch("app_state?id=eq.exclusions&select=data");
+  if (!res.ok) return { entries: [], restored_keys: [], updated_at: null };
+  const rows = (await res.json()) as { data: ExclusionsData }[];
+  const data = rows[0]?.data;
+  return {
+    entries: data?.entries || [],
+    restored_keys: data?.restored_keys || [],
+    updated_at: data?.updated_at ?? null,
+  };
+}
+
+export async function writeExclusions(data: ExclusionsData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeExclusions(data);
+    return;
+  }
+  data.updated_at = new Date().toISOString();
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "exclusions", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readFixedCharges(): Promise<FixedChargesData> {
+  if (!supabaseConfigured()) return local.readFixedCharges();
+  const res = await supabaseFetch("app_state?id=eq.fixed_charges&select=data");
+  if (!res.ok) return { charges: [], updated_at: null };
+  const rows = (await res.json()) as { data: FixedChargesData }[];
+  const data = rows[0]?.data;
+  return { charges: data?.charges || [], updated_at: data?.updated_at ?? null };
+}
+
+export async function writeFixedCharges(data: FixedChargesData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeFixedCharges(data);
+    return;
+  }
+  data.updated_at = new Date().toISOString();
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "fixed_charges", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
 }
 
 export {

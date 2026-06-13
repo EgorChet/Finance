@@ -1,27 +1,17 @@
 import { readFileSync } from "fs";
 import path from "path";
-import type { SpendingReport, Transaction } from "../types.js";
+import type { FixedCharge, FixedChargesData, SpendingReport, Transaction } from "../types.js";
+import { readFixedCharges, writeFixedCharges } from "../storage/index.js";
 import { monthLabelFromIso } from "../utils/dates.js";
 
-interface FixedCharge {
-  id: string;
-  name_en: string;
-  name_he?: string;
-  amount: number;
-  category_en: string;
-  from_month: string;
-  through_month: string;
-}
-
-interface FixedChargesFile {
-  charges: FixedCharge[];
-}
-
-const CHARGES_PATH = path.resolve(
+const BUILTIN_PATH = path.resolve(
   process.env.DATA_DIR ? path.dirname(process.env.DATA_DIR) : path.join(process.cwd(), ".."),
   "data",
   "fixed_charges.json",
 );
+
+const ONGOING_THROUGH_MONTH = "2035-12";
+const MONTH_RE = /^\d{4}-\d{2}$/;
 
 /** Matches default pace card cycle start; configured charges land on this day each month. */
 export const DEFAULT_BILLING_CYCLE_DAY = 10;
@@ -40,30 +30,81 @@ export function fixedChargeDateForBilling(
 
 let cached: FixedCharge[] | null = null;
 
-function loadCharges(): FixedCharge[] {
-  if (cached) return cached;
+function loadBuiltinCharges(): FixedCharge[] {
   try {
-    const raw = readFileSync(CHARGES_PATH, "utf-8");
-    const data = JSON.parse(raw) as FixedChargesFile;
-    cached = data.charges || [];
+    const raw = readFileSync(BUILTIN_PATH, "utf-8");
+    const data = JSON.parse(raw) as { charges?: FixedCharge[] };
+    return (data.charges || []).map(normalizeCharge);
   } catch {
-    cached = [];
+    return [];
   }
-  return cached;
+}
+
+function normalizeCharge(charge: FixedCharge): FixedCharge {
+  return {
+    id: charge.id.trim(),
+    name_en: charge.name_en.trim(),
+    name_he: charge.name_he?.trim() || undefined,
+    amount: Math.round(charge.amount * 100) / 100,
+    category_en: charge.category_en.trim(),
+    from_month: charge.from_month.trim(),
+    through_month: charge.through_month.trim(),
+  };
+}
+
+function mergeCharges(user: FixedChargesData): FixedCharge[] {
+  if (user.charges?.length) return user.charges.map(normalizeCharge);
+  return loadBuiltinCharges();
+}
+
+export async function refreshFixedChargesCache(): Promise<void> {
+  const user = await readFixedCharges();
+  cached = mergeCharges(user);
+}
+
+function ensureCache(): void {
+  if (!cached) cached = loadBuiltinCharges();
 }
 
 export function loadFixedCharges(): FixedCharge[] {
-  return loadCharges();
+  ensureCache();
+  return cached!;
 }
 
 export function configuredChargesForMonth(billingYm: string): FixedCharge[] {
   const byId = new Map<string, FixedCharge>();
-  for (const charge of loadCharges()) {
+  for (const charge of loadFixedCharges()) {
     if (charge.from_month <= billingYm && billingYm <= charge.through_month) {
       byId.set(charge.id, charge);
     }
   }
   return [...byId.values()];
+}
+
+export function validateFixedCharges(charges: FixedCharge[]): string | null {
+  for (const raw of charges) {
+    const charge = normalizeCharge(raw);
+    if (!charge.id) return "Each charge needs an id";
+    if (!charge.name_en) return "Each charge needs an English name";
+    if (!charge.category_en) return "Each charge needs a category";
+    if (!Number.isFinite(charge.amount) || charge.amount <= 0) return "Amount must be positive";
+    if (!MONTH_RE.test(charge.from_month) || !MONTH_RE.test(charge.through_month)) {
+      return "Months must be YYYY-MM";
+    }
+    if (charge.from_month > charge.through_month) {
+      return `${charge.name_en}: start month must be on or before end month`;
+    }
+  }
+  return null;
+}
+
+export async function saveFixedCharges(charges: FixedCharge[]): Promise<FixedCharge[]> {
+  const normalized = charges.map(normalizeCharge);
+  const error = validateFixedCharges(normalized);
+  if (error) throw new Error(error);
+  await writeFixedCharges({ charges: normalized });
+  cached = normalized;
+  return normalized;
 }
 
 function monthKey(billingDate: string | undefined): string | null {
@@ -129,7 +170,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   const billingDate = report.metadata.billing_date as string | undefined;
   if (!billingDate) return report;
 
-  const charges = chargesForBilling(billingDate, loadCharges());
+  const charges = chargesForBilling(billingDate, loadFixedCharges());
   if (!charges.length) return report;
 
   const chargeById = new Map(charges.map((c) => [c.id, c]));
@@ -216,3 +257,5 @@ export function rebuildReportSummaries(report: SpendingReport): SpendingReport {
   updated.top_merchants = topMerchants(updated);
   return updated;
 }
+
+export { ONGOING_THROUGH_MONTH };

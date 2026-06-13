@@ -6,6 +6,8 @@
         <RouterLink class="nav-tab" to="/app/overview">Overview</RouterLink>
         <RouterLink class="nav-tab" to="/app/mappings">Mappings</RouterLink>
         <RouterLink class="nav-tab" to="/app/review">Review</RouterLink>
+        <RouterLink class="nav-tab" to="/app/excluded">Excluded</RouterLink>
+        <RouterLink class="nav-tab" to="/app/recurring">Recurring</RouterLink>
       </nav>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>

@@ -78,3 +78,39 @@ export interface ReviewQueueItem {
   display_english: string;
   occurrence_count: number;
 }
+
+export interface ExcludedEntry {
+  key: string;
+  note?: string;
+  added_at?: string;
+  source?: "builtin" | "user";
+}
+
+export interface ExclusionsData {
+  entries: ExcludedEntry[];
+  /** Keys restored via UI — skips built-in defaults for that key. */
+  restored_keys?: string[];
+  updated_at?: string | null;
+}
+
+export interface ExcludedItemView extends ExcludedEntry {
+  date?: string;
+  merchant_he?: string;
+  amount?: number;
+  can_restore: boolean;
+}
+
+export interface FixedCharge {
+  id: string;
+  name_en: string;
+  name_he?: string;
+  amount: number;
+  category_en: string;
+  from_month: string;
+  through_month: string;
+}
+
+export interface FixedChargesData {
+  charges: FixedCharge[];
+  updated_at?: string | null;
+}

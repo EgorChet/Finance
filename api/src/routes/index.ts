@@ -17,7 +17,7 @@ import {
   merchantCatalog,
   normalizeReviewKey,
   suggestEnglish,
-  transactionKey,
+  transactionKey as reviewTransactionKey,
 } from "../services/reviewService.js";
 import {
   discoverXlsxFiles,
@@ -30,10 +30,32 @@ import {
   writeRules,
   writeStatements,
 } from "../storage/index.js";
-import type { MerchantRules } from "../types.js";
+import {
+  addExclusion,
+  listExclusions,
+  refreshExclusionsCache,
+  removeExclusion,
+  transactionKey,
+} from "../services/exclusions.js";
+import {
+  loadFixedCharges,
+  refreshFixedChargesCache,
+  saveFixedCharges,
+  validateFixedCharges,
+} from "../services/fixedCharges.js";
+import type { FixedCharge, MerchantRules } from "../types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
+
+router.use(async (_req, _res, next) => {
+  try {
+    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache()]);
+    next();
+  } catch (e) {
+    next(e);
+  }
+});
 
 router.get("/health", async (req, res) => {
   const deep = req.query.deep === "1" || req.query.deep === "true";
@@ -84,8 +106,55 @@ router.get("/rules", async (_req, res) => {
 });
 
 router.get("/fixed-charges", async (_req, res) => {
-  const { loadFixedCharges } = await import("../services/fixedCharges.js");
   res.json({ charges: loadFixedCharges() });
+});
+
+router.put("/fixed-charges", async (req, res) => {
+  const body = req.body as { charges?: FixedCharge[] };
+  const charges = body.charges;
+  if (!Array.isArray(charges)) {
+    res.status(400).json({ error: "charges array required" });
+    return;
+  }
+  const error = validateFixedCharges(charges);
+  if (error) {
+    res.status(400).json({ error });
+    return;
+  }
+  const saved = await saveFixedCharges(charges);
+  res.json({ saved: true, charges: saved });
+});
+
+router.get("/exclusions", async (_req, res) => {
+  const entries = await listExclusions();
+  res.json({ entries, total: entries.length });
+});
+
+router.post("/exclusions", async (req, res) => {
+  const { key, note, transaction } = req.body as {
+    key?: string;
+    note?: string;
+    transaction?: { date: string; merchant_he: string; charge_amount: number };
+  };
+  const resolvedKey =
+    key?.trim() ||
+    (transaction ? transactionKey(transaction as import("../types.js").Transaction) : "");
+  if (!resolvedKey) {
+    res.status(400).json({ error: "key or transaction required" });
+    return;
+  }
+  const entry = await addExclusion(resolvedKey, note);
+  res.json({ ok: true, entry });
+});
+
+router.post("/exclusions/remove", async (req, res) => {
+  const { key } = req.body as { key?: string };
+  if (!key?.trim()) {
+    res.status(400).json({ error: "key required" });
+    return;
+  }
+  await removeExclusion(key);
+  res.json({ ok: true });
 });
 
 router.put("/rules", async (req, res) => {
@@ -276,7 +345,7 @@ router.post("/review/confirm", async (req, res) => {
     for (const entry of Object.values(statements.statements)) {
       for (const tx of entry.report.transactions) {
         if (tx.merchant_he === hebrew) {
-          reviewed.add(transactionKey(tx));
+          reviewed.add(reviewTransactionKey(tx));
         }
       }
     }

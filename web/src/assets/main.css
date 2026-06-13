@@ -633,9 +633,24 @@ button {
 
 .explorer-grid {
   display: grid;
-  grid-template-columns: 7fr 3fr;
+  grid-template-columns: 6fr 4fr;
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
+}
+
+.explorer-pie-col {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 100%;
+}
+
+.explorer-pie-col .pie-chart-shell {
+  min-height: 320px;
+  height: 100%;
+}
+
+.explorer-legend-col {
+  min-height: 100%;
 }
 
 @media (max-width: 900px) {
@@ -687,8 +702,8 @@ button {
     font-size: 0.9rem;
   }
 
-  .chart {
-    height: 280px !important;
+  .explorer-pie-col .pie-chart-shell {
+    min-height: 260px;
   }
 
   .explorer-grid {
@@ -720,15 +735,41 @@ button {
 .legend-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: 100%;
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.45rem 0.6rem;
+  padding: 0.45rem 0.65rem;
   margin-bottom: 0.35rem;
   color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.legend-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.legend-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.legend-btn-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.legend-btn-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .swatch {
@@ -774,6 +815,140 @@ table.rules select {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.excluded-source-pill {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.btn-compact {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.tx-table .tx-actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tx-row-exclude {
+  margin-top: 0.45rem;
+}
+
+.recurring-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.recurring-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.recurring-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.recurring-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recurring-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.recurring-card-sub {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.recurring-card-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.recurring-table .recurring-amount-input {
+  width: 6.5rem;
+}
+
+.recurring-month-input {
+  width: 9.5rem;
+}
+
+.recurring-through-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recurring-ongoing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.recurring-status {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.recurring-status-active {
+  color: var(--accent);
+}
+
+.recurring-status-ended {
+  color: var(--text-muted);
+}
+
+.recurring-status-upcoming {
+  color: var(--text-muted);
+}
+
+.recurring-timeline {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.recurring-add {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.recurring-add-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.5rem;
+  align-items: end;
 }
 
 .login-page {

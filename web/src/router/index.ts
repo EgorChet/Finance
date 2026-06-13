@@ -12,6 +12,8 @@ const router = createRouter({
         { path: "", redirect: "/app/overview" },
         { path: "overview", name: "overview", component: () => import("../views/OverviewView.vue") },
         { path: "review", name: "review", component: () => import("../views/ReviewView.vue") },
+        { path: "excluded", name: "excluded", component: () => import("../views/ExcludedView.vue") },
+        { path: "recurring", name: "recurring", component: () => import("../views/FixedChargesView.vue") },
         { path: "mappings", name: "mappings", component: () => import("../views/MappingsView.vue") },
       ],
     },

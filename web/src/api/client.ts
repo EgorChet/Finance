@@ -1,9 +1,11 @@
 import type {
+  ExcludedItem,
   MerchantRules,
   MerchantRow,
   MonthItem,
   ReviewQueueItem,
   SpendingReport,
+  Transaction,
 } from "../types";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
@@ -78,6 +80,14 @@ export async function fetchReport(demo: boolean, month: string | null, token?: s
 
 export async function fetchFixedCharges(demo: boolean, token?: string) {
   return get<{ charges: ConfiguredCharge[] }>(`${prefix(demo)}/fixed-charges`, token);
+}
+
+export async function saveFixedCharges(charges: ConfiguredCharge[], token?: string) {
+  return put<{ saved: boolean; charges: ConfiguredCharge[] }>(
+    `${prefix(false)}/fixed-charges`,
+    { charges },
+    token,
+  );
 }
 
 export async function fetchRules(demo: boolean, token?: string) {
@@ -164,4 +174,19 @@ export async function confirmReview(
 
 export async function resetReviewProgress(token?: string) {
   return post(`${prefix(false)}/review/progress/reset`, {}, token);
+}
+
+export async function fetchExclusions(demo: boolean, token?: string) {
+  return get<{ entries: ExcludedItem[]; total: number }>(`${prefix(demo)}/exclusions`, token);
+}
+
+export async function addExclusion(
+  body: { key?: string; note?: string; transaction?: Transaction },
+  token?: string,
+) {
+  return post<{ ok: boolean; entry: ExcludedItem }>(`${prefix(false)}/exclusions`, body, token);
+}
+
+export async function removeExclusion(key: string, token?: string) {
+  return post<{ ok: boolean }>(`${prefix(false)}/exclusions/remove`, { key }, token);
 }
