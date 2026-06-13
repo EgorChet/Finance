@@ -227,6 +227,12 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     return;
   }
   const autoTranslate = req.body?.auto_translate !== "false";
+  const statementType = String(req.body?.statement_type || "").toLowerCase();
+  if (statementType !== "partial" && statementType !== "final") {
+    res.status(400).json({ error: "statement_type must be partial or final" });
+    return;
+  }
+  const provisional = statementType === "partial";
   const filename = sanitizeUploadFilename(req.file.originalname || "upload.xlsx");
   const buffer = req.file.buffer;
   const hash = fileHash(buffer);
@@ -241,10 +247,10 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const rules = await readRules();
     const report = await analyzeFileBuffer(buffer, filename, autoTranslate);
     const savedPath = await saveUploadedXlsx(filename, buffer);
-    const key = rememberReport(data, report, savedPath, filename, hash);
+    const key = rememberReport(data, report, savedPath, filename, hash, provisional);
     applyMerchantRules(data, rules);
     await writeStatements(data);
-    res.json({ key, report: finalizeReport(data.statements[key]!.report) });
+    res.json({ key, provisional, report: finalizeReport(data.statements[key]!.report) });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const warming =

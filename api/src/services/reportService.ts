@@ -52,6 +52,7 @@ export function monthCatalog(data: StatementsData): MonthCatalogItem[] {
         key,
         label: entry.month_label || monthLabel(billing || key),
         billing_date: billing || key,
+        partial: entry.provisional === true,
       };
     });
 }
@@ -66,6 +67,7 @@ export function summaryRows(data: StatementsData) {
       total: report.total_spent,
       transactions: report.transaction_count,
       source_file: entry.source_file,
+      partial: entry.provisional === true,
     };
   });
 }
@@ -154,15 +156,36 @@ export function getCombinedReport(
   );
 }
 
+/** Pending charges in mid-cycle exports often have purchase amount but zero charge. */
+export function normalizeProvisionalCharges(report: SpendingReport): SpendingReport {
+  let changed = false;
+  const transactions = report.transactions.map((tx) => {
+    if (tx.charge_amount > 0 || tx.amount <= 0) return tx;
+    changed = true;
+    return { ...tx, charge_amount: tx.amount };
+  });
+  if (!changed) return report;
+  return rebuildReportSummaries({ ...report, transactions });
+}
+
 export function rememberReport(
   data: StatementsData,
   report: SpendingReport,
   sourcePath: string,
   sourceFile: string,
   hash: string,
+  provisional = false,
 ): string {
   const billing = report.metadata.billing_date as string | undefined;
   const key = billingKey(billing);
+  let storedReport = provisional ? normalizeProvisionalCharges(report) : report;
+  storedReport = {
+    ...storedReport,
+    metadata: {
+      ...storedReport.metadata,
+      provisional,
+    },
+  };
   data.statements[key] = {
     billing_key: key,
     month_label: billing ? monthLabel(billing) : "Unknown",
@@ -170,7 +193,8 @@ export function rememberReport(
     source_path: sourcePath,
     file_hash: hash,
     saved_at: new Date().toISOString(),
-    report,
+    provisional,
+    report: storedReport,
   };
   return key;
 }

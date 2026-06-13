@@ -1,5 +1,5 @@
 <template>
-  <v-chart class="chart" :option="option" autoresize />
+  <v-chart class="chart" :class="{ 'chart--compact': isCompact }" :option="option" autoresize />
 </template>
 
 <script setup lang="ts">
@@ -12,10 +12,13 @@ import VChart from "vue-echarts";
 import type { Transaction } from "../types";
 import { subscriptionVendor } from "../utils/subscriptions";
 import { formatIls, roundMoney } from "../utils/format";
+import { useCompactLayout } from "../composables/useCompactLayout";
 
 use([CanvasRenderer, BarChart, GridComponent, TooltipComponent]);
 
 const props = defineProps<{ transactions: Transaction[]; category: string }>();
+
+const { isCompact } = useCompactLayout(768);
 
 const groupByCategory = computed(() => props.category.startsWith("Other"));
 const groupSubscriptions = computed(() => props.category === "Subscriptions");
@@ -37,38 +40,61 @@ const merchants = computed(() => {
   return [...map.entries()]
     .map(([name, total]) => ({ name, total }))
     .sort((a, b) => a.total - b.total)
-    .slice(-12);
+    .slice(isCompact.value ? -8 : -12);
 });
 
-const option = computed(() => ({
-  tooltip: {
-    trigger: "axis",
-    formatter: (params: { value?: number; name?: string } | { value?: number; name?: string }[]) => {
-      const p = Array.isArray(params) ? params[0] : params;
-      const v = typeof p?.value === "number" ? p.value : 0;
-      return `${p?.name ?? ""}: ${formatIls(v)}`;
+const option = computed(() => {
+  const compact = isCompact.value;
+  return {
+    tooltip: {
+      trigger: "axis",
+      confine: true,
+      formatter: (params: { value?: number; name?: string } | { value?: number; name?: string }[]) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        const v = typeof p?.value === "number" ? p.value : 0;
+        return `${p?.name ?? ""}: ${formatIls(v)}`;
+      },
     },
-  },
-  grid: { left: 120, right: 40, top: 10, bottom: 10 },
-  xAxis: { type: "value" },
-  yAxis: {
-    type: "category",
-    data: merchants.value.map((m) => m.name),
-    axisLabel: { width: 110, overflow: "truncate" },
-  },
-  series: [
-    {
-      type: "bar",
-      data: merchants.value.map((m) => m.total),
-      itemStyle: { color: "#38bdf8" },
+    grid: {
+      left: compact ? 4 : 8,
+      right: compact ? 12 : 40,
+      top: 8,
+      bottom: 8,
+      containLabel: true,
     },
-  ],
-}));
+    xAxis: {
+      type: "value",
+      axisLabel: { fontSize: compact ? 10 : 12 },
+    },
+    yAxis: {
+      type: "category",
+      data: merchants.value.map((m) => m.name),
+      axisLabel: {
+        width: compact ? 88 : 110,
+        overflow: "truncate",
+        fontSize: compact ? 10 : 12,
+      },
+    },
+    series: [
+      {
+        type: "bar",
+        data: merchants.value.map((m) => m.total),
+        barMaxWidth: compact ? 18 : 24,
+        itemStyle: { color: "#38bdf8" },
+      },
+    ],
+  };
+});
 </script>
 
 <style scoped>
 .chart {
   height: 380px;
   width: 100%;
+}
+
+.chart--compact {
+  height: min(52vw, 300px);
+  min-height: 220px;
 }
 </style>

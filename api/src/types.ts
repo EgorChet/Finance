@@ -46,6 +46,8 @@ export interface StatementEntry {
   source_path: string;
   file_hash: string;
   saved_at: string;
+  /** Mid-cycle export — does not close the billing cycle until a final upload. */
+  provisional?: boolean;
   report: SpendingReport;
 }
 
@@ -65,6 +67,8 @@ export interface MonthCatalogItem {
   key: string;
   label: string;
   billing_date: string;
+  /** True for mid-cycle snapshot uploads. */
+  partial?: boolean;
 }
 
 export interface ReviewProgressData {

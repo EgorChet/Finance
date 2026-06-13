@@ -69,6 +69,10 @@ export function formatBillingPeriod(metadata: Record<string, unknown>): string {
     if (label && billing) return `${label} · in progress`;
     if (billing) return `${openCycleTabLabel(billing)} · in progress`;
   }
+  if (metadata.provisional) {
+    const billing = metadata.billing_date as string | undefined;
+    if (billing) return `${billingCycleLabel(billing)} · partial snapshot`;
+  }
   const combined = metadata.combined_billing_dates as string[] | undefined;
   if (combined?.length) {
     const sorted = [...combined].sort();

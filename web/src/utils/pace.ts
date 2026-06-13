@@ -491,8 +491,44 @@ export function nextCycleStart(cycleStart: string, cycleDay = 10): string {
   return isoDate(next);
 }
 
-/** True when no uploaded statement has closed this billing cycle yet. */
-export function cycleNeedsOpenTab(
+/** Statement billing date (charge date) for a cycle that starts on `cycleStart`. */
+export function statementBillingDateForCycle(cycleStart: string, cycleDay = 10): string {
+  return nextCycleStart(cycleStart, cycleDay);
+}
+
+export function findPartialMonth(
+  months: MonthItem[],
+  cycleStart: string,
+  cycleDay = 10,
+): MonthItem | undefined {
+  const billing = statementBillingDateForCycle(cycleStart, cycleDay);
+  return months.find((m) => !isCycleMonthKey(m.key) && m.billing_date === billing && m.partial);
+}
+
+export function cycleHasFinalStatement(
+  months: MonthItem[],
+  cycleStart: string,
+  cycleDay = 10,
+): boolean {
+  const billing = statementBillingDateForCycle(cycleStart, cycleDay);
+  const stmt = months.find((m) => !isCycleMonthKey(m.key) && m.billing_date === billing);
+  return !!stmt && !stmt.partial;
+}
+
+/** Latest billing date from a final (non-partial) uploaded statement. */
+export function latestFinalBillingDate(months: MonthItem[]): string | null {
+  const finals = months.filter((m) => !isCycleMonthKey(m.key) && !m.partial);
+  if (!finals.length) return null;
+  return [...finals].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]!.billing_date;
+}
+
+/** True when no final uploaded statement has closed this billing cycle yet. */
+export function cycleNeedsOpenTab(cycleStart: string, cycleDay: number, months: MonthItem[]): boolean {
+  return !cycleHasFinalStatement(months, cycleStart, cycleDay);
+}
+
+/** @deprecated Pass `months` — partial statements no longer close the cycle. */
+export function cycleNeedsOpenTabFromLatestBilling(
   latestBillingDate: string | null,
   cycleStart: string,
   cycleDay = 10,
@@ -501,17 +537,14 @@ export function cycleNeedsOpenTab(
   return parseIsoDate(latestBillingDate) < parseIsoDate(nextCycleStart(cycleStart, cycleDay));
 }
 
-/** True when no uploaded statement covers this billing cycle yet. */
-export function shouldShowCurrentCycleMonth(
-  latestBillingDate: string | null,
-  cycleStart: string,
-): boolean {
-  return cycleNeedsOpenTab(latestBillingDate, cycleStart);
+/** True when no final uploaded statement covers this billing cycle yet. */
+export function shouldShowCurrentCycleMonth(cycleStart: string, cycleDay: number, months: MonthItem[]): boolean {
+  return cycleNeedsOpenTab(cycleStart, cycleDay, months);
 }
 
 export function getOpenCycleMonthItems(
   cycleDay: number,
-  latestBillingDate: string | null,
+  months: MonthItem[],
   today = new Date(),
 ): MonthItem[] {
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -519,7 +552,7 @@ export function getOpenCycleMonthItems(
   const starts: string[] = [];
   let start = currentStart;
 
-  while (cycleNeedsOpenTab(latestBillingDate, start, cycleDay)) {
+  while (cycleNeedsOpenTab(start, cycleDay, months)) {
     starts.push(start);
     const prev = parseIsoDate(start);
     prev.setMonth(prev.getMonth() - 1);
@@ -558,12 +591,8 @@ export function isCycleEnded(cycleStart: string, cycleDay: number, today = new D
   return norm > parseIsoDate(end);
 }
 
-export function mergeMonthsWithOpenCycles(
-  months: MonthItem[],
-  cycleDay: number,
-  latestBillingDate: string | null,
-): MonthItem[] {
-  const openItems = getOpenCycleMonthItems(cycleDay, latestBillingDate);
+export function mergeMonthsWithOpenCycles(months: MonthItem[], cycleDay: number): MonthItem[] {
+  const openItems = getOpenCycleMonthItems(cycleDay, months);
   if (!openItems.length) return months;
 
   const toAdd = openItems.filter((open) => !months.some((m) => m.key === open.key));
@@ -571,13 +600,13 @@ export function mergeMonthsWithOpenCycles(
   return [...toAdd, ...months];
 }
 
-/** @deprecated Use mergeMonthsWithOpenCycles */
+/** @deprecated Use mergeMonthsWithOpenCycles(months, cycleDay) */
 export function mergeMonthsWithCurrentCycle(
   months: MonthItem[],
   cycleDay: number,
-  latestBillingDate: string | null,
+  _latestBillingDate: string | null,
 ): MonthItem[] {
-  return mergeMonthsWithOpenCycles(months, cycleDay, latestBillingDate);
+  return mergeMonthsWithOpenCycles(months, cycleDay);
 }
 
 function transactionsInCycle(

@@ -15,15 +15,19 @@
     <div v-if="auth.isDemo" class="demo-banner">
       Demo mode — sample spending data. Sign in to see your real statements.
     </div>
-    <h2 style="margin: 0 0 1rem">Spending overview</h2>
+    <h2 class="overview-page-title">Spending overview</h2>
+    <div v-if="partialCycleBanner" class="demo-banner partial-statement-banner">
+      {{ partialCycleBanner }}
+    </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics v-if="showSummaryMetrics" :report="report" @select-category="onCategory" />
     <PaceCard
       v-if="isLiveCycleSelected"
       :transactions="paceTransactions"
-      :latest-billing-date="latestBillingDate"
+      :latest-billing-date="latestFinalBillingDate"
       :configured-charges="configuredCharges"
+      :partial-statement-active="currentCyclePartial"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -237,8 +241,10 @@ import {
 import {
   buildCycleReport,
   cycleStartFromMonthKey,
+  findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
+  latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
   loadManualCycleSpend,
   loadPaceIncludeFixed,
@@ -276,26 +282,39 @@ const searchHint = ref("");
 const searchMerchants = ref<SearchMerchantRow[]>([]);
 const excludingKey = ref<string | null>(null);
 const cycleDay = ref(loadCycleDay());
+const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 
-const latestBillingDate = computed(() => {
-  if (!months.value.length) return null;
-  const sorted = [...months.value].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
-  return sorted[0]?.billing_date ?? null;
-});
+const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.value));
 
 const displayMonths = computed(() => {
-  const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, latestBillingDate.value);
-  return merged.map((m) => ({
-    ...m,
-    label: m.inProgress || m.pendingStatement
-      ? openCycleTabLabel(m.billing_date)
-      : billingCycleLabel(m.billing_date),
-  }));
+  const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value);
+  return merged.map((m) => {
+    if (m.inProgress || m.pendingStatement) {
+      return { ...m, label: openCycleTabLabel(m.billing_date) };
+    }
+    const base = billingCycleLabel(m.billing_date);
+    return { ...m, label: m.partial ? `${base} · partial` : base };
+  });
 });
 
 const selectedCycleStart = computed(() =>
   isCycleMonthKey(selectedMonth.value) ? cycleStartFromMonthKey(selectedMonth.value!) : null,
 );
+
+const currentCyclePartial = computed(() => {
+  if (!selectedCycleStart.value) return false;
+  return !!findPartialMonth(months.value, selectedCycleStart.value, cycleDay.value);
+});
+
+const partialCycleBanner = computed(() => {
+  if (isLiveCycleSelected.value && currentCyclePartial.value) {
+    return "Partial statement loaded — pace and categories use your latest export. Re-upload anytime; choose Final only when the bill is complete (often a few days after the 10th).";
+  }
+  if (report.value?.metadata?.provisional) {
+    return "Partial snapshot — cycle still in progress. Use the · now tab for pace, or upload the final statement when it arrives.";
+  }
+  return "";
+});
 
 const selectedOpenCycle = computed(() =>
   displayMonths.value.find((m) => m.key === selectedMonth.value) ?? null,
@@ -602,13 +621,30 @@ async function saveLabel(row: SearchMerchantRow) {
 
 let reportRequestId = 0;
 
-function buildLocalCycleReport(monthKey: string): SpendingReport {
-  const txs = paceReport.value?.transactions ?? [];
+async function loadPartialReport(key: string): Promise<SpendingReport | null> {
+  const cached = partialReportCache.value.get(key);
+  if (cached) return cached;
+  try {
+    const r = await fetchReport(auth.isDemo, key, auth.token || undefined);
+    partialReportCache.value.set(key, r);
+    return r;
+  } catch {
+    return null;
+  }
+}
+
+async function buildLocalCycleReport(monthKey: string): Promise<SpendingReport> {
   const start = cycleStartFromMonthKey(monthKey);
   const { end } = getCycleRangeForStart(start, cycleDay.value);
+  const partial = findPartialMonth(months.value, start, cycleDay.value);
+  let txs = paceReport.value?.transactions ?? [];
+  if (partial) {
+    const partialReport = await loadPartialReport(partial.key);
+    if (partialReport) txs = partialReport.transactions;
+  }
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
-    manualSpend: loadManualCycleSpend(start),
+    manualSpend: partial ? null : loadManualCycleSpend(start),
     configuredCharges: configuredCharges.value,
   });
 }
@@ -616,7 +652,7 @@ function buildLocalCycleReport(monthKey: string): SpendingReport {
 async function refreshReport(month: string | null = selectedMonth.value) {
   if (month && isCycleMonthKey(month)) {
     if (!paceReport.value) await refreshPaceReport();
-    report.value = buildLocalCycleReport(month);
+    report.value = await buildLocalCycleReport(month);
     error.value = "";
     return;
   }
@@ -676,15 +712,20 @@ async function loadMonths() {
     const token = auth.token || undefined;
     const m = await fetchMonths(demo, token);
     months.value = m.months;
-    summary.value = m.summary.map((row) => ({
-      ...row,
-      month: billingCycleLabel(row.billing_date),
-    }));
+    partialReportCache.value.clear();
+    summary.value = m.summary
+      .filter((row) => !m.months.some((month) => month.billing_date === row.billing_date && month.partial))
+      .map((row) => ({
+        ...row,
+        month: billingCycleLabel(row.billing_date),
+      }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
-    const sortedMonths = [...m.months].sort((a, b) => b.billing_date.localeCompare(a.billing_date));
-    const latest = sortedMonths[0]?.billing_date ?? null;
-    const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value, latest);
-    const initial = sortedMonths[0]?.key ?? merged[0]?.key ?? null;
+    const merged = mergeMonthsWithOpenCycles(m.months, cycleDay.value);
+    const openCurrent = merged.find((x) => x.inProgress);
+    const sortedFinal = [...m.months]
+      .filter((month) => !month.partial)
+      .sort((a, b) => b.billing_date.localeCompare(a.billing_date));
+    const initial = openCurrent?.key ?? sortedFinal[0]?.key ?? merged[0]?.key ?? null;
     selectedMonth.value = initial;
     await refreshReport(initial);
   } catch (e) {

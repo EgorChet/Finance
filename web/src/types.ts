@@ -39,6 +39,8 @@ export interface MonthItem {
   inProgress?: boolean;
   /** Cycle ended; waiting for statement upload. */
   pendingStatement?: boolean;
+  /** Mid-cycle snapshot upload for this billing period. */
+  partial?: boolean;
 }
 
 export interface MerchantRule {

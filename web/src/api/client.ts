@@ -122,10 +122,16 @@ export async function warmApi(token?: string) {
   return get<{ status: string; analyzer?: boolean }>(`${prefix(false)}/health?deep=1`, token);
 }
 
-export async function uploadStatement(file: File, token?: string, autoTranslate = true) {
+export async function uploadStatement(
+  file: File,
+  statementType: "partial" | "final",
+  token?: string,
+  autoTranslate = true,
+) {
   const form = new FormData();
   form.append("file", file);
   form.append("auto_translate", String(autoTranslate));
+  form.append("statement_type", statementType);
   let res: Response;
   try {
     res = await fetch(`${prefix(false)}/upload`, {

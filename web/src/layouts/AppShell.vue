@@ -74,6 +74,23 @@
         </div>
       </div>
     </div>
+
+    <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
+      <div class="process-error-card upload-type-card">
+        <h3>Statement type</h3>
+        <p class="upload-type-file">{{ uploadPromptFile.name }}</p>
+        <p class="upload-type-hint">
+          Exports around the <strong>10th–13th</strong> are often still incomplete — pick
+          <strong>Partial</strong> unless this file is the full official bill for the cycle.
+          <strong>Final</strong> closes the month (pace tab, projections) — use only when nothing is missing.
+        </p>
+        <div class="process-error-actions upload-type-actions">
+          <button type="button" class="btn" @click="cancelUploadPrompt">Cancel</button>
+          <button type="button" class="btn btn-primary" @click="confirmUpload('partial')">Partial snapshot</button>
+          <button type="button" class="btn" @click="confirmUpload('final')">Final — closes cycle</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -114,6 +131,7 @@ const processErrorTitle = ref("Something went wrong");
 const canRetry = ref(false);
 const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
+const uploadPromptFile = ref<File | null>(null);
 const menuOpen = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -167,12 +185,16 @@ function retryProcess() {
   fn?.();
 }
 
-async function runUpload(file: File) {
-  beginProcess("Processing statement", file.name, UPLOAD_STEPS);
+async function runUpload(file: File, statementType: "partial" | "final") {
+  beginProcess(
+    "Processing statement",
+    statementType === "partial" ? `${file.name} · partial snapshot` : file.name,
+    UPLOAD_STEPS,
+  );
   try {
     processStep.value = 0;
     startStepTimer(UPLOAD_STEPS.length - 2);
-    await uploadStatement(file, auth.token || undefined);
+    await uploadStatement(file, statementType, auth.token || undefined);
     clearStepTimer();
     processStep.value = UPLOAD_STEPS.length - 1;
     processSubtitle.value = "Done — refreshing your overview…";
@@ -180,7 +202,7 @@ async function runUpload(file: File) {
     window.location.reload();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    failProcess("Upload failed", message, () => runUpload(file));
+    failProcess("Upload failed", message, () => runUpload(file, statementType));
   }
 }
 
@@ -201,13 +223,24 @@ async function sync() {
   }
 }
 
+function cancelUploadPrompt() {
+  uploadPromptFile.value = null;
+}
+
+function confirmUpload(statementType: "partial" | "final") {
+  const file = uploadPromptFile.value;
+  uploadPromptFile.value = null;
+  if (!file) return;
+  void runUpload(file, statementType);
+}
+
 async function onUpload(e: Event) {
   menuOpen.value = false;
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
-  if (!file) return;
-  await runUpload(file);
   input.value = "";
+  if (!file) return;
+  uploadPromptFile.value = file;
 }
 
 function logout() {

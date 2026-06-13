@@ -40,10 +40,11 @@
       <section class="pace-panel pace-panel-entry pace-panel-wide">
         <div class="pace-entry-grid">
           <div class="pace-entry-main">
-            <label class="pace-manual-label" for="pace-manual-input">
+            <label v-if="!partialStatementActive" class="pace-manual-label" for="pace-manual-input">
               Everyday spending so far (₪)
             </label>
             <input
+              v-if="!partialStatementActive"
               id="pace-manual-input"
               v-model="manualInput"
               class="input pace-manual-input"
@@ -53,7 +54,14 @@
               @blur="persistManual"
             />
             <p class="pace-manual-hint">
-              <template v-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
+              <template v-if="partialStatementActive && pace && pace.statementSpend > 0">
+                From partial statement: <strong>{{ formatIls(pace.statementSpend) }}</strong>
+                <span v-if="includeFixed && pace.configuredChargesTotal > 0">
+                  + {{ formatIls(pace.configuredChargesTotal) }} bills
+                  = <strong>{{ formatIls(pace.currentSpend) }}</strong>
+                </span>
+              </template>
+              <template v-else-if="pace && pace.manualEverydaySpend !== null && includeFixed && pace.configuredChargesTotal > 0">
                 {{ formatIls(pace.manualEverydaySpend) }} everyday
                 + {{ formatIls(pace.configuredChargesTotal) }} bills
                 = <strong>{{ formatIls(pace.currentSpend) }}</strong> total
@@ -212,6 +220,7 @@ const props = defineProps<{
   transactions: Transaction[];
   latestBillingDate?: string | null;
   configuredCharges?: ConfiguredCharge[];
+  partialStatementActive?: boolean;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -263,7 +272,7 @@ const pace = computed(() =>
     cycleDay,
     includeFixed: includeFixed.value,
     latestBillingDate: props.latestBillingDate ?? null,
-    manualSpend: manualSpend.value,
+    manualSpend: props.partialStatementActive ? null : manualSpend.value,
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
   }),
