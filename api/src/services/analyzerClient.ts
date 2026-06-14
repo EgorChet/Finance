@@ -45,16 +45,21 @@ async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response
 
 /** Wake the Python analyzer (Render free tier sleeps both services). */
 export async function warmAnalyzer(): Promise<boolean> {
+  let lastError = "";
   for (let attempt = 0; attempt < ANALYZER_WARMUP_ATTEMPTS; attempt += 1) {
     try {
       const res = await fetchAnalyzer("/health");
       if (res.ok) return true;
-    } catch {
-      /* retry */
+      lastError = `HTTP ${res.status}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
     }
     if (attempt < ANALYZER_WARMUP_ATTEMPTS - 1) {
       await new Promise((r) => setTimeout(r, ANALYZER_WARMUP_DELAY_MS));
     }
+  }
+  if (lastError) {
+    console.error(`Analyzer warmup failed after ${ANALYZER_WARMUP_ATTEMPTS} attempts: ${lastError}`);
   }
   return false;
 }
@@ -129,7 +134,7 @@ export function analyzerNotReadyMessage(): string {
       "(Environment → Link service → Host and port), not the public https://….onrender.com URL."
     );
   }
-  return `Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT.`;
+  return `Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT. If you set host:port manually, use the service name from render.yaml (finance-analyzer:10000), not the public URL slug (finance-analyzer-jsoq).`;
 }
 
 /** True only for cold-start / connectivity failures — not analyzer HTTP 4xx/5xx. */

@@ -95,7 +95,9 @@ If `analyzer_env_set` is **false** → `ANALYZER_URL` was never wired. Re-apply 
 
 If `analyzer` is **false** → API cannot reach the Python service (wrong port, analyzer asleep, or not deployed).
 
-**Do not** set `ANALYZER_URL` to the analyzer’s public URL (`https://finance-analyzer-xxxx.onrender.com`). The API must use Render’s **internal** host:port from **Link service** (looks like `http://finance-analyzer-xxxx:10000` in API logs — **http**, no `.onrender.com`).
+**Do not** set `ANALYZER_URL` to the analyzer’s public URL (`https://finance-analyzer-xxxx.onrender.com`). The API must use Render’s **internal** host:port from **Link service** (looks like `http://finance-analyzer:10000` in API logs — **http**, service **name**, no `-jsoq` slug, no `.onrender.com`).
+
+If you typed host:port by hand and used `finance-analyzer-jsoq`, that is wrong — `-jsoq` is only in the public URL. Use **`finance-analyzer:10000`** (matches `name:` in `render.yaml`) or link via **Add from → finance-analyzer → Host and port**.
 
 **Render dashboard checklist**
 
@@ -103,7 +105,7 @@ If `analyzer` is **false** → API cannot reach the Python service (wrong port, 
 |-------|--------|----------|
 | Two web services | Dashboard | `finance-api` **and** `finance-analyzer` |
 | Same Blueprint | Both service pages | Created from `render.yaml` together |
-| `ANALYZER_URL` on API | finance-api → Environment | Value like `finance-analyzer-xxxx:10000` (from **Link service**) |
+| `ANALYZER_URL` on API | finance-api → Environment | Value like `finance-analyzer:10000` (from **Link service**) |
 | Analyzer healthy | finance-analyzer → Logs | `Uvicorn running on 0.0.0.0:10000` |
 | API log on start | finance-api → Logs | `Analyzer URL: http://finance-analyzer-...` |
 
