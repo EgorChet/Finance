@@ -68,6 +68,16 @@ router.get("/health", async (req, res) => {
   res.json({ status: "ok", analyzer, analyzer_url: process.env.ANALYZER_URL ? "set" : "missing" });
 });
 
+/** Block until analyzer is awake — call before upload on Render free tier. */
+router.get("/warm-analyzer", async (_req, res) => {
+  const ready = await warmAnalyzer();
+  if (!ready) {
+    res.status(503).json({ ready: false, error: "Analyzer not ready" });
+    return;
+  }
+  res.json({ ready: true });
+});
+
 function sanitizeUploadFilename(name: string): string {
   const base = path.basename(name).replace(/[^\w.\- ]+/g, "").trim() || "upload.xlsx";
   return base.toLowerCase().endsWith(".xlsx") ? base : `${base}.xlsx`;

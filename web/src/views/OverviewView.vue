@@ -21,7 +21,7 @@
     </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
-    <SummaryMetrics v-if="showSummaryMetrics" :report="report" />
+    <SummaryMetrics v-if="showSummaryMetrics" :report="report" :retrospective="budgetRetrospective" />
     <PaceCard
       v-if="showPaceCard"
       :transactions="paceTransactions"
@@ -277,6 +277,12 @@ const isCycleTabSelected = computed(() => isCycleMonthKey(selectedMonth.value));
 const isInProgressCycle = computed(
   () => !!report.value?.metadata?.in_progress && !report.value?.metadata?.pending_statement,
 );
+
+/** Closed/final statement months — budget card speaks in past tense (overspent / under budget). */
+const budgetRetrospective = computed(() => {
+  if (!report.value || isLiveCycleSelected.value || isPartialForOpenCycle.value) return false;
+  return !isInProgressCycle.value;
+});
 
 const showCategoryExplorer = computed(() => {
   if (!report.value) return false;

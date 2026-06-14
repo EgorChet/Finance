@@ -123,6 +123,15 @@ export async function warmApi(token?: string) {
   return get<{ status: string; analyzer?: boolean }>(`${prefix(false)}/health?deep=1`, token);
 }
 
+/** Wake analyzer before upload — may take 1–2 min on Render free tier. */
+export async function warmAnalyzerService(token?: string) {
+  const res = await fetch(`${prefix(false)}/warm-analyzer`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  return res.json() as Promise<{ ready: boolean }>;
+}
+
 export async function uploadStatement(
   file: File,
   statementType: "partial" | "final",

@@ -17,10 +17,15 @@ export function isPublicRenderAnalyzerUrl(url: string): boolean {
 const ANALYZER_URL = normalizeAnalyzerUrl(process.env.ANALYZER_URL);
 const ANALYZER_USES_PUBLIC_URL = isPublicRenderAnalyzerUrl(ANALYZER_URL);
 const ANALYZER_TIMEOUT_MS = Number(process.env.ANALYZER_TIMEOUT_MS || 120_000);
+const ANALYZER_WARMUP_FETCH_TIMEOUT_MS = Number(process.env.ANALYZER_WARMUP_FETCH_TIMEOUT_MS || 45_000);
 const ANALYZER_WARMUP_ATTEMPTS = Number(
-  process.env.ANALYZER_WARMUP_ATTEMPTS || (ANALYZER_USES_PUBLIC_URL ? 12 : 8),
+  process.env.ANALYZER_WARMUP_ATTEMPTS || (ANALYZER_USES_PUBLIC_URL ? 30 : 10),
 );
 const ANALYZER_WARMUP_DELAY_MS = Number(process.env.ANALYZER_WARMUP_DELAY_MS || 5000);
+const ANALYZER_WAKE_PAUSE_MS = Number(process.env.ANALYZER_WAKE_PAUSE_MS || 6000);
+
+/** Render returns these while a free-tier service is still spinning up. */
+const WARMUP_RETRYABLE_STATUS = new Set([500, 502, 503, 504]);
 
 if (process.env.NODE_ENV !== "test") {
   console.log(`Analyzer URL: ${ANALYZER_URL}`);
@@ -45,14 +50,78 @@ async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response
   }
 }
 
+async function fetchAnalyzerWarm(path: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ANALYZER_WARMUP_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(`${ANALYZER_URL}${path}`, { ...init, signal: controller.signal });
+  } catch (e) {
+    const cause = e instanceof Error && "cause" in e ? String((e as Error & { cause?: unknown }).cause) : "";
+    const detail = cause ? ` (${cause})` : "";
+    throw new Error(`Analyzer unreachable at ${ANALYZER_URL}${path}${detail}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isWarmingHttpStatus(status: number): boolean {
+  return WARMUP_RETRYABLE_STATUS.has(status);
+}
+
+/** Hit the public base URL so Render starts the analyzer container (502 is normal while waking). */
+async function pingAnalyzerBase(): Promise<void> {
+  for (const path of ["/", "/health"]) {
+    try {
+      const res = await fetchAnalyzerWarm(path, { method: "GET", redirect: "follow" });
+      if (res.ok) return;
+      if (!isWarmingHttpStatus(res.status)) return;
+    } catch {
+      /* still waking */
+    }
+  }
+}
+
+async function quickHealthCheck(): Promise<boolean> {
+  try {
+    const res = await fetchAnalyzerWarm("/health");
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Fast path when already awake; full wake loop if not. */
+export async function ensureAnalyzerReady(): Promise<boolean> {
+  if (await quickHealthCheck()) return true;
+  return warmAnalyzer();
+}
+
 /** Wake the Python analyzer (Render free tier sleeps both services). */
 export async function warmAnalyzer(): Promise<boolean> {
   let lastError = "";
+
+  if (ANALYZER_USES_PUBLIC_URL) {
+    console.log("Pinging analyzer base URL to wake Render instance…");
+    await pingAnalyzerBase();
+    await new Promise((r) => setTimeout(r, ANALYZER_WAKE_PAUSE_MS));
+  }
+
   for (let attempt = 0; attempt < ANALYZER_WARMUP_ATTEMPTS; attempt += 1) {
+    if (ANALYZER_USES_PUBLIC_URL && attempt > 0 && attempt % 4 === 0) {
+      await pingAnalyzerBase();
+    }
     try {
-      const res = await fetchAnalyzer("/health");
-      if (res.ok) return true;
+      const res = await fetchAnalyzerWarm("/health");
+      if (res.ok) {
+        if (attempt > 0 || ANALYZER_USES_PUBLIC_URL) {
+          console.log(`Analyzer ready after ${attempt + 1} warmup attempt(s)`);
+        }
+        return true;
+      }
       lastError = `HTTP ${res.status}`;
+      if (!isWarmingHttpStatus(res.status)) {
+        console.warn(`Analyzer /health returned ${res.status} (attempt ${attempt + 1})`);
+      }
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
     }
@@ -71,7 +140,7 @@ export async function analyzeFileBuffer(
   filename: string,
   autoTranslate = true,
 ): Promise<SpendingReport> {
-  const ready = await warmAnalyzer();
+  const ready = await ensureAnalyzerReady();
   if (!ready) {
     throw new Error(analyzerNotReadyMessage());
   }
@@ -118,7 +187,7 @@ export async function reanalyzeAll(
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const res = await fetchAnalyzer("/health");
+    const res = await fetchAnalyzerWarm("/health");
     return res.ok;
   } catch {
     return false;
@@ -136,8 +205,8 @@ export function analyzerUsesPublicUrl(): boolean {
 export function analyzerNotReadyMessage(): string {
   if (ANALYZER_USES_PUBLIC_URL) {
     return (
-      `Analyzer not ready at ${ANALYZER_URL}. On Render free tier the analyzer wakes via its public URL — ` +
-      "wait a minute and try again, or open the analyzer URL in a browser first."
+      `Analyzer not ready at ${ANALYZER_URL}. Render free tier can take 1–2 minutes to wake — ` +
+      "wait and try again, or open the analyzer URL in a browser first."
     );
   }
   return (
