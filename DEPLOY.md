@@ -95,6 +95,8 @@ If `analyzer_env_set` is **false** → `ANALYZER_URL` was never wired. Re-apply 
 
 If `analyzer` is **false** → API cannot reach the Python service (wrong port, analyzer asleep, or not deployed).
 
+**Do not** set `ANALYZER_URL` to the analyzer’s public URL (`https://finance-analyzer-xxxx.onrender.com`). The API must use Render’s **internal** host:port from **Link service** (looks like `http://finance-analyzer-xxxx:10000` in API logs — **http**, no `.onrender.com`).
+
 **Render dashboard checklist**
 
 | Check | Where | Expected |

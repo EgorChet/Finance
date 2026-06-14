@@ -9,12 +9,24 @@ export function normalizeAnalyzerUrl(raw: string | undefined): string {
   return url.replace(/\/$/, "");
 }
 
+/** Public Render URL in ANALYZER_URL breaks private service-to-service calls. */
+export function isPublicRenderAnalyzerUrl(url: string): boolean {
+  return /\.onrender\.com/i.test(url);
+}
+
 const ANALYZER_URL = normalizeAnalyzerUrl(process.env.ANALYZER_URL);
+const ANALYZER_URL_MISCONFIGURED = isPublicRenderAnalyzerUrl(ANALYZER_URL);
 const ANALYZER_TIMEOUT_MS = Number(process.env.ANALYZER_TIMEOUT_MS || 120_000);
-const ANALYZER_WARMUP_ATTEMPTS = Number(process.env.ANALYZER_WARMUP_ATTEMPTS || 3);
+const ANALYZER_WARMUP_ATTEMPTS = Number(process.env.ANALYZER_WARMUP_ATTEMPTS || 8);
+const ANALYZER_WARMUP_DELAY_MS = Number(process.env.ANALYZER_WARMUP_DELAY_MS || 5000);
 
 if (process.env.NODE_ENV !== "test") {
   console.log(`Analyzer URL: ${ANALYZER_URL}`);
+  if (ANALYZER_URL_MISCONFIGURED) {
+    console.error(
+      "ANALYZER_URL looks like a public Render URL. On Render, link finance-analyzer via Environment → Add from → Host and port (http://service-name:10000), not https://….onrender.com.",
+    );
+  }
 }
 
 async function fetchAnalyzer(path: string, init?: RequestInit): Promise<Response> {
@@ -41,7 +53,7 @@ export async function warmAnalyzer(): Promise<boolean> {
       /* retry */
     }
     if (attempt < ANALYZER_WARMUP_ATTEMPTS - 1) {
-      await new Promise((r) => setTimeout(r, 4000));
+      await new Promise((r) => setTimeout(r, ANALYZER_WARMUP_DELAY_MS));
     }
   }
   return false;
@@ -54,7 +66,7 @@ export async function analyzeFileBuffer(
 ): Promise<SpendingReport> {
   const ready = await warmAnalyzer();
   if (!ready) {
-    throw new Error(`Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT.`);
+    throw new Error(analyzerNotReadyMessage());
   }
   const form = new FormData();
   form.append("file", new Blob([new Uint8Array(buffer)]), filename);
@@ -104,4 +116,31 @@ export async function healthCheck(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function analyzerUrlMisconfigured(): boolean {
+  return ANALYZER_URL_MISCONFIGURED;
+}
+
+export function analyzerNotReadyMessage(): string {
+  if (ANALYZER_URL_MISCONFIGURED) {
+    return (
+      "Analyzer URL is misconfigured: use Render internal host:port for finance-analyzer " +
+      "(Environment → Link service → Host and port), not the public https://….onrender.com URL."
+    );
+  }
+  return `Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT.`;
+}
+
+/** True only for cold-start / connectivity failures — not analyzer HTTP 4xx/5xx. */
+export function isAnalyzerConnectivityError(message: string): boolean {
+  return (
+    message.includes("ECONNREFUSED") ||
+    message.includes("ENOTFOUND") ||
+    message.includes("ETIMEDOUT") ||
+    message.includes("fetch failed") ||
+    message.includes("Analyzer unreachable") ||
+    message.includes("Analyzer not ready") ||
+    (message.includes("abort") && !message.includes("Analyzer error"))
+  );
 }

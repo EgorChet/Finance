@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { warmAnalyzer, normalizeAnalyzerUrl } from "./services/analyzerClient.js";
+import { warmAnalyzer, normalizeAnalyzerUrl, analyzerUrlMisconfigured } from "./services/analyzerClient.js";
 import { requireAuth } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
@@ -42,6 +42,7 @@ app.get("/health", async (req, res) => {
     analyzer,
     analyzer_url: normalizeAnalyzerUrl(process.env.ANALYZER_URL),
     analyzer_env_set: !!process.env.ANALYZER_URL?.trim(),
+    analyzer_url_misconfigured: analyzerUrlMisconfigured(),
   });
 });
 

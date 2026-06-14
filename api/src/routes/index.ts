@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
-import { analyzeFileBuffer, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
+import { analyzeFileBuffer, isAnalyzerConnectivityError, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
 import { finalizeReport } from "../services/reportService.js";
 import {
   getCombinedReport,
@@ -257,13 +257,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     res.json({ key, provisional, report: finalizeReport(data.statements[key]!.report) });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    const warming =
-      message.includes("abort") ||
-      message.includes("fetch failed") ||
-      message.includes("ECONNREFUSED") ||
-      message.includes("Analyzer unreachable") ||
-      message.includes("Analyzer not ready") ||
-      message.includes("Analyzer error");
+    const waking = isAnalyzerConnectivityError(message);
     console.error("Upload failed:", message);
     res.status(warming ? 503 : 500).json({
       error: warming

@@ -52,6 +52,7 @@ async def analyze_upload(
     file: UploadFile = File(...),
     auto_translate: bool = True,
 ) -> dict:
+    print(f"analyze-file: {file.filename!r} auto_translate={auto_translate}", flush=True)
     suffix = Path(file.filename or "upload.xlsx").suffix or ".xlsx"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await file.read()
