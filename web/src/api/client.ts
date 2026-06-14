@@ -123,7 +123,14 @@ export async function warmApi(token?: string) {
   return get<{ status: string; analyzer?: boolean }>(`${prefix(false)}/health?deep=1`, token);
 }
 
-/** Wake analyzer before upload — may take 1–2 min on Render free tier. */
+export async function fetchAppConfig(token?: string) {
+  return get<{ analyzer_wake_url: string | null; analyzer_wake_from_browser: boolean }>(
+    `${prefix(false)}/config`,
+    token,
+  );
+}
+
+/** Server-side wake — fallback when analyzer is on internal network. */
 export async function warmAnalyzerService(token?: string) {
   const res = await fetch(`${prefix(false)}/warm-analyzer`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},

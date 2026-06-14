@@ -135,7 +135,8 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import { syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import { fetchAppConfig, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 
@@ -260,7 +261,16 @@ async function runUpload(file: File, statementType: "partial" | "final") {
     processStep.value = 0;
     if (import.meta.env.VITE_API_URL) {
       processSubtitle.value = "Waking analyzer — first upload after idle can take 1–2 minutes…";
-      await warmAnalyzerService(auth.token || undefined);
+      const config = await fetchAppConfig(auth.token || undefined);
+      const wakeUrl =
+        config.analyzer_wake_url ||
+        (import.meta.env.VITE_ANALYZER_URL as string | undefined)?.trim() ||
+        null;
+      if (wakeUrl) {
+        await wakeAnalyzerInBrowser(wakeUrl);
+      } else {
+        await warmAnalyzerService(auth.token || undefined);
+      }
     }
     startStepTimer(UPLOAD_STEPS.length - 2);
     await uploadStatement(file, statementType, auth.token || undefined);

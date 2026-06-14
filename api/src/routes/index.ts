@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
-import { analyzeFileBuffer, isAnalyzerConnectivityError, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
+import { analyzeFileBuffer, analyzerUsesPublicUrl, isAnalyzerConnectivityError, isPublicRenderAnalyzerUrl, normalizeAnalyzerUrl, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
 import { finalizeReport } from "../services/reportService.js";
 import {
   getCombinedReport,
@@ -76,6 +76,14 @@ router.get("/warm-analyzer", async (_req, res) => {
     return;
   }
   res.json({ ready: true });
+});
+
+router.get("/config", (_req, res) => {
+  const url = normalizeAnalyzerUrl(process.env.ANALYZER_URL);
+  res.json({
+    analyzer_wake_url: isPublicRenderAnalyzerUrl(url) ? url : null,
+    analyzer_wake_from_browser: analyzerUsesPublicUrl(),
+  });
 });
 
 function sanitizeUploadFilename(name: string): string {

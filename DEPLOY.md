@@ -108,7 +108,9 @@ So internal host:port (`finance-analyzer-jsoq:10000`) **will not work** on free 
 
 Set on **finance-api → Environment → `ANALYZER_URL`** (manual value, no trailing slash).
 
-**Paid tier (analyzer on Starter+):** use internal host:port from **finance-analyzer → Connect → Internal** tab, e.g. `http://finance-analyzer-jsoq:8001` (exact value from dashboard).
+The app wakes the analyzer **from your browser** before upload (same as opening the URL manually). Server-to-server wake from finance-api often fails on free tier.
+
+**Paid tier (analyzer on Starter+):** use internal host:port from **finance-analyzer → Connect → Internal** tab.
 
 **Render dashboard checklist**
 
