@@ -9,22 +9,24 @@ export function normalizeAnalyzerUrl(raw: string | undefined): string {
   return url.replace(/\/$/, "");
 }
 
-/** Public Render URL in ANALYZER_URL breaks private service-to-service calls. */
+/** Public Render URL — required on free tier (free web services cannot receive private network traffic). */
 export function isPublicRenderAnalyzerUrl(url: string): boolean {
   return /\.onrender\.com/i.test(url);
 }
 
 const ANALYZER_URL = normalizeAnalyzerUrl(process.env.ANALYZER_URL);
-const ANALYZER_URL_MISCONFIGURED = isPublicRenderAnalyzerUrl(ANALYZER_URL);
+const ANALYZER_USES_PUBLIC_URL = isPublicRenderAnalyzerUrl(ANALYZER_URL);
 const ANALYZER_TIMEOUT_MS = Number(process.env.ANALYZER_TIMEOUT_MS || 120_000);
-const ANALYZER_WARMUP_ATTEMPTS = Number(process.env.ANALYZER_WARMUP_ATTEMPTS || 8);
+const ANALYZER_WARMUP_ATTEMPTS = Number(
+  process.env.ANALYZER_WARMUP_ATTEMPTS || (ANALYZER_USES_PUBLIC_URL ? 12 : 8),
+);
 const ANALYZER_WARMUP_DELAY_MS = Number(process.env.ANALYZER_WARMUP_DELAY_MS || 5000);
 
 if (process.env.NODE_ENV !== "test") {
   console.log(`Analyzer URL: ${ANALYZER_URL}`);
-  if (ANALYZER_URL_MISCONFIGURED) {
-    console.error(
-      "ANALYZER_URL looks like a public Render URL. On Render, link finance-analyzer via Environment → Add from → Host and port (http://service-name:10000), not https://….onrender.com.",
+  if (ANALYZER_USES_PUBLIC_URL) {
+    console.log(
+      "Analyzer via public Render URL (normal on free tier — free web services cannot receive private network traffic).",
     );
   }
 }
@@ -124,17 +126,24 @@ export async function healthCheck(): Promise<boolean> {
 }
 
 export function analyzerUrlMisconfigured(): boolean {
-  return ANALYZER_URL_MISCONFIGURED;
+  return false;
+}
+
+export function analyzerUsesPublicUrl(): boolean {
+  return ANALYZER_USES_PUBLIC_URL;
 }
 
 export function analyzerNotReadyMessage(): string {
-  if (ANALYZER_URL_MISCONFIGURED) {
+  if (ANALYZER_USES_PUBLIC_URL) {
     return (
-      "Analyzer URL is misconfigured: use Render internal host:port for finance-analyzer " +
-      "(Environment → Link service → Host and port), not the public https://….onrender.com URL."
+      `Analyzer not ready at ${ANALYZER_URL}. On Render free tier the analyzer wakes via its public URL — ` +
+      "wait a minute and try again, or open the analyzer URL in a browser first."
     );
   }
-  return `Analyzer not ready at ${ANALYZER_URL}. Check finance-analyzer is deployed and listening on PORT. If you set host:port manually, use the service name from render.yaml (finance-analyzer:10000), not the public URL slug (finance-analyzer-jsoq).`;
+  return (
+    `Analyzer not ready at ${ANALYZER_URL}. Use the internal host:port from finance-analyzer → Connect → Internal, ` +
+    "or upgrade the analyzer off free tier (free web services cannot receive private network traffic)."
+  );
 }
 
 /** True only for cold-start / connectivity failures — not analyzer HTTP 4xx/5xx. */

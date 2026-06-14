@@ -88,30 +88,39 @@ curl "https://YOUR_API.onrender.com/health?deep=1"
 You want:
 
 ```json
-{ "status": "ok", "analyzer": true, "analyzer_env_set": true, "analyzer_url": "http://finance-analyzer-xxxx:10000" }
+{ "status": "ok", "analyzer": true, "analyzer_env_set": true, "analyzer_uses_public_url": true }
 ```
 
-If `analyzer_env_set` is **false** → `ANALYZER_URL` was never wired. Re-apply the Blueprint or set it manually (see troubleshooting below).
+If `analyzer_env_set` is **false** → set `ANALYZER_URL` on finance-api (see below).
 
-If `analyzer` is **false** → API cannot reach the Python service (wrong port, analyzer asleep, or not deployed).
+If `analyzer` is **false** → analyzer is asleep or `ANALYZER_URL` is wrong. See troubleshooting.
 
-**Do not** set `ANALYZER_URL` to the analyzer’s public URL (`https://finance-analyzer-xxxx.onrender.com`). The API must use Render’s **internal** host:port from **Link service** (looks like `http://finance-analyzer:10000` in API logs — **http**, service **name**, no `-jsoq` slug, no `.onrender.com`).
+### `ANALYZER_URL` on Render (important)
 
-If you typed host:port by hand and used `finance-analyzer-jsoq`, that is wrong — `-jsoq` is only in the public URL. Use **`finance-analyzer:10000`** (matches `name:` in `render.yaml`) or link via **Add from → finance-analyzer → Host and port**.
+**Free tier (both services on Free):** use the analyzer’s **public URL**:
+
+```text
+https://finance-analyzer-jsoq.onrender.com
+```
+
+Render docs: *“Free web services can send private network requests, but they can't receive them.”*  
+So internal host:port (`finance-analyzer-jsoq:10000`) **will not work** on free tier — you’ll see `ENOTFOUND` or “Analyzer not ready” with no `analyze-file` logs.
+
+Set on **finance-api → Environment → `ANALYZER_URL`** (manual value, no trailing slash).
+
+**Paid tier (analyzer on Starter+):** use internal host:port from **finance-analyzer → Connect → Internal** tab, e.g. `http://finance-analyzer-jsoq:8001` (exact value from dashboard).
 
 **Render dashboard checklist**
 
 | Check | Where | Expected |
 |-------|--------|----------|
 | Two web services | Dashboard | `finance-api` **and** `finance-analyzer` |
-| Same Blueprint | Both service pages | Created from `render.yaml` together |
-| `ANALYZER_URL` on API | finance-api → Environment | Value like `finance-analyzer:10000` (from **Link service**) |
+| `ANALYZER_URL` on API | finance-api → Environment | **Free:** `https://finance-analyzer-….onrender.com` |
 | Analyzer healthy | finance-analyzer → Logs | `Uvicorn running on 0.0.0.0:10000` |
-| API log on start | finance-api → Logs | `Analyzer URL: http://finance-analyzer-...` |
+| API log on start | finance-api → Logs | `Analyzer URL: https://finance-analyzer-…` (free tier) |
+| Upload works | finance-analyzer → Logs | `analyze-file: '….xlsx'` and `POST /analyze-file` |
 
-To link manually if Blueprint missed it: **finance-api** → **Environment** → add `ANALYZER_URL` → **Add from** → select **finance-analyzer** → **Host and port**.
-
-**First request after idle** may take ~30s (Render free tier cold start).
+**First request after idle** may take ~60s (Render free tier cold start). Open the analyzer URL in a browser first to wake it, then upload.
 
 ---
 

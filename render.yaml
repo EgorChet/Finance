@@ -8,10 +8,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: ANALYZER_URL
-        fromService:
-          name: finance-analyzer
-          type: web
-          property: hostport
+        sync: false
       - key: AUTH_PASSWORD
         sync: false
       - key: AUTH_SECRET
