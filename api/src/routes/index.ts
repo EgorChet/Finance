@@ -259,8 +259,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const message = e instanceof Error ? e.message : String(e);
     const waking = isAnalyzerConnectivityError(message);
     console.error("Upload failed:", message);
-    res.status(warming ? 503 : 500).json({
-      error: warming
+    res.status(waking ? 503 : 500).json({
+      error: waking
         ? "Analyzer is waking up (Render free tier). Wait ~30 seconds and try again."
         : message,
     });
