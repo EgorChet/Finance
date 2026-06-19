@@ -138,6 +138,15 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
         "billing_date": billing_date,
         "source_file": path.name,
         "transaction_count": len(transactions),
-        "pending_currencies": {str(k): v for k, v in pending_currencies.items()},
+        "pending_currencies": _pending_currencies_metadata(pending_currencies),
     }
     return transactions, metadata
+
+
+def _pending_currencies_metadata(pending: dict[float, str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for amount, currency in pending.items():
+        out[str(amount)] = currency
+        out[f"{amount:.2f}"] = currency
+        out[f"{amount:.1f}"] = currency
+    return out

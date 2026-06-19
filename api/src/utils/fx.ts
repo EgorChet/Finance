@@ -72,11 +72,12 @@ export function pendingCurrencyForAmount(
 ): string | undefined {
   if (!pendingCurrencies) return undefined;
   const key = roundMoney(amount);
-  return (
-    pendingCurrencies[String(key)] ??
-    pendingCurrencies[key.toFixed(2)] ??
-    pendingCurrencies[key.toFixed(1)]
-  );
+  const keys = [String(key), key.toFixed(2), key.toFixed(1)];
+  for (const k of keys) {
+    const hit = pendingCurrencies[k];
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 function explicitCurrencyForTx(
@@ -84,8 +85,12 @@ function explicitCurrencyForTx(
   pendingCurrencies?: Record<string, string> | null,
 ): string | null | undefined {
   if (isPendingCharge(tx.charge_amount, tx.notes)) {
-    // Header totals (e.g. "469.40 PLN") beat stale stored original_currency.
-    return pendingCurrencyForAmount(tx.amount, pendingCurrencies) ?? null;
+    // Header map and parser output beat merchant heuristics (OPENAI → USD).
+    return (
+      pendingCurrencyForAmount(tx.amount, pendingCurrencies) ??
+      tx.original_currency ??
+      null
+    );
   }
   return tx.original_currency;
 }
@@ -112,7 +117,10 @@ export function resolveChargeIls(
 
   // Pending — column 3 not final; use FX even if charge_amount was already estimated.
   if (pending) {
-    const currency = detectCurrency(merchant, amount, null, explicitCurrency);
+    const currency =
+      explicitCurrency && explicitCurrency !== "ILS"
+        ? explicitCurrency
+        : detectCurrency(merchant, amount, null, null);
     if (currency === "ILS") {
       return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: true };
     }

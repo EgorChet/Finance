@@ -264,7 +264,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
   try {
     const data = await readStatements();
-    if (isCachedFile(data, hash)) {
+    if (isCachedFile(data, hash) && !provisional) {
       res.json({ skipped: true, reason: "unchanged" });
       return;
     }

@@ -15,6 +15,22 @@ def test_cursor_usd_uses_bank_ils_charge():
 
 
 @patch("fx.get_rate_to_ils", return_value=0.95)
+def test_pending_openai_uses_parser_currency_without_header_metadata(_mock):
+    """When metadata is missing, keep PLN from parser — do not guess USD from OPENAI."""
+    charge, currency, estimated = resolve_charge_ils(
+        469.4,
+        373.09,
+        "OPENAI *CHATGPT SUBSCR +14158799686 IE",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 19),
+        explicit_currency="PLN",
+    )
+    assert currency == "PLN"
+    assert estimated is True
+    assert charge == round(469.4 * 0.95, 2)
+
+
+@patch("fx.get_rate_to_ils", return_value=0.95)
 def test_pending_openai_keeps_pln_after_estimate(_mock):
     """API re-normalize must not treat estimated ILS as bank charge (IE suffix → EUR bug)."""
     charge, currency, estimated = resolve_charge_ils(
@@ -61,7 +77,8 @@ def test_parser_metadata_includes_pending_currencies():
     files = glob.glob(str(Path(__file__).resolve().parents[2] / "statements" / "*19.06.26*.xlsx"))
     assert files, "Jun 19 statement fixture missing"
     _, meta = parse_leumi_visa_xlsx(Path(files[0]))
-    assert meta["pending_currencies"] == {"469.4": "PLN"}
+    assert meta["pending_currencies"]["469.4"] == "PLN"
+    assert meta["pending_currencies"]["469.40"] == "PLN"
 
 
 def test_pending_israeli_uses_amount_as_ils():
