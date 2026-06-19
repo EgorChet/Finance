@@ -46,6 +46,8 @@ export function detectCurrency(
     if (inferred) return inferred;
   }
 
+  if (USD_MERCHANT.test(merchant)) return "USD";
+
   const suffix = COUNTRY_SUFFIX.exec(merchant.trim());
   if (suffix) {
     const cc = suffix[1]!;
@@ -57,7 +59,6 @@ export function detectCurrency(
     if (cc === "AM") return "AMD";
   }
 
-  if (USD_MERCHANT.test(merchant)) return "USD";
   if (BGN_MERCHANT.test(merchant)) return "BGN";
   if (EUR_MERCHANT.test(merchant)) return "EUR";
   if (/[A-Za-z]{3,}/.test(merchant) && !hasHebrew(merchant)) return "USD";
@@ -81,6 +82,24 @@ export function resolveChargeIls(
 ): { chargeAmount: number; originalCurrency: string | null; estimated: boolean } {
   const charge = chargeRaw == null ? null : Number(chargeRaw);
 
+  if (amount <= 0) return { chargeAmount: 0, originalCurrency: null, estimated: false };
+
+  const pending = isPendingCharge(chargeRaw, notes);
+
+  // Pending — column 3 not final; use FX even if charge_amount was already estimated.
+  if (pending) {
+    const currency = detectCurrency(merchant, amount, null, explicitCurrency);
+    if (currency === "ILS") {
+      return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: true };
+    }
+    const rate = getRateToIls(currency, txDate);
+    return {
+      chargeAmount: roundMoney(amount * rate),
+      originalCurrency: currency,
+      estimated: true,
+    };
+  }
+
   // Bank ILS charge — column 3 always wins.
   if (charge != null && charge > 0) {
     const currency = detectCurrency(merchant, amount, charge, explicitCurrency);
@@ -94,12 +113,9 @@ export function resolveChargeIls(
     return { chargeAmount: roundMoney(charge), originalCurrency: currency, estimated: false };
   }
 
-  if (amount <= 0) return { chargeAmount: 0, originalCurrency: null, estimated: false };
-
-  const pending = isPendingCharge(chargeRaw, notes);
   const currency = detectCurrency(merchant, amount, charge, explicitCurrency);
   if (currency === "ILS") {
-    return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: pending };
+    return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: false };
   }
 
   const rate = getRateToIls(currency, txDate);
@@ -116,7 +132,14 @@ export function normalizeForeignCharges(transactions: Transaction[]): {
 } {
   let changed = false;
   const result = transactions.map((tx) => {
-    const resolved = resolveChargeIls(tx.amount, tx.charge_amount, tx.merchant_he, tx.notes, tx.date);
+    const resolved = resolveChargeIls(
+      tx.amount,
+      tx.charge_amount,
+      tx.merchant_he,
+      tx.notes,
+      tx.date,
+      tx.original_currency,
+    );
     const sameCharge = resolved.chargeAmount === tx.charge_amount;
     const sameCurrency = (tx.original_currency ?? null) === resolved.originalCurrency;
     const sameEstimated = !!tx.charge_estimated === resolved.estimated;

@@ -74,6 +74,9 @@ def detect_currency(
         if inferred:
             return inferred
 
+    if _USD_MERCHANT.search(merchant):
+        return "USD"
+
     suffix = _COUNTRY_SUFFIX.search(merchant.strip())
     if suffix:
         cc = suffix.group(1)
@@ -90,8 +93,6 @@ def detect_currency(
         if cc == "AM":
             return "AMD"
 
-    if _USD_MERCHANT.search(merchant):
-        return "USD"
     if _BGN_MERCHANT.search(merchant):
         return "BGN"
     if _EUR_MERCHANT.search(merchant):
@@ -135,22 +136,31 @@ def resolve_charge_ils(
         except (TypeError, ValueError):
             charge = None
 
-    # Bank rate — always trust column 3 when the bank charged in ILS.
+    if amount <= 0:
+        return 0.0, None, False
+
+    pending = is_pending_charge(charge_raw, notes)
+
+    # Pending — column 3 not final; use FX even if charge_amount was already estimated.
+    if pending:
+        currency = detect_currency(merchant, amount, None, explicit_currency)
+        if currency == "ILS":
+            return _round_money(amount), "ILS", True
+        rate_date = tx_date or date.today()
+        rate = get_rate_to_ils(currency, rate_date)
+        return _round_money(amount * rate), currency, True
+
+    # Bank ILS charge — always trust column 3 when the bank charged in ILS.
     if charge is not None and charge > 0:
         currency = detect_currency(merchant, amount, charge, explicit_currency)
         if currency == "ILS" or abs(amount - charge) < 0.02:
             return _round_money(charge), "ILS" if abs(amount - charge) < 0.02 else currency, False
         return _round_money(charge), currency, False
 
-    if amount <= 0:
-        return 0.0, None, False
-
-    pending = is_pending_charge(charge_raw, notes)
     currency = detect_currency(merchant, amount, charge, explicit_currency)
     if currency == "ILS":
-        return _round_money(amount), "ILS", pending
+        return _round_money(amount), "ILS", False
 
-    # Pending foreign charge — fetch live rate for transaction date.
     rate_date = tx_date or date.today()
     rate = get_rate_to_ils(currency, rate_date)
     return _round_money(amount * rate), currency, True

@@ -15,6 +15,22 @@ def test_cursor_usd_uses_bank_ils_charge():
 
 
 @patch("fx.get_rate_to_ils", return_value=0.95)
+def test_pending_openai_keeps_pln_after_estimate(_mock):
+    """API re-normalize must not treat estimated ILS as bank charge (IE suffix → EUR bug)."""
+    charge, currency, estimated = resolve_charge_ils(
+        469.4,
+        373.09,
+        "OPENAI *CHATGPT SUBSCR +14158799686 IE",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 19),
+        explicit_currency="PLN",
+    )
+    assert currency == "PLN"
+    assert estimated is True
+    assert charge == round(469.4 * 0.95, 2)
+
+
+@patch("fx.get_rate_to_ils", return_value=0.95)
 def test_pending_openai_uses_pln_from_header(_mock):
     charge, currency, estimated = resolve_charge_ils(
         469.4,
