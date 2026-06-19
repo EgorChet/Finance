@@ -202,15 +202,13 @@ export function mergeConfiguredChargeTransactions(
   cycleDay = DEFAULT_BILLING_CYCLE_DAY,
 ): Transaction[] {
   const applicable = configuredChargesForCycle(cycleStart, charges, cycleEnd);
-  if (!applicable.length) return transactions;
-
   const chargeById = new Map(applicable.map((c) => [c.id, c]));
-  const updated = transactions.map((tx) => {
-    if (!tx.notes?.startsWith("fixed_charge:")) return tx;
+  const updated = transactions.flatMap((tx) => {
+    if (!tx.notes?.startsWith("fixed_charge:")) return [tx];
     const id = tx.notes.slice("fixed_charge:".length);
     const charge = chargeById.get(id);
-    if (!charge) return tx;
-    return {
+    if (!charge) return [];
+    return [{
       ...tx,
       date: transactionDateForCharge(charge, cycleStart, cycleDay),
       merchant_he: charge.name_he || charge.name_en,
@@ -219,7 +217,7 @@ export function mergeConfiguredChargeTransactions(
       charge_amount: charge.amount,
       category_en: charge.category_en,
       billing_month: billingLabel,
-    };
+    }];
   });
 
   const existingIds = new Set(
@@ -246,6 +244,9 @@ export function mergeConfiguredChargeTransactions(
     });
   }
 
-  if (!added.length && updated.every((tx, i) => tx === transactions[i])) return transactions;
+  if (!added.length && updated.length === transactions.length
+    && updated.every((tx, i) => tx === transactions[i])) {
+    return transactions;
+  }
   return [...updated, ...added].sort((a, b) => b.date.localeCompare(a.date));
 }

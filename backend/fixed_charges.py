@@ -126,9 +126,6 @@ def augment_report(report: SpendingReport) -> SpendingReport:
         return apply_exclusions(report)
 
     applicable = charges_for_billing(billing_date)
-    if not applicable:
-        return apply_exclusions(report)
-
     cycle_start = cycle_start_for_statement_billing(billing_date)
     charge_by_id = {c["id"]: c for c in applicable}
     month_label = billing_date.strftime("%b %Y")
@@ -138,24 +135,25 @@ def augment_report(report: SpendingReport) -> SpendingReport:
         if tx.notes and tx.notes.startswith("fixed_charge:"):
             charge_id = tx.notes.split(":", 1)[1]
             charge = charge_by_id.get(charge_id)
-            if charge:
-                if charge.get("schedule") == "once" and charge.get("charge_date"):
-                    charge_date = date.fromisoformat(charge["charge_date"])
-                else:
-                    charge_date = fixed_charge_date_for_billing(cycle_start)
-                updated_txs.append(
-                    replace(
-                        tx,
-                        date=charge_date,
-                        merchant_he=str(charge.get("name_he", charge["name_en"])),
-                        merchant_en=str(charge["name_en"]),
-                        amount=float(charge["amount"]),
-                        charge_amount=float(charge["amount"]),
-                        category_en=str(charge.get("category_en", "Uncategorized")),
-                        billing_month=month_label,
-                    )
-                )
+            if not charge:
                 continue
+            if charge.get("schedule") == "once" and charge.get("charge_date"):
+                charge_date = date.fromisoformat(charge["charge_date"])
+            else:
+                charge_date = fixed_charge_date_for_billing(cycle_start)
+            updated_txs.append(
+                replace(
+                    tx,
+                    date=charge_date,
+                    merchant_he=str(charge.get("name_he", charge["name_en"])),
+                    merchant_en=str(charge["name_en"]),
+                    amount=float(charge["amount"]),
+                    charge_amount=float(charge["amount"]),
+                    category_en=str(charge.get("category_en", "Uncategorized")),
+                    billing_month=month_label,
+                )
+            )
+            continue
         updated_txs.append(tx)
 
     existing_ids = {

@@ -208,21 +208,19 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   if (!billingDate) return report;
 
   const charges = chargesForBilling(billingDate, loadFixedCharges());
-  if (!charges.length) return report;
-
   const cycleStart = cycleStartForStatementBilling(billingDate);
   const chargeById = new Map(charges.map((c) => [c.id, c]));
   const label = monthLabelFromIso(billingDate);
 
-  const transactions = report.transactions.map((tx) => {
-    if (!tx.notes?.startsWith("fixed_charge:")) return tx;
+  const transactions = report.transactions.flatMap((tx) => {
+    if (!tx.notes?.startsWith("fixed_charge:")) return [tx];
     const id = tx.notes.slice("fixed_charge:".length);
     const charge = chargeById.get(id);
-    if (!charge) return tx;
+    if (!charge) return [];
     const chargeDate = isOneTime(charge) && charge.charge_date
       ? charge.charge_date
       : fixedChargeDateForBilling(cycleStart);
-    return {
+    return [{
       ...tx,
       date: chargeDate,
       merchant_he: charge.name_he || charge.name_en,
@@ -231,7 +229,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
       charge_amount: charge.amount,
       category_en: charge.category_en,
       billing_month: label,
-    };
+    }];
   });
 
   const existingIds = new Set(
@@ -261,16 +259,19 @@ export function augmentReport(report: SpendingReport): SpendingReport {
     });
   }
 
-  if (!newTxs.length && transactions.every((tx, i) => tx === report.transactions[i])) return report;
-
   const merged = [...transactions, ...newTxs].sort((a, b) => b.date.localeCompare(a.date));
+  if (newTxs.length === 0 && merged.length === report.transactions.length
+    && merged.every((tx, i) => tx === report.transactions[i])) {
+    return report;
+  }
+
   const dates = merged.map((t) => t.date).sort();
   const total = merged.reduce((s, t) => s + t.charge_amount, 0);
   const augmented: SpendingReport = {
     ...report,
     transactions: merged,
     total_spent: total,
-    transaction_count: transactions.length,
+    transaction_count: merged.length,
     date_range: dates.length ? [dates[0], dates[dates.length - 1]] : report.date_range,
     by_category: [],
     top_merchants: [],
