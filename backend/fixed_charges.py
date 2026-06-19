@@ -71,8 +71,34 @@ def month_key(billing_date: date | str | None) -> str | None:
     return billing_date.strftime("%Y-%m")
 
 
+def cycle_start_for_statement_billing(
+    billing_date: date,
+    cycle_day: int = DEFAULT_BILLING_CYCLE_DAY,
+) -> date:
+    """Which cycle a statement bill belongs to (matches web pace utils)."""
+    day = min(max(cycle_day, 1), 28)
+    if billing_date.month == 1:
+        prev_year = billing_date.year - 1
+        prev_month = 12
+    else:
+        prev_year = billing_date.year
+        prev_month = billing_date.month - 1
+    import calendar
+
+    last = calendar.monthrange(prev_year, prev_month)[1]
+    return date(prev_year, prev_month, min(day, last))
+
+
+def cycle_month_key_for_billing(billing_date: date | str | None) -> str | None:
+    """Billing-cycle month (e.g. Feb 2026), not the statement charge month."""
+    parsed = _parse_billing_date(billing_date)
+    if parsed is None:
+        return None
+    return cycle_start_for_statement_billing(parsed).strftime("%Y-%m")
+
+
 def charges_for_billing(billing_date: date | str | None) -> list[dict]:
-    ym = month_key(billing_date)
+    ym = cycle_month_key_for_billing(billing_date)
     if not ym:
         return []
     applicable: list[dict] = []
@@ -103,6 +129,7 @@ def augment_report(report: SpendingReport) -> SpendingReport:
     if not applicable:
         return apply_exclusions(report)
 
+    cycle_start = cycle_start_for_statement_billing(billing_date)
     charge_by_id = {c["id"]: c for c in applicable}
     month_label = billing_date.strftime("%b %Y")
 
@@ -115,7 +142,7 @@ def augment_report(report: SpendingReport) -> SpendingReport:
                 if charge.get("schedule") == "once" and charge.get("charge_date"):
                     charge_date = date.fromisoformat(charge["charge_date"])
                 else:
-                    charge_date = fixed_charge_date_for_billing(billing_date)
+                    charge_date = fixed_charge_date_for_billing(cycle_start)
                 updated_txs.append(
                     replace(
                         tx,
@@ -146,7 +173,7 @@ def augment_report(report: SpendingReport) -> SpendingReport:
             tx_date = date.fromisoformat(charge["charge_date"])
             tx_type = "חיוב ידני"
         else:
-            tx_date = fixed_charge_date_for_billing(billing_date)
+            tx_date = fixed_charge_date_for_billing(cycle_start)
             tx_type = "חיוב קבוע"
         new_txs.append(
             Transaction(

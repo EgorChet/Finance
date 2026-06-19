@@ -72,14 +72,14 @@
               <label class="field-label">From</label>
               <MonthSelect v-model="newRecurring.from_month" />
             </div>
-            <div class="field-group recurring-segment-through">
-              <label class="field-label">Through</label>
-              <MonthSelect v-if="!newRecurringOngoing" v-model="newRecurring.through_month" />
-              <label class="recurring-ongoing recurring-ongoing--compact">
-                <input v-model="newRecurringOngoing" type="checkbox" />
-                <span class="recurring-ongoing-text">No end date</span>
-              </label>
-            </div>
+          </div>
+          <div class="field-group recurring-segment-through">
+            <label class="field-label">Through</label>
+            <MonthSelect v-if="!newRecurringOngoing" v-model="newRecurring.through_month" />
+            <label class="recurring-ongoing recurring-ongoing--compact">
+              <input v-model="newRecurringOngoing" type="checkbox" />
+              <span class="recurring-ongoing-text">No end date</span>
+            </label>
           </div>
           <button type="button" class="btn btn-primary recurring-add-btn" :disabled="saving" @click="addRecurring">
             {{ saving ? "Saving…" : "Add recurring bill" }}
@@ -94,7 +94,7 @@
             <label class="field-label">Name</label>
             <input v-model="newOneTime.name_en" class="input" placeholder="e.g. Cherry watermelon market" />
           </div>
-          <div class="recurring-add-schedule-row">
+          <div class="recurring-add-schedule-row recurring-add-schedule-row--triple">
             <div class="field-group">
               <label class="field-label">Date</label>
               <input v-model="newOneTime.charge_date" class="input" type="date" />
@@ -175,7 +175,9 @@
                     <MonthSelect v-if="!auth.isDemo" v-model="seg.from_month" @update:model-value="queueSave()" />
                     <p v-else style="margin: 0">{{ ymToLabel(seg.from_month) }}</p>
                   </div>
+                </div>
 
+                <div class="recurring-segment-footer">
                   <div class="field-group recurring-segment-through">
                     <label class="field-label">Through</label>
                     <template v-if="!auth.isDemo">
@@ -195,12 +197,12 @@
                     </template>
                     <p v-else style="margin: 0">{{ throughLabel(seg.through_month) }}</p>
                   </div>
-                </div>
 
-                <div v-if="!auth.isDemo" class="recurring-segment-actions">
-                  <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
-                    {{ saving ? "…" : "Delete period" }}
-                  </button>
+                  <div v-if="!auth.isDemo" class="recurring-segment-actions">
+                    <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
+                      {{ saving ? "…" : "Delete period" }}
+                    </button>
+                  </div>
                 </div>
               </article>
             </div>
@@ -232,7 +234,7 @@
               </span>
             </div>
 
-            <div class="recurring-segment-row">
+            <div class="recurring-segment-row recurring-segment-row--triple">
               <div class="field-group">
                 <label class="field-label">Date</label>
                 <input

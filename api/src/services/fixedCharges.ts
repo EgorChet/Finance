@@ -21,6 +21,20 @@ function isOneTime(charge: FixedCharge): boolean {
 /** Matches default pace card cycle start; configured charges land on this day each month. */
 export const DEFAULT_BILLING_CYCLE_DAY = 10;
 
+/** Inverse of statement billing date — cycle start for that statement (matches web pace utils). */
+export function cycleStartForStatementBilling(billingDate: string, cycleDay = DEFAULT_BILLING_CYCLE_DAY): string {
+  const [y, m] = billingDate.slice(0, 10).split("-").map(Number);
+  const prev = new Date(y, m - 2, cycleDay);
+  const day = Math.min(Math.max(cycleDay, 1), 28);
+  const lastDay = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+  const safeDay = Math.min(day, lastDay);
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+/** Billing-cycle month key (what users see as "Feb 2026"), not the statement charge month. */
+export function cycleMonthKeyForBilling(billingDate: string, cycleDay = DEFAULT_BILLING_CYCLE_DAY): string {
+  return cycleStartForStatementBilling(billingDate, cycleDay).slice(0, 7);
+}
 /** Pin recurring charges to the billing cycle start (e.g. 10th), not the statement close date. */
 export function fixedChargeDateForBilling(
   billingDate: string,
@@ -134,13 +148,9 @@ export async function saveFixedCharges(charges: FixedCharge[]): Promise<FixedCha
   return normalized;
 }
 
-function monthKey(billingDate: string | undefined): string | null {
-  if (!billingDate) return null;
-  return billingDate.slice(0, 7);
-}
 
 function chargesForBilling(billingDate: string | undefined, charges: FixedCharge[]): FixedCharge[] {
-  const ym = monthKey(billingDate);
+  const ym = billingDate ? cycleMonthKeyForBilling(billingDate) : null;
   if (!ym) return [];
   return charges.filter((c) => c.from_month <= ym && ym <= c.through_month);
 }
@@ -200,6 +210,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   const charges = chargesForBilling(billingDate, loadFixedCharges());
   if (!charges.length) return report;
 
+  const cycleStart = cycleStartForStatementBilling(billingDate);
   const chargeById = new Map(charges.map((c) => [c.id, c]));
   const label = monthLabelFromIso(billingDate);
 
@@ -210,7 +221,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
     if (!charge) return tx;
     const chargeDate = isOneTime(charge) && charge.charge_date
       ? charge.charge_date
-      : fixedChargeDateForBilling(billingDate);
+      : fixedChargeDateForBilling(cycleStart);
     return {
       ...tx,
       date: chargeDate,
@@ -234,7 +245,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
     if (existingIds.has(charge.id)) continue;
     const chargeDate = isOneTime(charge) && charge.charge_date
       ? charge.charge_date
-      : fixedChargeDateForBilling(billingDate);
+      : fixedChargeDateForBilling(cycleStart);
     newTxs.push({
       date: chargeDate,
       merchant_he: charge.name_he || charge.name_en,
