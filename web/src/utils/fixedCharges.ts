@@ -1,4 +1,8 @@
+import type { Transaction } from "../types";
 import { roundMoney } from "./format";
+import { isoDateLocal } from "./transactionPeriod";
+
+export type ChargeSchedule = "monthly" | "once";
 
 export interface ConfiguredCharge {
   id: string;
@@ -8,28 +12,73 @@ export interface ConfiguredCharge {
   category_en: string;
   from_month: string;
   through_month: string;
+  schedule?: ChargeSchedule;
+  charge_date?: string;
+}
+
+export function isOneTimeCharge(charge: ConfiguredCharge): boolean {
+  return charge.schedule === "once";
+}
+
+export function isMonthlyCharge(charge: ConfiguredCharge): boolean {
+  return !isOneTimeCharge(charge);
+}
+
+export function todayIsoDate(): string {
+  return isoDateLocal(new Date());
+}
+
+export function normalizeConfiguredCharge(charge: ConfiguredCharge): ConfiguredCharge {
+  const schedule: ChargeSchedule = charge.schedule === "once" ? "once" : "monthly";
+  const amount = Math.round(charge.amount * 100) / 100;
+  if (schedule === "once" && charge.charge_date) {
+    const ym = charge.charge_date.slice(0, 7);
+    return {
+      ...charge,
+      schedule,
+      amount,
+      charge_date: charge.charge_date.slice(0, 10),
+      from_month: ym,
+      through_month: ym,
+    };
+  }
+  return { ...charge, schedule, amount };
 }
 
 export function chargesForMonth(ym: string, charges: ConfiguredCharge[]): ConfiguredCharge[] {
   return charges.filter((c) => c.from_month <= ym && ym <= c.through_month);
 }
 
-/** Configured recurring charges for a billing cycle (deduped by id). */
+/** Configured charges for a billing cycle (deduped by id for monthly). */
 export function configuredChargesForCycle(
   cycleStart: string,
   charges: ConfiguredCharge[],
+  cycleEnd?: string,
 ): ConfiguredCharge[] {
   const ym = cycleStart.slice(0, 7);
+  const end = cycleEnd ?? cycleStart;
   const byId = new Map<string, ConfiguredCharge>();
-  for (const charge of chargesForMonth(ym, charges)) {
-    byId.set(charge.id, charge);
+  for (const charge of charges) {
+    if (isOneTimeCharge(charge)) {
+      const date = charge.charge_date;
+      if (!date || date < cycleStart || date > end) continue;
+      byId.set(charge.id, charge);
+      continue;
+    }
+    if (charge.from_month <= ym && ym <= charge.through_month) {
+      byId.set(charge.id, charge);
+    }
   }
   return [...byId.values()];
 }
 
-export function sumConfiguredCharges(cycleStart: string, charges: ConfiguredCharge[]): number {
+export function sumConfiguredCharges(
+  cycleStart: string,
+  charges: ConfiguredCharge[],
+  cycleEnd?: string,
+): number {
   return roundMoney(
-    configuredChargesForCycle(cycleStart, charges).reduce((sum, c) => sum + c.amount, 0),
+    configuredChargesForCycle(cycleStart, charges, cycleEnd).reduce((sum, c) => sum + c.amount, 0),
   );
 }
 
@@ -54,6 +103,12 @@ export function segmentStatus(
   return "active";
 }
 
+export function oneTimeStatus(chargeDate: string, today = todayIsoDate()): "upcoming" | "active" | "past" {
+  if (chargeDate > today) return "upcoming";
+  if (chargeDate === today) return "active";
+  return "past";
+}
+
 export interface ChargeGroup {
   id: string;
   name_en: string;
@@ -64,7 +119,7 @@ export interface ChargeGroup {
 
 export function groupCharges(charges: ConfiguredCharge[]): ChargeGroup[] {
   const groups = new Map<string, ChargeGroup>();
-  for (const charge of charges) {
+  for (const charge of charges.filter(isMonthlyCharge)) {
     const existing = groups.get(charge.id);
     if (existing) {
       existing.segments.push(charge);
@@ -85,6 +140,9 @@ export function groupCharges(charges: ConfiguredCharge[]): ChargeGroup[] {
 }
 
 export function segmentKey(charge: ConfiguredCharge): string {
+  if (isOneTimeCharge(charge)) {
+    return `${charge.id}|${charge.charge_date}|${charge.amount}`;
+  }
   return `${charge.id}|${charge.from_month}|${charge.through_month}|${charge.amount}`;
 }
 
@@ -100,8 +158,94 @@ export function ymToLabel(ym: string): string {
   return `${months[idx]} ${y}`;
 }
 
+export function dateToLabel(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const idx = Number.parseInt(m, 10) - 1;
+  if (idx < 0 || idx > 11) return iso;
+  return `${Number.parseInt(d, 10)} ${months[idx]} ${y}`;
+}
+
 export function monthRangeLabel(fromMonth: string, throughMonth: string): string {
   const from = ymToLabel(fromMonth);
   if (isOngoingThrough(throughMonth)) return `${from} → ongoing`;
   return `${from} → ${ymToLabel(throughMonth)}`;
+}
+
+/** Default billing cycle day — recurring charges without an explicit date land here. */
+export const DEFAULT_BILLING_CYCLE_DAY = 10;
+
+export function fixedChargeDateForBilling(billingDate: string, cycleDay = DEFAULT_BILLING_CYCLE_DAY): string {
+  const [y, m] = billingDate.slice(0, 7).split("-").map(Number);
+  const day = Math.min(Math.max(cycleDay, 1), 28);
+  const lastDay = new Date(y, m, 0).getDate();
+  const safeDay = Math.min(day, lastDay);
+  return `${y}-${String(m).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}
+
+export function transactionDateForCharge(
+  charge: ConfiguredCharge,
+  billingDate: string,
+  cycleDay = DEFAULT_BILLING_CYCLE_DAY,
+): string {
+  if (isOneTimeCharge(charge) && charge.charge_date) return charge.charge_date.slice(0, 10);
+  return fixedChargeDateForBilling(billingDate, cycleDay);
+}
+
+/** Inject configured charges missing from an open-cycle transaction list. */
+export function mergeConfiguredChargeTransactions(
+  transactions: Transaction[],
+  cycleStart: string,
+  cycleEnd: string,
+  charges: ConfiguredCharge[],
+  billingLabel: string,
+  cycleDay = DEFAULT_BILLING_CYCLE_DAY,
+): Transaction[] {
+  const applicable = configuredChargesForCycle(cycleStart, charges, cycleEnd);
+  if (!applicable.length) return transactions;
+
+  const chargeById = new Map(applicable.map((c) => [c.id, c]));
+  const updated = transactions.map((tx) => {
+    if (!tx.notes?.startsWith("fixed_charge:")) return tx;
+    const id = tx.notes.slice("fixed_charge:".length);
+    const charge = chargeById.get(id);
+    if (!charge) return tx;
+    return {
+      ...tx,
+      date: transactionDateForCharge(charge, cycleStart, cycleDay),
+      merchant_he: charge.name_he || charge.name_en,
+      merchant_en: charge.name_en,
+      amount: charge.amount,
+      charge_amount: charge.amount,
+      category_en: charge.category_en,
+      billing_month: billingLabel,
+    };
+  });
+
+  const existingIds = new Set(
+    updated
+      .filter((tx) => tx.notes?.startsWith("fixed_charge:"))
+      .map((tx) => tx.notes!.slice("fixed_charge:".length)),
+  );
+
+  const added: Transaction[] = [];
+  for (const charge of applicable) {
+    if (existingIds.has(charge.id)) continue;
+    added.push({
+      date: transactionDateForCharge(charge, cycleStart, cycleDay),
+      merchant_he: charge.name_he || charge.name_en,
+      merchant_en: charge.name_en,
+      amount: charge.amount,
+      charge_amount: charge.amount,
+      transaction_type_he: isOneTimeCharge(charge) ? "חיוב ידני" : "חיוב קבוע",
+      category_he: null,
+      category_en: charge.category_en,
+      notes: `fixed_charge:${charge.id}`,
+      merchant_known: true,
+      billing_month: billingLabel,
+    });
+  }
+
+  if (!added.length && updated.every((tx, i) => tx === transactions[i])) return transactions;
+  return [...updated, ...added].sort((a, b) => b.date.localeCompare(a.date));
 }

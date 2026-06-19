@@ -12,6 +12,11 @@ const BUILTIN_PATH = path.resolve(
 
 const ONGOING_THROUGH_MONTH = "2035-12";
 const MONTH_RE = /^\d{4}-\d{2}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isOneTime(charge: FixedCharge): boolean {
+  return charge.schedule === "once";
+}
 
 /** Matches default pace card cycle start; configured charges land on this day each month. */
 export const DEFAULT_BILLING_CYCLE_DAY = 10;
@@ -41,14 +46,30 @@ function loadBuiltinCharges(): FixedCharge[] {
 }
 
 function normalizeCharge(charge: FixedCharge): FixedCharge {
+  const schedule = charge.schedule === "once" ? "once" : "monthly";
+  const amount = Math.round(charge.amount * 100) / 100;
+  let fromMonth = charge.from_month.trim();
+  let throughMonth = charge.through_month.trim();
+  let chargeDate = charge.charge_date?.trim().slice(0, 10);
+
+  if (schedule === "once") {
+    if (chargeDate && DATE_RE.test(chargeDate)) {
+      const ym = chargeDate.slice(0, 7);
+      fromMonth = ym;
+      throughMonth = ym;
+    }
+  }
+
   return {
     id: charge.id.trim(),
     name_en: charge.name_en.trim(),
     name_he: charge.name_he?.trim() || undefined,
-    amount: Math.round(charge.amount * 100) / 100,
+    amount,
     category_en: charge.category_en.trim(),
-    from_month: charge.from_month.trim(),
-    through_month: charge.through_month.trim(),
+    from_month: fromMonth,
+    through_month: throughMonth,
+    schedule,
+    charge_date: chargeDate,
   };
 }
 
@@ -88,6 +109,12 @@ export function validateFixedCharges(charges: FixedCharge[]): string | null {
     if (!charge.name_en) return "Each charge needs an English name";
     if (!charge.category_en) return "Each charge needs a category";
     if (!Number.isFinite(charge.amount) || charge.amount <= 0) return "Amount must be positive";
+    if (isOneTime(charge)) {
+      if (!charge.charge_date || !DATE_RE.test(charge.charge_date)) {
+        return `${charge.name_en}: one-time charges need a date (YYYY-MM-DD)`;
+      }
+      continue;
+    }
     if (!MONTH_RE.test(charge.from_month) || !MONTH_RE.test(charge.through_month)) {
       return "Months must be YYYY-MM";
     }
@@ -175,13 +202,15 @@ export function augmentReport(report: SpendingReport): SpendingReport {
 
   const chargeById = new Map(charges.map((c) => [c.id, c]));
   const label = monthLabelFromIso(billingDate);
-  const chargeDate = fixedChargeDateForBilling(billingDate);
 
   const transactions = report.transactions.map((tx) => {
     if (!tx.notes?.startsWith("fixed_charge:")) return tx;
     const id = tx.notes.slice("fixed_charge:".length);
     const charge = chargeById.get(id);
     if (!charge) return tx;
+    const chargeDate = isOneTime(charge) && charge.charge_date
+      ? charge.charge_date
+      : fixedChargeDateForBilling(billingDate);
     return {
       ...tx,
       date: chargeDate,
@@ -203,13 +232,16 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   const newTxs: Transaction[] = [];
   for (const charge of charges) {
     if (existingIds.has(charge.id)) continue;
+    const chargeDate = isOneTime(charge) && charge.charge_date
+      ? charge.charge_date
+      : fixedChargeDateForBilling(billingDate);
     newTxs.push({
       date: chargeDate,
       merchant_he: charge.name_he || charge.name_en,
       merchant_en: charge.name_en,
       amount: charge.amount,
       charge_amount: charge.amount,
-      transaction_type_he: "חיוב קבוע",
+      transaction_type_he: isOneTime(charge) ? "חיוב ידני" : "חיוב קבוע",
       category_he: null,
       category_en: charge.category_en,
       notes: `fixed_charge:${charge.id}`,

@@ -1,7 +1,7 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
 import type { ConfiguredCharge } from "./fixedCharges";
-import { configuredChargesForCycle, sumConfiguredCharges } from "./fixedCharges";
+import { configuredChargesForCycle, mergeConfiguredChargeTransactions, sumConfiguredCharges } from "./fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
 
 export interface BillingCycle {
@@ -338,12 +338,13 @@ export function computePace(
   }
 
   const cycleStartIso = isoDate(cycle.start);
+  const cycleEndIso = isoDate(cycle.end);
   const configuredList = options.configuredCharges ?? [];
-  const configuredCharges = configuredChargesForCycle(cycleStartIso, configuredList).map((c) => ({
+  const configuredCharges = configuredChargesForCycle(cycleStartIso, configuredList, cycleEndIso).map((c) => ({
     name_en: c.name_en,
     amount: c.amount,
   }));
-  const configuredChargesTotal = sumConfiguredCharges(cycleStartIso, configuredList);
+  const configuredChargesTotal = sumConfiguredCharges(cycleStartIso, configuredList, cycleEndIso);
 
   let currentSpend = statementSpend;
   if (manualEveryday !== null) {
@@ -779,8 +780,16 @@ export function buildCycleReport(
   const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const { end: cycleEndIso } = getCycleRangeForStart(cycleStart, 10);
   const cycleEnded = todayNorm > parseIsoDate(cycleEndIso);
-  const txs = transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed);
   const label = openCycleTabLabel(cycleStart);
+  let txs = transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed);
+  txs = mergeConfiguredChargeTransactions(
+    txs,
+    cycleStart,
+    cycleEnd,
+    options.configuredCharges ?? [],
+    label,
+  );
+  txs = transactionsInCycle(txs, cycleStart, cycleEnd, todayNorm, includeFixed);
 
   const catTotals = new Map<string, { total: number; count: number; he: string | null }>();
   let statementTotal = 0;
@@ -798,7 +807,7 @@ export function buildCycleReport(
     options.manualSpend != null && options.manualSpend >= 0
       ? roundMoney(options.manualSpend)
       : null;
-  const configuredChargesTotal = sumConfiguredCharges(cycleStart, options.configuredCharges ?? []);
+  const configuredChargesTotal = sumConfiguredCharges(cycleStart, options.configuredCharges ?? [], cycleEnd);
   const total =
     manualEveryday !== null
       ? cycleEnded || !includeFixed

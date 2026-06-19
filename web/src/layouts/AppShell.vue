@@ -152,7 +152,7 @@ const NAV_ITEMS = [
   { to: "/app/mappings", label: "Mappings" },
   { to: "/app/review", label: "Label" },
   { to: "/app/excluded", label: "Excluded" },
-  { to: "/app/recurring", label: "Recurring" },
+  { to: "/app/recurring", label: "Extra charges" },
 ] as const;
 
 const navItems = NAV_ITEMS;

@@ -156,7 +156,7 @@ button {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
@@ -173,7 +173,7 @@ button {
 }
 
 .metric-value {
-  font-size: 1.45rem;
+  font-size: 1.25rem;
   font-weight: 700;
   margin-top: 0.15rem;
 }
@@ -1946,6 +1946,32 @@ table.rules select {
   width: 1%;
   white-space: nowrap;
   text-align: right;
+}
+
+.manual-section {
+  margin-bottom: 2rem;
+}
+
+.manual-section-header {
+  margin-bottom: 1rem;
+}
+
+.manual-section-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.manual-section-lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.manual-empty {
+  color: var(--text-muted);
+  margin: 0.75rem 0 1rem;
+  font-size: 0.9rem;
 }
 
 .recurring-header {

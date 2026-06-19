@@ -104,6 +104,8 @@ export interface ExcludedItemView extends ExcludedEntry {
   can_restore: boolean;
 }
 
+export type ChargeSchedule = "monthly" | "once";
+
 export interface FixedCharge {
   id: string;
   name_en: string;
@@ -112,6 +114,10 @@ export interface FixedCharge {
   category_en: string;
   from_month: string;
   through_month: string;
+  /** Defaults to monthly for legacy entries. */
+  schedule?: ChargeSchedule;
+  /** Required for one-time charges — shown on this date in spending. */
+  charge_date?: string;
 }
 
 export interface FixedChargesData {

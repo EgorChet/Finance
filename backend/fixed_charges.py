@@ -27,12 +27,40 @@ def fixed_charge_date_for_billing(
     return date(billing_date.year, billing_date.month, min(day, last))
 
 
+def _normalize_charge(charge: dict) -> dict:
+    schedule = charge.get("schedule", "monthly")
+    if schedule not in ("monthly", "once"):
+        schedule = "monthly"
+    from_m = str(charge.get("from_month", "")).strip()
+    through_m = str(charge.get("through_month", "")).strip()
+    charge_date = charge.get("charge_date")
+    if charge_date:
+        charge_date = str(charge_date).strip()[:10]
+    if schedule == "once" and charge_date:
+        ym = charge_date[:7]
+        from_m = ym
+        through_m = ym
+    out = {
+        "id": str(charge["id"]).strip(),
+        "name_en": str(charge["name_en"]).strip(),
+        "name_he": charge.get("name_he"),
+        "amount": round(float(charge["amount"]), 2),
+        "category_en": str(charge.get("category_en", "Uncategorized")).strip(),
+        "from_month": from_m,
+        "through_month": through_m,
+        "schedule": schedule,
+    }
+    if charge_date:
+        out["charge_date"] = charge_date
+    return out
+
+
 def _load_charges() -> list[dict]:
     if not FIXED_CHARGES_PATH.exists():
         return []
     with FIXED_CHARGES_PATH.open(encoding="utf-8") as f:
         data = json.load(f)
-    return list(data.get("charges", []))
+    return [_normalize_charge(c) for c in data.get("charges", [])]
 
 
 def month_key(billing_date: date | str | None) -> str | None:
@@ -76,7 +104,6 @@ def augment_report(report: SpendingReport) -> SpendingReport:
         return apply_exclusions(report)
 
     charge_by_id = {c["id"]: c for c in applicable}
-    charge_date = fixed_charge_date_for_billing(billing_date)
     month_label = billing_date.strftime("%b %Y")
 
     updated_txs: list[Transaction] = []
@@ -85,6 +112,10 @@ def augment_report(report: SpendingReport) -> SpendingReport:
             charge_id = tx.notes.split(":", 1)[1]
             charge = charge_by_id.get(charge_id)
             if charge:
+                if charge.get("schedule") == "once" and charge.get("charge_date"):
+                    charge_date = date.fromisoformat(charge["charge_date"])
+                else:
+                    charge_date = fixed_charge_date_for_billing(billing_date)
                 updated_txs.append(
                     replace(
                         tx,
@@ -111,13 +142,19 @@ def augment_report(report: SpendingReport) -> SpendingReport:
         charge_id = charge["id"]
         if charge_id in existing_ids:
             continue
+        if charge.get("schedule") == "once" and charge.get("charge_date"):
+            tx_date = date.fromisoformat(charge["charge_date"])
+            tx_type = "חיוב ידני"
+        else:
+            tx_date = fixed_charge_date_for_billing(billing_date)
+            tx_type = "חיוב קבוע"
         new_txs.append(
             Transaction(
-                date=charge_date,
+                date=tx_date,
                 merchant_he=str(charge.get("name_he", charge["name_en"])),
                 amount=float(charge["amount"]),
                 charge_amount=float(charge["amount"]),
-                transaction_type_he="חיוב קבוע",
+                transaction_type_he=tx_type,
                 category_he=None,
                 notes=f"fixed_charge:{charge_id}",
                 merchant_en=str(charge["name_en"]),
