@@ -69,9 +69,9 @@
                         <td>Your normal at this point</td>
                         <td>{{ formatIls(paceCompareAvg) }}</td>
                       </tr>
-                      <tr v-if="pace.previousMonthTomorrowLabel && pace.previousMonthTomorrowVariable > 0">
-                        <td>Last cycle by {{ pace.previousMonthTomorrowLabel }}</td>
-                        <td>{{ formatIls(pace.previousMonthTomorrowVariable) }}</td>
+                      <tr v-if="pace.avgCyclesTomorrowLabel && pace.avgCyclesTomorrowVariable > 0">
+                        <td>{{ avgTomorrowRowLabel }}</td>
+                        <td>{{ formatIls(pace.avgCyclesTomorrowVariable) }}</td>
                       </tr>
                       <tr class="pace-simple-table-gap" :class="deltaClass">
                         <td>Difference</td>
@@ -100,9 +100,8 @@
                   </table>
                 </div>
                 <p class="pace-simple-footnote">
-                  “Normal” is the average from your uploaded past statements at the same point in the month.
-                  “Last cycle by …” is everyday spending through that date one month before tomorrow
-                  (e.g. on 13 Jun, it shows where you were by 14 May).
+                  “Your normal” averages your last {{ pace.cyclesUsed || 3 }} uploaded cycles through today.
+                  The row below uses the same window through tomorrow ({{ pace.avgCyclesTomorrowLabel }}).
                 </p>
               </details>
             </template>
@@ -139,13 +138,11 @@ import {
   cycleStartForDate,
   getBillingCycle,
   getCycleRangeForStart,
+  loadCycleDay,
   loadManualCycleSpend,
   loadPaceAvgCycles,
   saveManualCycleSpend,
 } from "../utils/pace";
-
-/** Billing cycle always starts on the 10th (Leumi Visa). */
-const CYCLE_DAY = 10;
 
 const props = defineProps<{
   transactions: Transaction[];
@@ -157,19 +154,21 @@ const props = defineProps<{
   partialTotalSpend?: number | null;
   /** Pin demo pace to sample “today” (Jun 13 2026). */
   referenceDate?: Date;
+  /** Billing cycle start day (default from settings). */
+  cycleDay?: number;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
 
-const cycleDay = CYCLE_DAY;
+const cycleDay = computed(() => props.cycleDay ?? loadCycleDay());
 const avgCycles = ref(loadPaceAvgCycles());
 
 const cycleInfo = computed(() => {
   const today = props.referenceDate ?? new Date();
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const cycle = getBillingCycle(norm, cycleDay);
-  const start = cycleStartForDate(norm, cycleDay);
-  const { end } = getCycleRangeForStart(start, cycleDay);
+  const cycle = getBillingCycle(norm, cycleDay.value);
+  const start = cycleStartForDate(norm, cycleDay.value);
+  const { end } = getCycleRangeForStart(start, cycleDay.value);
   return {
     dayIndex: cycle.dayIndex,
     cycleLength: cycle.cycleLength,
@@ -210,7 +209,7 @@ const statementSpendOverride = computed(() => {
 
 const pace = computed(() =>
   computePace(props.transactions, {
-    cycleDay,
+    cycleDay: cycleDay.value,
     includeFixed: false,
     latestBillingDate: props.latestBillingDate ?? null,
     manualSpend: props.partialStatementActive ? null : manualSpend.value,
@@ -233,6 +232,13 @@ const showEntryPanel = computed(() => {
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => pace.value?.historicalAvgVariableAtDay ?? 0);
+
+const avgTomorrowRowLabel = computed(() => {
+  const n = pace.value?.cyclesUsed ?? 0;
+  const label = pace.value?.avgCyclesTomorrowLabel ?? "";
+  if (!n || !label) return "";
+  return `${n}-mo avg by ${label}`;
+});
 
 const projectedAtUsualPace = computed(() => pace.value?.projectedAtUsualPace ?? 0);
 

@@ -37,6 +37,7 @@
       :partial-variable-spend="partialVariableSpend"
       :partial-total-spend="partialTotalSpend"
       :reference-date="refDate"
+      :cycle-day="cycleDay"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard

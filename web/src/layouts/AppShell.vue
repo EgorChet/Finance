@@ -149,6 +149,7 @@ const SYNC_STEPS = [
 
 const NAV_ITEMS = [
   { to: "/app/overview", label: "Overview" },
+  { to: "/app/browse", label: "Browse" },
   { to: "/app/mappings", label: "Mappings" },
   { to: "/app/review", label: "Label" },
   { to: "/app/excluded", label: "Excluded" },

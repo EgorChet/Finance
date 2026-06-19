@@ -54,9 +54,9 @@ export interface PaceResult {
   fixedBreakdown: PaceBreakdownLine[];
   variableBreakdown: PaceBreakdownLine[];
   recentCycles: PaceCycleSnapshot[];
-  /** Variable spend in the last completed cycle through the same calendar date one month before tomorrow. */
-  previousMonthTomorrowVariable: number;
-  previousMonthTomorrowLabel: string;
+  /** Variable spend in recent cycles through tomorrow's day index in the billing month. */
+  avgCyclesTomorrowVariable: number;
+  avgCyclesTomorrowLabel: string;
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -299,20 +299,21 @@ export function computePace(
     variableAtDay: roundMoney(s.total - s.fixed),
   }));
 
-  const compDate = previousMonthTomorrowDate(todayNorm);
-  const compCycle = getBillingCycle(compDate, cycleDay);
-  const compKey = cycleKey(compCycle.start);
-  const compBucket = byCycle.get(compKey);
-  let previousMonthTomorrowVariable = 0;
-  let previousMonthTomorrowLabel = "";
-  if (compBucket && compKey !== currentKey) {
-    const atDay = spendAtDay(compBucket, compCycle.dayIndex);
-    previousMonthTomorrowVariable = roundMoney(atDay.total - atDay.fixed);
-    previousMonthTomorrowLabel = compDate.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    });
-  }
+  const tomorrowNorm = new Date(todayNorm.getFullYear(), todayNorm.getMonth(), todayNorm.getDate() + 1);
+  const tomorrowCycle = getBillingCycle(tomorrowNorm, cycleDay);
+  const tomorrowDayIndex = tomorrowCycle.dayIndex;
+  const tomorrowVariables = usedSnapshots.map((s) => {
+    const atDay = spendAtDay(s.bucket, tomorrowDayIndex);
+    return roundMoney(atDay.total - atDay.fixed);
+  });
+  const avgCyclesTomorrowVariable =
+    tomorrowVariables.length > 0
+      ? roundMoney(tomorrowVariables.reduce((s, v) => s + v, 0) / tomorrowVariables.length)
+      : 0;
+  const avgCyclesTomorrowLabel = tomorrowNorm.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 
   const currentBucket = byCycle.get(currentKey);
   let statementSpend = 0;
@@ -480,8 +481,8 @@ export function computePace(
     fixedBreakdown,
     variableBreakdown,
     recentCycles,
-    previousMonthTomorrowVariable,
-    previousMonthTomorrowLabel,
+    avgCyclesTomorrowVariable,
+    avgCyclesTomorrowLabel,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,
