@@ -23,6 +23,107 @@
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
 
+      <div v-if="!auth.isDemo" class="recurring-add-toolbar">
+        <button
+          type="button"
+          class="btn"
+          :class="{ 'btn-primary': activeAddForm === 'recurring' }"
+          :disabled="saving"
+          @click="toggleAddForm('recurring')"
+        >
+          {{ activeAddForm === "recurring" ? "Cancel" : "Add recurring bill" }}
+        </button>
+        <button
+          type="button"
+          class="btn"
+          :class="{ 'btn-primary': activeAddForm === 'once' }"
+          :disabled="saving"
+          @click="toggleAddForm('once')"
+        >
+          {{ activeAddForm === "once" ? "Cancel" : "Add one-time charge" }}
+        </button>
+      </div>
+
+      <section v-if="activeAddForm === 'recurring' && !auth.isDemo" class="recurring-add recurring-add--panel">
+        <h3 class="recurring-add-title">New recurring bill</h3>
+        <div class="recurring-add-fields">
+          <div class="field-group">
+            <label class="field-label">Name</label>
+            <input v-model="newRecurring.name_en" class="input" placeholder="e.g. Rent" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Category</label>
+            <CategorySelect v-model="newRecurring.category_en" :options="categories" />
+          </div>
+          <div class="recurring-add-schedule-row">
+            <div class="field-group">
+              <label class="field-label">Amount (₪)</label>
+              <input
+                v-model.number="newRecurring.amount"
+                class="input"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="0"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">From</label>
+              <MonthSelect v-model="newRecurring.from_month" />
+            </div>
+            <div class="field-group recurring-segment-through">
+              <label class="field-label">Through</label>
+              <MonthSelect v-if="!newRecurringOngoing" v-model="newRecurring.through_month" />
+              <label class="recurring-ongoing recurring-ongoing--compact">
+                <input v-model="newRecurringOngoing" type="checkbox" />
+                <span class="recurring-ongoing-text">No end date</span>
+              </label>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary recurring-add-btn" :disabled="saving" @click="addRecurring">
+            {{ saving ? "Saving…" : "Add recurring bill" }}
+          </button>
+        </div>
+      </section>
+
+      <section v-if="activeAddForm === 'once' && !auth.isDemo" class="recurring-add recurring-add--panel">
+        <h3 class="recurring-add-title">New one-time charge</h3>
+        <div class="recurring-add-fields">
+          <div class="field-group">
+            <label class="field-label">Name</label>
+            <input v-model="newOneTime.name_en" class="input" placeholder="e.g. Cherry watermelon market" />
+          </div>
+          <div class="recurring-add-schedule-row">
+            <div class="field-group">
+              <label class="field-label">Date</label>
+              <input v-model="newOneTime.charge_date" class="input" type="date" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Amount (₪)</label>
+              <input
+                v-model.number="newOneTime.amount"
+                class="input"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                placeholder="0"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Category</label>
+              <CategorySelect v-model="newOneTime.category_en" :options="categories" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary recurring-add-btn" :disabled="saving" @click="addOneTime">
+            {{ saving ? "Saving…" : "Add one-time charge" }}
+          </button>
+        </div>
+      </section>
+
+      <p v-if="status" class="recurring-form-error">{{ status }}</p>
+
       <section class="manual-section">
         <header class="manual-section-header">
           <h3 class="manual-section-title">Recurring monthly</h3>
@@ -34,12 +135,11 @@
             <header class="recurring-card-header">
               <div>
                 <h3 class="recurring-card-title">{{ group.name_en }}</h3>
-                <p v-if="group.name_he" class="recurring-card-sub">{{ group.name_he }} · {{ group.category_en }}</p>
-                <p v-else class="recurring-card-sub">{{ group.category_en }}</p>
+                <p class="recurring-card-sub">{{ group.category_en }}</p>
               </div>
               <div v-if="!auth.isDemo" class="recurring-card-actions">
                 <button type="button" class="btn" :disabled="saving" @click="addSegment(group)">Add period</button>
-                <button type="button" class="btn btn-ghost" :disabled="saving" @click="removeCharge(group.id)">
+                <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
                   Remove bill
                 </button>
               </div>
@@ -54,7 +154,7 @@
                   </span>
                 </div>
 
-                <div class="recurring-segment-fields">
+                <div class="recurring-segment-row">
                   <div class="field-group">
                     <label class="field-label">Amount (₪)</label>
                     <input
@@ -76,32 +176,29 @@
                     <p v-else style="margin: 0">{{ ymToLabel(seg.from_month) }}</p>
                   </div>
 
-                  <div class="field-group">
+                  <div class="field-group recurring-segment-through">
                     <label class="field-label">Through</label>
-                    <p v-if="!auth.isDemo && isOngoingThrough(seg.through_month)" class="recurring-ongoing-readonly">No end date</p>
-                    <MonthSelect
-                      v-else-if="!auth.isDemo"
-                      v-model="seg.through_month"
-                      @update:model-value="queueSave()"
-                    />
+                    <template v-if="!auth.isDemo">
+                      <MonthSelect
+                        v-if="!isOngoingThrough(seg.through_month)"
+                        v-model="seg.through_month"
+                        @update:model-value="queueSave()"
+                      />
+                      <label class="recurring-ongoing recurring-ongoing--compact">
+                        <input
+                          type="checkbox"
+                          :checked="isOngoingThrough(seg.through_month)"
+                          @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
+                        />
+                        <span class="recurring-ongoing-text">No end date</span>
+                      </label>
+                    </template>
                     <p v-else style="margin: 0">{{ throughLabel(seg.through_month) }}</p>
                   </div>
-
-                  <div v-if="!auth.isDemo" class="field-group">
-                    <label class="recurring-ongoing">
-                      <input
-                        type="checkbox"
-                        :checked="isOngoingThrough(seg.through_month)"
-                        @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
-                      />
-                      <span class="recurring-ongoing-text">No end date — runs every month</span>
-                    </label>
-                  </div>
-                  <p v-else-if="isOngoingThrough(seg.through_month)" class="recurring-ongoing-readonly">Ongoing — no end date</p>
                 </div>
 
                 <div v-if="!auth.isDemo" class="recurring-segment-actions">
-                  <button type="button" class="btn btn-ghost" :disabled="saving" @click="removeSegment(seg)">
+                  <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
                     {{ saving ? "…" : "Delete period" }}
                   </button>
                 </div>
@@ -113,54 +210,6 @@
         </div>
 
         <p v-else class="manual-empty">No recurring bills yet.</p>
-
-        <section v-if="!auth.isDemo" class="recurring-add">
-          <h3 class="recurring-add-title">Add recurring bill</h3>
-          <div class="recurring-add-fields">
-            <div class="field-group">
-              <label class="field-label">Name (English)</label>
-              <input v-model="newRecurring.name_en" class="input" placeholder="e.g. Rent" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Name (Hebrew, optional)</label>
-              <input v-model="newRecurring.name_he" class="input" placeholder="שם בעברית" dir="rtl" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Category</label>
-              <CategorySelect v-model="newRecurring.category_en" :options="categories" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Amount (₪)</label>
-              <input
-                v-model.number="newRecurring.amount"
-                class="input"
-                type="number"
-                min="0"
-                step="0.01"
-                inputmode="decimal"
-                placeholder="0"
-              />
-            </div>
-            <div class="field-group">
-              <label class="field-label">From</label>
-              <MonthSelect v-model="newRecurring.from_month" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Through</label>
-              <p v-if="newRecurringOngoing" class="recurring-ongoing-readonly">No end date</p>
-              <MonthSelect v-else v-model="newRecurring.through_month" />
-            </div>
-            <div class="field-group">
-              <label class="recurring-ongoing">
-                <input v-model="newRecurringOngoing" type="checkbox" />
-                <span class="recurring-ongoing-text">No end date — runs every month</span>
-              </label>
-            </div>
-            <button type="button" class="btn btn-primary recurring-add-btn" :disabled="saving" @click="addRecurring">
-              {{ saving ? "Saving…" : "Add recurring bill" }}
-            </button>
-          </div>
-        </section>
       </section>
 
       <section class="manual-section">
@@ -176,15 +225,14 @@
             <div class="recurring-segment-head">
               <div>
                 <strong>{{ charge.name_en }}</strong>
-                <p v-if="charge.name_he" class="recurring-card-sub">{{ charge.name_he }} · {{ charge.category_en }}</p>
-                <p v-else class="recurring-card-sub">{{ charge.category_en }}</p>
+                <p class="recurring-card-sub">{{ charge.category_en }}</p>
               </div>
               <span class="recurring-status" :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)">
                 {{ oneTimeStatusLabel(charge.charge_date!) }}
               </span>
             </div>
 
-            <div class="recurring-segment-fields">
+            <div class="recurring-segment-row">
               <div class="field-group">
                 <label class="field-label">Date</label>
                 <input
@@ -220,7 +268,7 @@
             </div>
 
             <div v-if="!auth.isDemo" class="recurring-segment-actions">
-              <button type="button" class="btn btn-ghost" :disabled="saving" @click="removeOneTime(charge)">
+              <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
                 {{ saving ? "…" : "Delete" }}
               </button>
             </div>
@@ -228,46 +276,7 @@
         </div>
 
         <p v-else class="manual-empty">No one-time charges yet.</p>
-
-        <section v-if="!auth.isDemo" class="recurring-add">
-          <h3 class="recurring-add-title">Add one-time charge</h3>
-          <div class="recurring-add-fields">
-            <div class="field-group">
-              <label class="field-label">Name (English)</label>
-              <input v-model="newOneTime.name_en" class="input" placeholder="e.g. Cherry watermelon market" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Name (Hebrew, optional)</label>
-              <input v-model="newOneTime.name_he" class="input" placeholder="שם בעברית" dir="rtl" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Date</label>
-              <input v-model="newOneTime.charge_date" class="input" type="date" />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Amount (₪)</label>
-              <input
-                v-model.number="newOneTime.amount"
-                class="input"
-                type="number"
-                min="0"
-                step="0.01"
-                inputmode="decimal"
-                placeholder="0"
-              />
-            </div>
-            <div class="field-group">
-              <label class="field-label">Category</label>
-              <CategorySelect v-model="newOneTime.category_en" :options="categories" />
-            </div>
-            <button type="button" class="btn btn-primary recurring-add-btn" :disabled="saving" @click="addOneTime">
-              {{ saving ? "Saving…" : "Add one-time charge" }}
-            </button>
-          </div>
-        </section>
       </section>
-
-      <p v-if="status" class="recurring-form-error">{{ status }}</p>
     </template>
   </div>
 </template>
@@ -312,12 +321,14 @@ const saveError = ref(false);
 const charges = ref<ConfiguredCharge[]>([]);
 const savedSnapshot = ref("");
 
+type AddFormKind = "recurring" | "once";
+const activeAddForm = ref<AddFormKind | null>(null);
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
 const newRecurring = ref({
   name_en: "",
-  name_he: "",
   category_en: "Housing",
   amount: 0,
   from_month: currentYearMonth(),
@@ -327,7 +338,6 @@ const newRecurringOngoing = ref(true);
 
 const newOneTime = ref({
   name_en: "",
-  name_he: "",
   category_en: "Groceries",
   amount: 0,
   charge_date: todayIsoDate(),
@@ -346,6 +356,15 @@ watch(newRecurringOngoing, (on) => {
     newRecurring.value.through_month = currentYearMonth();
   }
 });
+
+function toggleAddForm(kind: AddFormKind) {
+  if (activeAddForm.value === kind) {
+    activeAddForm.value = null;
+  } else {
+    activeAddForm.value = kind;
+  }
+  status.value = "";
+}
 
 function snapshot(data: ConfiguredCharge[]): string {
   return JSON.stringify(data);
@@ -485,7 +504,6 @@ function addSegment(group: ChargeGroup) {
     id: group.id,
     schedule: "monthly",
     name_en: group.name_en,
-    name_he: group.name_he,
     category_en: group.category_en,
     amount: last?.amount ?? 0,
     from_month: fromMonth,
@@ -552,7 +570,6 @@ async function addRecurring() {
       id: uniqueRecurringId(name),
       schedule: "monthly",
       name_en: name,
-      name_he: newRecurring.value.name_he.trim() || undefined,
       category_en: newRecurring.value.category_en.trim() || "Uncategorized",
       amount: newRecurring.value.amount,
       from_month: newRecurring.value.from_month,
@@ -561,7 +578,6 @@ async function addRecurring() {
   );
   newRecurring.value = {
     name_en: "",
-    name_he: "",
     category_en: "Housing",
     amount: 0,
     from_month: currentYearMonth(),
@@ -572,6 +588,7 @@ async function addRecurring() {
   const ok = await persistCharges();
   if (ok) {
     status.value = "";
+    activeAddForm.value = null;
     showSaveStatus(`Added ${name}`);
   } else {
     status.value = "Could not save — try again.";
@@ -598,7 +615,6 @@ async function addOneTime() {
       id: uniqueOneTimeId(name, newOneTime.value.charge_date),
       schedule: "once",
       name_en: name,
-      name_he: newOneTime.value.name_he.trim() || undefined,
       category_en: newOneTime.value.category_en.trim() || "Uncategorized",
       amount: newOneTime.value.amount,
       charge_date: newOneTime.value.charge_date,
@@ -608,7 +624,6 @@ async function addOneTime() {
   );
   newOneTime.value = {
     name_en: "",
-    name_he: "",
     category_en: "Groceries",
     amount: 0,
     charge_date: todayIsoDate(),
@@ -617,6 +632,7 @@ async function addOneTime() {
   const ok = await persistCharges();
   if (ok) {
     status.value = "";
+    activeAddForm.value = null;
     showSaveStatus(`Added ${name}`);
   } else {
     status.value = "Could not save — try again.";

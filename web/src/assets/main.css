@@ -86,6 +86,18 @@ button {
   background: transparent;
 }
 
+.btn-danger {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
+  border-color: var(--danger);
+}
+
 .input {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2130,6 +2142,18 @@ table.rules select {
   font-size: 0.85rem;
 }
 
+.recurring-add-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.recurring-add-toolbar .btn {
+  flex: 1;
+  min-width: 10rem;
+}
+
 .recurring-groups {
   display: flex;
   flex-direction: column;
@@ -2205,15 +2229,35 @@ table.rules select {
   gap: 0;
 }
 
+.recurring-segment-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.85fr) 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+}
+
+.recurring-segment-row .field-group {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.recurring-segment-through {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 .recurring-segment-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 0.65rem;
 }
 
 .recurring-segment-actions .btn {
-  flex: 1;
-  min-height: 44px;
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.88rem;
 }
 
 .recurring-ongoing {
@@ -2224,6 +2268,11 @@ table.rules select {
   padding: 0.35rem 0;
   cursor: pointer;
   user-select: none;
+}
+
+.recurring-ongoing--compact {
+  min-height: 44px;
+  margin: 0;
 }
 
 .recurring-ongoing input[type="checkbox"] {
@@ -2280,6 +2329,12 @@ table.rules select {
   background: var(--surface);
 }
 
+.recurring-add--panel {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  border-style: solid;
+}
+
 .recurring-add-title {
   margin: 0 0 0.85rem;
   font-size: 1rem;
@@ -2289,6 +2344,18 @@ table.rules select {
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.recurring-add-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.85fr) 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+}
+
+.recurring-add-schedule-row .field-group {
+  margin-bottom: 0.85rem;
+  min-width: 0;
 }
 
 .recurring-add-btn {

@@ -58,23 +58,25 @@
             </div>
             <div class="browse-amount-inputs">
               <input
-                v-model="minAmount"
+                :value="minAmount"
                 class="input"
                 type="number"
                 min="0"
                 step="1"
                 placeholder="Min"
                 inputmode="decimal"
+                @input="minAmount = ($event.target as HTMLInputElement).value"
               />
               <span class="browse-amount-sep">–</span>
               <input
-                v-model="maxAmount"
+                :value="maxAmount"
                 class="input"
                 type="number"
                 min="0"
                 step="1"
                 placeholder="Max"
                 inputmode="decimal"
+                @input="maxAmount = ($event.target as HTMLInputElement).value"
               />
             </div>
           </div>
@@ -187,8 +189,9 @@ const filteredTotal = computed(() =>
   filteredTransactions.value.reduce((sum, tx) => sum + tx.charge_amount, 0),
 );
 
-function parseAmount(raw: string): number | null {
-  const trimmed = raw.trim();
+function parseAmount(raw: string | number): number | null {
+  if (raw === "" || raw == null) return null;
+  const trimmed = String(raw).trim();
   if (!trimmed) return null;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;
