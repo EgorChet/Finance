@@ -48,7 +48,7 @@
     <template v-if="showTransactions">
       <section class="tx-section">
         <h3 class="tx-section-title">Charges</h3>
-        <TransactionPeriodPicker v-model="txPeriod" />
+        <TransactionPeriodPicker v-if="isLiveTransactionView" v-model="txPeriod" />
         <p v-if="!periodTransactions.length" class="tx-period-empty">
           No charges for {{ periodLabel }}.
         </p>
@@ -252,9 +252,10 @@ const periodTransactions = computed(() => {
   );
 });
 
-const periodLabel = computed(
-  () => TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label.toLowerCase() ?? txPeriod.value,
-);
+const periodLabel = computed(() => {
+  if (!isLiveTransactionView.value) return "this billing cycle";
+  return TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label.toLowerCase() ?? txPeriod.value;
+});
 
 const showCategoryExplorer = computed(() => {
   if (!report.value) return false;
