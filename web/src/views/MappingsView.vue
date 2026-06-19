@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
-    <h2 style="margin: 0 0 1rem">Merchant mappings</h2>
+    <h2 class="page-title">Merchant mappings</h2>
     <AppLoader
       v-if="loading"
       title="Loading merchant mappings"
@@ -11,43 +11,39 @@
     <div v-if="statusMessage" class="demo-banner" :class="{ 'import-error': statusIsError }">
       {{ statusMessage }}
     </div>
-    <div v-if="!auth.isDemo" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap">
-      <input v-model="newHebrew" class="input" placeholder="Hebrew" style="max-width: 180px" />
-      <input v-model="newEnglish" class="input" placeholder="English" style="max-width: 180px" />
-      <input v-model="newCategory" class="input" placeholder="Category" list="spending-cats" style="max-width: 160px" />
-      <button class="btn btn-primary" @click="addRule">Add</button>
-      <button class="btn" :disabled="saving" @click="save">{{ saving ? "Saving…" : "Save all" }}</button>
-      <button class="btn" @click="exportJson">Export JSON</button>
+    <div v-if="!auth.isDemo" class="mappings-add-form">
+      <input v-model="newHebrew" class="input" placeholder="Hebrew name" />
+      <input v-model="newEnglish" class="input" placeholder="English name" />
+      <CategorySelect v-model="newCategory" :options="categories" allow-empty empty-label="Category" />
+      <div class="mappings-add-actions">
+        <button class="btn btn-primary" @click="addRule">Add</button>
+        <button class="btn" :disabled="saving" @click="save">{{ saving ? "Saving…" : "Save all" }}</button>
+        <button class="btn" @click="exportJson">Export</button>
+        <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
+          {{ importing ? "Importing…" : "Import" }}
+        </button>
+      </div>
       <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
-      <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
-        {{ importing ? "Importing…" : "Import JSON" }}
-      </button>
     </div>
-    <div class="table-scroll">
-      <table class="rules">
-      <thead>
-        <tr>
-          <th>Hebrew</th>
-          <th>English</th>
-          <th>Category</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in rows" :key="row.Hebrew">
-          <td>{{ row.Hebrew }}</td>
-          <td>
-            <input v-model="row.English" :readonly="auth.isDemo" />
-          </td>
-          <td>
-            <input v-model="row.Category" list="spending-cats" :readonly="auth.isDemo" />
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="mappings-list">
+      <article v-for="row in rows" :key="row.Hebrew" class="mappings-card">
+        <p class="mappings-card-hebrew" dir="rtl">{{ row.Hebrew }}</p>
+        <div class="field-group">
+          <label class="field-label">English</label>
+          <input v-model="row.English" class="input" :readonly="auth.isDemo" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Category</label>
+          <CategorySelect
+            v-model="row.Category"
+            :options="categories"
+            :disabled="auth.isDemo"
+            allow-empty
+            empty-label="Uncategorized"
+          />
+        </div>
+      </article>
     </div>
-    <datalist id="spending-cats">
-      <option v-for="c in categories" :key="c" :value="c" />
-    </datalist>
     </template>
   </div>
 </template>
@@ -56,12 +52,13 @@
 import { onMounted, ref } from "vue";
 import { fetchRules, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
+import CategorySelect from "../components/CategorySelect.vue";
 import { useAuthStore } from "../stores/auth";
-import { SPENDING_CATEGORIES } from "../categories";
+import { CATEGORY_PICKLIST } from "../categories";
 import { canonicalMerchantEnglish } from "../utils/merchantVendor";
 import type { MerchantRow } from "../types";
 
-const categories = SPENDING_CATEGORIES;
+const categories = CATEGORY_PICKLIST;
 
 const auth = useAuthStore();
 const rows = ref<MerchantRow[]>([]);

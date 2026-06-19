@@ -54,6 +54,9 @@ export interface PaceResult {
   fixedBreakdown: PaceBreakdownLine[];
   variableBreakdown: PaceBreakdownLine[];
   recentCycles: PaceCycleSnapshot[];
+  /** Variable spend in the last completed cycle through the same calendar date one month before tomorrow. */
+  previousMonthTomorrowVariable: number;
+  previousMonthTomorrowLabel: string;
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -99,6 +102,13 @@ export function getBillingCycle(date: Date, cycleDay: number): BillingCycle {
 /** ISO date string for the start of the billing cycle containing `date`. */
 export function cycleStartForDate(date: Date, cycleDay: number): string {
   return isoDate(getBillingCycle(date, cycleDay).start);
+}
+
+/** e.g. 13 Jun → 14 May (tomorrow's calendar day, one month earlier). */
+export function previousMonthTomorrowDate(today: Date): Date {
+  const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const tomorrow = new Date(norm.getFullYear(), norm.getMonth(), norm.getDate() + 1);
+  return new Date(tomorrow.getFullYear(), tomorrow.getMonth() - 1, tomorrow.getDate());
 }
 
 function cycleKey(start: Date): string {
@@ -289,6 +299,21 @@ export function computePace(
     variableAtDay: roundMoney(s.total - s.fixed),
   }));
 
+  const compDate = previousMonthTomorrowDate(todayNorm);
+  const compCycle = getBillingCycle(compDate, cycleDay);
+  const compKey = cycleKey(compCycle.start);
+  const compBucket = byCycle.get(compKey);
+  let previousMonthTomorrowVariable = 0;
+  let previousMonthTomorrowLabel = "";
+  if (compBucket && compKey !== currentKey) {
+    const atDay = spendAtDay(compBucket, compCycle.dayIndex);
+    previousMonthTomorrowVariable = roundMoney(atDay.total - atDay.fixed);
+    previousMonthTomorrowLabel = compDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  }
+
   const currentBucket = byCycle.get(currentKey);
   let statementSpend = 0;
   if (currentBucket) {
@@ -454,6 +479,8 @@ export function computePace(
     fixedBreakdown,
     variableBreakdown,
     recentCycles,
+    previousMonthTomorrowVariable,
+    previousMonthTomorrowLabel,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,

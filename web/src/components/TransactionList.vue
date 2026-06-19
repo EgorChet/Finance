@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="tx-list-header">
-      <strong>{{ title }}</strong>
+      <strong v-if="title">{{ title }}</strong>
       <div v-if="showSort" class="tx-list-sort">
         <button
           v-for="col in sortOptions"
@@ -16,38 +16,8 @@
       </div>
     </div>
 
-    <table class="tx-table">
-      <thead>
-        <tr>
-          <th @click="setSort('date')">Date</th>
-          <th @click="setSort('merchant')">Merchant</th>
-          <th v-if="showCategory" @click="setSort('category')">Category</th>
-          <th class="tx-amount" @click="setSort('amount')">Amount</th>
-          <th v-if="excludeable" class="tx-actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in visibleRows" :key="row.key">
-          <td>{{ row.dateLabel }}</td>
-          <td>{{ row.merchant }}</td>
-          <td v-if="showCategory">{{ row.category }}</td>
-          <td class="tx-amount">{{ formatIls(row.amount) }}</td>
-          <td v-if="excludeable" class="tx-actions">
-            <button
-              type="button"
-              class="tx-exclude-btn"
-              :disabled="excludingKey === row.key"
-              @click="emitExclude(row.tx)"
-            >
-              {{ excludingKey === row.key ? "…" : "Exclude" }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
     <div class="tx-row-mobile">
-      <div v-for="row in visibleRows" :key="'m-' + row.key" class="tx-row">
+      <div v-for="row in visibleRows" :key="row.key" class="tx-row">
         <div class="tx-row-top">
           <div class="tx-row-merchant">{{ row.merchant }}</div>
           <div class="tx-row-amount">{{ formatIls(row.amount) }}</div>

@@ -11,15 +11,21 @@
     dismissible
     @dismiss="error = ''"
   />
-  <template v-else-if="report">
+  <template v-else-if="report || reportLoading">
     <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <h2 class="overview-page-title">Spending overview</h2>
-    <div v-if="partialCycleBanner" class="demo-banner partial-statement-banner">
+    <div v-if="partialCycleBanner && !reportLoading" class="demo-banner partial-statement-banner">
       {{ partialCycleBanner }}
     </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
+    <AppLoader
+      v-if="reportLoading"
+      title="Loading month"
+      :subtitle="switchingMonthLabel"
+    />
+    <template v-else-if="report">
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics v-if="showSummaryMetrics" :report="report" :retrospective="budgetRetrospective" />
     <PaceCard
@@ -38,92 +44,53 @@
       :cycle-start="selectedCycleStart"
       @settings-change="onPaceSettingsChange"
     />
-    <template v-if="showCategoryExplorer">
-    <p class="section-title">Where did the money go?</p>
-    <div class="explorer-grid" :class="{ 'explorer-grid--no-pie': hidePieChart }">
-      <div v-if="!hidePieChart" class="explorer-pie-col">
-        <CategoryPieChart :categories="displayCategories" :selected="expandedTopLevelKey" @select="onCategory" />
-      </div>
-      <div class="explorer-legend-col">
-        <CategoryAccordion
-          v-model:expanded-keys="expandedCategoryKeys"
-          :categories="displayCategories"
-          :transactions="report.transactions"
-          :total-spent="report.total_spent"
-          :statement-billing="selectedMonth ? statementBilling : null"
+    <template v-if="showTransactions">
+      <section class="tx-section">
+        <h3 class="tx-section-title">Charges</h3>
+        <TransactionPeriodPicker v-model="txPeriod" />
+        <p v-if="!periodTransactions.length" class="tx-period-empty">
+          No charges for {{ periodLabel }}.
+        </p>
+        <TransactionList
+          v-else
+          :transactions="periodTransactions"
+          title=""
+          show-category
+          :statement-billing="statementBilling"
           :excludeable="!auth.isDemo"
           :excluding-key="excludingKey"
+          :show-sort="false"
+          :default-limit="50"
           @exclude="excludeTransaction"
         />
-      </div>
-    </div>
+      </section>
+    </template>
+    <template v-if="showCategoryExplorer">
+    <p class="section-title">Where did the money go?</p>
+    <CategoryAccordion
+      v-model:expanded-keys="expandedCategoryKeys"
+      :categories="displayCategories"
+      :transactions="report.transactions"
+      :total-spent="report.total_spent"
+      :statement-billing="selectedMonth ? statementBilling : null"
+      :excludeable="!auth.isDemo"
+      :excluding-key="excludingKey"
+      @exclude="excludeTransaction"
+    />
     </template>
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       Category breakdown and transactions will appear once this cycle’s statement is uploaded.
     </p>
-    <details v-if="app.expertMode" class="label-fix-panel">
-      <summary class="label-fix-summary">Search or fix a label</summary>
-      <div class="label-fix-body">
-        <p v-if="auth.isDemo" class="label-fix-demo-note">
-          Demo mode — search only. Sign in to save label fixes.
-        </p>
-        <input
-          v-model="search"
-          class="input label-fix-search"
-          placeholder="Merchant, category, amount…"
-          enterkeyhint="search"
-        />
-        <p v-if="search.trim() && !searchMerchants.length" class="label-fix-empty">No matching charges.</p>
-        <div v-if="searchMerchants.length" class="label-fix-list">
-          <article v-for="row in searchMerchants" :key="row.key" class="label-fix-card">
-            <div class="label-fix-card-head">
-              <span class="label-fix-card-amount">{{ formatIls(row.amount) }}</span>
-              <span class="label-fix-card-date">{{ formatTransactionDate(row.date) }}</span>
-            </div>
-            <p class="label-fix-card-hebrew">{{ row.hebrew }}</p>
-            <label class="label-fix-field">
-              <span class="label-fix-field-label">English</span>
-              <input v-model="row.english" class="input" :readonly="auth.isDemo" />
-            </label>
-            <label class="label-fix-field">
-              <span class="label-fix-field-label">Category</span>
-              <input v-model="row.category" class="input" list="overview-spending-cats" :readonly="auth.isDemo" />
-            </label>
-            <div class="label-fix-card-actions">
-              <button
-                type="button"
-                class="btn btn-primary"
-                :disabled="auth.isDemo || row.saving"
-                @click="saveLabel(row)"
-              >
-                {{ row.saving ? "Saving…" : "Save" }}
-              </button>
-              <button
-                v-if="!auth.isDemo"
-                type="button"
-                class="btn btn-ghost"
-                :disabled="excludingKey === row.key"
-                @click="excludeFromSearch(row)"
-              >
-                {{ excludingKey === row.key ? "…" : "Exclude" }}
-              </button>
-            </div>
-          </article>
-        </div>
-        <p v-if="searchHint" class="label-fix-hint">{{ searchHint }}</p>
-        <datalist id="overview-spending-cats">
-          <option v-for="c in categories" :key="c" :value="c" />
-        </datalist>
-      </div>
-    </details>
+    </template>
   </template>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { addExclusion, fetchFixedCharges, fetchMonths, fetchReport, saveRuleEntry } from "../api/client";
+import { computed, onMounted, ref } from "vue";
+import { addExclusion, fetchFixedCharges, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
-import CategoryPieChart from "../components/CategoryPieChart.vue";
+import TransactionList from "../components/TransactionList.vue";
+import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
 import AppLoader from "../components/AppLoader.vue";
 import ErrorBanner from "../components/ErrorBanner.vue";
 import MonthPicker from "../components/MonthPicker.vue";
@@ -131,19 +98,10 @@ import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
 import PaceCard from "../components/PaceCard.vue";
 import PendingCycleCard from "../components/PendingCycleCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
-import { useCompactLayout } from "../composables/useCompactLayout";
-import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
 import {
-  CATEGORY_PICKLIST,
-  groupCategoriesForPie,
-  HOME_LIVING,
-  isHomeSubsection,
-  isOtherBucketLabel,
-  OTHER_BUCKET,
   rollupCategoriesForDisplay,
-  rollupCategory,
   splitFixedVariable,
 } from "../categories";
 import {
@@ -163,29 +121,18 @@ import {
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
 import { referenceDate } from "../utils/appDate";
-import { billingCycleLabel, formatIls, formatTransactionDate, openCycleTabLabel, roundMoney } from "../utils/format";
+import { billingCycleLabel, formatIls, openCycleTabLabel } from "../utils/format";
+import {
+  filterTransactionsByPeriod,
+  TRANSACTION_PERIOD_OPTIONS,
+  type TransactionPeriod,
+} from "../utils/transactionPeriod";
 import { transactionKey } from "../utils/transactionKey";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 
-const categories = CATEGORY_PICKLIST;
-
-const { isCompact } = useCompactLayout(768);
-/** Phone / narrow layout: category list only — pie is hard to read on small screens. */
-const hidePieChart = isCompact;
-
-interface SearchMerchantRow {
-  key: string;
-  date: string;
-  amount: number;
-  hebrew: string;
-  english: string;
-  category: string;
-  saving: boolean;
-}
-
 const auth = useAuthStore();
-const app = useAppStore();
 const loading = ref(true);
+const reportLoading = ref(false);
 const error = ref("");
 const report = ref<SpendingReport | null>(null);
 const paceReport = ref<SpendingReport | null>(null);
@@ -193,11 +140,9 @@ const configuredCharges = ref<ConfiguredCharge[]>([]);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
-const search = ref("");
-const searchHint = ref("");
-const searchMerchants = ref<SearchMerchantRow[]>([]);
 const excludingKey = ref<string | null>(null);
 const expandedCategoryKeys = ref<string[]>([]);
+const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
 const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 
@@ -221,6 +166,12 @@ const displayMonths = computed(() => {
     }
     return { ...m, label: base };
   });
+});
+
+const switchingMonthLabel = computed(() => {
+  if (selectedMonth.value === null) return "All months";
+  const month = displayMonths.value.find((m) => m.key === selectedMonth.value);
+  return month?.label ?? "Selected month";
 });
 
 const activeCycleStart = computed((): string | null => {
@@ -254,6 +205,10 @@ const showPaceCard = computed(() => isLiveCycleSelected.value || isPartialForOpe
 
 const partialStatementActive = computed(() => isPartialForOpenCycle.value);
 
+const isLiveTransactionView = computed(
+  () => isLiveCycleSelected.value || isPartialForOpenCycle.value,
+);
+
 const partialCycleBanner = computed(() => {
   if (partialStatementActive.value) {
     return "Partial snapshot for this cycle — pace and categories from your latest export. Re-upload anytime; choose Final when the bill is complete.";
@@ -284,6 +239,22 @@ const budgetRetrospective = computed(() => {
   return !isInProgressCycle.value;
 });
 
+const showTransactions = computed(() => (report.value?.transactions.length ?? 0) > 0);
+
+const periodTransactions = computed(() => {
+  if (!report.value) return [];
+  return filterTransactionsByPeriod(
+    report.value.transactions,
+    txPeriod.value,
+    refDate.value,
+    isLiveTransactionView.value,
+  );
+});
+
+const periodLabel = computed(
+  () => TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label.toLowerCase() ?? txPeriod.value,
+);
+
 const showCategoryExplorer = computed(() => {
   if (!report.value) return false;
   if (isPartialForOpenCycle.value) {
@@ -307,11 +278,6 @@ const showSummaryMetrics = computed(() => {
 const displayCategories = computed(() =>
   report.value ? rollupCategoriesForDisplay(report.value.by_category) : [],
 );
-
-const expandedTopLevelKey = computed(() => {
-  const top = expandedCategoryKeys.value.find((k) => !k.includes("::"));
-  return top ?? "";
-});
 
 const statementBilling = computed(() => {
   const meta = report.value?.metadata;
@@ -338,100 +304,6 @@ const partialTotalSpend = computed(() => {
 });
 
 
-function categoryKey(name: string): string {
-  if (isOtherBucketLabel(name)) return OTHER_BUCKET;
-  return name;
-}
-
-function subCategoryKey(parent: string, child: string): string {
-  return `${parent}::${child}`;
-}
-
-function toggleCategoryKey(key: string) {
-  const next = new Set(expandedCategoryKeys.value);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  expandedCategoryKeys.value = [...next];
-}
-
-function onCategory(name: string) {
-  if (!report.value) return;
-
-  if (isOtherBucketLabel(name)) {
-    toggleCategoryKey(OTHER_BUCKET);
-    return;
-  }
-
-  const { top } = groupCategoriesForPie(report.value.by_category);
-  const topNames = new Set(top.map((c) => c.category_en));
-
-  if (isHomeSubsection(name) && name !== HOME_LIVING) {
-    const sub = subCategoryKey(HOME_LIVING, name);
-    const next = new Set(expandedCategoryKeys.value);
-    next.add(HOME_LIVING);
-    if (next.has(sub)) next.delete(sub);
-    else next.add(sub);
-    expandedCategoryKeys.value = [...next];
-    return;
-  }
-
-  const rolled = rollupCategory(name);
-  if (rolled === "Subscriptions" && name !== "Subscriptions") {
-    const sub = subCategoryKey("Subscriptions", name);
-    const next = new Set(expandedCategoryKeys.value);
-    next.add("Subscriptions");
-    if (next.has(sub)) next.delete(sub);
-    else next.add(sub);
-    expandedCategoryKeys.value = [...next];
-    return;
-  }
-
-  if (!topNames.has(name) && !topNames.has(rolled)) {
-    const sub = subCategoryKey(OTHER_BUCKET, name);
-    const next = new Set(expandedCategoryKeys.value);
-    next.add(OTHER_BUCKET);
-    if (next.has(sub)) next.delete(sub);
-    else next.add(sub);
-    expandedCategoryKeys.value = [...next];
-    return;
-  }
-
-  toggleCategoryKey(categoryKey(name));
-}
-
-const searchResults = computed(() => {
-  if (!report.value || !search.value.trim()) return [];
-  const q = search.value.toLowerCase();
-  return report.value.transactions
-    .filter(
-      (t) =>
-        (t.merchant_en || "").toLowerCase().includes(q) ||
-        t.merchant_he.includes(q) ||
-        (t.category_en || "").toLowerCase().includes(q) ||
-        String(t.charge_amount).includes(q),
-    )
-    .slice(0, 200);
-});
-
-watch(searchResults, (txs) => {
-  searchHint.value = "";
-  if (!txs.length) {
-    searchMerchants.value = [];
-    return;
-  }
-  searchMerchants.value = [...txs]
-    .sort((a, b) => b.date.localeCompare(a.date) || b.charge_amount - a.charge_amount)
-    .map((t) => ({
-      key: transactionKey(t),
-      date: t.date,
-      amount: t.charge_amount,
-      hebrew: t.merchant_he,
-      english: t.merchant_en || "",
-      category: t.category_en || "",
-      saving: false,
-    }));
-});
-
 async function afterExclusionChange() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -455,61 +327,18 @@ async function excludeTransaction(tx: Transaction) {
   if (!confirmExclude(label)) return;
   const key = transactionKey(tx);
   excludingKey.value = key;
-  searchHint.value = "";
   try {
     await addExclusion({ transaction: tx, note: "Not my spend" }, auth.token || undefined);
-    searchMerchants.value = searchMerchants.value.filter((r) => r.key !== key);
     await afterExclusionChange();
-    searchHint.value = "Charge excluded from totals. See Excluded tab to restore.";
   } catch (e) {
-    searchHint.value = String(e);
+    window.alert(String(e));
   } finally {
     excludingKey.value = null;
-  }
-}
-
-async function excludeFromSearch(row: SearchMerchantRow) {
-  if (auth.isDemo) return;
-  const label = `${formatIls(row.amount)} · ${row.english || row.hebrew}`;
-  if (!confirmExclude(label)) return;
-  excludingKey.value = row.key;
-  searchHint.value = "";
-  try {
-    await addExclusion({ key: row.key, note: "Not my spend" }, auth.token || undefined);
-    searchMerchants.value = searchMerchants.value.filter((r) => r.key !== row.key);
-    await afterExclusionChange();
-    searchHint.value = "Charge excluded from totals. See Excluded tab to restore.";
-  } catch (e) {
-    searchHint.value = String(e);
-  } finally {
-    excludingKey.value = null;
-  }
-}
-
-async function saveLabel(row: SearchMerchantRow) {
-  if (auth.isDemo) return;
-  row.saving = true;
-  searchHint.value = "";
-  try {
-    await saveRuleEntry(
-      {
-        hebrew: row.hebrew,
-        english: row.english.trim(),
-        category: row.category.trim() || undefined,
-      },
-      auth.token || undefined,
-    );
-    await refreshReport();
-    await refreshPaceReport();
-    searchHint.value = `Saved "${row.english || row.hebrew}" → ${row.category || "Uncategorized"}. Charts updated.`;
-  } catch (e) {
-    searchHint.value = String(e);
-  } finally {
-    row.saving = false;
   }
 }
 
 let reportRequestId = 0;
+let monthSwitchId = 0;
 
 async function loadPartialReport(key: string): Promise<SpendingReport | null> {
   const cached = partialReportCache.value.get(key);
@@ -581,10 +410,30 @@ async function refreshPaceReport() {
   }
 }
 
+function defaultTxPeriod(month: string | null): TransactionPeriod {
+  if (!month) return "month";
+  if (isCycleMonthKey(month)) return "today";
+  const m = months.value.find((row) => row.key === month);
+  if (m?.partial) {
+    const start = cycleStartForStatementBilling(m.billing_date, cycleDay.value);
+    if (cycleNeedsOpenTab(start, cycleDay.value, months.value)) return "today";
+  }
+  return "month";
+}
+
 async function onMonthSelected(month: string | null) {
   selectedMonth.value = month;
   expandedCategoryKeys.value = [];
-  await refreshReport(month);
+  txPeriod.value = defaultTxPeriod(month);
+  const switchId = ++monthSwitchId;
+  reportLoading.value = true;
+  try {
+    await refreshReport(month);
+  } finally {
+    if (switchId === monthSwitchId) {
+      reportLoading.value = false;
+    }
+  }
 }
 
 function onPaceSettingsChange() {
@@ -617,6 +466,7 @@ async function loadMonths() {
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
     const initial = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     selectedMonth.value = initial;
+    txPeriod.value = defaultTxPeriod(initial);
     await refreshReport(initial);
   } catch (e) {
     error.value = String(e);

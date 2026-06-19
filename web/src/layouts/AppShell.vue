@@ -13,11 +13,6 @@
         </span>
       </button>
       <h1 class="app-title">Finance</h1>
-      <nav class="app-nav" aria-label="Main">
-        <RouterLink v-for="item in navItems" :key="item.to" class="nav-tab" :to="item.to">
-          {{ item.label }}
-        </RouterLink>
-      </nav>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
         <div v-if="menuOpen" class="app-menu-backdrop" @click="menuOpen = false" />
@@ -25,10 +20,6 @@
           <label class="app-menu-item">
             <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
             Light mode
-          </label>
-          <label class="app-menu-item">
-            <input type="checkbox" :checked="app.expertMode" @change="app.toggleExpertMode()" />
-            Expert mode
           </label>
           <template v-if="!auth.isDemo">
             <button
@@ -159,7 +150,7 @@ const SYNC_STEPS = [
 const NAV_ITEMS = [
   { to: "/app/overview", label: "Overview" },
   { to: "/app/mappings", label: "Mappings" },
-  { to: "/app/review", label: "Review" },
+  { to: "/app/review", label: "Label" },
   { to: "/app/excluded", label: "Excluded" },
   { to: "/app/recurring", label: "Recurring" },
 ] as const;
