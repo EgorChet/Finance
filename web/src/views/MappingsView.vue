@@ -26,19 +26,24 @@
         <template v-else>{{ rows.length }} mappings</template>
       </p>
     </div>
-    <div v-if="!auth.isDemo" class="mappings-add-form">
+    <div v-if="!auth.isDemo" class="mappings-actions">
+      <button class="btn btn-primary" :disabled="saving" @click="save">
+        {{ saving ? "Saving…" : "Save all" }}
+      </button>
+      <button class="btn" @click="exportJson">Export</button>
+      <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
+        {{ importing ? "Importing…" : "Import" }}
+      </button>
+      <button class="btn" type="button" @click="showAddForm = !showAddForm">
+        {{ showAddForm ? "Cancel" : "Add mapping" }}
+      </button>
+      <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
+    </div>
+    <div v-if="showAddForm && !auth.isDemo" class="mappings-add-form">
       <input v-model="newHebrew" class="input" placeholder="Hebrew name" />
       <input v-model="newEnglish" class="input" placeholder="English name" />
       <CategorySelect v-model="newCategory" :options="categories" allow-empty empty-label="Category" />
-      <div class="mappings-add-actions">
-        <button class="btn btn-primary" @click="addRule">Add</button>
-        <button class="btn" :disabled="saving" @click="save">{{ saving ? "Saving…" : "Save all" }}</button>
-        <button class="btn" @click="exportJson">Export</button>
-        <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
-          {{ importing ? "Importing…" : "Import" }}
-        </button>
-      </div>
-      <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
+      <button class="btn btn-primary mappings-add-submit" @click="addRule">Add</button>
     </div>
     <div v-if="filteredRows.length" class="mappings-list">
       <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
@@ -65,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { fetchRules, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
@@ -88,16 +93,33 @@ const newHebrew = ref("");
 const newEnglish = ref("");
 const newCategory = ref("");
 const searchQuery = ref("");
+const showAddForm = ref(false);
+/** Hebrew keys that matched the last search — stays stable while you edit fields. */
+const matchedHebrewKeys = ref<string[] | null>(null);
+
+function rowMatchesQuery(row: MerchantRow, q: string): boolean {
+  return (
+    row.Hebrew.toLowerCase().includes(q) ||
+    row.English.toLowerCase().includes(q) ||
+    row.Category.toLowerCase().includes(q)
+  );
+}
+
+function refreshSearchMatches() {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) {
+    matchedHebrewKeys.value = null;
+    return;
+  }
+  matchedHebrewKeys.value = rows.value.filter((row) => rowMatchesQuery(row, q)).map((row) => row.Hebrew);
+}
+
+watch(searchQuery, refreshSearchMatches);
 
 const filteredRows = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return rows.value;
-  return rows.value.filter(
-    (row) =>
-      row.Hebrew.toLowerCase().includes(q) ||
-      row.English.toLowerCase().includes(q) ||
-      row.Category.toLowerCase().includes(q),
-  );
+  if (!matchedHebrewKeys.value) return rows.value;
+  const keys = new Set(matchedHebrewKeys.value);
+  return rows.value.filter((row) => keys.has(row.Hebrew));
 });
 
 function rulesFromRows() {
@@ -132,6 +154,7 @@ async function load() {
   try {
     const rules = await fetchRules(auth.isDemo, auth.token || undefined);
     rows.value = rowsFromRules(rules);
+    refreshSearchMatches();
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
   } finally {
@@ -146,6 +169,9 @@ function addRule() {
     English: newEnglish.value.trim(),
     Category: newCategory.value.trim(),
   });
+  rows.value.sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
+  showAddForm.value = false;
+  refreshSearchMatches();
   newHebrew.value = "";
   newEnglish.value = "";
   newCategory.value = "";
@@ -209,6 +235,7 @@ async function importJson(e: Event) {
     }
 
     rows.value.sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
+    refreshSearchMatches();
     setStatus(`Imported ${Object.keys(imported).length} rules (${added} new, ${updated} updated). Saving…`);
 
     const result = await saveRules(rulesFromRows(), auth.token || undefined);

@@ -1706,11 +1706,31 @@ button {
   padding: 1.5rem 0;
 }
 
+.mappings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mappings-actions .btn {
+  flex: 1 1 calc(50% - 0.25rem);
+  min-height: 44px;
+}
+
 .mappings-add-form {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
   margin-bottom: 1rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+
+.mappings-add-submit {
+  min-height: 44px;
 }
 
 .mappings-add-actions {
