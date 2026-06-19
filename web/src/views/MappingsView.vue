@@ -11,6 +11,21 @@
     <div v-if="statusMessage" class="demo-banner" :class="{ 'import-error': statusIsError }">
       {{ statusMessage }}
     </div>
+    <div class="mappings-toolbar">
+      <input
+        v-model="searchQuery"
+        class="input mappings-search"
+        type="search"
+        placeholder="Search Hebrew, English, or category"
+        autocomplete="off"
+      />
+      <p class="mappings-search-meta">
+        <template v-if="searchQuery.trim()">
+          {{ filteredRows.length }} of {{ rows.length }} mappings
+        </template>
+        <template v-else>{{ rows.length }} mappings</template>
+      </p>
+    </div>
     <div v-if="!auth.isDemo" class="mappings-add-form">
       <input v-model="newHebrew" class="input" placeholder="Hebrew name" />
       <input v-model="newEnglish" class="input" placeholder="English name" />
@@ -25,8 +40,8 @@
       </div>
       <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
     </div>
-    <div class="mappings-list">
-      <article v-for="row in rows" :key="row.Hebrew" class="mappings-card">
+    <div v-if="filteredRows.length" class="mappings-list">
+      <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
         <p class="mappings-card-hebrew" dir="rtl">{{ row.Hebrew }}</p>
         <div class="field-group">
           <label class="field-label">English</label>
@@ -44,12 +59,13 @@
         </div>
       </article>
     </div>
+    <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { fetchRules, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
@@ -71,6 +87,18 @@ const statusIsError = ref(false);
 const newHebrew = ref("");
 const newEnglish = ref("");
 const newCategory = ref("");
+const searchQuery = ref("");
+
+const filteredRows = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return rows.value;
+  return rows.value.filter(
+    (row) =>
+      row.Hebrew.toLowerCase().includes(q) ||
+      row.English.toLowerCase().includes(q) ||
+      row.Category.toLowerCase().includes(q),
+  );
+});
 
 function rulesFromRows() {
   const rules: Record<string, { english: string; category?: string }> = {};

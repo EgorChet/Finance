@@ -1684,6 +1684,28 @@ button {
   }
 }
 
+.mappings-toolbar {
+  margin-bottom: 1rem;
+}
+
+.mappings-search {
+  width: 100%;
+}
+
+.mappings-search-meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.mappings-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
 .mappings-add-form {
   display: flex;
   flex-direction: column;
