@@ -53,7 +53,7 @@ export function detectCurrency(
     const cc = suffix[1]!;
     if (cc === "US") return "USD";
     if (cc === "PL") return "PLN";
-    if (["DE", "FR", "IT", "ES", "NL", "AT", "BE", "PT", "GR", "IE"].includes(cc)) return "EUR";
+    if (["DE", "FR", "IT", "ES", "NL", "AT", "BE", "PT", "GR"].includes(cc)) return "EUR";
     if (cc === "GB") return "GBP";
     if (cc === "BG") return "BGN";
     if (cc === "AM") return "AMD";
@@ -64,6 +64,30 @@ export function detectCurrency(
   if (/[A-Za-z]{3,}/.test(merchant) && !hasHebrew(merchant)) return "USD";
 
   return "ILS";
+}
+
+export function pendingCurrencyForAmount(
+  amount: number,
+  pendingCurrencies?: Record<string, string> | null,
+): string | undefined {
+  if (!pendingCurrencies) return undefined;
+  const key = roundMoney(amount);
+  return (
+    pendingCurrencies[String(key)] ??
+    pendingCurrencies[key.toFixed(2)] ??
+    pendingCurrencies[key.toFixed(1)]
+  );
+}
+
+function explicitCurrencyForTx(
+  tx: Transaction,
+  pendingCurrencies?: Record<string, string> | null,
+): string | null | undefined {
+  if (isPendingCharge(tx.charge_amount, tx.notes)) {
+    // Header totals (e.g. "469.40 PLN") beat stale stored original_currency.
+    return pendingCurrencyForAmount(tx.amount, pendingCurrencies) ?? null;
+  }
+  return tx.original_currency;
 }
 
 export function isPendingCharge(chargeRaw: number | null | undefined, notes: string | null): boolean {
@@ -126,7 +150,10 @@ export function resolveChargeIls(
   };
 }
 
-export function normalizeForeignCharges(transactions: Transaction[]): {
+export function normalizeForeignCharges(
+  transactions: Transaction[],
+  pendingCurrencies?: Record<string, string> | null,
+): {
   transactions: Transaction[];
   changed: boolean;
 } {
@@ -138,7 +165,7 @@ export function normalizeForeignCharges(transactions: Transaction[]): {
       tx.merchant_he,
       tx.notes,
       tx.date,
-      tx.original_currency,
+      explicitCurrencyForTx(tx, pendingCurrencies),
     );
     const sameCharge = resolved.chargeAmount === tx.charge_amount;
     const sameCurrency = (tx.original_currency ?? null) === resolved.originalCurrency;

@@ -32,8 +32,18 @@ function remapLegacyCategories(report: SpendingReport): SpendingReport {
   return rebuildReportSummaries({ ...report, transactions });
 }
 
+function pendingCurrenciesFromMetadata(metadata: Record<string, unknown>): Record<string, string> | undefined {
+  const raw = metadata.pending_currencies;
+  if (!raw || typeof raw !== "object") return undefined;
+  return raw as Record<string, string>;
+}
+
 export function finalizeReport(report: SpendingReport): SpendingReport {
-  const { transactions: normalizedTxs, changed } = normalizeForeignCharges(report.transactions);
+  const pendingCurrencies = pendingCurrenciesFromMetadata(report.metadata);
+  const { transactions: normalizedTxs, changed } = normalizeForeignCharges(
+    report.transactions,
+    pendingCurrencies,
+  );
   const withFx = changed
     ? rebuildReportSummaries({ ...report, transactions: normalizedTxs })
     : report;
@@ -207,7 +217,8 @@ export async function normalizeProvisionalChargesAsync(report: SpendingReport): 
 }
 
 export function normalizeProvisionalCharges(report: SpendingReport): SpendingReport {
-  const { transactions, changed } = normalizeForeignCharges(report.transactions);
+  const pendingCurrencies = pendingCurrenciesFromMetadata(report.metadata);
+  const { transactions, changed } = normalizeForeignCharges(report.transactions, pendingCurrencies);
   if (!changed) return report;
   return rebuildReportSummaries({ ...report, transactions });
 }

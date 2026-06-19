@@ -53,6 +53,17 @@ def test_parse_pending_currencies_from_header():
     assert parse_pending_currencies(rows, 1) == {469.4: "PLN"}
 
 
+def test_parser_metadata_includes_pending_currencies():
+    import glob
+    from pathlib import Path
+    from parser import parse_leumi_visa_xlsx
+
+    files = glob.glob(str(Path(__file__).resolve().parents[2] / "statements" / "*19.06.26*.xlsx"))
+    assert files, "Jun 19 statement fixture missing"
+    _, meta = parse_leumi_visa_xlsx(Path(files[0]))
+    assert meta["pending_currencies"] == {"469.4": "PLN"}
+
+
 def test_pending_israeli_uses_amount_as_ils():
     charge, currency, estimated = resolve_charge_ils(
         47.9, None, "חינם פלוס נתניה", "עסקה בקליטה", tx_date=date(2026, 6, 19)

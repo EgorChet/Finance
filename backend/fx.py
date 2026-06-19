@@ -84,7 +84,7 @@ def detect_currency(
             return "USD"
         if cc == "PL":
             return "PLN"
-        if cc in ("DE", "FR", "IT", "ES", "NL", "AT", "BE", "PT", "GR", "IE"):
+        if cc in ("DE", "FR", "IT", "ES", "NL", "AT", "BE", "PT", "GR"):
             return "EUR"
         if cc == "GB":
             return "GBP"
