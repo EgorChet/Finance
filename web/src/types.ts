@@ -10,6 +10,8 @@ export interface Transaction {
   category_en: string;
   merchant_known: boolean;
   billing_month?: string | null;
+  original_currency?: string | null;
+  charge_estimated?: boolean;
 }
 
 export interface CategorySummary {

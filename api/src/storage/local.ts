@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
-import type { ExclusionsData, FixedChargesData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
+import type { ExclusionsData, FixedChargesData, FxFallbackData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
 
 const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "..", "data");
 
@@ -10,6 +10,7 @@ const RULES_PATH = path.join(DATA_DIR, "merchant_rules.json");
 const REVIEW_PATH = path.join(DATA_DIR, "review_progress.json");
 const EXCLUSIONS_PATH = path.join(DATA_DIR, "user_exclusions.json");
 const FIXED_CHARGES_PATH = path.join(DATA_DIR, "user_fixed_charges.json");
+const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const PROJECT_ROOT = path.resolve(DATA_DIR, "..");
 const STATEMENTS_DIR = path.join(PROJECT_ROOT, "statements");
 const XLSX_DIRS = [STATEMENTS_DIR];
@@ -99,6 +100,21 @@ export async function writeFixedCharges(data: FixedChargesData): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   data.updated_at = new Date().toISOString();
   await fs.writeFile(FIXED_CHARGES_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export async function readFxFallback(): Promise<FxFallbackData> {
+  try {
+    const raw = await fs.readFile(FX_FALLBACK_PATH, "utf-8");
+    const data = JSON.parse(raw) as Partial<FxFallbackData>;
+    return { updated: data.updated ?? "", rates: data.rates ?? {} };
+  } catch {
+    return { updated: "", rates: {} };
+  }
+}
+
+export async function writeFxFallback(data: FxFallbackData): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(FX_FALLBACK_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
 export async function discoverXlsxFiles(): Promise<string[]> {

@@ -10,6 +10,10 @@ export interface Transaction {
   category_en: string;
   merchant_known: boolean;
   billing_month?: string | null;
+  /** Original transaction currency when different from ILS. */
+  original_currency?: string | null;
+  /** True when charge_amount was estimated from FX rates (pending export). */
+  charge_estimated?: boolean;
 }
 
 export interface CategorySummary {
@@ -123,4 +127,9 @@ export interface FixedCharge {
 export interface FixedChargesData {
   charges: FixedCharge[];
   updated_at?: string | null;
+}
+
+export interface FxFallbackData {
+  updated: string;
+  rates: Record<string, number>;
 }

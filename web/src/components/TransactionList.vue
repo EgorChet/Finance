@@ -20,7 +20,7 @@
       <div v-for="row in visibleRows" :key="row.key" class="tx-row">
         <div class="tx-row-top">
           <div class="tx-row-merchant">{{ row.merchant }}</div>
-          <div class="tx-row-amount">{{ formatIls(row.amount) }}</div>
+          <div class="tx-row-amount">{{ formatChargeAmount(row.tx) }}</div>
         </div>
         <div class="tx-row-meta">
           <span class="tx-row-meta-text">
@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
-import { formatIls, formatTransactionDate, monthLabelFromIso } from "../utils/format";
+import { formatChargeAmount, formatTransactionDate, monthLabelFromIso } from "../utils/format";
 import { transactionKey } from "../utils/transactionKey";
 
 type SortKey = "date" | "merchant" | "category" | "amount";

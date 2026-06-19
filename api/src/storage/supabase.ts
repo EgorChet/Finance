@@ -2,7 +2,7 @@
  * Supabase storage adapter — set STORAGE=supabase and configure env vars.
  * Falls back to local files when not configured.
  */
-import type { ExclusionsData, FixedChargesData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
+import type { ExclusionsData, FixedChargesData, FxFallbackData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
 import * as local from "./local.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -139,6 +139,31 @@ export async function writeFixedCharges(data: FixedChargesData): Promise<void> {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "fixed_charges", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readFxFallback(): Promise<FxFallbackData> {
+  if (!supabaseConfigured()) return local.readFxFallback();
+  const res = await supabaseFetch("app_state?id=eq.fx_fallback&select=data");
+  if (!res.ok) return { updated: "", rates: {} };
+  const rows = (await res.json()) as { data: FxFallbackData }[];
+  const data = rows[0]?.data;
+  return { updated: data?.updated ?? "", rates: data?.rates ?? {} };
+}
+
+export async function writeFxFallback(data: FxFallbackData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeFxFallback(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "fx_fallback", data }),
   });
   if (!res.ok) {
     const text = await res.text();

@@ -11,6 +11,8 @@ import { monthLabelFromIso } from "../utils/dates.js";
 import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
+import { normalizeForeignCharges } from "../utils/fx.js";
+import { prefetchRatesForPending } from "../utils/fxRates.js";
 
 /** Retired categories merged into another for display and totals. */
 const CATEGORY_ALIASES: Record<string, string> = {
@@ -31,7 +33,16 @@ function remapLegacyCategories(report: SpendingReport): SpendingReport {
 }
 
 export function finalizeReport(report: SpendingReport): SpendingReport {
-  return applyExclusions(augmentReport(remapLegacyCategories(report)));
+  const { transactions: normalizedTxs, changed } = normalizeForeignCharges(report.transactions);
+  const withFx = changed
+    ? rebuildReportSummaries({ ...report, transactions: normalizedTxs })
+    : report;
+  return applyExclusions(augmentReport(remapLegacyCategories(withFx)));
+}
+
+export async function finalizeReportAsync(report: SpendingReport): Promise<SpendingReport> {
+  await prefetchRatesForPending(report.transactions);
+  return finalizeReport(report);
 }
 
 function billingKey(dateStr: string | undefined): string {
@@ -128,6 +139,38 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
   };
 }
 
+export async function getCombinedReportAsync(
+  data: StatementsData,
+  keys: string[] | null,
+): Promise<SpendingReport | null> {
+  const entries = Object.values(data.statements).sort((a, b) =>
+    a.billing_key.localeCompare(b.billing_key),
+  );
+  if (!entries.length) return null;
+
+  let selected: StatementEntry[];
+  if (keys && keys.length) {
+    const set = new Set(keys);
+    selected = entries.filter((e) => set.has(e.billing_key));
+  } else {
+    selected = entries;
+  }
+  if (!selected.length) return null;
+
+  await prefetchRatesForPending(selected.flatMap((e) => e.report.transactions));
+
+  if (selected.length === 1) {
+    return finalizeReport(selected[0].report);
+  }
+
+  const labels = selected.map((e) => e.month_label);
+  const label = `${labels[0]} – ${labels[labels.length - 1]} (${selected.length} months)`;
+  return combineReports(
+    selected.map((e) => finalizeReport(e.report)),
+    label,
+  );
+}
+
 export function getCombinedReport(
   data: StatementsData,
   keys: string[] | null,
@@ -158,13 +201,13 @@ export function getCombinedReport(
 }
 
 /** Pending charges in mid-cycle exports often have purchase amount but zero charge. */
+export async function normalizeProvisionalChargesAsync(report: SpendingReport): Promise<SpendingReport> {
+  await prefetchRatesForPending(report.transactions);
+  return normalizeProvisionalCharges(report);
+}
+
 export function normalizeProvisionalCharges(report: SpendingReport): SpendingReport {
-  let changed = false;
-  const transactions = report.transactions.map((tx) => {
-    if (tx.charge_amount > 0 || tx.amount <= 0) return tx;
-    changed = true;
-    return { ...tx, charge_amount: tx.amount };
-  });
+  const { transactions, changed } = normalizeForeignCharges(report.transactions);
   if (!changed) return report;
   return rebuildReportSummaries({ ...report, transactions });
 }
@@ -179,11 +222,10 @@ export function rememberReport(
 ): string {
   const billing = report.metadata.billing_date as string | undefined;
   const key = billingKey(billing);
-  let storedReport = provisional ? normalizeProvisionalCharges(report) : report;
-  storedReport = {
-    ...storedReport,
+  const storedReport: SpendingReport = {
+    ...report,
     metadata: {
-      ...storedReport.metadata,
+      ...report.metadata,
       provisional,
     },
   };

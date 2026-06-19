@@ -3,11 +3,13 @@ import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
 import { analyzeFileBuffer, analyzerUsesPublicUrl, isAnalyzerConnectivityError, isPublicRenderAnalyzerUrl, normalizeAnalyzerUrl, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
-import { finalizeReport } from "../services/reportService.js";
 import {
-  getCombinedReport,
+  finalizeReport,
+  finalizeReportAsync,
+  getCombinedReportAsync,
   isCachedFile,
   monthCatalog,
+  normalizeProvisionalChargesAsync,
   rememberReport,
   applyMerchantRules,
   summaryRows,
@@ -44,6 +46,7 @@ import {
   saveFixedCharges,
   validateFixedCharges,
 } from "../services/fixedCharges.js";
+import { ensureDailyFallback } from "../utils/fxRates.js";
 import type { FixedCharge, MerchantRules } from "../types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -51,7 +54,7 @@ const router = Router();
 
 router.use(async (_req, _res, next) => {
   try {
-    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache()]);
+    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache(), ensureDailyFallback()]);
     next();
   } catch (e) {
     next(e);
@@ -112,7 +115,7 @@ router.get("/report", async (req, res) => {
       .filter((k) => k >= from && k <= to);
   }
 
-  const report = getCombinedReport(data, keys);
+  const report = await getCombinedReportAsync(data, keys);
   if (!report) {
     res.status(404).json({ error: "No statements found" });
     return;
@@ -208,7 +211,7 @@ router.get("/merchants", async (req, res) => {
   const rules = await readRules();
   const month = req.query.month as string | undefined;
   const keys = month ? [month] : null;
-  const report = getCombinedReport(data, keys);
+  const report = await getCombinedReportAsync(data, keys);
   if (!report) {
     res.json([]);
     return;
@@ -268,11 +271,12 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     const rules = await readRules();
     const report = await analyzeFileBuffer(buffer, filename, autoTranslate);
+    const storedReport = provisional ? await normalizeProvisionalChargesAsync(report) : report;
     const savedPath = await saveUploadedXlsx(filename, buffer);
-    const key = rememberReport(data, report, savedPath, filename, hash, provisional);
+    const key = rememberReport(data, storedReport, savedPath, filename, hash, provisional);
     applyMerchantRules(data, rules);
     await writeStatements(data);
-    res.json({ key, provisional, report: finalizeReport(data.statements[key]!.report) });
+    res.json({ key, provisional, report: await finalizeReportAsync(data.statements[key]!.report) });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const waking = isAnalyzerConnectivityError(message);
@@ -308,7 +312,7 @@ router.get("/review/queue", async (req, res) => {
 
   const month = req.query.month as string | undefined;
   const keys = month ? [month] : null;
-  const report = getCombinedReport(data, keys);
+  const report = await getCombinedReportAsync(data, keys);
   if (!report) {
     res.json({ queue: [], total: 0, reviewed_count: 0 });
     return;

@@ -10,6 +10,39 @@ export function formatIls(amount: number): string {
   })}`;
 }
 
+const CURRENCY_PREFIX: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+};
+
+function formatForeignAmount(amount: number, currency: string): string {
+  const formatted = amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const prefix = CURRENCY_PREFIX[currency];
+  if (prefix) return `${prefix}${formatted}`;
+  return `${formatted} ${currency}`;
+}
+
+/** ILS charge with optional original foreign amount. */
+export function formatChargeAmount(tx: {
+  amount: number;
+  charge_amount: number;
+  original_currency?: string | null;
+  charge_estimated?: boolean;
+}): string {
+  const ils = formatIls(tx.charge_amount);
+  const currency = tx.original_currency;
+  if (!currency || currency === "ILS" || Math.abs(tx.amount - tx.charge_amount) < 0.02) {
+    return tx.charge_estimated ? `~${ils}` : ils;
+  }
+  const original = formatForeignAmount(tx.amount, currency);
+  const prefix = tx.charge_estimated ? "~" : "";
+  return `${prefix}${ils} (${original})`;
+}
+
 /** Softer amounts for sentences — ~₪1,700 not ₪1,720.62. */
 export function formatAboutIls(amount: number): string {
   const sign = amount < 0 ? -1 : 1;

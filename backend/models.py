@@ -18,3 +18,5 @@ class Transaction:
     category_en: str = ""
     merchant_known: bool = False
     billing_month: Optional[str] = None
+    original_currency: Optional[str] = None
+    charge_estimated: bool = False

@@ -13,6 +13,7 @@ data/statements.json
 data/merchant_rules.json
 data/review_progress.json
 data/translation_cache.json
+data/fx_fallback.json
 
 node_modules/
 api/dist/

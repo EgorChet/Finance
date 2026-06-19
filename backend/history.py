@@ -47,6 +47,8 @@ def _tx_to_dict(tx: Transaction) -> dict:
         "category_en": tx.category_en,
         "merchant_known": tx.merchant_known,
         "billing_month": tx.billing_month,
+        "original_currency": tx.original_currency,
+        "charge_estimated": tx.charge_estimated,
     }
 
 
@@ -63,6 +65,8 @@ def _tx_from_dict(data: dict) -> Transaction:
         category_en=data.get("category_en", ""),
         merchant_known=bool(data.get("merchant_known", False)),
         billing_month=data.get("billing_month"),
+        original_currency=data.get("original_currency"),
+        charge_estimated=bool(data.get("charge_estimated", False)),
     )
 
 
