@@ -1,4 +1,4 @@
-export type HouseholdUserId = "egor" | "julia";
+import type { HouseholdUserId } from "../types";
 
 export type UserFeatures = {
   portfolio: boolean;
@@ -14,23 +14,26 @@ export type UserProfile = {
   features: UserFeatures;
 };
 
-export const USER_PROFILES: Record<HouseholdUserId, UserProfile> = {
-  egor: { id: "egor", label: "Egor", features: { portfolio: true, spending: true, calendar: true, upload: true, recurring: true } },
-  julia: { id: "julia", label: "Julia", features: { portfolio: true, spending: true, calendar: true, upload: true, recurring: true } },
+/** Default display names — API may override via /auth/status. */
+export const DEFAULT_USER_LABELS: Record<HouseholdUserId, string> = {
+  egor: "boss",
+  julia: "julia",
 };
 
-export const HOUSEHOLD_USERS = [
-  { id: "egor" as const, label: "Egor" },
-  { id: "julia" as const, label: "Julia" },
-];
+export const DEFAULT_HOUSEHOLD_USERS = (
+  Object.entries(DEFAULT_USER_LABELS) as [HouseholdUserId, string][]
+).map(([id, label]) => ({ id, label }));
 
 export function isHouseholdUserId(value: unknown): value is HouseholdUserId {
   return value === "egor" || value === "julia";
 }
 
-export function userLabel(userId: HouseholdUserId | null | undefined): string {
+export function userLabel(
+  userId: HouseholdUserId | null | undefined,
+  directory: Partial<Record<HouseholdUserId, string>> = DEFAULT_USER_LABELS,
+): string {
   if (!userId) return "";
-  return USER_PROFILES[userId]?.label ?? userId;
+  return directory[userId] ?? DEFAULT_USER_LABELS[userId] ?? userId;
 }
 
 export function creatorClass(userId: HouseholdUserId | undefined): string {
@@ -49,4 +52,11 @@ export function userIdFromToken(token: string | null | undefined): HouseholdUser
   } catch {
     return null;
   }
+}
+
+export function directoryFromUsers(users: { id: HouseholdUserId; label: string }[]): Record<HouseholdUserId, string> {
+  return {
+    egor: users.find((u) => u.id === "egor")?.label ?? DEFAULT_USER_LABELS.egor,
+    julia: users.find((u) => u.id === "julia")?.label ?? DEFAULT_USER_LABELS.julia,
+  };
 }

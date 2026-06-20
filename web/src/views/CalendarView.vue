@@ -58,7 +58,7 @@
                 <p class="calendar-event-title">
                   {{ item.event.title }}
                   <span v-if="item.event.created_by" class="calendar-creator-badge" :class="creatorClass(item.event.created_by)">
-                    {{ userLabel(item.event.created_by) }}
+                    {{ auth.labelFor(item.event.created_by) }}
                   </span>
                 </p>
                 <p class="calendar-event-meta">{{ formatEventWhen(item.event, item.date) }}</p>
@@ -141,7 +141,7 @@ import {
   type CalendarPeriodFilter,
   formToPayload,
 } from "../utils/calendarEvents";
-import { creatorClass, userLabel } from "../utils/users";
+import { creatorClass } from "../utils/users";
 
 const auth = useAuthStore();
 const loading = ref(true);

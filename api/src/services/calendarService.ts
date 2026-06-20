@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { readCalendar, writeCalendar } from "../storage/index.js";
 import type { CalendarData, CalendarEvent, CalendarImportance, CalendarRecurrence, HouseholdUserId } from "../types.js";
-import { defaultEventCreator, isHouseholdUserId } from "../users.js";
+import { defaultEventCreator, isHouseholdUserId, userProfile } from "../users.js";
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -262,7 +262,7 @@ function appendEventLines(lines: string[], ev: CalendarEvent, now: string): void
   }
 
   lines.push("SUMMARY:" + escapeIcs(ev.title));
-  const creatorLabel = ev.created_by === "julia" ? "Julia" : ev.created_by === "egor" ? "Egor" : "";
+  const creatorLabel = ev.created_by ? userProfile(ev.created_by).label : "";
   const creatorNote = creatorLabel ? `Added by ${creatorLabel}` : "";
   const description = [ev.description?.trim(), creatorNote].filter(Boolean).join("\n\n");
   if (description) lines.push("DESCRIPTION:" + escapeIcs(description));

@@ -15,7 +15,7 @@
             <span class="home-event-title">
               {{ item.event.title }}
               <span v-if="item.event.created_by" class="calendar-creator-badge" :class="creatorClass(item.event.created_by)">
-                {{ userLabel(item.event.created_by) }}
+                {{ auth.labelFor(item.event.created_by) }}
               </span>
             </span>
             <span class="home-event-when">{{ formatEventWhen(item.event, item.date) }}</span>
@@ -29,9 +29,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import AppLoader from "../AppLoader.vue";
+import { useAuthStore } from "../../stores/auth";
 import type { CalendarEvent } from "../../types";
 import { formatEventWhen, inferImportance, upcomingOccurrences } from "../../utils/calendarEvents";
-import { creatorClass, userLabel } from "../../utils/users";
+import { creatorClass } from "../../utils/users";
+
+const auth = useAuthStore();
 
 const props = defineProps<{
   loading: boolean;

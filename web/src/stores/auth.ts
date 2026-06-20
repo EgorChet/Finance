@@ -3,7 +3,13 @@ import { ref, computed } from "vue";
 import { authStatus, fetchAuthMe, login as apiLogin } from "../api/client";
 import type { HouseholdUserId } from "../types";
 import type { UserFeatures } from "../utils/users";
-import { USER_PROFILES, userIdFromToken } from "../utils/users";
+import {
+  DEFAULT_HOUSEHOLD_USERS,
+  DEFAULT_USER_LABELS,
+  directoryFromUsers,
+  userIdFromToken,
+  userLabel as labelForUser,
+} from "../utils/users";
 
 const TOKEN_KEY = "finance_auth_token";
 
@@ -15,11 +21,6 @@ const DEFAULT_FEATURES: UserFeatures = {
   recurring: true,
 };
 
-function featuresFor(userId: HouseholdUserId | null): UserFeatures {
-  if (!userId) return DEFAULT_FEATURES;
-  return USER_PROFILES[userId]?.features ?? DEFAULT_FEATURES;
-}
-
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
   const isDemo = ref(!token.value);
@@ -28,10 +29,21 @@ export const useAuthStore = defineStore("auth", () => {
   const loading = ref(false);
   const error = ref("");
   const userId = ref<HouseholdUserId | null>(token.value ? userIdFromToken(token.value) : null);
-  const userLabel = ref(userId.value ? USER_PROFILES[userId.value].label : "");
-  const features = ref<UserFeatures>(featuresFor(userId.value));
+  const userDirectory = ref<Record<HouseholdUserId, string>>({ ...DEFAULT_USER_LABELS });
+  const householdUsers = ref(DEFAULT_HOUSEHOLD_USERS);
+  const userLabel = ref(userId.value ? labelForUser(userId.value, userDirectory.value) : "");
+  const features = ref<UserFeatures>({ ...DEFAULT_FEATURES });
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
+
+  function syncUsers(users: { id: HouseholdUserId; label: string }[]) {
+    if (!users.length) return;
+    householdUsers.value = users;
+    userDirectory.value = directoryFromUsers(users);
+    if (userId.value) {
+      userLabel.value = labelForUser(userId.value, userDirectory.value);
+    }
+  }
 
   function applySession(next: {
     token?: string | null;
@@ -44,8 +56,8 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = null;
       isDemo.value = true;
       userId.value = "egor";
-      userLabel.value = USER_PROFILES.egor.label;
-      features.value = DEFAULT_FEATURES;
+      userLabel.value = labelForUser("egor", userDirectory.value);
+      features.value = { ...DEFAULT_FEATURES };
       localStorage.removeItem(TOKEN_KEY);
       return;
     }
@@ -57,13 +69,14 @@ export const useAuthStore = defineStore("auth", () => {
     demoAsOf.value = null;
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
     userId.value = resolvedUser;
-    userLabel.value = next.label ?? USER_PROFILES[resolvedUser].label;
-    features.value = next.features ?? featuresFor(resolvedUser);
+    userLabel.value = next.label ?? labelForUser(resolvedUser, userDirectory.value);
+    features.value = next.features ?? { ...DEFAULT_FEATURES };
   }
 
   async function checkStatus() {
     const status = await authStatus();
     authRequired.value = status.auth_required;
+    if (status.users?.length) syncUsers(status.users);
     if (!status.auth_required) {
       isDemo.value = false;
     }
@@ -76,12 +89,15 @@ export const useAuthStore = defineStore("auth", () => {
       userId.value = me.user;
       userLabel.value = me.label;
       features.value = me.features;
+      userDirectory.value = {
+        ...userDirectory.value,
+        [me.user]: me.label,
+      };
     } catch {
       const fromToken = userIdFromToken(token.value);
       if (fromToken) {
         userId.value = fromToken;
-        userLabel.value = USER_PROFILES[fromToken].label;
-        features.value = featuresFor(fromToken);
+        userLabel.value = labelForUser(fromToken, userDirectory.value);
       }
     }
   }
@@ -97,6 +113,10 @@ export const useAuthStore = defineStore("auth", () => {
         label: res.label,
         features: res.features,
       });
+      userDirectory.value = {
+        ...userDirectory.value,
+        [res.user]: res.label,
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/fetch|network|failed|load/i.test(msg)) {
@@ -125,6 +145,10 @@ export const useAuthStore = defineStore("auth", () => {
     return features.value[feature] !== false;
   }
 
+  function labelFor(id: HouseholdUserId | null | undefined): string {
+    return labelForUser(id, userDirectory.value);
+  }
+
   return {
     token,
     isDemo,
@@ -134,6 +158,8 @@ export const useAuthStore = defineStore("auth", () => {
     error,
     userId,
     userLabel,
+    userDirectory,
+    householdUsers,
     features,
     isAuthenticated,
     checkStatus,
@@ -142,5 +168,6 @@ export const useAuthStore = defineStore("auth", () => {
     enterDemo,
     logout,
     can,
+    labelFor,
   };
 });

@@ -22,12 +22,24 @@ const DEFAULT_FEATURES: UserFeatures = {
   recurring: true,
 };
 
-export const USER_PROFILES: Record<HouseholdUserId, UserProfile> = {
-  egor: { id: "egor", label: "Egor", features: { ...DEFAULT_FEATURES } },
-  julia: { id: "julia", label: "Julia", features: { ...DEFAULT_FEATURES } },
-};
-
 export const HOUSEHOLD_USER_IDS: HouseholdUserId[] = ["egor", "julia"];
+
+function displayLabel(userId: HouseholdUserId): string {
+  if (userId === "egor") return process.env.AUTH_LABEL_EGOR?.trim() || "boss";
+  return process.env.AUTH_LABEL_JULIA?.trim() || "julia";
+}
+
+export function userProfile(userId: HouseholdUserId): UserProfile {
+  return {
+    id: userId,
+    label: displayLabel(userId),
+    features: { ...DEFAULT_FEATURES },
+  };
+}
+
+export function listAuthUsers(): { id: HouseholdUserId; label: string }[] {
+  return HOUSEHOLD_USER_IDS.map((id) => ({ id, label: displayLabel(id) }));
+}
 
 export function isHouseholdUserId(value: unknown): value is HouseholdUserId {
   return value === "egor" || value === "julia";
@@ -37,21 +49,13 @@ export function parseUserId(value: unknown): HouseholdUserId | null {
   return isHouseholdUserId(value) ? value : null;
 }
 
-export function userProfile(userId: HouseholdUserId): UserProfile {
-  return USER_PROFILES[userId];
-}
-
-export function listAuthUsers(): { id: HouseholdUserId; label: string }[] {
-  return HOUSEHOLD_USER_IDS.map((id) => ({ id, label: USER_PROFILES[id].label }));
-}
-
-/** Password for a household user (from env). */
+/** Same family password for both — pick a name only to tag calendar events etc. */
 export function passwordForUser(userId: HouseholdUserId): string | undefined {
   const shared = process.env.AUTH_PASSWORD?.trim();
   if (userId === "egor") {
     return process.env.AUTH_USER_EGOR?.trim() || shared;
   }
-  return process.env.AUTH_PASSWORD_JULIA?.trim() || process.env.AUTH_USER_JULIA?.trim() || shared;
+  return process.env.AUTH_PASSWORD_JULIA?.trim() || shared;
 }
 
 export function defaultEventCreator(existing?: string | null): HouseholdUserId {

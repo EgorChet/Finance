@@ -18,7 +18,7 @@
         <legend class="field-label">Added by</legend>
         <div class="calendar-radio-group calendar-radio-group--inline">
           <label
-            v-for="person in HOUSEHOLD_USERS"
+            v-for="person in householdUsers"
             :key="person.id"
             class="calendar-radio-option calendar-radio-option--compact"
             :class="{ 'calendar-radio-option--active': form.created_by === person.id }"
@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
 import type { CalendarEvent, HouseholdUserId } from "../types";
-import { HOUSEHOLD_USERS } from "../utils/users";
+import { useAuthStore } from "../stores/auth";
 import {
   CALENDAR_IMPORTANCE_OPTIONS,
   CALENDAR_RECURRENCE_OPTIONS,
@@ -94,6 +94,9 @@ const props = defineProps<{
   event?: CalendarEvent | null;
   saving?: boolean;
 }>();
+
+const auth = useAuthStore();
+const householdUsers = computed(() => auth.householdUsers);
 
 const emit = defineEmits<{
   save: [payload: ReturnType<typeof formToPayload>];

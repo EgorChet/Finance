@@ -8,7 +8,7 @@
 
       <template v-if="showPasswordForm">
         <fieldset class="login-user-picker">
-          <legend class="field-label">Who's signing in?</legend>
+          <legend class="field-label">You are</legend>
           <div class="login-user-options">
             <label
               v-for="person in loginUsers"
@@ -35,7 +35,7 @@
         <p v-if="auth.error" class="login-error">{{ auth.error }}</p>
         <div class="login-actions">
           <button class="btn btn-primary" :disabled="auth.loading" @click="doLogin">
-            {{ auth.loading ? "Signing in…" : `Sign in as ${selectedUserLabel}` }}
+            {{ auth.loading ? "Signing in…" : "Sign in — my spending" }}
           </button>
           <button class="btn btn-ghost" type="button" @click="tryDemo">Try demo first</button>
         </div>
@@ -60,10 +60,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { authStatus } from "../api/client";
 import { useAuthStore } from "../stores/auth";
 import type { HouseholdUserId } from "../types";
-import { HOUSEHOLD_USERS, USER_PROFILES } from "../utils/users";
+import { DEFAULT_HOUSEHOLD_USERS } from "../utils/users";
 import { shouldShowSignInForm, wantsSignIn } from "../utils/signIn";
 
 const auth = useAuthStore();
@@ -72,19 +71,13 @@ const route = useRoute();
 const password = ref("");
 const passwordInput = ref<HTMLInputElement | null>(null);
 const selectedUser = ref<HouseholdUserId>("egor");
-const loginUsers = ref(HOUSEHOLD_USERS);
+const loginUsers = computed(() => auth.householdUsers);
 
 const showPasswordForm = computed(() => shouldShowSignInForm(auth.authRequired, route.query));
 
-const selectedUserLabel = computed(() => USER_PROFILES[selectedUser.value].label);
-
 async function ensureAuthStatus() {
   try {
-    const status = await authStatus();
-    auth.authRequired = status.auth_required;
-    if (status.users?.length) {
-      loginUsers.value = status.users;
-    }
+    await auth.checkStatus();
   } catch {
     if (wantsSignIn(route.query)) {
       auth.error = "Could not reach the server — check your connection and try again.";
