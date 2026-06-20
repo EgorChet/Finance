@@ -2330,7 +2330,22 @@ table.rules select {
 }
 
 .recurring-segment-row--triple {
-  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
+  grid-template-columns: minmax(0, 35fr) minmax(0, 25fr) minmax(0, 40fr);
+}
+
+.recurring-segment-row--triple .input,
+.recurring-add-schedule-row--triple .input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.recurring-segment-row--triple input[type="date"] {
+  display: block;
+}
+
+.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit,
+.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit {
+  min-width: 0;
 }
 
 .recurring-segment-row .field-group {
@@ -2470,7 +2485,7 @@ table.rules select {
 }
 
 .recurring-add-schedule-row--triple {
-  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
+  grid-template-columns: minmax(0, 35fr) minmax(0, 25fr) minmax(0, 40fr);
 }
 
 .recurring-add-schedule-row .field-group {
