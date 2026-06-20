@@ -254,7 +254,8 @@ export function calibrateSecondHalfMultiplier(
 
   if (!ratios.length) return DEFAULT_SECOND_HALF_MULTIPLIER;
   const avg = ratios.reduce((s, v) => s + v, 0) / ratios.length;
-  return Math.min(1.5, Math.max(1.0, roundMoney(avg * 100) / 100));
+  // Never below default — end of cycle is typically heavier even when recent months mixed.
+  return Math.min(1.5, Math.max(DEFAULT_SECOND_HALF_MULTIPLIER, roundMoney(avg * 100) / 100));
 }
 
 function extrapolateToFullCycle(

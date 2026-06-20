@@ -101,9 +101,9 @@
                 </div>
                 <p class="pace-simple-footnote">
                   “Your normal at this point” compares everyday spend through today.
-                  “On track for” weights the second half of the cycle heavier (×{{
+                  “On track for” projects the rest of the cycle with a heavier second half (×{{
                     (pace.secondHalfMultiplier ?? 1.2).toFixed(2)
-                  }}, from your last {{ pace.cyclesUsed || 3 }} cycles).
+                  }}, at least ×1.2 from your last {{ pace.cyclesUsed || 3 }} cycles).
                   “Your normal month” is the average full total of those cycles.
                 </p>
               </details>
