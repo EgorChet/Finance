@@ -22,6 +22,7 @@
 
       <CalendarEventForm
         v-if="!auth.isDemo && showForm"
+        ref="formPanelRef"
         :model-date="selectedDate"
         :default-user="auth.userId ?? 'egor'"
         :editing="!!editingEvent"
@@ -31,6 +32,33 @@
         @cancel="closeForm"
         @delete="deleteEditing"
       />
+
+      <section class="calendar-month">
+        <div class="calendar-month-head">
+          <button type="button" class="btn btn-icon" aria-label="Previous month" @click="prevMonth">‹</button>
+          <h3 class="calendar-month-label">{{ monthLabel }}</h3>
+          <button type="button" class="btn btn-icon" aria-label="Next month" @click="nextMonth">›</button>
+        </div>
+        <div class="calendar-grid">
+          <div v-for="dow in weekdays" :key="dow" class="calendar-dow">{{ dow }}</div>
+          <button
+            v-for="cell in monthCells"
+            :key="cell.key"
+            type="button"
+            class="calendar-cell"
+            :class="{
+              'calendar-cell--outside': !cell.inMonth,
+              'calendar-cell--today': cell.isToday,
+              'calendar-cell--selected': cell.date === selectedDate,
+              'calendar-cell--has-events': cell.eventCount > 0,
+            }"
+            @click="selectDate(cell.date, cell.inMonth)"
+          >
+            <span class="calendar-cell-day">{{ cell.day }}</span>
+            <span v-if="cell.eventCount" class="calendar-cell-dot" :title="`${cell.eventCount} event(s)`" />
+          </button>
+        </div>
+      </section>
 
       <section ref="eventsPanelRef" class="calendar-events-panel">
         <fieldset v-if="!listAnchorDate" class="calendar-period-filter">
@@ -52,6 +80,8 @@
           <span>{{ dayFocusLabel }}</span>
           <button type="button" class="btn btn-ghost calendar-day-focus-clear" @click="clearDayFocus">Show all</button>
         </div>
+
+        <p v-if="!listAnchorDate && !auth.isDemo" class="calendar-events-hint">Tap a day above, or use Edit on an event.</p>
 
         <p v-if="!filteredOccurrences.length" class="calendar-empty">{{ emptyPeriodLabel }}</p>
         <ul v-else class="calendar-event-list">
@@ -79,32 +109,6 @@
             </button>
           </li>
         </ul>
-      </section>
-
-      <section class="calendar-month">
-        <div class="calendar-month-head">
-          <button type="button" class="btn btn-icon" aria-label="Previous month" @click="prevMonth">‹</button>
-          <h3 class="calendar-month-label">{{ monthLabel }}</h3>
-          <button type="button" class="btn btn-icon" aria-label="Next month" @click="nextMonth">›</button>
-        </div>
-        <div class="calendar-grid">
-          <div v-for="dow in weekdays" :key="dow" class="calendar-dow">{{ dow }}</div>
-          <div
-            v-for="cell in monthCells"
-            :key="cell.key"
-            class="calendar-cell"
-            :class="{
-              'calendar-cell--outside': !cell.inMonth,
-              'calendar-cell--today': cell.isToday,
-              'calendar-cell--selected': cell.date === selectedDate,
-              'calendar-cell--has-events': cell.eventCount > 0,
-            }"
-            @click="selectDate(cell.date, cell.inMonth)"
-          >
-            <span class="calendar-cell-day">{{ cell.day }}</span>
-            <span v-if="cell.eventCount" class="calendar-cell-dot" :title="`${cell.eventCount} event(s)`" />
-          </div>
-        </div>
       </section>
 
       <details v-if="!auth.isDemo && feedUrl" class="calendar-subscribe calendar-subscribe--bottom">
@@ -170,6 +174,7 @@ const viewMonth = ref(0);
 const selectedDate = ref("");
 const listAnchorDate = ref<string | null>(null);
 const eventsPanelRef = ref<HTMLElement | null>(null);
+const formPanelRef = ref<{ $el: HTMLElement } | null>(null);
 const periodFilter = ref<CalendarPeriodFilter>("week");
 const copied = ref(false);
 const regenerating = ref(false);
@@ -208,8 +213,8 @@ watch(hasEventsThisWeek, (hasWeek) => {
 });
 
 watch(periodFilter, () => {
-  listAnchorDate.value = null;
-  if (!listAnchorDate.value && periodFilter.value === "week" && !hasEventsThisWeek.value) {
+  if (listAnchorDate.value) return;
+  if (periodFilter.value === "week" && !hasEventsThisWeek.value) {
     periodFilter.value = "month";
   }
 });
@@ -338,7 +343,13 @@ function clearDayFocus() {
 
 function scrollToEvents() {
   void nextTick(() => {
-    eventsPanelRef.value?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    eventsPanelRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function scrollToForm() {
+  void nextTick(() => {
+    formPanelRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 
@@ -359,8 +370,10 @@ function selectDate(date: string, inMonth: boolean) {
   if (dayEvents.length === 1) {
     startEdit(dayEvents[0]!);
   } else if (dayEvents.length === 0) {
+    if (auth.isDemo) return;
     editingEvent.value = null;
     showForm.value = true;
+    scrollToForm();
   } else {
     closeForm();
   }
@@ -370,7 +383,7 @@ function startEdit(ev: CalendarEvent) {
   if (auth.isDemo) return;
   editingEvent.value = ev;
   showForm.value = true;
-  scrollToEvents();
+  scrollToForm();
 }
 
 function prevMonth() {

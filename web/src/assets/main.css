@@ -4327,6 +4327,12 @@ table.rules select {
   gap: 0.15rem;
   cursor: pointer;
   position: relative;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  width: 100%;
 }
 
 .calendar-cell--outside {
@@ -4359,6 +4365,12 @@ table.rules select {
 .calendar-day-focus-clear {
   font-size: 0.82rem;
   padding: 0.25rem 0.5rem;
+}
+
+.calendar-events-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .calendar-cell-day {
@@ -4416,9 +4428,10 @@ table.rules select {
 .calendar-event-edit {
   flex-shrink: 0;
   min-height: 36px;
-  padding: 0.35rem 0.65rem;
+  padding: 0.35rem 0.75rem;
   font-size: 0.82rem;
   align-self: center;
+  border: 1px solid var(--border);
 }
 
 .calendar-form-panel {

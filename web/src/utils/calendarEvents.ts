@@ -213,31 +213,35 @@ export function formTimesValid(form: Pick<CalendarEventFormState, "all_day" | "s
   return parseTimeMinutes(form.end_time) > parseTimeMinutes(form.start_time);
 }
 
-export function formToPayload(form: CalendarEventFormState): CalendarEventFormState & {
+export type CalendarEventPayload = {
+  title: string;
+  date: string;
   all_day: boolean;
   start_time?: string;
   end_time?: string;
   importance: CalendarImportance;
-} {
+  description?: string;
+  recurrence?: CalendarRecurrence;
+  created_by: import("../types").HouseholdUserId;
+};
+
+export function formToPayload(form: CalendarEventFormState): CalendarEventPayload {
+  const base = {
+    title: form.title.trim(),
+    date: form.date,
+    importance: form.importance,
+    description: form.description?.trim() || undefined,
+    recurrence: form.recurrence,
+    created_by: form.created_by,
+  };
   if (form.all_day) {
-    return {
-      ...form,
-      title: form.title.trim(),
-      description: form.description?.trim() || undefined,
-      all_day: true,
-      start_time: undefined,
-      end_time: undefined,
-      importance: form.importance,
-    };
+    return { ...base, all_day: true };
   }
   return {
-    ...form,
-    title: form.title.trim(),
-    description: form.description?.trim() || undefined,
+    ...base,
     all_day: false,
     start_time: form.start_time,
     end_time: form.end_time,
-    importance: form.importance,
   };
 }
 
