@@ -6,9 +6,8 @@ import {
   ALL_FEATURES,
   DEFAULT_HOUSEHOLD_USERS,
   DEFAULT_USER_LABELS,
+  DEMO_USER_LABELS,
   directoryFromUsers,
-  loginNameHint,
-  parseUsername,
   userIdFromToken,
   userLabel as labelForUser,
   type UserFeatures,
@@ -71,7 +70,6 @@ export const useAuthStore = defineStore("auth", () => {
   async function checkStatus() {
     const status = await authStatus();
     authRequired.value = status.auth_required;
-    if (status.users?.length) syncUsers(status.users);
     if (!status.auth_required) {
       isDemo.value = false;
     }
@@ -84,10 +82,13 @@ export const useAuthStore = defineStore("auth", () => {
       userId.value = me.user;
       userLabel.value = me.label;
       features.value = me.features;
-      userDirectory.value = {
-        ...userDirectory.value,
-        [me.user]: me.label,
-      };
+      if (me.users?.length) syncUsers(me.users);
+      else {
+        userDirectory.value = {
+          ...userDirectory.value,
+          [me.user]: me.label,
+        };
+      }
     } catch {
       const fromToken = userIdFromToken(token.value);
       if (fromToken) {
@@ -98,11 +99,6 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function login(password: string, username: string) {
-    const resolved = parseUsername(username, userDirectory.value);
-    if (!resolved) {
-      error.value = `Unknown name — use ${loginNameHint(userDirectory.value)}`;
-      throw new Error(error.value);
-    }
     loading.value = true;
     error.value = "";
     try {
@@ -113,14 +109,17 @@ export const useAuthStore = defineStore("auth", () => {
         label: res.label,
         features: res.features,
       });
-      userDirectory.value = {
-        ...userDirectory.value,
-        [res.user]: res.label,
-      };
+      if (res.users?.length) syncUsers(res.users);
+      else {
+        userDirectory.value = {
+          ...userDirectory.value,
+          [res.user]: res.label,
+        };
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/unknown name/i.test(msg)) {
-        error.value = msg;
+        error.value = "Unknown name";
       } else if (/fetch|network|failed|load/i.test(msg)) {
         error.value = "Could not reach the server — check your connection and try again.";
       } else {
@@ -135,6 +134,11 @@ export const useAuthStore = defineStore("auth", () => {
   function enterDemo() {
     applySession({ demo: true });
     demoAsOf.value = null;
+    householdUsers.value = (
+      Object.entries(DEMO_USER_LABELS) as [HouseholdUserId, string][]
+    ).map(([id, label]) => ({ id, label }));
+    userDirectory.value = { ...DEMO_USER_LABELS };
+    userLabel.value = labelForUser("egor", userDirectory.value);
   }
 
   function logout() {

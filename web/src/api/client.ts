@@ -59,17 +59,17 @@ async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
 }
 
 export async function authStatus() {
-  return get<{
-    auth_required: boolean;
-    users?: { id: import("../types").HouseholdUserId; label: string }[];
-  }>(`${BASE}/api/auth/status`);
+  return get<{ auth_required: boolean }>(`${BASE}/api/auth/status`);
 }
+
+type AuthUser = { id: import("../types").HouseholdUserId; label: string };
 
 export async function fetchAuthMe(token?: string) {
   return get<{
     user: import("../types").HouseholdUserId;
     label: string;
     features: import("../utils/users").UserFeatures;
+    users?: AuthUser[];
   }>(`${BASE}/api/auth/me`, token);
 }
 
@@ -80,6 +80,7 @@ export async function login(password: string, username: string) {
     user: import("../types").HouseholdUserId;
     label: string;
     features: import("../utils/users").UserFeatures;
+    users?: AuthUser[];
   }>(`${BASE}/api/auth/login`, { password, username });
 }
 

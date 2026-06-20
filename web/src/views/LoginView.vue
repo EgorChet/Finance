@@ -14,7 +14,7 @@
           v-model="username"
           class="input"
           type="text"
-          :placeholder="nameHint"
+          placeholder="Your name"
           autocomplete="username"
           autocapitalize="none"
           spellcheck="false"
@@ -61,7 +61,6 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import { loginNameHint } from "../utils/users";
 import { shouldShowSignInForm, wantsSignIn } from "../utils/signIn";
 
 const auth = useAuthStore();
@@ -71,7 +70,6 @@ const username = ref("");
 const password = ref("");
 const usernameInput = ref<HTMLInputElement | null>(null);
 const passwordInput = ref<HTMLInputElement | null>(null);
-const nameHint = computed(() => loginNameHint(auth.userDirectory));
 
 const showPasswordForm = computed(() => shouldShowSignInForm(auth.authRequired, route.query));
 
@@ -99,7 +97,7 @@ function focusPassword() {
 
 async function doLogin() {
   if (!username.value.trim()) {
-    auth.error = `Enter your name (${nameHint.value})`;
+    auth.error = "Enter your name";
     usernameInput.value?.focus();
     return;
   }

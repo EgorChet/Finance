@@ -25,8 +25,13 @@ export type UserProfile = {
 
 /** Default display labels — API may override via /auth/status. */
 export const DEFAULT_USER_LABELS: Record<HouseholdUserId, string> = {
-  egor: "boss",
-  julia: "julia",
+  egor: "",
+  julia: "",
+};
+
+export const DEMO_USER_LABELS: Record<HouseholdUserId, string> = {
+  egor: "User 1",
+  julia: "User 2",
 };
 
 export const DEFAULT_HOUSEHOLD_USERS = (
@@ -43,15 +48,11 @@ export function parseUsername(
 ): HouseholdUserId | null {
   const name = raw.trim().toLowerCase();
   if (!name) return null;
-  const boss = (labels.egor ?? DEFAULT_USER_LABELS.egor).toLowerCase();
-  const julia = (labels.julia ?? DEFAULT_USER_LABELS.julia).toLowerCase();
-  if (name === "egor" || name === boss) return "egor";
-  if (name === "julia" || name === julia) return "julia";
+  const primary = (labels.egor ?? DEFAULT_USER_LABELS.egor).toLowerCase();
+  const secondary = (labels.julia ?? DEFAULT_USER_LABELS.julia).toLowerCase();
+  if (name === "egor" || (primary && name === primary)) return "egor";
+  if (name === "julia" || (secondary && name === secondary)) return "julia";
   return null;
-}
-
-export function loginNameHint(labels: Partial<Record<HouseholdUserId, string>> = DEFAULT_USER_LABELS): string {
-  return `${labels.egor ?? DEFAULT_USER_LABELS.egor} or ${labels.julia ?? DEFAULT_USER_LABELS.julia}`;
 }
 
 export function userLabel(
