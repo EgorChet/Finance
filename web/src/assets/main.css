@@ -2340,7 +2340,6 @@ table.rules select {
 .recurring-segment-row--triple > .field-group,
 .recurring-add-schedule-row--triple > .field-group {
   min-width: 0;
-  overflow: hidden;
 }
 
 .recurring-segment-row--triple > .field-group:nth-child(1),
@@ -2368,8 +2367,6 @@ table.rules select {
 .recurring-segment-row--triple input[type="date"],
 .recurring-add-schedule-row--triple input[type="date"] {
   display: block;
-  padding-left: 0.5rem;
-  padding-right: 0.25rem;
 }
 
 .recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-fields-wrapper,
@@ -2377,7 +2374,6 @@ table.rules select {
 .recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit,
 .recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit {
   min-width: 0;
-  overflow: hidden;
 }
 
 .recurring-segment-row--triple input[type="date"]::-webkit-calendar-picker-indicator,
