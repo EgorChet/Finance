@@ -629,17 +629,6 @@ button {
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
-.app-portfolio-badge {
-  flex-shrink: 0;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  padding: 0.12rem 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-
 .app-portfolio-refresh {
   flex-shrink: 0;
   border: 0;
@@ -719,12 +708,6 @@ button {
 
 .app-kaspa-strip--stale {
   opacity: 0.72;
-}
-
-.app-header-actions {
-  position: relative;
-  flex-shrink: 0;
-  margin-left: auto;
 }
 
 .mobile-nav-toggle {
@@ -834,63 +817,136 @@ button {
   margin-top: 0.15rem;
 }
 
+.mobile-nav-links {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mobile-nav-bottom {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.mobile-nav-portfolio {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.mobile-nav-portfolio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-nav-portfolio-row + .mobile-nav-portfolio-row {
+  margin-top: 0.15rem;
+}
+
+.mobile-nav-portfolio-row--active {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--text);
+}
+
+.mobile-nav-portfolio-row--stale {
+  opacity: 0.72;
+}
+
+.mobile-nav-portfolio-logo {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.mobile-nav-portfolio-label {
+  flex-shrink: 0;
+  min-width: 2.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.mobile-nav-portfolio-price {
+  flex-shrink: 0;
+}
+
+.mobile-nav-portfolio-sep {
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.mobile-nav-portfolio-total {
+  min-width: 0;
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mobile-nav-portfolio-row--combined {
+  flex-wrap: wrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mobile-nav-portfolio-row--market {
+  opacity: 0.92;
+}
+
+.mobile-nav-portfolio-values {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin-left: auto;
+  justify-content: flex-end;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mobile-nav-portfolio-row--combined .mobile-nav-portfolio-label {
+  color: var(--text);
+}
+
+.mobile-nav-footer {
+  flex-shrink: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.mobile-nav-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.85rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  text-align: left;
+}
+
+.mobile-nav-action.btn {
+  justify-content: flex-start;
+}
+
 .btn-icon {
   min-width: 44px;
   min-height: 44px;
   padding: 0.35rem 0.65rem;
   font-size: 1.25rem;
   line-height: 1;
-}
-
-.app-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 29;
-}
-
-.app-menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  z-index: 30;
-  width: min(17.5rem, calc(100vw - 1.5rem));
-  max-width: calc(100vw - 1.5rem);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.5rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.app-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  margin-bottom: 0.35rem;
-  font-size: 0.9rem;
-  color: var(--text);
-  min-height: 44px;
-  padding: 0.35rem 0.25rem;
-}
-
-.app-menu-item:last-child {
-  margin-bottom: 0;
-}
-
-.app-menu-note {
-  margin: 0 0 0.35rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-menu-error {
-  color: var(--danger);
-  white-space: normal;
-  line-height: 1.35;
 }
 
 .app-loader-overlay {

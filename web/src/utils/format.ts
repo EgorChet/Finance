@@ -5,11 +5,26 @@ export function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
-export function formatIls(amount: number): string {
+export function formatIls(amount: number, decimals = 2): string {
   return `₪${roundMoney(amount).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })}`;
+}
+
+export function formatRub(amount: number, decimals = 0): string {
+  return `${roundMoney(amount).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} ₽`;
+}
+
+/** S&P 500 index level — whole points. */
+export function formatSp500(level: number): string {
+  return level.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 }
 
 export function formatUsdt(amount: number, decimals = 2): string {

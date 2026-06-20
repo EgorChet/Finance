@@ -178,6 +178,20 @@ export async function fetchFxcnQuote(demo: boolean, token?: string, force = fals
   return get<FxcnQuote>(`${prefix(demo)}/fxcn${q}`, token);
 }
 
+export type MarketSnapshot = {
+  btc_usd: number;
+  sp500: number;
+  usd_ils: number;
+  usd_rub: number;
+  updated_at: string;
+  stale?: boolean;
+};
+
+export async function fetchMarketSnapshot(demo: boolean, token?: string, force = false) {
+  const q = force ? "?refresh=1" : "";
+  return get<MarketSnapshot>(`${prefix(demo)}/market-snapshot${q}`, token);
+}
+
 /** Server-side wake — fallback when analyzer is on internal network. */
 export async function warmAnalyzerService(token?: string) {
   const res = await fetch(`${prefix(false)}/warm-analyzer`, {

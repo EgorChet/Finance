@@ -57,51 +57,9 @@
           :title="portfolioTitle"
         >
           <img v-if="portfolioAsset === 'kas'" class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
-          <span v-else class="app-portfolio-badge">FXCN</span>
           <span class="app-kaspa-item">{{ portfolioPriceLabel }}</span>
           <span class="app-kaspa-sep" aria-hidden="true">·</span>
           <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
-        </div>
-      </div>
-      <div class="app-header-actions">
-        <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
-        <div v-if="menuOpen" class="app-menu-backdrop" @click="menuOpen = false" />
-        <div v-if="menuOpen" class="app-menu">
-          <label class="app-menu-item">
-            <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
-            Light mode
-          </label>
-          <template v-if="!auth.isDemo">
-            <button
-              v-if="showLocalSync"
-              type="button"
-              class="app-menu-item btn"
-              :disabled="processing"
-              @click="sync"
-            >
-              Sync .xlsx files
-            </button>
-            <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
-            <button
-              type="button"
-              class="app-menu-item btn"
-              :disabled="processing"
-              @click="uploadInput?.click()"
-            >
-              Upload statement
-            </button>
-          </template>
-          <button
-            v-if="auth.authRequired && auth.isAuthenticated"
-            type="button"
-            class="app-menu-item btn"
-            @click="logout"
-          >
-            Sign out
-          </button>
-          <button v-if="auth.isDemo" type="button" class="app-menu-item btn" @click="goLogin">
-            Sign in for real data
-          </button>
         </div>
       </div>
     </header>
@@ -116,15 +74,112 @@
               ×
             </button>
           </div>
-          <RouterLink
-            v-for="item in navItems"
-            :key="item.to"
-            class="mobile-nav-link"
-            :to="item.to"
-            @click="closeNav"
-          >
-            {{ item.label }}
-          </RouterLink>
+          <div class="mobile-nav-links">
+            <RouterLink
+              v-for="item in navItems"
+              :key="item.to"
+              class="mobile-nav-link"
+              :to="item.to"
+              @click="closeNav"
+            >
+              {{ item.label }}
+            </RouterLink>
+          </div>
+          <div class="mobile-nav-bottom">
+            <div v-if="sideMenuPortfolioVisible" class="mobile-nav-portfolio">
+              <div
+                v-if="kaspaQuote"
+                class="mobile-nav-portfolio-row"
+                :class="{
+                  'mobile-nav-portfolio-row--active': portfolioAsset === 'kas',
+                  'mobile-nav-portfolio-row--stale': kaspaQuote.stale,
+                }"
+                :title="kasPortfolioTitle"
+              >
+                <img class="mobile-nav-portfolio-logo" :src="kaspaLogo" alt="" width="18" height="18" />
+                <span class="mobile-nav-portfolio-price">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
+                <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
+                <span class="mobile-nav-portfolio-total">{{ formatUsdt(kaspaQuote.portfolio_usdt, 0) }}</span>
+              </div>
+              <div
+                v-if="fxcnQuote"
+                class="mobile-nav-portfolio-row"
+                :class="{
+                  'mobile-nav-portfolio-row--active': portfolioAsset === 'fxcn',
+                  'mobile-nav-portfolio-row--stale': fxcnQuote.stale,
+                }"
+                :title="fxcnPortfolioTitle"
+              >
+                <span class="mobile-nav-portfolio-label">FXCN</span>
+                <span class="mobile-nav-portfolio-price">{{ formatFxcnNavPrice(fxcnQuote.nav_usd) }}</span>
+                <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
+                <span class="mobile-nav-portfolio-total">{{ formatUsd(fxcnQuote.portfolio_usd, 0) }}</span>
+              </div>
+              <div
+                v-if="portfolioCombinedUsd != null"
+                class="mobile-nav-portfolio-row mobile-nav-portfolio-row--combined"
+                :title="portfolioCombinedTitle"
+              >
+                <span class="mobile-nav-portfolio-label">Total</span>
+                <span class="mobile-nav-portfolio-values">
+                  <span>{{ formatUsd(portfolioCombinedUsd, 0) }}</span>
+                  <template v-if="portfolioCombinedIls != null">
+                    <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
+                    <span>{{ formatIls(portfolioCombinedIls, 0) }}</span>
+                  </template>
+                  <template v-if="portfolioCombinedRub != null">
+                    <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
+                    <span>{{ formatRub(portfolioCombinedRub, 0) }}</span>
+                  </template>
+                </span>
+              </div>
+              <div v-if="marketSnapshot?.btc_usd" class="mobile-nav-portfolio-row mobile-nav-portfolio-row--market">
+                <span class="mobile-nav-portfolio-label">BTC</span>
+                <span class="mobile-nav-portfolio-total">{{ formatUsd(marketSnapshot.btc_usd, 0) }}</span>
+              </div>
+              <div v-if="marketSnapshot?.sp500" class="mobile-nav-portfolio-row mobile-nav-portfolio-row--market">
+                <span class="mobile-nav-portfolio-label">S&amp;P</span>
+                <span class="mobile-nav-portfolio-total">{{ formatSp500(marketSnapshot.sp500) }}</span>
+              </div>
+            </div>
+            <div class="mobile-nav-footer">
+            <label class="mobile-nav-action">
+              <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
+              Light mode
+            </label>
+            <template v-if="!auth.isDemo">
+              <button
+                v-if="showLocalSync"
+                type="button"
+                class="mobile-nav-action btn"
+                :disabled="processing"
+                @click="sync"
+              >
+                Sync .xlsx files
+              </button>
+              <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
+              <button
+                type="button"
+                class="mobile-nav-action btn"
+                :disabled="processing"
+                @click="uploadInput?.click()"
+              >
+                Upload statement
+              </button>
+            </template>
+            <button
+              v-if="auth.authRequired && auth.isAuthenticated"
+              type="button"
+              class="mobile-nav-action btn"
+              @click="logout"
+            >
+              Sign out
+            </button>
+            <button v-if="auth.isDemo" type="button" class="mobile-nav-action btn" @click="goLogin">
+              Sign in for real data
+            </button>
+            </div>
+          </div>
         </nav>
       </template>
     </Teleport>
@@ -176,12 +231,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
-import type { FxcnQuote, KaspaQuote } from "../api/client";
+import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
-import { formatFxcnNavPrice, formatKasUsdtPrice, formatUsd, formatUsdt } from "../utils/format";
+import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
 
 const PORTFOLIO_ASSET_KEY = "portfolio_header_asset";
@@ -229,10 +284,10 @@ const canRetry = ref(false);
 const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
-const menuOpen = ref(false);
 const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
 const fxcnQuote = ref<FxcnQuote | null>(null);
+const marketSnapshot = ref<MarketSnapshot | null>(null);
 const portfolioAsset = ref<PortfolioAsset>(
   (localStorage.getItem(PORTFOLIO_ASSET_KEY) as PortfolioAsset | null) === "fxcn" ? "fxcn" : "kas",
 );
@@ -240,9 +295,48 @@ const portfolioRefreshing = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 let kaspaTimer: ReturnType<typeof setInterval> | null = null;
 let fxcnTimer: ReturnType<typeof setInterval> | null = null;
+let marketTimer: ReturnType<typeof setInterval> | null = null;
 
 const KAS_REFRESH_MS = 600_000;
 const FXCN_REFRESH_MS = 6 * 60 * 60 * 1000;
+const MARKET_REFRESH_MS = 600_000;
+
+const sideMenuPortfolioVisible = computed(
+  () =>
+    !!kaspaQuote.value ||
+    !!fxcnQuote.value ||
+    portfolioCombinedUsd.value != null ||
+    !!marketSnapshot.value?.btc_usd ||
+    !!marketSnapshot.value?.sp500,
+);
+
+const portfolioCombinedUsd = computed(() => {
+  let total = 0;
+  if (kaspaQuote.value) total += kaspaQuote.value.portfolio_usdt;
+  if (fxcnQuote.value) total += fxcnQuote.value.portfolio_usd;
+  return total > 0 ? total : null;
+});
+
+const portfolioCombinedIls = computed(() => {
+  const usd = portfolioCombinedUsd.value;
+  const rate = marketSnapshot.value?.usd_ils;
+  return usd != null && rate ? Math.round(usd * rate) : null;
+});
+
+const portfolioCombinedRub = computed(() => {
+  const usd = portfolioCombinedUsd.value;
+  const rate = marketSnapshot.value?.usd_rub;
+  return usd != null && rate ? Math.round(usd * rate) : null;
+});
+
+const portfolioCombinedTitle = computed(() => {
+  const usd = portfolioCombinedUsd.value;
+  if (usd == null) return "";
+  const parts = [formatUsd(usd)];
+  if (portfolioCombinedIls.value != null) parts.push(formatIls(portfolioCombinedIls.value, 0));
+  if (portfolioCombinedRub.value != null) parts.push(formatRub(portfolioCombinedRub.value, 0));
+  return `Combined portfolio · ${parts.join(" · ")}`;
+});
 
 const portfolioStripVisible = computed(() =>
   portfolioAsset.value === "kas" ? !!kaspaQuote.value : !!fxcnQuote.value,
@@ -276,17 +370,23 @@ const portfolioRefreshLabel = computed(() =>
   portfolioAsset.value === "kas" ? "Refresh KAS price" : "Refresh FXCN NAV",
 );
 
+const kasPortfolioTitle = computed(() => {
+  if (!kaspaQuote.value) return "";
+  const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
+  const staleNote = stale ? " · cached" : "";
+  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} · ${source}${staleNote}`;
+});
+
+const fxcnPortfolioTitle = computed(() => {
+  if (!fxcnQuote.value) return "";
+  const { nav_usd, lots, portfolio_usd, source, stale } = fxcnQuote.value;
+  const staleNote = stale ? " · cached" : "";
+  return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
+});
+
 const portfolioTitle = computed(() => {
-  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
-    const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
-    const staleNote = stale ? " · cached" : "";
-    return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} · ${source}${staleNote}`;
-  }
-  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
-    const { nav_usd, lots, portfolio_usd, source, stale } = fxcnQuote.value;
-    const staleNote = stale ? " · cached" : "";
-    return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
-  }
+  if (portfolioAsset.value === "kas") return kasPortfolioTitle.value;
+  if (portfolioAsset.value === "fxcn") return fxcnPortfolioTitle.value;
   return "";
 });
 
@@ -309,6 +409,14 @@ async function refreshFxcnQuote(force = false) {
     fxcnQuote.value = await fetchFxcnQuote(auth.isDemo, auth.token || undefined, force);
   } catch {
     /* keep last quote */
+  }
+}
+
+async function refreshMarketSnapshot(force = false) {
+  try {
+    marketSnapshot.value = await fetchMarketSnapshot(auth.isDemo, auth.token || undefined, force);
+  } catch {
+    /* keep last snapshot */
   }
 }
 
@@ -346,8 +454,10 @@ const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 onMounted(() => {
   void refreshKaspaQuote();
   void refreshFxcnQuote();
+  void refreshMarketSnapshot();
   kaspaTimer = setInterval(() => void refreshKaspaQuote(), KAS_REFRESH_MS);
   fxcnTimer = setInterval(() => void refreshFxcnQuote(), FXCN_REFRESH_MS);
+  marketTimer = setInterval(() => void refreshMarketSnapshot(), MARKET_REFRESH_MS);
 });
 
 onUnmounted(() => {
@@ -359,6 +469,10 @@ onUnmounted(() => {
   if (fxcnTimer) {
     clearInterval(fxcnTimer);
     fxcnTimer = null;
+  }
+  if (marketTimer) {
+    clearInterval(marketTimer);
+    marketTimer = null;
   }
   document.body.style.overflow = "";
 });
@@ -442,7 +556,7 @@ async function runUpload(file: File, statementType: "partial" | "final") {
 }
 
 async function sync() {
-  menuOpen.value = false;
+  closeNav();
   beginProcess("Syncing statements", "Reading files from your statements folder", SYNC_STEPS);
   try {
     startStepTimer(SYNC_STEPS.length - 2);
@@ -470,7 +584,7 @@ function confirmUpload(statementType: "partial" | "final") {
 }
 
 async function onUpload(e: Event) {
-  menuOpen.value = false;
+  closeNav();
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
@@ -479,13 +593,13 @@ async function onUpload(e: Event) {
 }
 
 function logout() {
-  menuOpen.value = false;
+  closeNav();
   auth.logout();
   router.push("/");
 }
 
 function goLogin() {
-  menuOpen.value = false;
+  closeNav();
   router.push("/");
 }
 </script>
