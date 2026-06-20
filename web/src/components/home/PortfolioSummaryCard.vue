@@ -1,7 +1,10 @@
 <template>
   <section class="home-card home-card-portfolio">
     <header class="home-card-head">
-      <h3 class="home-card-title">Portfolio</h3>
+      <h3 class="home-card-title">
+        Portfolio
+        <span v-if="demo" class="home-card-demo-tag">sample</span>
+      </h3>
       <button
         v-if="!loading"
         type="button"
@@ -61,6 +64,7 @@ import {
 const props = defineProps<{
   loading: boolean;
   refreshing?: boolean;
+  demo?: boolean;
   kaspa: KaspaQuote | null;
   fxcn: FxcnQuote | null;
   market: MarketSnapshot | null;

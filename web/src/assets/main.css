@@ -3643,6 +3643,20 @@ table.rules select {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.home-card-demo-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 
 .home-card-meta {

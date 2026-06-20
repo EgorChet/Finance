@@ -28,6 +28,7 @@
     <PortfolioSummaryCard
       :loading="portfolioLoading"
       :refreshing="portfolioRefreshing"
+      :demo="auth.isDemo"
       :kaspa="kaspaQuote"
       :fxcn="fxcnQuote"
       :market="marketSnapshot"
