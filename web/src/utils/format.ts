@@ -28,8 +28,6 @@ function formatForeignAmount(amount: number, currency: string): string {
   return `${formatted} ${currency}`;
 }
 
-import { isRefundTransaction } from "./transaction";
-
 /** ILS charge with optional original foreign amount. */
 export function formatChargeAmount(tx: {
   amount: number;
