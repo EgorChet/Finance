@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import patch
 
-from fx import detect_currency, resolve_charge_ils
+from fx import detect_currency, resolve_charge_ils, should_skip_installment_row, should_skip_non_spend_row
 from parser import parse_pending_currencies
 
 
@@ -100,6 +100,76 @@ def test_installment_uses_ils_slice():
     )
     assert charge == 511.71
     assert estimated is False
+
+
+def test_installment_payment_zero_is_skipped():
+    assert should_skip_installment_row(None, "תשלום 0 מתוך 3", transaction_type_he="רכישה בקרדיט")
+
+
+def test_installment_payment_one_with_charge_is_kept():
+    assert not should_skip_installment_row(511.71, "תשלום 1 מתוך 3", transaction_type_he="רכישה בקרדיט")
+
+
+def test_dedupe_prefers_billed_installment_over_estimate():
+    from dataclasses import dataclass
+    from fx import dedupe_transaction_snapshots
+
+    @dataclass
+    class Tx:
+        date: date
+        merchant_he: str
+        charge_amount: float
+        charge_estimated: bool = False
+        notes: str | None = None
+
+    txs = dedupe_transaction_snapshots([
+        Tx(date(2026, 6, 5), "מרכז לגביית קנסות", 1500, True, "תשלום 1 מתוך 3"),
+        Tx(date(2026, 6, 5), "מרכז לגביית קנסות", 511.71, False, "תשלום 1 מתוך 3"),
+    ])
+    assert len(txs) == 1
+    assert txs[0].charge_amount == 511.71
+
+
+def test_dedupe_keeps_same_day_installment_plan():
+    from dataclasses import dataclass
+    from fx import dedupe_transaction_snapshots
+
+    @dataclass
+    class Tx:
+        date: date
+        merchant_he: str
+        charge_amount: float
+        notes: str | None = None
+
+    txs = dedupe_transaction_snapshots([
+        Tx(date(2025, 11, 11), "GO MOBILE", 1470, "תשלום 1 מתוך 3"),
+        Tx(date(2025, 11, 11), "GO MOBILE", 1468, "תשלום 2 מתוך 3"),
+        Tx(date(2025, 11, 11), "GO MOBILE", 1468, "תשלום 3 מתוך 3"),
+    ])
+    assert len(txs) == 3
+
+
+def test_billing_adjustment_is_skipped():
+    assert should_skip_non_spend_row(
+        14572.99,
+        "העברת חיובים עקב שינוי מועד חיוב",
+        None,
+        transaction_type_he="רגילה",
+    )
+    assert should_skip_non_spend_row(
+        -14572.99,
+        "העברת חיובים עקב שינוי מועד חיוב",
+        None,
+        transaction_type_he="זיכוי",
+    )
+
+
+def test_card_fee_pending_is_skipped():
+    assert should_skip_non_spend_row(None, "דמי כרטיס ויזה", None, transaction_type_he="דמי חבר")
+
+
+def test_card_fee_final_is_kept():
+    assert not should_skip_non_spend_row(12.88, "דמי כרטיס ויזה", None, transaction_type_he="דמי חבר")
 
 
 def test_interest_row():

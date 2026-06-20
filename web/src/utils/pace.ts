@@ -3,6 +3,7 @@ import { costTypeForCategory } from "../categories";
 import type { ConfiguredCharge } from "./fixedCharges";
 import { configuredChargesForCycle, mergeConfiguredChargeTransactions, sumConfiguredCharges } from "./fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
+import { dedupeTransactionSnapshots, filterSpendTransactions } from "./transaction";
 
 export interface BillingCycle {
   start: Date;
@@ -896,7 +897,11 @@ export function buildCycleReport(
   const { end: cycleEndIso } = getCycleRangeForStart(cycleStart, 10);
   const cycleEnded = todayNorm > parseIsoDate(cycleEndIso);
   const label = openCycleTabLabel(cycleStart);
-  let txs = transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed);
+  let txs = dedupeTransactionSnapshots(
+    filterSpendTransactions(
+      transactionsInCycle(allTransactions, cycleStart, cycleEnd, todayNorm, includeFixed),
+    ),
+  );
   txs = mergeConfiguredChargeTransactions(
     txs,
     cycleStart,

@@ -11,7 +11,7 @@ import { monthLabelFromIso } from "../utils/dates.js";
 import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
-import { normalizeForeignCharges } from "../utils/fx.js";
+import { dedupeTransactionSnapshots, normalizeForeignCharges, shouldSkipNonSpendRow } from "../utils/fx.js";
 import { prefetchRatesForPending } from "../utils/fxRates.js";
 
 /** Retired categories merged into another for display and totals. */
@@ -40,13 +40,19 @@ function pendingCurrenciesFromMetadata(metadata: Record<string, unknown>): Recor
 
 export function finalizeReport(report: SpendingReport): SpendingReport {
   const pendingCurrencies = pendingCurrenciesFromMetadata(report.metadata);
+  const kept = report.transactions.filter(
+    (tx) => !shouldSkipNonSpendRow(tx.charge_amount, tx.merchant_he, tx.notes, tx.transaction_type_he),
+  );
+  const base = kept.length !== report.transactions.length
+    ? rebuildReportSummaries({ ...report, transactions: kept })
+    : report;
   const { transactions: normalizedTxs, changed } = normalizeForeignCharges(
-    report.transactions,
+    base.transactions,
     pendingCurrencies,
   );
   const withFx = changed
-    ? rebuildReportSummaries({ ...report, transactions: normalizedTxs })
-    : report;
+    ? rebuildReportSummaries({ ...base, transactions: normalizedTxs })
+    : base;
   return applyExclusions(augmentReport(remapLegacyCategories(withFx)));
 }
 
@@ -126,9 +132,10 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
       txs.push({ ...tx, billing_month: tx.billing_month || month });
     }
   }
-  txs.sort((a, b) => b.date.localeCompare(a.date));
-  const dates = txs.map((t) => t.date).sort();
-  const total = txs.reduce((s, t) => s + t.charge_amount, 0);
+  const deduped = dedupeTransactionSnapshots(txs);
+  deduped.sort((a, b) => b.date.localeCompare(a.date));
+  const dates = deduped.map((t) => t.date).sort();
+  const total = deduped.reduce((s, t) => s + t.charge_amount, 0);
   const combinedDates = reports.flatMap((r) => r.metadata.combined_billing_dates as string[] || []);
   const billingDates = reports.map((r) => r.metadata.billing_date as string).filter(Boolean);
 
@@ -140,12 +147,12 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
       statement_count: reports.length,
     },
     total_spent: total,
-    transaction_count: txs.length,
+    transaction_count: deduped.length,
     date_range: dates.length ? [dates[0], dates[dates.length - 1]] : [new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10)],
     by_category: mergeCategorySummaries(reports),
     top_merchants: reports.flatMap((r) => r.top_merchants).slice(0, 15),
     unknown_merchants: [...new Set(reports.flatMap((r) => r.unknown_merchants))],
-    transactions: txs,
+    transactions: deduped,
   };
 }
 

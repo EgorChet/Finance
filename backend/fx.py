@@ -105,6 +105,124 @@ def detect_currency(
 
 
 REFUND_TYPE_MARKERS = ("זיכוי", "השבת מכירה")
+_INSTALLMENT = re.compile(r"תשלום\s+(\d+)\s+מתוך\s+(\d+)")
+_BILLING_ADJUSTMENT = "שינוי מועד חיוב"
+_CARD_FEE_TYPE = "דמי חבר"
+_INTEREST_MERCHANT = "* ריבית *"
+
+
+def parse_installment(notes: Optional[str]) -> Optional[tuple[int, int]]:
+    if not notes:
+        return None
+    match = _INSTALLMENT.search(notes)
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def should_skip_installment_row(
+    charge_raw,
+    notes: Optional[str],
+    *,
+    transaction_type_he: Optional[str] = None,
+) -> bool:
+    """Credit installments before the bank posts an ILS slice — skip, do not estimate the full amount."""
+    installment = parse_installment(notes)
+    if installment is None:
+        return False
+    current, _ = installment
+    if current == 0:
+        return True
+    return is_pending_charge(
+        charge_raw,
+        notes,
+        transaction_type_he=transaction_type_he,
+    )
+
+
+def is_billing_cycle_adjustment(merchant: str) -> bool:
+    return _BILLING_ADJUSTMENT in merchant
+
+
+def is_card_membership_fee(merchant: str, transaction_type_he: Optional[str] = None) -> bool:
+    if transaction_type_he == _CARD_FEE_TYPE:
+        return True
+    return "דמי כרטיס" in merchant
+
+
+def is_interest_row(merchant: str) -> bool:
+    return _INTEREST_MERCHANT in merchant
+
+
+def should_skip_non_spend_row(
+    charge_raw,
+    merchant: str,
+    notes: Optional[str],
+    *,
+    transaction_type_he: Optional[str] = None,
+) -> bool:
+    """Rows that must not appear in spend totals or transaction lists."""
+    if should_skip_installment_row(charge_raw, notes, transaction_type_he=transaction_type_he):
+        return True
+    if is_billing_cycle_adjustment(merchant):
+        return True
+    if is_card_membership_fee(merchant, transaction_type_he) and is_pending_charge(
+        charge_raw,
+        notes,
+        transaction_type_he=transaction_type_he,
+    ):
+        return True
+    return False
+
+
+def transaction_snapshot_key(tx) -> tuple:
+    """Dedupe key — installment payments on the same day stay distinct."""
+    raw_date = getattr(tx, "date", None)
+    if isinstance(raw_date, date):
+        tx_date = raw_date.isoformat()
+    else:
+        tx_date = str(raw_date)[:10]
+    merchant = getattr(tx, "merchant_he", "")
+    notes = getattr(tx, "notes", None)
+    installment = parse_installment(notes)
+    if installment:
+        current, total = installment
+        return (tx_date, merchant, "inst", current, total)
+    charge = round(float(getattr(tx, "charge_amount", 0) or 0), 2)
+    note_key = notes or ""
+    return (tx_date, merchant, "tx", charge, note_key)
+
+
+def pick_better_transaction(a, b):
+    """When the same purchase appears in multiple exports, keep the billed snapshot."""
+    a_est = bool(getattr(a, "charge_estimated", False))
+    b_est = bool(getattr(b, "charge_estimated", False))
+    if a_est != b_est:
+        return b if a_est else a
+
+    a_inst = parse_installment(getattr(a, "notes", None))
+    b_inst = parse_installment(getattr(b, "notes", None))
+    if a_inst and b_inst:
+        if a_inst[0] != b_inst[0]:
+            return a if a_inst[0] > b_inst[0] else b
+
+    if a.charge_amount != b.charge_amount:
+        return a if a.charge_amount < b.charge_amount else b
+
+    return b
+
+
+def dedupe_transaction_snapshots(transactions: list) -> list:
+    best: dict[tuple, object] = {}
+    order: list[tuple] = []
+    for tx in transactions:
+        key = transaction_snapshot_key(tx)
+        if key not in best:
+            order.append(key)
+            best[key] = tx
+        else:
+            best[key] = pick_better_transaction(best[key], tx)
+    return [best[key] for key in order]
 
 
 def is_refund_transaction(
@@ -172,6 +290,9 @@ def resolve_charge_ils(
 
     if amount <= 0:
         return 0.0, None, False
+
+    if is_interest_row(merchant) and charge is not None and charge > 0:
+        return _round_money(charge), "ILS", False
 
     pending = is_pending_charge(
         charge_raw,

@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 
 from models import Transaction
+from fx import dedupe_transaction_snapshots
 
 
 def _month_label(billing_date: date | None) -> str:
@@ -166,6 +167,10 @@ def combine_reports(reports: list[SpendingReport], label: str) -> SpendingReport
             if not tx.merchant_known and tx.merchant_en == tx.merchant_he:
                 unknown.add(tx.merchant_he)
         unknown.update(report.unknown_merchants)
+
+    combined_transactions = dedupe_transaction_snapshots(combined_transactions)
+    total = sum(tx.charge_amount for tx in combined_transactions)
+    tx_count = len(combined_transactions)
 
     by_category = sorted(
         [

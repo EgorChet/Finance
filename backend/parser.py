@@ -7,7 +7,13 @@ from typing import Optional
 
 import openpyxl
 
-from fx import detect_currency, is_pending_charge, is_refund_transaction, resolve_charge_ils
+from fx import (
+    detect_currency,
+    is_pending_charge,
+    is_refund_transaction,
+    resolve_charge_ils,
+    should_skip_non_spend_row,
+)
 from fx_rates import prefetch_rates
 from models import Transaction
 
@@ -113,6 +119,9 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
             amount = _to_float(row[2])
             notes = str(row[6]).strip() if row[6] else None
             tx_type = str(row[4] or "").strip()
+            merchant = str(row[1] or "").strip()
+            if should_skip_non_spend_row(row[3], merchant, notes, transaction_type_he=tx_type):
+                continue
             tx_date = _to_date(row[0])
             explicit = pending_currencies.get(_amount_key(amount))
             charge_ils, original_currency, estimated = resolve_charge_ils(
