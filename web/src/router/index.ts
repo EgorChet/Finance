@@ -25,17 +25,17 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  if (!auth.authRequired && to.path === "/") {
+  if (to.name === "login" || to.path === "/") {
     try {
       await auth.checkStatus();
     } catch {
-      /* offline */
+      /* offline — login page shows a connection error when needed */
     }
   }
   if (to.path.startsWith("/app") && auth.authRequired && !auth.isAuthenticated && !auth.isDemo) {
-    return "/";
+    return { name: "login", query: { signin: "1" } };
   }
-  if (to.path === "/" && auth.isAuthenticated) {
+  if ((to.name === "login" || to.path === "/") && auth.isAuthenticated) {
     return { name: "home" };
   }
   return true;

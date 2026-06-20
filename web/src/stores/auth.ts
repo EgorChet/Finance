@@ -31,9 +31,14 @@ export const useAuthStore = defineStore("auth", () => {
       isDemo.value = false;
       demoAsOf.value = null;
       localStorage.setItem(TOKEN_KEY, res.token);
-    } catch {
-      error.value = "Wrong password";
-      throw new Error("login failed");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/fetch|network|failed|load/i.test(msg)) {
+        error.value = "Could not reach the server — check your connection and try again.";
+      } else {
+        error.value = "Wrong password";
+      }
+      throw e;
     } finally {
       loading.value = false;
     }

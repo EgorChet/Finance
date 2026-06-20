@@ -236,6 +236,7 @@ import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
+import { goToSignIn } from "../utils/signIn";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
 
@@ -602,6 +603,6 @@ function logout() {
 
 function goLogin() {
   closeNav();
-  router.push("/");
+  void goToSignIn(router);
 }
 </script>

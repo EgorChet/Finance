@@ -1,7 +1,8 @@
 <template>
   <div class="home-page">
     <div v-if="auth.isDemo" class="demo-banner">
-      Demo household — sample portfolio, calendar, and spending. Sign in for your real data.
+      Demo household — sample portfolio, calendar, and spending.
+      <button type="button" class="demo-banner-link" @click="goSignIn">Sign in for your real data</button>.
     </div>
     <h2 class="page-title">Home</h2>
     <p class="page-lead home-lead">This cycle's spending, what's coming up, and your investments at a glance.</p>
@@ -37,6 +38,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import {
   fetchCalendar,
   fetchFixedCharges,
@@ -54,6 +56,7 @@ import PortfolioSummaryCard from "../components/home/PortfolioSummaryCard.vue";
 import SpendingSnapshotCard from "../components/home/SpendingSnapshotCard.vue";
 import UpcomingEventsCard from "../components/home/UpcomingEventsCard.vue";
 import { useAuthStore } from "../stores/auth";
+import { goToSignIn } from "../utils/signIn";
 import { splitFixedVariable } from "../categories";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
@@ -81,6 +84,7 @@ import {
 } from "../utils/pace";
 
 const auth = useAuthStore();
+const router = useRouter();
 
 const portfolioLoading = ref(true);
 const portfolioRefreshing = ref(false);
@@ -272,4 +276,8 @@ onMounted(() => {
   void loadCalendar();
   void loadSpending();
 });
+
+function goSignIn() {
+  void goToSignIn(router);
+}
 </script>
