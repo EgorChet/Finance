@@ -1,5 +1,5 @@
 <template>
-  <div :class="['app-loader', { 'app-loader-overlay': overlay, 'app-loader-inline': !overlay }]">
+  <div :class="['app-loader', { 'app-loader-overlay': overlay, 'app-loader-inline': !overlay, 'app-loader-compact': compact && !overlay }]">
     <div class="app-loader-card" role="status" aria-live="polite">
       <div class="app-loader-spinner" aria-hidden="true">
         <span class="app-loader-ring" />
@@ -31,11 +31,13 @@ withDefaults(
     steps?: string[];
     activeStep?: number;
     overlay?: boolean;
+    compact?: boolean;
   }>(),
   {
     steps: () => [],
     activeStep: 0,
     overlay: false,
+    compact: false,
   },
 );
 </script>

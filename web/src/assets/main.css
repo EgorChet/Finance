@@ -992,6 +992,23 @@ button {
   padding: 2rem 1rem;
 }
 
+.app-loader-inline.app-loader-compact {
+  min-height: 0;
+  padding: 0.35rem 0 0.5rem;
+}
+
+.app-loader-compact .app-loader-spinner {
+  margin-bottom: 0.5rem;
+}
+
+.app-loader-compact .app-loader-title {
+  font-size: 0.9rem;
+}
+
+.app-loader-compact .app-loader-subtitle {
+  font-size: 0.82rem;
+}
+
 .app-loader-card {
   width: min(100%, 360px);
   padding: 1.35rem 1.25rem 1.15rem;
@@ -3737,24 +3754,38 @@ table.rules select {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .home-event-row {
   display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
+  align-items: flex-start;
+  gap: 0.55rem;
   font-size: 0.92rem;
 }
 
-.home-event-date {
-  flex: 0 0 5.5rem;
-  color: var(--text-muted);
-  font-size: 0.82rem;
+.home-event-row .calendar-importance-dot {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+
+.home-event-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .home-event-title {
-  flex: 1;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.home-event-when {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .home-spend-metrics {
@@ -4302,25 +4333,4 @@ table.rules select {
   margin: 0.15rem 0 0;
   font-size: 0.82rem;
   color: var(--text-muted);
-}
-
-.home-event-when {
-  flex: 0 0 11rem;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-
-.home-event-row {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-}
-
-@media (min-width: 480px) {
-  .home-event-row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 0.75rem;
-  }
 }
