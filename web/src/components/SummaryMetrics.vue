@@ -19,7 +19,10 @@
             <span>{{ formatIls(budgetCarLoan) }}</span>
           </li>
         </ul>
-        <p class="metric-sub-note">Rent is not counted — paid outside this ₪12k.</p>
+        <p class="metric-sub-note">
+          Rent is not counted — paid outside this {{ formatIls(livingBudget) }} cap.
+          <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Edit budget</RouterLink>
+        </p>
       </div>
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
@@ -64,11 +67,10 @@ import {
   everydaySpendingTotal,
   moneyLeft,
   monthlyBillsTotal,
-  MONTHLY_DISCRETIONARY_BUDGET,
 } from "../utils/householdBudget";
 
 const props = withDefaults(
-  defineProps<{ report: SpendingReport; retrospective?: boolean }>(),
+  defineProps<{ report: SpendingReport; livingBudget: number; retrospective?: boolean }>(),
   { retrospective: false },
 );
 
@@ -79,7 +81,7 @@ const budgetSpent = computed(() => budgetBreakdown.value.spent);
 const budgetEveryday = computed(() => budgetBreakdown.value.everyday);
 const budgetDevInstitute = computed(() => budgetBreakdown.value.devInstitute);
 const budgetCarLoan = computed(() => budgetBreakdown.value.carLoan);
-const budgetLeft = computed(() => moneyLeft(props.report.transactions));
+const budgetLeft = computed(() => moneyLeft(props.report.transactions, props.livingBudget));
 const isOverBudget = computed(() => budgetLeft.value < 0);
 const overAmount = computed(() => Math.abs(budgetLeft.value));
 
@@ -94,7 +96,7 @@ const budgetDisplayValue = computed(() =>
 );
 
 const budgetFormula = computed(() => {
-  const budget = formatIls(MONTHLY_DISCRETIONARY_BUDGET);
+  const budget = formatIls(props.livingBudget);
   const spent = formatIls(budgetSpent.value);
   if (isOverBudget.value) {
     return `${budget} living budget − ${spent} used = ${formatIls(overAmount.value)} over`;
@@ -106,7 +108,7 @@ const budgetFormula = computed(() => {
 });
 const budgetClass = computed(() => {
   if (budgetLeft.value < 0) return "metric-card-budget--over";
-  if (budgetLeft.value <= MONTHLY_DISCRETIONARY_BUDGET * 0.2) return "metric-card-budget--low";
+  if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";
   return "metric-card-budget--ok";
 });
 

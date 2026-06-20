@@ -129,6 +129,17 @@ export interface FixedChargesData {
   updated_at?: string | null;
 }
 
+export interface LivingBudgetSegment {
+  amount: number;
+  from_month: string;
+  through_month: string;
+}
+
+export interface LivingBudgetData {
+  segments: LivingBudgetSegment[];
+  updated_at?: string | null;
+}
+
 export interface FxFallbackData {
   updated: string;
   rates: Record<string, number>;

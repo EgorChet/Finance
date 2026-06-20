@@ -47,15 +47,21 @@ import {
   saveFixedCharges,
   validateFixedCharges,
 } from "../services/fixedCharges.js";
+import {
+  loadLivingBudgetSegments,
+  refreshLivingBudgetCache,
+  saveLivingBudget,
+  validateLivingBudget,
+} from "../services/livingBudget.js";
 import { ensureDailyFallback } from "../utils/fxRates.js";
-import type { FixedCharge, MerchantRules } from "../types.js";
+import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 router.use(async (_req, _res, next) => {
   try {
-    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache(), ensureDailyFallback()]);
+    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache(), refreshLivingBudgetCache(), ensureDailyFallback()]);
     next();
   } catch (e) {
     next(e);
@@ -146,6 +152,26 @@ router.put("/fixed-charges", async (req, res) => {
   }
   const saved = await saveFixedCharges(charges);
   res.json({ saved: true, charges: saved });
+});
+
+router.get("/living-budget", async (_req, res) => {
+  res.json({ segments: loadLivingBudgetSegments() });
+});
+
+router.put("/living-budget", async (req, res) => {
+  const body = req.body as { segments?: LivingBudgetSegment[] };
+  const segments = body.segments;
+  if (!Array.isArray(segments)) {
+    res.status(400).json({ error: "segments array required" });
+    return;
+  }
+  const error = validateLivingBudget(segments);
+  if (error) {
+    res.status(400).json({ error });
+    return;
+  }
+  const saved = await saveLivingBudget(segments);
+  res.json({ saved: true, segments: saved });
 });
 
 router.get("/exclusions", async (_req, res) => {

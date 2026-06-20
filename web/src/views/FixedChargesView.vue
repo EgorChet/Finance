@@ -1,14 +1,14 @@
 <template>
   <div>
     <div v-if="auth.isDemo" class="demo-banner">
-      Demo mode — extra charges are read-only. Sign in to manage recurring bills and one-time entries.
+      Demo mode — living budget and extra charges are read-only. Sign in to manage your settings.
     </div>
     <div class="recurring-header">
       <div class="recurring-header-top">
         <div>
           <h2 class="page-title">Extra charges</h2>
           <p class="page-lead" style="margin-bottom: 0">
-            Recurring monthly bills plus one-time charges from other cards or cash. Review edits, then save when ready.
+            Living budget cap, recurring monthly bills, and one-time charges. Review edits, then save when ready.
           </p>
         </div>
         <p
@@ -32,11 +32,13 @@
 
     <AppLoader
       v-if="loading"
-      title="Loading extra charges"
-      subtitle="Fetching recurring bills and one-time entries"
+      title="Loading household settings"
+      subtitle="Fetching living budget and extra charges"
     />
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
+
+      <LivingBudgetSection v-model="livingBudgetSegments" :readonly="auth.isDemo" :disabled="saving" />
 
       <div v-if="!auth.isDemo" class="recurring-add-toolbar">
         <button
@@ -298,9 +300,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
-import { fetchFixedCharges, saveFixedCharges } from "../api/client";
+import { fetchFixedCharges, fetchLivingBudget, saveFixedCharges, saveLivingBudget } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import LivingBudgetSection from "../components/LivingBudgetSection.vue";
 import MonthSelect from "../components/MonthSelect.vue";
 import { SPENDING_CATEGORIES } from "../categories";
 import { useAuthStore } from "../stores/auth";
@@ -325,6 +328,10 @@ import {
   todayIsoDate,
   ymToLabel,
 } from "../utils/fixedCharges";
+import {
+  type LivingBudgetSegment,
+  normalizeLivingBudgetSegment,
+} from "../utils/livingBudget";
 
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
@@ -335,7 +342,9 @@ const status = ref("");
 const saveStatus = ref("");
 const saveError = ref(false);
 const charges = ref<ConfiguredCharge[]>([]);
+const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
 const savedSnapshot = ref("");
+const savedBudgetSnapshot = ref("");
 
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
@@ -386,8 +395,20 @@ function snapshot(data: ConfiguredCharge[]): string {
   return JSON.stringify(data);
 }
 
-function isDirty(): boolean {
+function budgetSnapshot(data: LivingBudgetSegment[]): string {
+  return JSON.stringify(data);
+}
+
+function isChargesDirty(): boolean {
   return snapshot(charges.value) !== savedSnapshot.value;
+}
+
+function isBudgetDirty(): boolean {
+  return budgetSnapshot(livingBudgetSegments.value) !== savedBudgetSnapshot.value;
+}
+
+function isDirty(): boolean {
+  return isChargesDirty() || isBudgetDirty();
 }
 
 function showSaveStatus(message: string, isError = false) {
@@ -414,6 +435,7 @@ async function discardChanges() {
   });
   if (!ok) return;
   charges.value = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
+  livingBudgetSegments.value = JSON.parse(savedBudgetSnapshot.value) as LivingBudgetSegment[];
   status.value = "";
   saveStatus.value = "";
 }
@@ -435,10 +457,30 @@ async function runPersist(): Promise<boolean> {
   showSaveStatus("Saving…");
   status.value = "";
   try {
-    const payload = charges.value.map((c) => normalizeConfiguredCharge(c));
-    const data = await saveFixedCharges(payload, auth.token || undefined);
-    charges.value = data.charges.map((c) => normalizeConfiguredCharge(c));
-    savedSnapshot.value = snapshot(charges.value);
+    const tasks: Promise<void>[] = [];
+    if (isChargesDirty()) {
+      tasks.push(
+        saveFixedCharges(
+          charges.value.map((c) => normalizeConfiguredCharge(c)),
+          auth.token || undefined,
+        ).then((data) => {
+          charges.value = data.charges.map((c) => normalizeConfiguredCharge(c));
+          savedSnapshot.value = snapshot(charges.value);
+        }),
+      );
+    }
+    if (isBudgetDirty()) {
+      tasks.push(
+        saveLivingBudget(
+          livingBudgetSegments.value.map((s) => normalizeLivingBudgetSegment(s)),
+          auth.token || undefined,
+        ).then((data) => {
+          livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
+          savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
+        }),
+      );
+    }
+    await Promise.all(tasks);
     showSaveStatus("Saved");
     return true;
   } catch (e) {
@@ -685,12 +727,19 @@ async function load() {
   error.value = "";
   status.value = "";
   try {
-    const data = await fetchFixedCharges(auth.isDemo, auth.token || undefined);
-    charges.value = data.charges.map((c) => normalizeConfiguredCharge(c));
+    const token = auth.token || undefined;
+    const [chargesData, budgetData] = await Promise.all([
+      fetchFixedCharges(auth.isDemo, token),
+      fetchLivingBudget(auth.isDemo, token),
+    ]);
+    charges.value = chargesData.charges.map((c) => normalizeConfiguredCharge(c));
+    livingBudgetSegments.value = budgetData.segments.map((s) => normalizeLivingBudgetSegment(s));
     savedSnapshot.value = snapshot(charges.value);
+    savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
   } catch (e) {
     error.value = String(e);
     charges.value = [];
+    livingBudgetSegments.value = [];
   } finally {
     loading.value = false;
   }

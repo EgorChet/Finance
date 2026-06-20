@@ -2,7 +2,15 @@
  * Supabase storage adapter — set STORAGE=supabase and configure env vars.
  * Falls back to local files when not configured.
  */
-import type { ExclusionsData, FixedChargesData, FxFallbackData, MerchantRules, ReviewProgressData, StatementsData } from "../types.js";
+import type {
+  ExclusionsData,
+  FixedChargesData,
+  FxFallbackData,
+  LivingBudgetData,
+  MerchantRules,
+  ReviewProgressData,
+  StatementsData,
+} from "../types.js";
 import * as local from "./local.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
@@ -139,6 +147,32 @@ export async function writeFixedCharges(data: FixedChargesData): Promise<void> {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "fixed_charges", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readLivingBudget(): Promise<LivingBudgetData> {
+  if (!supabaseConfigured()) return local.readLivingBudget();
+  const res = await supabaseFetch("app_state?id=eq.living_budget&select=data");
+  if (!res.ok) return { segments: [], updated_at: null };
+  const rows = (await res.json()) as { data: LivingBudgetData }[];
+  const data = rows[0]?.data;
+  return { segments: data?.segments || [], updated_at: data?.updated_at ?? null };
+}
+
+export async function writeLivingBudget(data: LivingBudgetData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeLivingBudget(data);
+    return;
+  }
+  data.updated_at = new Date().toISOString();
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "living_budget", data }),
   });
   if (!res.ok) {
     const text = await res.text();

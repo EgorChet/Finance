@@ -1,8 +1,9 @@
 import type { Transaction } from "../types";
 import { roundMoney } from "./format";
+import { DEFAULT_LIVING_BUDGET } from "./livingBudget";
 
-/** Monthly living budget (excludes rent only — rent is paid outside the card budget). */
-export const MONTHLY_DISCRETIONARY_BUDGET = 12000;
+/** Fallback when no budget segment matches the billing cycle month. */
+export const MONTHLY_DISCRETIONARY_BUDGET = DEFAULT_LIVING_BUDGET;
 
 const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
 const CAR_LOAN_NAME_RE = /\b(car loan|הלוואת רכב)/i;

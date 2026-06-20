@@ -3,6 +3,7 @@ import {
   DEMO_AS_OF,
   demoExclusions,
   demoFixedCharges,
+  demoLivingBudget,
   demoMerchants,
   demoMonthCatalog,
   demoReviewQueue,
@@ -37,6 +38,14 @@ router.get("/fixed-charges", (_req, res) => {
 
 router.put("/fixed-charges", (_req, res) => {
   res.status(403).json({ error: "Fixed charges disabled in demo mode" });
+});
+
+router.get("/living-budget", (_req, res) => {
+  res.json(demoLivingBudget());
+});
+
+router.put("/living-budget", (_req, res) => {
+  res.status(403).json({ error: "Living budget disabled in demo mode" });
 });
 
 router.get("/merchants", (_req, res) => {

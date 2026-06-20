@@ -27,7 +27,12 @@
     />
     <template v-else-if="report">
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
-    <SummaryMetrics v-if="showSummaryMetrics" :report="report" :retrospective="budgetRetrospective" />
+    <SummaryMetrics
+      v-if="showSummaryMetrics"
+      :report="report"
+      :living-budget="resolvedLivingBudget"
+      :retrospective="budgetRetrospective"
+    />
     <PaceCard
       v-if="showPaceCard"
       :transactions="paceTransactions"
@@ -105,7 +110,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { addExclusion, fetchFixedCharges, fetchMonths, fetchReport } from "../api/client";
+import { addExclusion, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
@@ -148,6 +153,11 @@ import {
 } from "../utils/transactionPeriod";
 import { transactionKey } from "../utils/transactionKey";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
+import {
+  type LivingBudgetSegment,
+  normalizeLivingBudgetSegment,
+  resolvedLivingBudget as resolveLivingBudgetAmount,
+} from "../utils/livingBudget";
 
 const auth = useAuthStore();
 const loading = ref(true);
@@ -156,6 +166,7 @@ const error = ref("");
 const report = ref<SpendingReport | null>(null);
 const paceReport = ref<SpendingReport | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
+const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
@@ -290,6 +301,15 @@ const showCategoryExplorer = computed(() => {
   if (report.value.metadata?.pending_statement) return false;
   return report.value.transactions.length > 0;
 });
+
+const resolvedLivingBudget = computed(() =>
+  resolveLivingBudgetAmount(
+    selectedMonth.value,
+    report.value,
+    livingBudgetSegments.value,
+    cycleDay.value,
+  ),
+);
 
 const showSummaryMetrics = computed(() => {
   if (!report.value) return false;
@@ -426,6 +446,17 @@ async function refreshConfiguredCharges() {
   }
 }
 
+async function refreshLivingBudget() {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  try {
+    const data = await fetchLivingBudget(demo, token);
+    livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
+  } catch {
+    livingBudgetSegments.value = [];
+  }
+}
+
 async function refreshPaceReport() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -489,7 +520,7 @@ async function loadMonths() {
         ...row,
         month: billingCycleLabel(row.billing_date),
       }));
-    await Promise.all([refreshPaceReport(), refreshConfiguredCharges()]);
+    await Promise.all([refreshPaceReport(), refreshConfiguredCharges(), refreshLivingBudget()]);
     const initial = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     selectedMonth.value = initial;
     txPeriod.value = defaultTxPeriod(initial);

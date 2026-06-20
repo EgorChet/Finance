@@ -18,5 +18,7 @@ export const readExclusions = store.readExclusions;
 export const writeExclusions = store.writeExclusions;
 export const readFixedCharges = store.readFixedCharges;
 export const writeFixedCharges = store.writeFixedCharges;
+export const readLivingBudget = store.readLivingBudget;
+export const writeLivingBudget = store.writeLivingBudget;
 export const readFxFallback = store.readFxFallback;
 export const writeFxFallback = store.writeFxFallback;

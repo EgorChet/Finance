@@ -91,6 +91,24 @@ export async function saveFixedCharges(charges: ConfiguredCharge[], token?: stri
   );
 }
 
+export async function fetchLivingBudget(demo: boolean, token?: string) {
+  return get<{ segments: import("../utils/livingBudget").LivingBudgetSegment[] }>(
+    `${prefix(demo)}/living-budget`,
+    token,
+  );
+}
+
+export async function saveLivingBudget(
+  segments: import("../utils/livingBudget").LivingBudgetSegment[],
+  token?: string,
+) {
+  return put<{ saved: boolean; segments: import("../utils/livingBudget").LivingBudgetSegment[] }>(
+    `${prefix(false)}/living-budget`,
+    { segments },
+    token,
+  );
+}
+
 export async function fetchRules(demo: boolean, token?: string) {
   return get<MerchantRules>(`${prefix(demo)}/rules`, token);
 }

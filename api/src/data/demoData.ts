@@ -333,6 +333,18 @@ export function demoFixedCharges() {
   };
 }
 
+export function demoLivingBudget() {
+  return {
+    segments: [
+      { amount: 8400, from_month: "2024-01", through_month: "2024-12" },
+      { amount: 9600, from_month: "2025-01", through_month: "2025-08" },
+      { amount: 10800, from_month: "2025-09", through_month: "2025-12" },
+      { amount: 12000, from_month: "2026-01", through_month: "2026-06" },
+      { amount: 13250, from_month: "2026-07", through_month: "2035-12" },
+    ],
+  };
+}
+
 export function demoRules(): MerchantRules {
   return {
     "ארקפה רמת אביב": { english: "Arcaffe", category: "Coffee" },
