@@ -4,17 +4,21 @@
       Demo mode — calendar is read-only. Sign in to add events and subscribe in Apple Calendar.
     </div>
     <h2 class="page-title">Calendar</h2>
-    <p class="page-lead">Shared family events — appointments, birthdays, and reminders.</p>
+    <div class="calendar-page-head">
+      <p class="page-lead calendar-page-lead">Shared family events — appointments, birthdays, and reminders.</p>
+      <button
+        v-if="!auth.isDemo && !loading"
+        type="button"
+        class="btn btn-primary calendar-add-btn"
+        @click="openAddForm"
+      >
+        {{ showForm ? "Close form" : "+ Add event" }}
+      </button>
+    </div>
 
     <AppLoader v-if="loading" title="Loading calendar" subtitle="Fetching events" />
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
-
-      <div v-if="!auth.isDemo" class="calendar-toolbar">
-        <button type="button" class="btn btn-primary" @click="openAddForm">
-          {{ showForm ? "Close form" : "+ Add event" }}
-        </button>
-      </div>
 
       <CalendarEventForm
         v-if="!auth.isDemo && showForm"
@@ -28,8 +32,8 @@
         @delete="deleteEditing"
       />
 
-      <section class="calendar-events-panel">
-        <fieldset class="calendar-period-filter">
+      <section ref="eventsPanelRef" class="calendar-events-panel">
+        <fieldset v-if="!listAnchorDate" class="calendar-period-filter">
           <legend class="sr-only">Show events for</legend>
           <div class="calendar-radio-group calendar-radio-group--inline">
             <label
@@ -44,15 +48,15 @@
           </div>
         </fieldset>
 
+        <div v-else class="calendar-day-focus">
+          <span>{{ dayFocusLabel }}</span>
+          <button type="button" class="btn btn-ghost calendar-day-focus-clear" @click="clearDayFocus">Show all</button>
+        </div>
+
         <p v-if="!filteredOccurrences.length" class="calendar-empty">{{ emptyPeriodLabel }}</p>
         <ul v-else class="calendar-event-list">
           <li v-for="item in filteredOccurrences" :key="`${item.event.id}-${item.date}`" class="calendar-event-item">
-            <button
-              type="button"
-              class="calendar-event-body"
-              :class="{ 'calendar-event-body--readonly': auth.isDemo }"
-              @click="startEdit(item.event)"
-            >
+            <div class="calendar-event-body">
               <span class="calendar-importance-dot" :class="importanceClass(item.event)" aria-hidden="true" />
               <div class="calendar-event-text">
                 <p class="calendar-event-title">
@@ -64,6 +68,14 @@
                 <p class="calendar-event-meta">{{ formatEventWhen(item.event, item.date) }}</p>
                 <p v-if="item.event.description" class="calendar-event-desc">{{ item.event.description }}</p>
               </div>
+            </div>
+            <button
+              v-if="!auth.isDemo"
+              type="button"
+              class="btn btn-ghost calendar-event-edit"
+              @click="startEdit(item.event)"
+            >
+              Edit
             </button>
           </li>
         </ul>
@@ -85,6 +97,7 @@
               'calendar-cell--outside': !cell.inMonth,
               'calendar-cell--today': cell.isToday,
               'calendar-cell--selected': cell.date === selectedDate,
+              'calendar-cell--has-events': cell.eventCount > 0,
             }"
             @click="selectDate(cell.date, cell.inMonth)"
           >
@@ -117,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import {
   addCalendarEvent,
   calendarFeedUrl,
@@ -155,6 +168,8 @@ const showForm = ref(false);
 const viewYear = ref(0);
 const viewMonth = ref(0);
 const selectedDate = ref("");
+const listAnchorDate = ref<string | null>(null);
+const eventsPanelRef = ref<HTMLElement | null>(null);
 const periodFilter = ref<CalendarPeriodFilter>("week");
 const copied = ref(false);
 const regenerating = ref(false);
@@ -167,6 +182,11 @@ const feedUrl = computed(() => (feedToken.value ? calendarFeedUrl(feedToken.valu
 
 const hasEventsToday = computed(() => listOccurrences(events.value, todayIso.value, todayIso.value).length > 0);
 
+const hasEventsThisWeek = computed(() => {
+  const [from, through] = periodRange("week", todayIso.value);
+  return listOccurrences(events.value, from, through).length > 0;
+});
+
 const periodOptions = computed(() => {
   const opts: { value: CalendarPeriodFilter; label: string }[] = [];
   if (hasEventsToday.value) opts.push({ value: "today", label: "Today" });
@@ -177,16 +197,40 @@ const periodOptions = computed(() => {
 
 watch(hasEventsToday, (hasToday) => {
   if (!hasToday && periodFilter.value === "today") {
-    periodFilter.value = "week";
+    periodFilter.value = hasEventsThisWeek.value ? "week" : "month";
+  }
+});
+
+watch(hasEventsThisWeek, (hasWeek) => {
+  if (!listAnchorDate.value && !hasWeek && periodFilter.value === "week") {
+    periodFilter.value = "month";
+  }
+});
+
+watch(periodFilter, () => {
+  listAnchorDate.value = null;
+  if (!listAnchorDate.value && periodFilter.value === "week" && !hasEventsThisWeek.value) {
+    periodFilter.value = "month";
   }
 });
 
 const filteredOccurrences = computed(() => {
+  if (listAnchorDate.value) {
+    const d = listAnchorDate.value;
+    return listOccurrences(events.value, d, d);
+  }
   const [from, through] = periodRange(periodFilter.value, todayIso.value);
   return listOccurrences(events.value, from, through);
 });
 
+const dayFocusLabel = computed(() => {
+  if (!listAnchorDate.value) return "";
+  const d = new Date(listAnchorDate.value + "T12:00:00");
+  return `Events on ${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`;
+});
+
 const emptyPeriodLabel = computed(() => {
+  if (listAnchorDate.value) return "Nothing on this day.";
   if (periodFilter.value === "today") return "Nothing scheduled for today.";
   if (periodFilter.value === "week") return "Nothing scheduled this week.";
   return "Nothing scheduled this month.";
@@ -288,12 +332,37 @@ function closeForm() {
   editingEvent.value = null;
 }
 
+function clearDayFocus() {
+  listAnchorDate.value = null;
+}
+
+function scrollToEvents() {
+  void nextTick(() => {
+    eventsPanelRef.value?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
+
 function selectDate(date: string, inMonth: boolean) {
   selectedDate.value = date;
+  listAnchorDate.value = date;
   if (!inMonth) {
     const d = new Date(date + "T12:00:00");
     viewYear.value = d.getFullYear();
     viewMonth.value = d.getMonth();
+  }
+
+  const dayEvents = eventsOnDate(events.value, date);
+  scrollToEvents();
+
+  if (auth.isDemo) return;
+
+  if (dayEvents.length === 1) {
+    startEdit(dayEvents[0]!);
+  } else if (dayEvents.length === 0) {
+    editingEvent.value = null;
+    showForm.value = true;
+  } else {
+    closeForm();
   }
 }
 
@@ -301,6 +370,7 @@ function startEdit(ev: CalendarEvent) {
   if (auth.isDemo) return;
   editingEvent.value = ev;
   showForm.value = true;
+  scrollToEvents();
 }
 
 function prevMonth() {

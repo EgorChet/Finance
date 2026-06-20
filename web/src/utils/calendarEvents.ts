@@ -4,6 +4,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type CalendarPeriodFilter = "today" | "week" | "month";
 
+export type EventImportance = "quick" | "normal" | "important";
+
 export const CALENDAR_RECURRENCE_OPTIONS: { value: CalendarRecurrence; label: string }[] = [
   { value: "none", label: "Does not repeat" },
   { value: "weekly", label: "Every week" },
@@ -11,16 +13,10 @@ export const CALENDAR_RECURRENCE_OPTIONS: { value: CalendarRecurrence; label: st
   { value: "yearly", label: "Every year" },
 ];
 
-export const CALENDAR_IMPORTANCE_OPTIONS: {
-  value: CalendarImportance;
-  label: string;
-  hint: string;
-  durationMinutes: number | null;
-}[] = [
-  { value: "quick", label: "Quick", hint: "1 hour", durationMinutes: 60 },
-  { value: "normal", label: "Normal", hint: "2 hours", durationMinutes: 120 },
-  { value: "important", label: "Important", hint: "3 hours", durationMinutes: 180 },
-  { value: "all_day", label: "All day", hint: "Full day", durationMinutes: null },
+export const CALENDAR_IMPORTANCE_OPTIONS: { value: EventImportance; label: string; hint: string }[] = [
+  { value: "quick", label: "Quick", hint: "Low priority" },
+  { value: "normal", label: "Normal", hint: "Standard" },
+  { value: "important", label: "Important", hint: "High priority" },
 ];
 
 function parseDateParts(iso: string): { y: number; m: number; d: number } {
@@ -33,52 +29,31 @@ function parseTimeMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function minutesToTime(total: number): string {
+export function defaultEndTime(startTime: string, durationMinutes = 60): string {
+  const total = parseTimeMinutes(startTime) + durationMinutes;
   const h = Math.floor(total / 60) % 24;
   const m = total % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-export function defaultEndTime(startTime: string, durationMinutes = 60): string {
-  return minutesToTime(parseTimeMinutes(startTime) + durationMinutes);
+export function eventImportance(event: CalendarEvent): EventImportance {
+  const imp = event.importance;
+  if (imp === "quick" || imp === "normal" || imp === "important") return imp;
+  return "normal";
 }
 
-export function importanceDurationMinutes(importance: CalendarImportance): number | null {
-  return CALENDAR_IMPORTANCE_OPTIONS.find((o) => o.value === importance)?.durationMinutes ?? 120;
+/** @deprecated use eventImportance */
+export function inferImportance(event: CalendarEvent): EventImportance {
+  return eventImportance(event);
 }
 
-export function applyImportance(
-  importance: CalendarImportance,
-  startTime = "10:00",
-): { all_day: boolean; start_time?: string; end_time?: string } {
-  if (importance === "all_day") {
-    return { all_day: true };
-  }
-  const mins = importanceDurationMinutes(importance) ?? 120;
-  return {
-    all_day: false,
-    start_time: startTime,
-    end_time: defaultEndTime(startTime, mins),
-  };
-}
-
-export function inferImportance(event: CalendarEvent): CalendarImportance {
-  if (event.importance) return event.importance;
-  if (isAllDayEvent(event)) return "all_day";
-  if (!event.start_time || !event.end_time) return "normal";
-  const mins = parseTimeMinutes(event.end_time) - parseTimeMinutes(event.start_time);
-  if (mins <= 75) return "quick";
-  if (mins <= 150) return "normal";
-  return "important";
-}
-
-export function importanceLabel(importance: CalendarImportance): string {
+export function importanceLabel(importance: EventImportance): string {
   return CALENDAR_IMPORTANCE_OPTIONS.find((o) => o.value === importance)?.label ?? "Normal";
 }
 
 export function isAllDayEvent(event: CalendarEvent): boolean {
-  if (event.importance === "all_day") return true;
   if (event.all_day === true) return true;
+  if (event.importance === "all_day") return true;
   if (event.all_day === false) return false;
   return !event.start_time;
 }
@@ -195,8 +170,10 @@ export function emptyEventForm(date: string, createdBy: import("../types").House
   return {
     title: "",
     date,
-    importance: "normal" as CalendarImportance,
+    all_day: false,
     start_time: "10:00",
+    end_time: "12:00",
+    importance: "normal" as EventImportance,
     description: "",
     recurrence: "none" as CalendarRecurrence,
     created_by: createdBy,
@@ -204,12 +181,14 @@ export function emptyEventForm(date: string, createdBy: import("../types").House
 }
 
 export function eventToForm(event: CalendarEvent) {
-  const importance = inferImportance(event);
+  const all_day = isAllDayEvent(event);
   return {
     title: event.title,
     date: event.date,
-    importance,
+    all_day,
     start_time: event.start_time ?? "10:00",
+    end_time: event.end_time ?? defaultEndTime(event.start_time ?? "10:00", 120),
+    importance: eventImportance(event),
     description: event.description ?? "",
     recurrence: event.recurrence ?? "none",
     created_by: event.created_by ?? "egor",
@@ -219,29 +198,52 @@ export function eventToForm(event: CalendarEvent) {
 export type CalendarEventFormState = {
   title: string;
   date: string;
-  importance: CalendarImportance;
-  start_time?: string;
+  all_day: boolean;
+  start_time: string;
+  end_time: string;
+  importance: EventImportance;
   description?: string;
   recurrence?: CalendarRecurrence;
   created_by: import("../types").HouseholdUserId;
 };
 
+export function formTimesValid(form: Pick<CalendarEventFormState, "all_day" | "start_time" | "end_time">): boolean {
+  if (form.all_day) return true;
+  if (!form.start_time || !form.end_time) return false;
+  return parseTimeMinutes(form.end_time) > parseTimeMinutes(form.start_time);
+}
+
 export function formToPayload(form: CalendarEventFormState): CalendarEventFormState & {
   all_day: boolean;
+  start_time?: string;
   end_time?: string;
+  importance: CalendarImportance;
 } {
-  const timing = applyImportance(form.importance, form.start_time ?? "10:00");
+  if (form.all_day) {
+    return {
+      ...form,
+      title: form.title.trim(),
+      description: form.description?.trim() || undefined,
+      all_day: true,
+      start_time: undefined,
+      end_time: undefined,
+      importance: form.importance,
+    };
+  }
   return {
     ...form,
     title: form.title.trim(),
     description: form.description?.trim() || undefined,
-    all_day: timing.all_day,
-    start_time: timing.start_time,
-    end_time: timing.end_time,
+    all_day: false,
+    start_time: form.start_time,
+    end_time: form.end_time,
+    importance: form.importance,
   };
 }
 
 export function defaultPeriodFilter(events: CalendarEvent[], todayIso: string): CalendarPeriodFilter {
   if (listOccurrences(events, todayIso, todayIso).length > 0) return "today";
-  return "week";
+  const [weekFrom, weekThrough] = periodRange("week", todayIso);
+  if (listOccurrences(events, weekFrom, weekThrough).length > 0) return "week";
+  return "month";
 }

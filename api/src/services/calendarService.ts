@@ -15,33 +15,10 @@ function parseTimeMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function normalizeImportance(value: unknown): CalendarImportance | undefined {
-  if (value === "quick" || value === "normal" || value === "important" || value === "all_day") return value;
-  return undefined;
-}
-
-function importanceDuration(importance: CalendarImportance): number | null {
-  switch (importance) {
-    case "quick":
-      return 60;
-    case "normal":
-      return 120;
-    case "important":
-      return 180;
-    default:
-      return null;
-  }
-}
-
-function applyImportance(
-  importance: CalendarImportance,
-  startTime: string,
-): { all_day: boolean; start_time?: string; end_time?: string } {
-  if (importance === "all_day") return { all_day: true };
-  const mins = importanceDuration(importance) ?? 120;
-  const start = startTime.trim();
-  if (!TIME_RE.test(start)) return { all_day: false, start_time: "10:00", end_time: defaultEndTime("10:00", mins) };
-  return { all_day: false, start_time: start, end_time: defaultEndTime(start, mins) };
+function normalizeImportance(value: unknown): CalendarImportance {
+  if (value === "quick" || value === "normal" || value === "important") return value;
+  if (value === "all_day") return "normal";
+  return "normal";
 }
 
 function defaultEndTime(startTime: string, durationMinutes = 60): string {
@@ -67,35 +44,36 @@ export function normalizeEvent(raw: Partial<CalendarEvent>, existing?: CalendarE
   const date = String(raw.date ?? existing?.date ?? "").trim().slice(0, 10);
   if (!title || !DATE_RE.test(date)) return null;
 
-  const importance =
-    normalizeImportance(raw.importance ?? existing?.importance) ??
-    (raw.all_day === true || existing?.all_day === true ? "all_day" : undefined);
+  const importance = normalizeImportance(raw.importance ?? existing?.importance);
 
   let all_day: boolean;
   let start_time: string | undefined;
   let end_time: string | undefined;
-  let resolvedImportance: CalendarImportance | undefined = importance;
 
-  if (importance) {
-    const timing = applyImportance(importance, String(raw.start_time ?? existing?.start_time ?? "10:00"));
-    all_day = timing.all_day;
-    start_time = timing.start_time;
-    end_time = timing.end_time;
+  if (raw.all_day === true) {
+    all_day = true;
+  } else if (raw.all_day === false) {
+    all_day = false;
+    const start = String(raw.start_time ?? existing?.start_time ?? "10:00").trim();
+    if (!TIME_RE.test(start)) return null;
+    start_time = start;
+    const end = String(raw.end_time ?? existing?.end_time ?? defaultEndTime(start)).trim();
+    if (!TIME_RE.test(end)) return null;
+    if (parseTimeMinutes(end) <= parseTimeMinutes(start)) return null;
+    end_time = end;
+  } else if (existing?.all_day === true && raw.start_time === undefined && raw.end_time === undefined) {
+    all_day = true;
+  } else if (raw.importance === "all_day" && raw.all_day === undefined && !raw.start_time) {
+    all_day = true;
   } else {
-    const startProvided = raw.start_time !== undefined ? String(raw.start_time).trim() : existing?.start_time;
-    const allDayExplicit = raw.all_day ?? existing?.all_day;
-    all_day = allDayExplicit === true || (allDayExplicit !== false && !startProvided);
-
-    if (!all_day) {
-      const start = String(raw.start_time ?? existing?.start_time ?? "10:00").trim();
-      if (!TIME_RE.test(start)) return null;
-      start_time = start;
-      const end = String(raw.end_time ?? existing?.end_time ?? defaultEndTime(start)).trim();
-      if (!TIME_RE.test(end)) return null;
-      if (parseTimeMinutes(end) <= parseTimeMinutes(start)) return null;
-      end_time = end;
-    }
-    resolvedImportance = all_day ? "all_day" : "normal";
+    all_day = false;
+    const start = String(raw.start_time ?? existing?.start_time ?? "10:00").trim();
+    if (!TIME_RE.test(start)) return null;
+    start_time = start;
+    const end = String(raw.end_time ?? existing?.end_time ?? defaultEndTime(start)).trim();
+    if (!TIME_RE.test(end)) return null;
+    if (parseTimeMinutes(end) <= parseTimeMinutes(start)) return null;
+    end_time = end;
   }
 
   const recurrence = normalizeRecurrence(raw.recurrence ?? existing?.recurrence ?? "none");
@@ -111,7 +89,7 @@ export function normalizeEvent(raw: Partial<CalendarEvent>, existing?: CalendarE
     all_day,
     start_time,
     end_time,
-    importance: resolvedImportance,
+    importance,
     description,
     recurrence,
     created_by,

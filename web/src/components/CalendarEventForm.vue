@@ -15,40 +15,53 @@
       </div>
 
       <fieldset class="calendar-radio-fieldset">
-        <legend class="field-label">Added by</legend>
+        <legend class="field-label">When</legend>
         <div class="calendar-radio-group calendar-radio-group--inline">
           <label
-            v-for="person in householdUsers"
-            :key="person.id"
             class="calendar-radio-option calendar-radio-option--compact"
-            :class="{ 'calendar-radio-option--active': form.created_by === person.id }"
+            :class="{ 'calendar-radio-option--active': !form.all_day }"
           >
-            <input v-model="form.created_by" type="radio" name="created_by" :value="person.id" />
-            <span class="calendar-radio-label">{{ person.label }}</span>
+            <input v-model="form.all_day" type="radio" name="when" :value="false" />
+            <span class="calendar-radio-label">Set times</span>
+          </label>
+          <label
+            class="calendar-radio-option calendar-radio-option--compact"
+            :class="{ 'calendar-radio-option--active': form.all_day }"
+          >
+            <input v-model="form.all_day" type="radio" name="when" :value="true" />
+            <span class="calendar-radio-label">All day</span>
           </label>
         </div>
       </fieldset>
 
+      <div v-if="!form.all_day" class="calendar-time-row">
+        <div class="field-group calendar-date-field">
+          <label class="field-label">Start</label>
+          <input v-model="form.start_time" class="input calendar-time-input" type="time" />
+        </div>
+        <div class="field-group calendar-date-field">
+          <label class="field-label">End</label>
+          <input v-model="form.end_time" class="input calendar-time-input" type="time" />
+        </div>
+      </div>
+      <p v-if="!form.all_day && !timesValid" class="calendar-form-hint calendar-form-hint--error">
+        End time must be after start time.
+      </p>
+
       <fieldset class="calendar-radio-fieldset">
-        <legend class="field-label">How long</legend>
-        <div class="calendar-radio-group">
+        <legend class="field-label">Importance</legend>
+        <div class="calendar-radio-group calendar-radio-group--inline">
           <label
             v-for="opt in CALENDAR_IMPORTANCE_OPTIONS"
             :key="opt.value"
-            class="calendar-radio-option"
+            class="calendar-radio-option calendar-radio-option--compact"
             :class="{ 'calendar-radio-option--active': form.importance === opt.value }"
           >
             <input v-model="form.importance" type="radio" name="importance" :value="opt.value" />
             <span class="calendar-radio-label">{{ opt.label }}</span>
-            <span class="calendar-radio-hint">{{ opt.hint }}</span>
           </label>
         </div>
       </fieldset>
-
-      <div v-if="form.importance !== 'all_day'" class="field-group calendar-date-field">
-        <label class="field-label">Start time</label>
-        <input v-model="form.start_time" class="input calendar-time-input" type="time" />
-      </div>
 
       <div class="field-group">
         <label class="field-label">Repeat</label>
@@ -83,8 +96,8 @@ import {
   CALENDAR_RECURRENCE_OPTIONS,
   emptyEventForm,
   eventToForm,
+  formTimesValid,
   formToPayload,
-  type CalendarEventFormState,
 } from "../utils/calendarEvents";
 
 const props = defineProps<{
@@ -96,7 +109,6 @@ const props = defineProps<{
 }>();
 
 const auth = useAuthStore();
-const householdUsers = computed(() => auth.householdUsers);
 
 const emit = defineEmits<{
   save: [payload: ReturnType<typeof formToPayload>];
@@ -104,7 +116,11 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
-const form = reactive(emptyEventForm(props.modelDate, props.defaultUser ?? "egor"));
+function currentUser(): HouseholdUserId {
+  return props.defaultUser ?? auth.userId ?? "egor";
+}
+
+const form = reactive(emptyEventForm(props.modelDate, currentUser()));
 
 watch(
   () => props.event,
@@ -112,7 +128,7 @@ watch(
     if (ev) {
       Object.assign(form, eventToForm(ev));
     } else {
-      Object.assign(form, emptyEventForm(props.modelDate, props.defaultUser ?? "egor"));
+      Object.assign(form, emptyEventForm(props.modelDate, currentUser()));
     }
   },
   { immediate: true },
@@ -126,13 +142,15 @@ watch(
 );
 
 watch(
-  () => props.defaultUser,
-  (user) => {
-    if (!props.editing && user) form.created_by = user;
+  () => [props.defaultUser, auth.userId, props.editing] as const,
+  () => {
+    if (!props.editing) form.created_by = currentUser();
   },
 );
 
-const canSave = computed(() => !!form.title.trim() && !!form.date);
+const timesValid = computed(() => formTimesValid(form));
+
+const canSave = computed(() => !!form.title.trim() && !!form.date && timesValid.value);
 
 function handleSave() {
   emit("save", formToPayload(form));
