@@ -45,10 +45,10 @@
       :cycle-start="selectedCycleStart"
       @settings-change="onPaceSettingsChange"
     />
-    <template v-if="showTransactions">
+    <template v-if="showTransactions && isLiveTransactionView">
       <section class="tx-section">
         <h3 class="tx-section-title">Charges</h3>
-        <TransactionPeriodPicker v-if="isLiveTransactionView" v-model="txPeriod" />
+        <TransactionPeriodPicker v-model="txPeriod" />
         <p v-if="!periodTransactions.length" class="tx-period-empty">
           No charges for {{ periodLabel }}.
         </p>
@@ -78,6 +78,23 @@
       :excluding-key="excludingKey"
       @exclude="excludeTransaction"
     />
+    </template>
+    <template v-if="showTransactions && !isLiveTransactionView">
+      <section class="tx-section tx-section--after-categories">
+        <h3 class="section-title">Charges</h3>
+        <p class="tx-period-empty">{{ pastChargesHint }}</p>
+        <TransactionList
+          :transactions="periodTransactions"
+          title=""
+          show-category
+          paginated
+          :statement-billing="statementBilling"
+          :excludeable="!auth.isDemo"
+          :excluding-key="excludingKey"
+          :default-limit="25"
+          @exclude="excludeTransaction"
+        />
+      </section>
     </template>
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       Category breakdown and transactions will appear once this cycle’s statement is uploaded.
@@ -257,6 +274,12 @@ const periodLabel = computed(() => {
   if (!isLiveTransactionView.value) return "this billing cycle";
   return TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label.toLowerCase() ?? txPeriod.value;
 });
+
+const pastChargesHint = computed(() =>
+  selectedMonth.value
+    ? "All charges in this billing cycle."
+    : "All charges across uploaded statements.",
+);
 
 const showCategoryExplorer = computed(() => {
   if (!report.value) return false;

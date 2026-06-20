@@ -40,8 +40,39 @@
       </div>
     </div>
 
+    <nav
+      v-if="paginated && totalPages > 1"
+      class="tx-pagination"
+      aria-label="Charge pages"
+    >
+      <button
+        type="button"
+        class="btn btn-ghost tx-pagination-btn"
+        :disabled="currentPage <= 1"
+        @click="currentPage -= 1"
+      >
+        Previous
+      </button>
+      <span class="tx-pagination-meta">
+        {{ paginationRangeLabel }} · page {{ currentPage }} of {{ totalPages }}
+      </span>
+      <button
+        type="button"
+        class="btn btn-ghost tx-pagination-btn"
+        :disabled="currentPage >= totalPages"
+        @click="currentPage += 1"
+      >
+        Next
+      </button>
+    </nav>
+    <p
+      v-else-if="paginated && total > 0"
+      class="tx-pagination-meta tx-pagination-meta--solo"
+    >
+      {{ total }} charge{{ total === 1 ? "" : "s" }}
+    </p>
     <button
-      v-if="total > defaultLimit && !showAll"
+      v-else-if="total > defaultLimit && !showAll"
       type="button"
       class="btn"
       style="margin-top: 0.65rem"
@@ -79,6 +110,7 @@ const props = withDefaults(
     showCategory?: boolean;
     categoryFilter?: string;
     defaultLimit?: number;
+    paginated?: boolean;
     statementBilling?: string | null;
     showSort?: boolean;
     excludeable?: boolean;
@@ -88,6 +120,7 @@ const props = withDefaults(
     title: "Transactions",
     showCategory: false,
     defaultLimit: 25,
+    paginated: false,
     statementBilling: null,
     showSort: true,
     excludeable: false,
@@ -100,6 +133,7 @@ const emit = defineEmits<{
 }>();
 
 const showAll = ref(false);
+const currentPage = ref(1);
 const sortKey = ref<SortKey>("date");
 const sortDir = ref<"asc" | "desc">("desc");
 
@@ -113,6 +147,7 @@ watch(
   () => props.transactions,
   () => {
     showAll.value = false;
+    currentPage.value = 1;
   },
 );
 
@@ -141,9 +176,23 @@ const sorted = computed(() => {
 });
 
 const total = computed(() => sorted.value.length);
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / props.defaultLimit)));
+
+const paginationRangeLabel = computed(() => {
+  if (!total.value) return "";
+  const start = (currentPage.value - 1) * props.defaultLimit + 1;
+  const end = Math.min(currentPage.value * props.defaultLimit, total.value);
+  return `${start.toLocaleString()}–${end.toLocaleString()} of ${total.value.toLocaleString()} charges`;
+});
 
 const visibleRows = computed(() => {
-  const txs = showAll.value ? sorted.value : sorted.value.slice(0, props.defaultLimit);
+  let txs = sorted.value;
+  if (props.paginated) {
+    const start = (currentPage.value - 1) * props.defaultLimit;
+    txs = txs.slice(start, start + props.defaultLimit);
+  } else if (!showAll.value) {
+    txs = txs.slice(0, props.defaultLimit);
+  }
   return txs.map((t) => ({
     key: transactionRowKey(t),
     tx: t,
@@ -173,5 +222,6 @@ function setSort(key: SortKey) {
     sortKey.value = key;
     sortDir.value = key === "date" || key === "amount" ? "desc" : "asc";
   }
+  currentPage.value = 1;
 }
 </script>

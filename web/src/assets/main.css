@@ -166,6 +166,38 @@ button {
   font-weight: 700;
 }
 
+.tx-section--after-categories {
+  margin-top: 1.25rem;
+}
+
+.tx-section--after-categories .section-title {
+  margin-top: 0;
+}
+
+.tx-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.tx-pagination-btn {
+  min-width: 5.5rem;
+}
+
+.tx-pagination-meta {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  flex: 1 1 12rem;
+}
+
+.tx-pagination-meta--solo {
+  margin: 0.65rem 0 0;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
