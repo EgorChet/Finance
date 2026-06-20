@@ -12,6 +12,19 @@ export function formatIls(amount: number): string {
   })}`;
 }
 
+export function formatUsdt(amount: number, decimals = 2): string {
+  return `${roundMoney(amount).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} USDT`;
+}
+
+/** Spot KAS price — extra precision for sub-dollar coins. */
+export function formatKasUsdtPrice(price: number): string {
+  const decimals = price < 0.1 ? 4 : 2;
+  return formatUsdt(price, decimals);
+}
+
 const CURRENCY_PREFIX: Record<string, string> = {
   USD: "$",
   EUR: "€",

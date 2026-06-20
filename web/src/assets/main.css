@@ -589,13 +589,58 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.app-header-brand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
+}
+
 .app-title {
   font-size: 1.05rem;
   font-weight: 700;
   margin: 0;
-  flex: 1;
-  min-width: 0;
   flex-shrink: 0;
+}
+
+.app-kaspa-strip {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-kaspa-logo {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.app-kaspa-item {
+  flex-shrink: 0;
+}
+
+.app-kaspa-portfolio {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.app-kaspa-sep {
+  flex-shrink: 0;
+  opacity: 0.55;
 }
 
 .app-header-actions {

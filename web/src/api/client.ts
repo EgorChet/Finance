@@ -148,6 +148,18 @@ export async function fetchAppConfig(token?: string) {
   );
 }
 
+export type KaspaQuote = {
+  enabled: true;
+  price_usdt: number;
+  balance_kas: number;
+  portfolio_usdt: number;
+  updated_at: string;
+};
+
+export async function fetchKaspaQuote(demo: boolean, token?: string) {
+  return get<KaspaQuote>(`${prefix(demo)}/kaspa`, token);
+}
+
 /** Server-side wake — fallback when analyzer is on internal network. */
 export async function warmAnalyzerService(token?: string) {
   const res = await fetch(`${prefix(false)}/warm-analyzer`, {

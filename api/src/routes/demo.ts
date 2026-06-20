@@ -11,6 +11,7 @@ import {
   demoSummaryRows,
   getDemoReport,
 } from "../data/demoData.js";
+import { getKaspaQuote } from "../services/kaspaPrice.js";
 
 const router = Router();
 
@@ -26,6 +27,15 @@ router.get("/months", (_req, res) => {
 router.get("/report", (req, res) => {
   const month = req.query.month as string | undefined;
   res.json(getDemoReport(month));
+});
+
+router.get("/kaspa", async (_req, res) => {
+  try {
+    res.json(await getKaspaQuote());
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Kaspa price unavailable";
+    res.status(502).json({ error: message });
+  }
 });
 
 router.get("/rules", (_req, res) => {

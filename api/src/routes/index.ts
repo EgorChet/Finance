@@ -54,6 +54,7 @@ import {
   validateLivingBudget,
 } from "../services/livingBudget.js";
 import { ensureDailyFallback } from "../utils/fxRates.js";
+import { getKaspaQuote } from "../services/kaspaPrice.js";
 import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -94,6 +95,15 @@ router.get("/config", (_req, res) => {
     analyzer_wake_url: isPublicRenderAnalyzerUrl(url) ? url : null,
     analyzer_wake_from_browser: analyzerUsesPublicUrl(),
   });
+});
+
+router.get("/kaspa", async (_req, res) => {
+  try {
+    res.json(await getKaspaQuote());
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Kaspa price unavailable";
+    res.status(502).json({ error: message });
+  }
 });
 
 function sanitizeUploadFilename(name: string): string {

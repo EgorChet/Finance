@@ -12,7 +12,15 @@
           <span /><span /><span />
         </span>
       </button>
-      <h1 class="app-title">Finance</h1>
+      <div class="app-header-brand">
+        <h1 class="app-title">Finance</h1>
+        <p v-if="kaspaQuote" class="app-kaspa-strip" :title="kaspaTitle">
+          <img class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
+          <span class="app-kaspa-item">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
+          <span class="app-kaspa-sep" aria-hidden="true">·</span>
+          <span class="app-kaspa-item app-kaspa-portfolio">{{ formatUsdt(kaspaQuote.portfolio_usdt, 0) }}</span>
+        </p>
+      </div>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
         <div v-if="menuOpen" class="app-menu-backdrop" @click="menuOpen = false" />
@@ -123,13 +131,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import { fetchAppConfig, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import { fetchAppConfig, fetchKaspaQuote, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import type { KaspaQuote } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
+import { formatKasUsdtPrice, formatUsdt } from "../utils/format";
+import kaspaLogo from "../assets/kaspa.png";
 
 const UPLOAD_STEPS = [
   "Connecting to server",
@@ -175,7 +186,23 @@ const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const menuOpen = ref(false);
 const navOpen = ref(false);
+const kaspaQuote = ref<KaspaQuote | null>(null);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
+let kaspaTimer: ReturnType<typeof setInterval> | null = null;
+
+const kaspaTitle = computed(() => {
+  if (!kaspaQuote.value) return "";
+  const { price_usdt, balance_kas, portfolio_usdt } = kaspaQuote.value;
+  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} portfolio`;
+});
+
+async function refreshKaspaQuote() {
+  try {
+    kaspaQuote.value = await fetchKaspaQuote(auth.isDemo, auth.token || undefined);
+  } catch {
+    /* keep last quote or hide until first success */
+  }
+}
 
 function closeNav() {
   navOpen.value = false;
@@ -194,8 +221,17 @@ watch(navOpen, (open) => {
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
+onMounted(() => {
+  void refreshKaspaQuote();
+  kaspaTimer = setInterval(() => void refreshKaspaQuote(), 120_000);
+});
+
 onUnmounted(() => {
   clearStepTimer();
+  if (kaspaTimer) {
+    clearInterval(kaspaTimer);
+    kaspaTimer = null;
+  }
   document.body.style.overflow = "";
 });
 
