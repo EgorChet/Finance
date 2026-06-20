@@ -24,6 +24,9 @@ const rows = [
   { id: "statements", file: "statements.json" },
   { id: "rules", file: "merchant_rules.json" },
   { id: "review", file: "review_progress.json" },
+  { id: "living_budget", file: "living_budget.json" },
+  { id: "fixed_charges", file: "fixed_charges.json" },
+  { id: "exclusions", file: "excluded_transactions.json" },
 ];
 
 async function upsert(id, data) {

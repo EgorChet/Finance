@@ -232,17 +232,22 @@ async function loadSpending() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    const [m, charges, budget, allReport] = await Promise.all([
+    const [m, charges, allReport] = await Promise.all([
       fetchMonths(demo, token),
       fetchFixedCharges(demo, token),
-      fetchLivingBudget(demo, token),
       fetchReport(demo, null, token),
     ]);
     months.value = m.months;
     if (demo && m.demo_as_of) auth.demoAsOf = m.demo_as_of;
     configuredCharges.value = charges.charges;
-    livingBudgetSegments.value = budget.segments.map(normalizeLivingBudgetSegment);
     paceReport.value = allReport;
+
+    try {
+      const budget = await fetchLivingBudget(demo, token);
+      livingBudgetSegments.value = budget.segments.map(normalizeLivingBudgetSegment);
+    } catch {
+      livingBudgetSegments.value = [];
+    }
 
     const monthKey = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     currentMonthKey.value = monthKey;

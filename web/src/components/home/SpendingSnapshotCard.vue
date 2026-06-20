@@ -30,6 +30,13 @@
               {{ budgetDisplay }}
             </span>
           </div>
+          <div v-else class="home-spend-metric">
+            <span class="home-spend-metric-label">Living budget</span>
+            <span class="home-spend-metric-value home-spend-metric-value--sm home-spend-metric-value--muted">
+              Not set —
+              <RouterLink class="home-spend-budget-link" to="/app/recurring#living-budget">configure</RouterLink>
+            </span>
+          </div>
         </div>
 
         <div v-if="paceLabel" class="home-spend-pace-box">

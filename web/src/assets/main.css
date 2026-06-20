@@ -3780,6 +3780,21 @@ table.rules select {
   color: #fbbf24;
 }
 
+.home-spend-metric-value--muted {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.home-spend-budget-link {
+  color: var(--accent, #60a5fa);
+  text-decoration: none;
+}
+
+.home-spend-budget-link:hover {
+  text-decoration: underline;
+}
+
 .home-spend-badge {
   display: inline-block;
   margin-left: 0.45rem;
