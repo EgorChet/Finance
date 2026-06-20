@@ -2237,7 +2237,7 @@ table.rules select {
 }
 
 .recurring-segment-row--triple {
-  grid-template-columns: minmax(5.5rem, 0.85fr) 1fr 1fr;
+  grid-template-columns: minmax(9rem, auto) minmax(5.5rem, 7rem) minmax(0, 1fr);
 }
 
 .recurring-segment-row .field-group {
@@ -2377,7 +2377,7 @@ table.rules select {
 }
 
 .recurring-add-schedule-row--triple {
-  grid-template-columns: minmax(5.5rem, 0.85fr) 1fr 1fr;
+  grid-template-columns: minmax(9rem, auto) minmax(5.5rem, 7rem) minmax(0, 1fr);
 }
 
 .recurring-add-schedule-row .field-group {
