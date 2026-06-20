@@ -156,3 +156,20 @@ export interface FxcnPriceCache {
   nav_usd: number;
   source?: string;
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  /** All-day event date (YYYY-MM-DD). */
+  date: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CalendarData {
+  events: CalendarEvent[];
+  /** Secret token for the public ICS subscription URL. */
+  feed_token?: string;
+  updated_at?: string | null;
+}

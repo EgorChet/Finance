@@ -422,3 +422,16 @@ export function demoMerchants() {
   }
   return [...seen.values()].sort((a, b) => a.English.localeCompare(b.English));
 }
+
+export function demoCalendar() {
+  return {
+    events: [
+      { id: "demo-dentist", title: "Dentist", date: "2026-06-18", description: "Demo event" },
+      { id: "demo-dinner", title: "Birthday dinner", date: "2026-06-22" },
+      { id: "demo-upload", title: "Upload July statement", date: "2026-07-10", description: "When the cycle closes" },
+    ],
+    feed_token: null as string | null,
+    updated_at: null as string | null,
+    demo: true,
+  };
+}

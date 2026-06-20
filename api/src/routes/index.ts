@@ -57,6 +57,12 @@ import { ensureDailyFallback } from "../utils/fxRates.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
+import {
+  addCalendarEvent,
+  deleteCalendarEvent,
+  listCalendarEvents,
+  regenerateFeedToken,
+} from "../services/calendarService.js";
 import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -475,6 +481,55 @@ router.post("/review/confirm", async (req, res) => {
       console.error("Background reanalyze failed:", err);
     }
   })();
+});
+
+router.get("/calendar", async (_req, res) => {
+  try {
+    const data = await listCalendarEvents();
+    res.json(data);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Calendar unavailable";
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/calendar/events", async (req, res) => {
+  const { title, date, description } = req.body as { title?: string; date?: string; description?: string };
+  if (!title?.trim() || !date?.trim()) {
+    res.status(400).json({ error: "title and date required" });
+    return;
+  }
+  try {
+    const event = await addCalendarEvent({ title, date, description });
+    res.json({ ok: true, event });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Could not add event";
+    res.status(400).json({ error: message });
+  }
+});
+
+router.delete("/calendar/events/:id", async (req, res) => {
+  const id = req.params.id?.trim();
+  if (!id) {
+    res.status(400).json({ error: "id required" });
+    return;
+  }
+  const removed = await deleteCalendarEvent(id);
+  if (!removed) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+router.post("/calendar/regenerate-token", async (_req, res) => {
+  try {
+    const feed_token = await regenerateFeedToken();
+    res.json({ ok: true, feed_token });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Could not regenerate token";
+    res.status(500).json({ error: message });
+  }
 });
 
 export default router;

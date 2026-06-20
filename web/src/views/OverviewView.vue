@@ -110,6 +110,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { addExclusion, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
@@ -160,6 +161,7 @@ import {
 } from "../utils/livingBudget";
 
 const auth = useAuthStore();
+const route = useRoute();
 const loading = ref(true);
 const reportLoading = ref(false);
 const error = ref("");
@@ -521,7 +523,11 @@ async function loadMonths() {
         month: billingCycleLabel(row.billing_date),
       }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges(), refreshLivingBudget()]);
-    const initial = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
+    const queryMonth = typeof route.query.month === "string" ? route.query.month : null;
+    const initial =
+      queryMonth && m.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))
+        ? queryMonth
+        : defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     selectedMonth.value = initial;
     txPeriod.value = defaultTxPeriod(initial);
     await refreshReport(initial);

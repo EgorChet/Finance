@@ -5,6 +5,7 @@ import { requireAuth } from "./auth.js";
 import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
 import apiRoutes from "./routes/index.js";
+import { getIcsFeed, verifyFeedToken } from "./services/calendarService.js";
 
 const PORT = Number(process.env.PORT || 3000);
 
@@ -48,6 +49,24 @@ app.get("/health", async (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/demo", demoRoutes);
+
+app.get("/calendar/feed.ics", async (req, res) => {
+  const token = req.query.token as string | undefined;
+  if (!(await verifyFeedToken(token))) {
+    res.status(401).send("Invalid or missing token");
+    return;
+  }
+  try {
+    const body = await getIcsFeed();
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(body);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Calendar feed unavailable";
+    res.status(500).send(message);
+  }
+});
+
 app.use("/api", requireAuth, apiRoutes);
 
 app.listen(PORT, () => {

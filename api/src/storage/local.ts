@@ -7,6 +7,7 @@ import type {
   FxFallbackData,
   KaspaPriceCache,
   FxcnPriceCache,
+  CalendarData,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
@@ -24,6 +25,7 @@ const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
+const CALENDAR_PATH = path.join(DATA_DIR, "user_calendar.json");
 const PROJECT_ROOT = path.resolve(DATA_DIR, "..");
 const STATEMENTS_DIR = path.join(PROJECT_ROOT, "statements");
 const XLSX_DIRS = [STATEMENTS_DIR];
@@ -182,6 +184,22 @@ export async function readFxcnPriceCache(): Promise<FxcnPriceCache> {
 export async function writeFxcnPriceCache(data: FxcnPriceCache): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FXCN_PRICE_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
+export async function readCalendar(): Promise<CalendarData> {
+  try {
+    const raw = await fs.readFile(CALENDAR_PATH, "utf-8");
+    const data = JSON.parse(raw) as CalendarData;
+    return { events: data.events || [], feed_token: data.feed_token, updated_at: data.updated_at ?? null };
+  } catch {
+    return { events: [], updated_at: null };
+  }
+}
+
+export async function writeCalendar(data: CalendarData): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  data.updated_at = new Date().toISOString();
+  await fs.writeFile(CALENDAR_PATH, JSON.stringify(data, null, 2), "utf-8");
 }
 
 export async function discoverXlsxFiles(): Promise<string[]> {

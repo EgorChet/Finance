@@ -9,6 +9,7 @@ import {
   demoReviewQueue,
   demoRules,
   demoSummaryRows,
+  demoCalendar,
   getDemoReport,
 } from "../data/demoData.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
@@ -124,6 +125,22 @@ router.post("/exclusions", (_req, res) => {
 
 router.post("/exclusions/remove", (_req, res) => {
   res.status(403).json({ error: "Exclusions disabled in demo mode" });
+});
+
+router.get("/calendar", (_req, res) => {
+  res.json(demoCalendar());
+});
+
+router.post("/calendar/events", (_req, res) => {
+  res.status(403).json({ error: "Calendar disabled in demo mode" });
+});
+
+router.delete("/calendar/events/:id", (_req, res) => {
+  res.status(403).json({ error: "Calendar disabled in demo mode" });
+});
+
+router.post("/calendar/regenerate-token", (_req, res) => {
+  res.status(403).json({ error: "Calendar disabled in demo mode" });
 });
 
 export default router;

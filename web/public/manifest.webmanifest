@@ -2,7 +2,7 @@
   "name": "Finance",
   "short_name": "Finance",
   "description": "Personal spending overview and merchant categorization",
-  "start_url": "./app/overview",
+  "start_url": "./app/home",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0e1117",

@@ -77,3 +77,12 @@ export interface ExcludedItem {
   amount?: number;
   can_restore: boolean;
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}

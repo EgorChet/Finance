@@ -259,7 +259,9 @@ const SYNC_STEPS = [
 ];
 
 const NAV_ITEMS = [
-  { to: "/app/overview", label: "Overview" },
+  { to: "/app/home", label: "Home" },
+  { to: "/app/overview", label: "Spending" },
+  { to: "/app/calendar", label: "Calendar" },
   { to: "/app/browse", label: "Browse" },
   { to: "/app/mappings", label: "Mappings" },
   { to: "/app/review", label: "Label" },

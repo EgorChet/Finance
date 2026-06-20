@@ -275,3 +275,41 @@ export async function addExclusion(
 export async function removeExclusion(key: string, token?: string) {
   return post<{ ok: boolean }>(`${prefix(false)}/exclusions/remove`, { key }, token);
 }
+
+export type CalendarEvent = import("../types").CalendarEvent;
+
+export type CalendarResponse = {
+  events: CalendarEvent[];
+  feed_token: string | null;
+  updated_at?: string | null;
+  demo?: boolean;
+};
+
+export function calendarFeedUrl(feedToken: string): string {
+  const base = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  return `${base}/calendar/feed.ics?token=${encodeURIComponent(feedToken)}`;
+}
+
+export async function fetchCalendar(demo: boolean, token?: string) {
+  return get<CalendarResponse>(`${prefix(demo)}/calendar`, token);
+}
+
+export async function addCalendarEvent(
+  body: { title: string; date: string; description?: string },
+  token?: string,
+) {
+  return post<{ ok: boolean; event: CalendarEvent }>(`${prefix(false)}/calendar/events`, body, token);
+}
+
+export async function deleteCalendarEvent(id: string, token?: string) {
+  const res = await fetch(`${prefix(false)}/calendar/events/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function regenerateCalendarFeedToken(token?: string) {
+  return post<{ ok: boolean; feed_token: string }>(`${prefix(false)}/calendar/regenerate-token`, {}, token);
+}
