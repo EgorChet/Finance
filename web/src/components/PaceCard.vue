@@ -100,8 +100,10 @@
                   </table>
                 </div>
                 <p class="pace-simple-footnote">
-                  “Your normal” averages your last {{ pace.cyclesUsed || 3 }} uploaded cycles through today.
-                  The row below uses the same window through tomorrow ({{ pace.avgCyclesTomorrowLabel }}).
+                  “Your normal at this point” averages everyday spend through today across your last
+                  {{ pace.cyclesUsed || 3 }} uploaded cycles.
+                  “Your normal month” is the average full total of those same cycles (about
+                  {{ pace.cyclesUsed || 3 }} months).
                 </p>
               </details>
             </template>

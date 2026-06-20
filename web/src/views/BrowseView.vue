@@ -220,7 +220,7 @@ async function loadTransactions() {
   error.value = "";
   try {
     const report = await fetchReport(auth.isDemo, selectedMonth.value || null, auth.token || undefined);
-    allTransactions.value = report.transactions;
+    allTransactions.value = [...report.transactions];
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Could not load transactions";
     allTransactions.value = [];

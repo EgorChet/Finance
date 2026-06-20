@@ -7,7 +7,7 @@ from typing import Optional
 
 import openpyxl
 
-from fx import detect_currency, is_pending_charge, resolve_charge_ils
+from fx import detect_currency, is_pending_charge, is_refund_transaction, resolve_charge_ils
 from fx_rates import prefetch_rates
 from models import Transaction
 
@@ -88,7 +88,12 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
             continue
         try:
             amount = _to_float(row[2])
-            if amount <= 0 or not is_pending_charge(row[3], str(row[6]).strip() if row[6] else None):
+            tx_type = str(row[4] or "").strip()
+            notes = str(row[6]).strip() if row[6] else None
+            if not is_refund_transaction(tx_type, amount, row[3]) and (
+                amount <= 0
+                or not is_pending_charge(row[3], notes, transaction_type_he=tx_type, amount=amount)
+            ):
                 continue
             merchant = str(row[1] or "").strip()
             explicit = pending_currencies.get(_amount_key(amount))
@@ -107,6 +112,7 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
         try:
             amount = _to_float(row[2])
             notes = str(row[6]).strip() if row[6] else None
+            tx_type = str(row[4] or "").strip()
             tx_date = _to_date(row[0])
             explicit = pending_currencies.get(_amount_key(amount))
             charge_ils, original_currency, estimated = resolve_charge_ils(
@@ -116,6 +122,7 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
                 notes,
                 tx_date=tx_date,
                 explicit_currency=explicit,
+                transaction_type_he=tx_type,
             )
             transactions.append(
                 Transaction(
@@ -123,7 +130,7 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
                     merchant_he=str(row[1] or "").strip(),
                     amount=amount,
                     charge_amount=charge_ils,
-                    transaction_type_he=str(row[4] or "").strip(),
+                    transaction_type_he=tx_type,
                     category_he=str(row[5]).strip() if row[5] else None,
                     notes=notes,
                     original_currency=original_currency,

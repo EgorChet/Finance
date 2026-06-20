@@ -174,6 +174,11 @@ function spendAtDay(
   };
 }
 
+function fullCycleTotal(bucket: CycleBucket): number {
+  const cycleLength = daysBetween(bucket.start, bucket.end) + 1;
+  return spendAtDay(bucket, cycleLength).total;
+}
+
 function averageBreakdown(
   buckets: CycleBucket[],
   dayIndex: number,
@@ -422,6 +427,13 @@ export function computePace(
           usedFullSnapshots.reduce((s, row) => s + row.fixed, 0) / usedFullSnapshots.length,
         )
       : 0;
+  const historicalFullCycleAvg =
+    usedFullSnapshots.length > 0
+      ? roundMoney(
+          usedFullSnapshots.reduce((s, row) => s + fullCycleTotal(row.bucket), 0) /
+            usedFullSnapshots.length,
+        )
+      : 0;
 
   function extrapolateToFullCycle(spendAtDay: number): number {
     return cycle.dayIndex > 0
@@ -436,9 +448,11 @@ export function computePace(
 
   const projectedTotal = roundMoney(projectionFixed + projectedVariable);
 
-  const projectedAtUsualPace = includeFixed
+  const extrapolatedUsualPace = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + extrapolateToFullCycle(historicalAvgVariableAtDay))
     : roundMoney(projectionFixed + extrapolateToFullCycle(historicalAvgVariableAtDay));
+  const projectedAtUsualPace =
+    historicalFullCycleAvg > 0 ? historicalFullCycleAvg : extrapolatedUsualPace;
 
   let score = 50;
   if (compareAvg > 0 && currentSpend > 0) {

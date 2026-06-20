@@ -20,7 +20,7 @@
       <div v-for="row in visibleRows" :key="row.key" class="tx-row">
         <div class="tx-row-top">
           <div class="tx-row-merchant">{{ row.merchant }}</div>
-          <div class="tx-row-amount">{{ formatChargeAmount(row.tx) }}</div>
+          <div class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">{{ formatChargeAmount(row.tx) }}</div>
         </div>
         <div class="tx-row-meta">
           <span class="tx-row-meta-text">
@@ -68,7 +68,7 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatChargeAmount, formatTransactionDate, monthLabelFromIso } from "../utils/format";
-import { transactionKey } from "../utils/transactionKey";
+import { transactionRowKey } from "../utils/transaction";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
 
@@ -117,7 +117,7 @@ watch(
 );
 
 const filtered = computed(() => {
-  let txs = props.transactions;
+  let txs = [...props.transactions];
   if (props.categoryFilter) {
     txs = txs.filter((t) => t.category_en === props.categoryFilter);
   }
@@ -125,7 +125,7 @@ const filtered = computed(() => {
 });
 
 const sorted = computed(() => {
-  const txs = [...filtered.value];
+  const txs = filtered.value.slice();
   const dir = sortDir.value === "asc" ? 1 : -1;
   txs.sort((a, b) => {
     if (sortKey.value === "date") return dir * a.date.localeCompare(b.date);
@@ -145,7 +145,7 @@ const total = computed(() => sorted.value.length);
 const visibleRows = computed(() => {
   const txs = showAll.value ? sorted.value : sorted.value.slice(0, props.defaultLimit);
   return txs.map((t) => ({
-    key: transactionKey(t),
+    key: transactionRowKey(t),
     tx: t,
     dateLabel: formatChargeDate(t),
     merchant: t.merchant_en || t.merchant_he,

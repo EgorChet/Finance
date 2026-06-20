@@ -104,7 +104,33 @@ def detect_currency(
     return "ILS"
 
 
-def is_pending_charge(charge_raw, notes: Optional[str]) -> bool:
+def is_refund_transaction(
+    transaction_type_he: Optional[str],
+    amount: float,
+    charge_raw,
+) -> bool:
+    if transaction_type_he and "זיכוי" in transaction_type_he:
+        return True
+    if amount < 0:
+        return True
+    if charge_raw is not None:
+        try:
+            return float(charge_raw) < 0
+        except (TypeError, ValueError):
+            pass
+    return False
+
+
+def is_pending_charge(
+    charge_raw,
+    notes: Optional[str],
+    *,
+    transaction_type_he: Optional[str] = None,
+    amount: Optional[float] = None,
+) -> bool:
+    if amount is not None and transaction_type_he is not None:
+        if is_refund_transaction(transaction_type_he, amount, charge_raw):
+            return False
     if notes and "בקליטה" in notes:
         return True
     if charge_raw is None:
@@ -122,6 +148,7 @@ def resolve_charge_ils(
     notes: Optional[str],
     tx_date: Optional[date] = None,
     explicit_currency: Optional[str] = None,
+    transaction_type_he: Optional[str] = None,
 ) -> tuple[float, Optional[str], bool]:
     """
     Return (charge_amount_ils, original_currency, estimated).
@@ -136,10 +163,19 @@ def resolve_charge_ils(
         except (TypeError, ValueError):
             charge = None
 
+    if is_refund_transaction(transaction_type_he, amount, charge_raw):
+        base = charge if charge is not None and charge != 0 else amount
+        return _round_money(-abs(base)), "ILS", False
+
     if amount <= 0:
         return 0.0, None, False
 
-    pending = is_pending_charge(charge_raw, notes)
+    pending = is_pending_charge(
+        charge_raw,
+        notes,
+        transaction_type_he=transaction_type_he,
+        amount=amount,
+    )
 
     # Pending — column 3 not final; use FX even if charge_amount was already estimated.
     if pending:

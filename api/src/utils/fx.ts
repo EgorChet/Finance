@@ -84,7 +84,7 @@ function explicitCurrencyForTx(
   tx: Transaction,
   pendingCurrencies?: Record<string, string> | null,
 ): string | null | undefined {
-  if (isPendingCharge(tx.charge_amount, tx.notes)) {
+  if (isPendingCharge(tx.charge_amount, tx.notes, tx.transaction_type_he, tx.amount)) {
     // Header map and parser output beat merchant heuristics (OPENAI → USD).
     return (
       pendingCurrencyForAmount(tx.amount, pendingCurrencies) ??
@@ -95,7 +95,26 @@ function explicitCurrencyForTx(
   return tx.original_currency;
 }
 
-export function isPendingCharge(chargeRaw: number | null | undefined, notes: string | null): boolean {
+export function isRefundTransaction(
+  transactionTypeHe: string | null | undefined,
+  amount: number,
+  chargeRaw: number | null | undefined,
+): boolean {
+  if (transactionTypeHe?.includes("זיכוי")) return true;
+  if (amount < 0) return true;
+  if (chargeRaw != null && chargeRaw < 0) return true;
+  return false;
+}
+
+export function isPendingCharge(
+  chargeRaw: number | null | undefined,
+  notes: string | null,
+  transactionTypeHe?: string | null,
+  amount?: number,
+): boolean {
+  if (amount != null && transactionTypeHe != null) {
+    if (isRefundTransaction(transactionTypeHe, amount, chargeRaw)) return false;
+  }
   if (notes?.includes("בקליטה")) return true;
   if (chargeRaw == null) return true;
   return chargeRaw <= 0;
@@ -108,12 +127,18 @@ export function resolveChargeIls(
   notes: string | null,
   txDate: string,
   explicitCurrency?: string | null,
+  transactionTypeHe?: string | null,
 ): { chargeAmount: number; originalCurrency: string | null; estimated: boolean } {
   const charge = chargeRaw == null ? null : Number(chargeRaw);
 
+  if (isRefundTransaction(transactionTypeHe, amount, chargeRaw)) {
+    const base = charge != null && charge !== 0 ? charge : amount;
+    return { chargeAmount: roundMoney(-Math.abs(base)), originalCurrency: "ILS", estimated: false };
+  }
+
   if (amount <= 0) return { chargeAmount: 0, originalCurrency: null, estimated: false };
 
-  const pending = isPendingCharge(chargeRaw, notes);
+  const pending = isPendingCharge(chargeRaw, notes, transactionTypeHe, amount);
 
   // Pending — column 3 not final; use FX even if charge_amount was already estimated.
   if (pending) {
@@ -174,6 +199,7 @@ export function normalizeForeignCharges(
       tx.notes,
       tx.date,
       explicitCurrencyForTx(tx, pendingCurrencies),
+      tx.transaction_type_he,
     );
     const sameCharge = resolved.chargeAmount === tx.charge_amount;
     const sameCurrency = (tx.original_currency ?? null) === resolved.originalCurrency;

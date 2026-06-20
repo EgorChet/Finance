@@ -2676,6 +2676,10 @@ table.rules select {
   flex-shrink: 0;
 }
 
+.tx-row-amount--refund {
+  color: var(--success, #22c55e);
+}
+
 .tx-row-merchant {
   font-weight: 600;
   font-size: 1rem;

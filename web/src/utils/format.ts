@@ -32,15 +32,19 @@ export function formatChargeAmount(tx: {
   charge_amount: number;
   original_currency?: string | null;
   charge_estimated?: boolean;
+  transaction_type_he?: string;
 }): string {
-  const ils = formatIls(tx.charge_amount);
+  const refund = tx.charge_amount < 0 || tx.transaction_type_he?.includes("זיכוי");
+  const displayAmount = refund ? Math.abs(tx.charge_amount) : tx.charge_amount;
+  const ils = formatIls(displayAmount);
+  const signedIls = refund ? `−${ils}` : ils;
   const currency = tx.original_currency;
   if (!currency || currency === "ILS" || Math.abs(tx.amount - tx.charge_amount) < 0.02) {
-    return tx.charge_estimated ? `~${ils}` : ils;
+    return tx.charge_estimated && !refund ? `~${signedIls}` : signedIls;
   }
-  const original = formatForeignAmount(tx.amount, currency);
-  const prefix = tx.charge_estimated ? "~" : "";
-  return `${prefix}${ils} (${original})`;
+  const original = formatForeignAmount(Math.abs(tx.amount), currency);
+  const prefix = tx.charge_estimated && !refund ? "~" : "";
+  return `${prefix}${signedIls} (${original})`;
 }
 
 /** Softer amounts for sentences — ~₪1,700 not ₪1,720.62. */

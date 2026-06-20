@@ -108,5 +108,47 @@ def test_interest_row():
     assert estimated is False
 
 
+def test_refund_uses_negative_bank_charge():
+    charge, currency, estimated = resolve_charge_ils(
+        543,
+        -543,
+        "SKIMS US",
+        None,
+        tx_date=date(2026, 4, 12),
+        transaction_type_he="זיכוי",
+    )
+    assert charge == -543
+    assert currency == "ILS"
+    assert estimated is False
+
+
+def test_refund_from_negative_amount():
+    charge, currency, estimated = resolve_charge_ils(
+        -543,
+        None,
+        "SKIMS US",
+        None,
+        tx_date=date(2026, 4, 12),
+        transaction_type_he="זיכוי",
+    )
+    assert charge == -543
+    assert currency == "ILS"
+    assert estimated is False
+
+
+def test_refund_renormalizes_positive_stored_charge():
+    charge, currency, estimated = resolve_charge_ils(
+        543,
+        543,
+        "SKIMS US",
+        None,
+        tx_date=date(2026, 4, 12),
+        transaction_type_he="זיכוי",
+    )
+    assert charge == -543
+    assert currency == "ILS"
+    assert estimated is False
+
+
 def test_bgn_from_ratio():
     assert detect_currency("MAGAZIN ALKOHOL", 8.9, 17.96) == "BGN"
