@@ -205,6 +205,87 @@ export function isRefundTransaction(
   return false;
 }
 
+function txDateValue(tx: Transaction): string {
+  return tx.date.slice(0, 10);
+}
+
+export function findMatchingOriginalCharge(
+  merchant: string,
+  foreignAmount: number,
+  refundDate: string,
+  transactions: Transaction[],
+  skipIndex?: number,
+): Transaction | null {
+  if (foreignAmount <= 0) return null;
+  let best: Transaction | null = null;
+  let bestDate = "";
+  for (let i = 0; i < transactions.length; i++) {
+    if (skipIndex != null && i === skipIndex) continue;
+    const tx = transactions[i]!;
+    if (tx.merchant_he !== merchant) continue;
+    if (isRefundTransaction(tx.transaction_type_he, tx.amount, tx.charge_amount)) continue;
+    if (tx.charge_amount <= 0) continue;
+    if (Math.abs(Math.abs(tx.amount) - foreignAmount) > 0.02) continue;
+    const txDate = txDateValue(tx);
+    if (txDate > refundDate) continue;
+    if (!best || txDate > bestDate) {
+      best = tx;
+      bestDate = txDate;
+    }
+  }
+  return best;
+}
+
+export function resolveRefundIls(
+  amount: number,
+  chargeRaw: number | null | undefined,
+  merchant: string,
+  txDate: string,
+  explicitCurrency?: string | null,
+  transactionsForMatching?: Transaction[] | null,
+  skipIndex?: number,
+): { chargeAmount: number; originalCurrency: string | null; estimated: boolean } {
+  const charge = chargeRaw == null ? null : Number(chargeRaw);
+  const foreignAmount = amount !== 0 ? Math.abs(amount) : charge != null && charge !== 0 ? Math.abs(charge) : 0;
+  const refundDate = txDate.slice(0, 10);
+
+  if (transactionsForMatching?.length) {
+    const match = findMatchingOriginalCharge(
+      merchant,
+      foreignAmount,
+      refundDate,
+      transactionsForMatching,
+      skipIndex,
+    );
+    if (match) {
+      return {
+        chargeAmount: roundMoney(-Math.abs(match.charge_amount)),
+        originalCurrency: match.original_currency ?? "ILS",
+        estimated: !!match.charge_estimated,
+      };
+    }
+  }
+
+  if (charge != null && charge !== 0 && foreignAmount > 0) {
+    const ilsMagnitude = Math.abs(charge);
+    if (Math.abs(ilsMagnitude - foreignAmount) > 0.02) {
+      return { chargeAmount: roundMoney(-ilsMagnitude), originalCurrency: "ILS", estimated: false };
+    }
+  }
+
+  if (explicitCurrency && explicitCurrency !== "ILS") {
+    const rate = getRateToIls(explicitCurrency, txDate);
+    return {
+      chargeAmount: roundMoney(-foreignAmount * rate),
+      originalCurrency: explicitCurrency,
+      estimated: true,
+    };
+  }
+
+  const base = charge != null && charge !== 0 ? Math.abs(charge) : foreignAmount;
+  return { chargeAmount: roundMoney(-base), originalCurrency: "ILS", estimated: false };
+}
+
 export function isPendingCharge(
   chargeRaw: number | null | undefined,
   notes: string | null,
@@ -227,12 +308,21 @@ export function resolveChargeIls(
   txDate: string,
   explicitCurrency?: string | null,
   transactionTypeHe?: string | null,
+  transactionsForMatching?: Transaction[] | null,
+  skipIndex?: number,
 ): { chargeAmount: number; originalCurrency: string | null; estimated: boolean } {
   const charge = chargeRaw == null ? null : Number(chargeRaw);
 
   if (isRefundTransaction(transactionTypeHe, amount, chargeRaw)) {
-    const base = charge != null && charge !== 0 ? charge : amount;
-    return { chargeAmount: roundMoney(-Math.abs(base)), originalCurrency: "ILS", estimated: false };
+    return resolveRefundIls(
+      amount,
+      chargeRaw,
+      merchant,
+      txDate,
+      explicitCurrency,
+      transactionsForMatching,
+      skipIndex,
+    );
   }
 
   if (amount <= 0) return { chargeAmount: 0, originalCurrency: null, estimated: false };
@@ -294,16 +384,26 @@ export function normalizeForeignCharges(
   changed: boolean;
 } {
   let changed = false;
-  const result = transactions.map((tx) => {
-    const resolved = resolveChargeIls(
-      tx.amount,
-      tx.charge_amount,
-      tx.merchant_he,
-      tx.notes,
-      tx.date,
-      explicitCurrencyForTx(tx, pendingCurrencies),
-      tx.transaction_type_he,
-    );
+  const result = transactions.map((tx, index) => {
+    const resolved = isRefundTransaction(tx.transaction_type_he, tx.amount, tx.charge_amount)
+      ? resolveRefundIls(
+          tx.amount,
+          tx.charge_amount,
+          tx.merchant_he,
+          tx.date,
+          explicitCurrencyForTx(tx, pendingCurrencies),
+          transactions,
+          index,
+        )
+      : resolveChargeIls(
+          tx.amount,
+          tx.charge_amount,
+          tx.merchant_he,
+          tx.notes,
+          tx.date,
+          explicitCurrencyForTx(tx, pendingCurrencies),
+          tx.transaction_type_he,
+        );
     const sameCharge = resolved.chargeAmount === tx.charge_amount;
     const sameCurrency = (tx.original_currency ?? null) === resolved.originalCurrency;
     const sameEstimated = !!tx.charge_estimated === resolved.estimated;

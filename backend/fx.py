@@ -242,6 +242,100 @@ def is_refund_transaction(
     return False
 
 
+def _tx_date_value(tx) -> date:
+    raw = getattr(tx, "date", None)
+    if isinstance(raw, date):
+        return raw
+    if isinstance(raw, str):
+        return date.fromisoformat(raw[:10])
+    raise TypeError(f"Unsupported transaction date: {raw!r}")
+
+
+def find_matching_original_charge(
+    merchant: str,
+    foreign_amount: float,
+    refund_date: date,
+    transactions: list,
+    *,
+    skip_index: Optional[int] = None,
+):
+    """Find a prior purchase with the same merchant and foreign amount."""
+    if foreign_amount <= 0:
+        return None
+    best = None
+    best_date: Optional[date] = None
+    for i, tx in enumerate(transactions):
+        if skip_index is not None and i == skip_index:
+            continue
+        if getattr(tx, "merchant_he", "") != merchant:
+            continue
+        tx_amount = float(getattr(tx, "amount", 0))
+        tx_charge = float(getattr(tx, "charge_amount", 0))
+        tx_type = getattr(tx, "transaction_type_he", None)
+        if is_refund_transaction(tx_type, tx_amount, tx_charge if tx_charge != 0 else None):
+            continue
+        if tx_charge <= 0:
+            continue
+        if abs(abs(tx_amount) - foreign_amount) > 0.02:
+            continue
+        tx_date = _tx_date_value(tx)
+        if tx_date > refund_date:
+            continue
+        if best is None or tx_date > best_date:
+            best = tx
+            best_date = tx_date
+    return best
+
+
+def resolve_refund_ils(
+    amount: float,
+    charge_raw,
+    merchant: str,
+    tx_date: Optional[date] = None,
+    explicit_currency: Optional[str] = None,
+    transaction_type_he: Optional[str] = None,
+    transactions_for_matching: Optional[list] = None,
+    skip_index: Optional[int] = None,
+) -> tuple[float, Optional[str], bool]:
+    """Match refund to original charge when possible; otherwise convert via FX."""
+    charge: Optional[float]
+    if charge_raw is None:
+        charge = None
+    else:
+        try:
+            charge = float(charge_raw)
+        except (TypeError, ValueError):
+            charge = None
+
+    foreign_amount = abs(amount) if amount != 0 else (abs(charge) if charge else 0.0)
+    refund_date = tx_date or date.today()
+
+    if transactions_for_matching:
+        match = find_matching_original_charge(
+            merchant,
+            foreign_amount,
+            refund_date,
+            transactions_for_matching,
+            skip_index=skip_index,
+        )
+        if match is not None:
+            original_currency = getattr(match, "original_currency", None) or "ILS"
+            estimated = bool(getattr(match, "charge_estimated", False))
+            return _round_money(-abs(float(match.charge_amount))), original_currency, estimated
+
+    if charge is not None and charge != 0 and foreign_amount > 0:
+        ils_magnitude = abs(charge)
+        if abs(ils_magnitude - foreign_amount) > 0.02:
+            return _round_money(-ils_magnitude), "ILS", False
+
+    if explicit_currency and explicit_currency != "ILS":
+        rate = get_rate_to_ils(explicit_currency, refund_date)
+        return _round_money(-foreign_amount * rate), explicit_currency, True
+
+    base = abs(charge) if charge is not None and charge != 0 else foreign_amount
+    return _round_money(-base), "ILS", False
+
+
 def is_pending_charge(
     charge_raw,
     notes: Optional[str],
@@ -270,6 +364,8 @@ def resolve_charge_ils(
     tx_date: Optional[date] = None,
     explicit_currency: Optional[str] = None,
     transaction_type_he: Optional[str] = None,
+    transactions_for_matching: Optional[list] = None,
+    skip_index: Optional[int] = None,
 ) -> tuple[float, Optional[str], bool]:
     """
     Return (charge_amount_ils, original_currency, estimated).
@@ -285,8 +381,16 @@ def resolve_charge_ils(
             charge = None
 
     if is_refund_transaction(transaction_type_he, amount, charge_raw):
-        base = charge if charge is not None and charge != 0 else amount
-        return _round_money(-abs(base)), "ILS", False
+        return resolve_refund_ils(
+            amount,
+            charge_raw,
+            merchant,
+            tx_date=tx_date,
+            explicit_currency=explicit_currency,
+            transaction_type_he=transaction_type_he,
+            transactions_for_matching=transactions_for_matching,
+            skip_index=skip_index,
+        )
 
     if amount <= 0:
         return 0.0, None, False

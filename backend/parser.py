@@ -132,6 +132,7 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
                 tx_date=tx_date,
                 explicit_currency=explicit,
                 transaction_type_he=tx_type,
+                transactions_for_matching=transactions,
             )
             transactions.append(
                 Transaction(

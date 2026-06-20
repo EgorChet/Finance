@@ -236,3 +236,52 @@ def test_sale_return_refund_type():
 
 def test_bgn_from_ratio():
     assert detect_currency("MAGAZIN ALKOHOL", 8.9, 17.96) == "BGN"
+
+
+def test_refund_matches_bgn_booking_original_charge():
+    from dataclasses import dataclass
+
+    @dataclass
+    class Tx:
+        date: date
+        merchant_he: str
+        amount: float
+        charge_amount: float
+        original_currency: str | None = None
+        charge_estimated: bool = False
+        transaction_type_he: str | None = None
+
+    merchant = "BKG*HOTEL AT BOOKING.C"
+    txs = [
+        Tx(date(2025, 12, 1), merchant, 2033.30, 4045.13, "BGN", False, "רגילה"),
+        Tx(date(2025, 12, 5), merchant, 2033.30, -2033.30, "ILS", False, "זיכוי"),
+    ]
+    charge, currency, estimated = resolve_charge_ils(
+        2033.30,
+        -2033.30,
+        merchant,
+        None,
+        tx_date=date(2025, 12, 5),
+        transaction_type_he="זיכוי",
+        transactions_for_matching=txs,
+        skip_index=1,
+    )
+    assert charge == -4045.13
+    assert currency == "BGN"
+    assert estimated is False
+
+
+@patch("fx.get_rate_to_ils", return_value=1.99)
+def test_refund_fx_fallback_when_no_match(_mock):
+    charge, currency, estimated = resolve_charge_ils(
+        2033.30,
+        -2033.30,
+        "BKG*HOTEL AT BOOKING.C",
+        None,
+        tx_date=date(2025, 12, 5),
+        transaction_type_he="זיכוי",
+        explicit_currency="BGN",
+    )
+    assert charge == round(-2033.30 * 1.99, 2)
+    assert currency == "BGN"
+    assert estimated is True
