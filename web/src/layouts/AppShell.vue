@@ -13,21 +13,55 @@
         </span>
       </button>
       <div class="app-header-brand">
-        <div v-if="kaspaQuote" class="app-kaspa-strip" :class="{ 'app-kaspa-strip--stale': kaspaQuote.stale }" :title="kaspaTitle">
-          <img class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
-          <span class="app-kaspa-item">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
-          <span class="app-kaspa-sep" aria-hidden="true">·</span>
-          <span class="app-kaspa-item app-kaspa-portfolio">{{ formatUsdt(kaspaQuote.portfolio_usdt, 0) }}</span>
+        <div class="app-portfolio-switch">
+          <div class="app-portfolio-tabs" role="tablist" aria-label="Portfolio asset">
+            <button
+              type="button"
+              class="app-portfolio-tab"
+              :class="{ 'app-portfolio-tab--active': portfolioAsset === 'kas' }"
+              role="tab"
+              :aria-selected="portfolioAsset === 'kas'"
+              @click="setPortfolioAsset('kas')"
+            >
+              KAS
+            </button>
+            <button
+              type="button"
+              class="app-portfolio-tab"
+              :class="{ 'app-portfolio-tab--active': portfolioAsset === 'fxcn' }"
+              role="tab"
+              :aria-selected="portfolioAsset === 'fxcn'"
+              @click="setPortfolioAsset('fxcn')"
+            >
+              FXCN
+            </button>
+          </div>
+          <button
+            type="button"
+            class="app-portfolio-refresh"
+            :disabled="portfolioRefreshing"
+            :aria-label="portfolioRefreshLabel"
+            @click="refreshPortfolioQuote(true)"
+          >
+            <span
+              class="app-portfolio-refresh-icon"
+              :class="{ 'app-portfolio-refresh-icon--spin': portfolioRefreshing }"
+              aria-hidden="true"
+            >↻</span>
+          </button>
         </div>
-        <button
-          type="button"
-          class="btn btn-icon app-kaspa-refresh"
-          :disabled="kaspaRefreshing"
-          aria-label="Refresh Kaspa price"
-          @click="refreshKaspaQuote(true)"
+        <div
+          v-if="portfolioStripVisible"
+          class="app-kaspa-strip"
+          :class="{ 'app-kaspa-strip--stale': portfolioStale }"
+          :title="portfolioTitle"
         >
-          <span class="app-kaspa-refresh-icon" :class="{ 'app-kaspa-refresh-icon--spin': kaspaRefreshing }" aria-hidden="true">↻</span>
-        </button>
+          <img v-if="portfolioAsset === 'kas'" class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
+          <span v-else class="app-portfolio-badge">FXCN</span>
+          <span class="app-kaspa-item">{{ portfolioPriceLabel }}</span>
+          <span class="app-kaspa-sep" aria-hidden="true">·</span>
+          <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
+        </div>
       </div>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
@@ -142,13 +176,16 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import { fetchAppConfig, fetchKaspaQuote, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
-import type { KaspaQuote } from "../api/client";
+import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import type { FxcnQuote, KaspaQuote } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
-import { formatKasUsdtPrice, formatUsdt } from "../utils/format";
+import { formatFxcnNavPrice, formatKasUsdtPrice, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
+
+const PORTFOLIO_ASSET_KEY = "portfolio_header_asset";
+type PortfolioAsset = "kas" | "fxcn";
 
 const UPLOAD_STEPS = [
   "Connecting to server",
@@ -195,26 +232,97 @@ const uploadPromptFile = ref<File | null>(null);
 const menuOpen = ref(false);
 const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
-const kaspaRefreshing = ref(false);
+const fxcnQuote = ref<FxcnQuote | null>(null);
+const portfolioAsset = ref<PortfolioAsset>(
+  (localStorage.getItem(PORTFOLIO_ASSET_KEY) as PortfolioAsset | null) === "fxcn" ? "fxcn" : "kas",
+);
+const portfolioRefreshing = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 let kaspaTimer: ReturnType<typeof setInterval> | null = null;
+let fxcnTimer: ReturnType<typeof setInterval> | null = null;
 
-const kaspaTitle = computed(() => {
-  if (!kaspaQuote.value) return "";
-  const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
-  const staleNote = stale ? " · cached" : "";
-  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} portfolio · ${source}${staleNote}`;
+const KAS_REFRESH_MS = 600_000;
+const FXCN_REFRESH_MS = 6 * 60 * 60 * 1000;
+
+const portfolioStripVisible = computed(() =>
+  portfolioAsset.value === "kas" ? !!kaspaQuote.value : !!fxcnQuote.value,
+);
+
+const portfolioStale = computed(() =>
+  portfolioAsset.value === "kas" ? !!kaspaQuote.value?.stale : !!fxcnQuote.value?.stale,
+);
+
+const portfolioPriceLabel = computed(() => {
+  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
+    return formatKasUsdtPrice(kaspaQuote.value.price_usdt);
+  }
+  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
+    return formatFxcnNavPrice(fxcnQuote.value.nav_usd);
+  }
+  return "";
 });
 
+const portfolioValueLabel = computed(() => {
+  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
+    return formatUsdt(kaspaQuote.value.portfolio_usdt, 0);
+  }
+  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
+    return formatUsd(fxcnQuote.value.portfolio_usd, 0);
+  }
+  return "";
+});
+
+const portfolioRefreshLabel = computed(() =>
+  portfolioAsset.value === "kas" ? "Refresh KAS price" : "Refresh FXCN NAV",
+);
+
+const portfolioTitle = computed(() => {
+  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
+    const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
+    const staleNote = stale ? " · cached" : "";
+    return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} · ${source}${staleNote}`;
+  }
+  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
+    const { nav_usd, lots, portfolio_usd, source, stale } = fxcnQuote.value;
+    const staleNote = stale ? " · cached" : "";
+    return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
+  }
+  return "";
+});
+
+function setPortfolioAsset(asset: PortfolioAsset) {
+  portfolioAsset.value = asset;
+  localStorage.setItem(PORTFOLIO_ASSET_KEY, asset);
+  void refreshPortfolioQuote();
+}
+
 async function refreshKaspaQuote(force = false) {
-  if (kaspaRefreshing.value) return;
-  kaspaRefreshing.value = true;
   try {
     kaspaQuote.value = await fetchKaspaQuote(auth.isDemo, auth.token || undefined, force);
   } catch {
-    /* keep last quote or hide until first success */
+    /* keep last quote */
+  }
+}
+
+async function refreshFxcnQuote(force = false) {
+  try {
+    fxcnQuote.value = await fetchFxcnQuote(auth.isDemo, auth.token || undefined, force);
+  } catch {
+    /* keep last quote */
+  }
+}
+
+async function refreshPortfolioQuote(force = false) {
+  if (portfolioRefreshing.value) return;
+  portfolioRefreshing.value = true;
+  try {
+    if (portfolioAsset.value === "kas") {
+      await refreshKaspaQuote(force);
+    } else {
+      await refreshFxcnQuote(force);
+    }
   } finally {
-    kaspaRefreshing.value = false;
+    portfolioRefreshing.value = false;
   }
 }
 
@@ -237,7 +345,9 @@ const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
 onMounted(() => {
   void refreshKaspaQuote();
-  kaspaTimer = setInterval(() => void refreshKaspaQuote(), 600_000);
+  void refreshFxcnQuote();
+  kaspaTimer = setInterval(() => void refreshKaspaQuote(), KAS_REFRESH_MS);
+  fxcnTimer = setInterval(() => void refreshFxcnQuote(), FXCN_REFRESH_MS);
 });
 
 onUnmounted(() => {
@@ -245,6 +355,10 @@ onUnmounted(() => {
   if (kaspaTimer) {
     clearInterval(kaspaTimer);
     kaspaTimer = null;
+  }
+  if (fxcnTimer) {
+    clearInterval(fxcnTimer);
+    fxcnTimer = null;
   }
   document.body.style.overflow = "";
 });

@@ -12,6 +12,7 @@ import {
   getDemoReport,
 } from "../data/demoData.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
+import { getFxcnQuote } from "../services/fxcnQuote.js";
 
 const router = Router();
 
@@ -35,6 +36,16 @@ router.get("/kaspa", async (req, res) => {
     res.json(await getKaspaQuote({ force }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kaspa price unavailable";
+    res.status(502).json({ error: message });
+  }
+});
+
+router.get("/fxcn", async (req, res) => {
+  try {
+    const force = req.query.refresh === "1" || req.query.force === "1";
+    res.json(await getFxcnQuote({ force }));
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "FXCN NAV unavailable";
     res.status(502).json({ error: message });
   }
 });

@@ -24,3 +24,5 @@ export const readFxFallback = store.readFxFallback;
 export const writeFxFallback = store.writeFxFallback;
 export const readKaspaPriceCache = store.readKaspaPriceCache;
 export const writeKaspaPriceCache = store.writeKaspaPriceCache;
+export const readFxcnPriceCache = store.readFxcnPriceCache;
+export const writeFxcnPriceCache = store.writeFxcnPriceCache;

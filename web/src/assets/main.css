@@ -598,28 +598,84 @@ button {
   flex-wrap: nowrap;
 }
 
-.app-kaspa-refresh {
+.app-portfolio-switch {
+  display: inline-flex;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.app-portfolio-tabs {
+  display: inline-flex;
+}
+
+.app-portfolio-tab {
+  border: 0;
+  background: transparent;
   color: var(--text-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.28rem 0.55rem;
+  cursor: pointer;
 }
 
-.app-kaspa-refresh:disabled {
+.app-portfolio-tab--active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
+.app-portfolio-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0.12rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.app-portfolio-refresh {
+  flex-shrink: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.28rem 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-portfolio-refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.app-portfolio-refresh:disabled {
   opacity: 0.55;
+  cursor: default;
 }
 
-.app-kaspa-refresh-icon {
+.app-portfolio-refresh-icon {
   display: inline-block;
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
-.app-kaspa-refresh-icon--spin {
-  animation: app-kaspa-spin 0.8s linear infinite;
+.app-portfolio-refresh-icon--spin {
+  animation: app-portfolio-spin 0.8s linear infinite;
 }
 
-@keyframes app-kaspa-spin {
+@keyframes app-portfolio-spin {
   to {
     transform: rotate(360deg);
   }

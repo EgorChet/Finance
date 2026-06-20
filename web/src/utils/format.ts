@@ -28,6 +28,18 @@ export function formatKasUsdtPrice(price: number): string {
   })} USDT`;
 }
 
+export function formatUsd(amount: number, decimals = 2): string {
+  return `${amount.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} USD`;
+}
+
+/** FinEx NAV per share. */
+export function formatFxcnNavPrice(nav: number): string {
+  return formatUsd(nav, 4);
+}
+
 const CURRENCY_PREFIX: Record<string, string> = {
   USD: "$",
   EUR: "€",

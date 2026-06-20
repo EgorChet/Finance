@@ -163,6 +163,21 @@ export async function fetchKaspaQuote(demo: boolean, token?: string, force = fal
   return get<KaspaQuote>(`${prefix(demo)}/kaspa${q}`, token);
 }
 
+export type FxcnQuote = {
+  enabled: true;
+  nav_usd: number;
+  lots: number;
+  portfolio_usd: number;
+  updated_at: string;
+  source: string;
+  stale?: boolean;
+};
+
+export async function fetchFxcnQuote(demo: boolean, token?: string, force = false) {
+  const q = force ? "?refresh=1" : "";
+  return get<FxcnQuote>(`${prefix(demo)}/fxcn${q}`, token);
+}
+
 /** Server-side wake — fallback when analyzer is on internal network. */
 export async function warmAnalyzerService(token?: string) {
   const res = await fetch(`${prefix(false)}/warm-analyzer`, {

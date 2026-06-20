@@ -150,3 +150,9 @@ export interface KaspaPriceCache {
   price_usdt: number;
   source?: string;
 }
+
+export interface FxcnPriceCache {
+  updated_at: string;
+  nav_usd: number;
+  source?: string;
+}
