@@ -100,6 +100,7 @@ import PaceCard from "../components/PaceCard.vue";
 import PendingCycleCard from "../components/PendingCycleCard.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import { useAuthStore } from "../stores/auth";
+import { confirm } from "../composables/useConfirm";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
 import {
   rollupCategoriesForDisplay,
@@ -317,16 +318,16 @@ async function afterExclusionChange() {
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
-function confirmExclude(label: string): boolean {
-  return window.confirm(
-    `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
-  );
-}
-
 async function excludeTransaction(tx: Transaction) {
   if (auth.isDemo) return;
   const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
-  if (!confirmExclude(label)) return;
+  const ok = await confirm({
+    title: "Exclude transaction?",
+    message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
+    confirmLabel: "Exclude",
+    tone: "danger",
+  });
+  if (!ok) return;
   const key = transactionKey(tx);
   excludingKey.value = key;
   try {

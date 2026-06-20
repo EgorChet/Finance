@@ -4,15 +4,30 @@
       Demo mode — extra charges are read-only. Sign in to manage recurring bills and one-time entries.
     </div>
     <div class="recurring-header">
-      <div>
-        <h2 class="page-title">Extra charges</h2>
-        <p class="page-lead" style="margin-bottom: 0">
-          Recurring monthly bills plus one-time charges from other cards or cash. Changes save automatically.
+      <div class="recurring-header-top">
+        <div>
+          <h2 class="page-title">Extra charges</h2>
+          <p class="page-lead" style="margin-bottom: 0">
+            Recurring monthly bills plus one-time charges from other cards or cash. Review edits, then save when ready.
+          </p>
+        </div>
+        <p
+          v-if="saveStatus && !hasUnsavedChanges"
+          class="recurring-save-status"
+          :class="{ 'recurring-save-status--error': saveError }"
+        >
+          {{ saveStatus }}
         </p>
       </div>
-      <p v-if="saveStatus" class="recurring-save-status" :class="{ 'recurring-save-status--error': saveError }">
-        {{ saveStatus }}
-      </p>
+      <div v-if="hasUnsavedChanges && !auth.isDemo" class="recurring-unsaved-bar">
+        <p class="recurring-unsaved-text">You have unsaved changes</p>
+        <div class="recurring-unsaved-actions">
+          <button type="button" class="btn" :disabled="saving" @click="discardChanges">Discard</button>
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="saveChanges">
+            {{ saving ? "Saving…" : "Save changes" }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <AppLoader
@@ -165,14 +180,13 @@
                       min="0"
                       step="0.01"
                       inputmode="decimal"
-                      @input="queueSave()"
                     />
                     <p v-else class="recurring-segment-amount-display">{{ formatIls(seg.amount) }}</p>
                   </div>
 
                   <div class="field-group">
                     <label class="field-label">From</label>
-                    <MonthSelect v-if="!auth.isDemo" v-model="seg.from_month" @update:model-value="queueSave()" />
+                    <MonthSelect v-if="!auth.isDemo" v-model="seg.from_month" />
                     <p v-else style="margin: 0">{{ ymToLabel(seg.from_month) }}</p>
                   </div>
                 </div>
@@ -184,7 +198,6 @@
                       <MonthSelect
                         v-if="!isOngoingThrough(seg.through_month)"
                         v-model="seg.through_month"
-                        @update:model-value="queueSave()"
                       />
                       <label class="recurring-ongoing recurring-ongoing--compact">
                         <input
@@ -257,14 +270,13 @@
                   min="0"
                   step="0.01"
                   inputmode="decimal"
-                  @input="queueSave()"
                 />
                 <p v-else class="recurring-segment-amount-display">{{ formatIls(charge.amount) }}</p>
               </div>
 
               <div class="field-group">
                 <label class="field-label">Category</label>
-                <CategorySelect v-if="!auth.isDemo" v-model="charge.category_en" :options="categories" @update:model-value="queueSave()" />
+                <CategorySelect v-if="!auth.isDemo" v-model="charge.category_en" :options="categories" />
                 <p v-else style="margin: 0">{{ charge.category_en }}</p>
               </div>
             </div>
@@ -285,12 +297,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { fetchFixedCharges, saveFixedCharges } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import MonthSelect from "../components/MonthSelect.vue";
 import { SPENDING_CATEGORIES } from "../categories";
 import { useAuthStore } from "../stores/auth";
+import { confirm } from "../composables/useConfirm";
 import { formatIls } from "../utils/format";
 import {
   type ChargeGroup,
@@ -326,7 +340,6 @@ const savedSnapshot = ref("");
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
 const newRecurring = ref({
@@ -351,6 +364,7 @@ const oneTimeCharges = computed(() =>
     .filter(isOneTimeCharge)
     .sort((a, b) => (b.charge_date ?? "").localeCompare(a.charge_date ?? "")),
 );
+const hasUnsavedChanges = computed(() => isDirty());
 
 watch(newRecurringOngoing, (on) => {
   if (on) newRecurring.value.through_month = ONGOING_THROUGH_MONTH;
@@ -387,14 +401,21 @@ function showSaveStatus(message: string, isError = false) {
   }
 }
 
-function queueSave(immediate = false) {
-  if (auth.isDemo) return;
-  if (saveTimer) clearTimeout(saveTimer);
-  if (immediate) {
-    void persistCharges();
-    return;
-  }
-  saveTimer = setTimeout(() => void persistCharges(), 700);
+async function saveChanges() {
+  await persistCharges();
+}
+
+async function discardChanges() {
+  const ok = await confirm({
+    title: "Discard changes?",
+    message: "Your unsaved edits will be lost.",
+    confirmLabel: "Discard",
+    tone: "danger",
+  });
+  if (!ok) return;
+  charges.value = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
+  status.value = "";
+  saveStatus.value = "";
 }
 
 async function persistCharges(): Promise<boolean> {
@@ -464,14 +485,12 @@ function toggleOngoing(seg: ConfiguredCharge, ongoing: boolean) {
   } else if (isOngoingThrough(seg.through_month)) {
     seg.through_month = currentYearMonth();
   }
-  queueSave();
 }
 
 function onOneTimeDateChange(charge: ConfiguredCharge, date: string) {
   charge.charge_date = date;
   charge.from_month = date.slice(0, 7);
   charge.through_month = date.slice(0, 7);
-  queueSave();
 }
 
 function nextMonthAfter(ym: string): string {
@@ -511,10 +530,17 @@ function addSegment(group: ChargeGroup) {
     from_month: fromMonth,
     through_month: ONGOING_THROUGH_MONTH,
   });
-  queueSave(true);
 }
 
 async function removeSegment(seg: ConfiguredCharge) {
+  const label = `${formatIls(seg.amount)} (${monthRangeLabel(seg.from_month, seg.through_month)})`;
+  const ok = await confirm({
+    title: "Delete period?",
+    message: `Remove this billing period — ${label}?`,
+    confirmLabel: "Delete period",
+    tone: "danger",
+  });
+  if (!ok) return;
   const key = segmentKey(seg);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
@@ -523,12 +549,25 @@ async function removeSegment(seg: ConfiguredCharge) {
 async function removeCharge(id: string) {
   const group = recurringGroups.value.find((g) => g.id === id);
   const label = group?.name_en ?? "this bill";
-  if (!window.confirm(`Remove ${label} from recurring bills?`)) return;
+  const ok = await confirm({
+    title: "Remove bill?",
+    message: `Remove ${label} from recurring bills?`,
+    confirmLabel: "Remove bill",
+    tone: "danger",
+  });
+  if (!ok) return;
   charges.value = charges.value.filter((c) => c.id !== id || isOneTimeCharge(c));
   await persistCharges();
 }
 
 async function removeOneTime(charge: ConfiguredCharge) {
+  const ok = await confirm({
+    title: "Delete charge?",
+    message: `Delete "${charge.name_en}" (${formatIls(charge.amount)})?`,
+    confirmLabel: "Delete",
+    tone: "danger",
+  });
+  if (!ok) return;
   const key = segmentKey(charge);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
@@ -657,10 +696,29 @@ async function load() {
   }
 }
 
-onMounted(load);
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (!auth.isDemo && isDirty()) {
+    e.preventDefault();
+  }
+}
+
+onBeforeRouteLeave(async () => {
+  if (auth.isDemo || !isDirty()) return true;
+  return confirm({
+    title: "Unsaved changes",
+    message: "You have unsaved changes. Leave without saving?",
+    confirmLabel: "Leave without saving",
+    cancelLabel: "Stay",
+  });
+});
+
+onMounted(() => {
+  load();
+  window.addEventListener("beforeunload", onBeforeUnload);
+});
 
 onUnmounted(() => {
-  if (saveTimer) clearTimeout(saveTimer);
+  window.removeEventListener("beforeunload", onBeforeUnload);
   if (saveStatusTimer) clearTimeout(saveStatusTimer);
 });
 </script>

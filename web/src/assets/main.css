@@ -942,6 +942,67 @@ button {
   width: 100%;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-dialog {
+  width: min(100%, 400px);
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 18%);
+}
+
+.confirm-dialog-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.confirm-dialog-title--danger {
+  color: var(--danger);
+}
+
+.confirm-dialog-message {
+  margin: 0 0 1.15rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+}
+
+@media (min-width: 480px) {
+  .confirm-dialog-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .confirm-dialog-actions .btn {
+    width: auto;
+    min-width: 6.5rem;
+  }
+}
+
+.confirm-dialog-actions .btn {
+  width: 100%;
+}
+
 .partial-statement-banner {
   font-size: 0.88rem;
   line-height: 1.45;
@@ -2126,6 +2187,38 @@ table.rules select {
   margin-bottom: 1rem;
 }
 
+.recurring-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.recurring-unsaved-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.recurring-unsaved-text {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.recurring-unsaved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .recurring-save-status {
   margin: 0;
   font-size: 0.85rem;
@@ -2237,7 +2330,7 @@ table.rules select {
 }
 
 .recurring-segment-row--triple {
-  grid-template-columns: minmax(9rem, auto) minmax(5.5rem, 7rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
 }
 
 .recurring-segment-row .field-group {
@@ -2377,7 +2470,7 @@ table.rules select {
 }
 
 .recurring-add-schedule-row--triple {
-  grid-template-columns: minmax(9rem, auto) minmax(5.5rem, 7rem) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
 }
 
 .recurring-add-schedule-row .field-group {

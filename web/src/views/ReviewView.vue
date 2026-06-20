@@ -203,6 +203,7 @@ import {
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import { useAuthStore } from "../stores/auth";
+import { confirm as askConfirm } from "../composables/useConfirm";
 import type { ReviewQueueItem } from "../types";
 import { CATEGORY_PICKLIST } from "../categories";
 import { formatIls, formatTransactionDate } from "../utils/format";
@@ -476,7 +477,13 @@ async function confirm() {
 }
 
 async function reset() {
-  if (!window.confirm("Clear your review progress? Saved merchant labels will not be deleted.")) return;
+  const ok = await askConfirm({
+    title: "Clear progress?",
+    message: "Clear your review progress? Saved merchant labels will not be deleted.",
+    confirmLabel: "Clear progress",
+    tone: "danger",
+  });
+  if (!ok) return;
   await resetReviewProgress(auth.token || undefined);
   await load();
 }

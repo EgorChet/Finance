@@ -117,6 +117,7 @@ import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import TransactionList from "../components/TransactionList.vue";
 import { useAuthStore } from "../stores/auth";
+import { confirm } from "../composables/useConfirm";
 import type { MonthItem, Transaction } from "../types";
 import { CATEGORY_PICKLIST, rollupCategory } from "../categories";
 import { formatIls } from "../utils/format";
@@ -242,13 +243,13 @@ async function load() {
 async function excludeTransaction(tx: Transaction) {
   if (auth.isDemo) return;
   const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
-  if (
-    !window.confirm(
-      `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
-    )
-  ) {
-    return;
-  }
+  const ok = await confirm({
+    title: "Exclude transaction?",
+    message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
+    confirmLabel: "Exclude",
+    tone: "danger",
+  });
+  if (!ok) return;
   const key = transactionKey(tx);
   excludingKey.value = key;
   try {
