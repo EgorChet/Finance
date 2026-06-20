@@ -59,11 +59,28 @@ async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
 }
 
 export async function authStatus() {
-  return get<{ auth_required: boolean }>(`${BASE}/api/auth/status`);
+  return get<{
+    auth_required: boolean;
+    users?: { id: import("../types").HouseholdUserId; label: string }[];
+  }>(`${BASE}/api/auth/status`);
 }
 
-export async function login(password: string) {
-  return post<{ token: string; auth_required: boolean }>(`${BASE}/api/auth/login`, { password });
+export async function fetchAuthMe(token?: string) {
+  return get<{
+    user: import("../types").HouseholdUserId;
+    label: string;
+    features: import("../utils/users").UserFeatures;
+  }>(`${BASE}/api/auth/me`, token);
+}
+
+export async function login(password: string, user: import("../types").HouseholdUserId = "egor") {
+  return post<{
+    token: string;
+    auth_required: boolean;
+    user: import("../types").HouseholdUserId;
+    label: string;
+    features: import("../utils/users").UserFeatures;
+  }>(`${BASE}/api/auth/login`, { password, user });
 }
 
 export async function fetchMonths(demo: boolean, token?: string) {
@@ -304,6 +321,7 @@ export async function addCalendarEvent(
     importance?: import("../types").CalendarImportance;
     description?: string;
     recurrence?: import("../types").CalendarRecurrence;
+    created_by?: import("../types").HouseholdUserId;
   },
   token?: string,
 ) {
@@ -321,6 +339,7 @@ export async function updateCalendarEvent(
     importance?: import("../types").CalendarImportance;
     description?: string;
     recurrence?: import("../types").CalendarRecurrence;
+    created_by?: import("../types").HouseholdUserId;
   },
   token?: string,
 ) {

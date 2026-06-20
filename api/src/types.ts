@@ -162,6 +162,8 @@ export type CalendarRecurrence = "none" | "weekly" | "monthly" | "yearly";
 /** How much time the event blocks — drives default duration. */
 export type CalendarImportance = "quick" | "normal" | "important" | "all_day";
 
+export type HouseholdUserId = "egor" | "julia";
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -173,6 +175,8 @@ export interface CalendarEvent {
   importance?: CalendarImportance;
   description?: string;
   recurrence?: CalendarRecurrence;
+  /** Who added this event — egor or julia. */
+  created_by?: HouseholdUserId;
   created_at?: string;
   updated_at?: string;
 }

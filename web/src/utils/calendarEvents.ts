@@ -191,7 +191,7 @@ export function formatEventWhen(event: CalendarEvent, dateIso?: string): string 
   return time ? `${dateLabel} · ${time}${repeat}` : `${dateLabel}${repeat}`;
 }
 
-export function emptyEventForm(date: string) {
+export function emptyEventForm(date: string, createdBy: import("../types").HouseholdUserId = "egor") {
   return {
     title: "",
     date,
@@ -199,6 +199,7 @@ export function emptyEventForm(date: string) {
     start_time: "10:00",
     description: "",
     recurrence: "none" as CalendarRecurrence,
+    created_by: createdBy,
   };
 }
 
@@ -211,6 +212,7 @@ export function eventToForm(event: CalendarEvent) {
     start_time: event.start_time ?? "10:00",
     description: event.description ?? "",
     recurrence: event.recurrence ?? "none",
+    created_by: event.created_by ?? "egor",
   };
 }
 
@@ -221,6 +223,7 @@ export type CalendarEventFormState = {
   start_time?: string;
   description?: string;
   recurrence?: CalendarRecurrence;
+  created_by: import("../types").HouseholdUserId;
 };
 
 export function formToPayload(form: CalendarEventFormState): CalendarEventFormState & {

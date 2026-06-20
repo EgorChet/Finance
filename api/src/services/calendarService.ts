@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { readCalendar, writeCalendar } from "../storage/index.js";
-import type { CalendarData, CalendarEvent, CalendarImportance, CalendarRecurrence } from "../types.js";
+import type { CalendarData, CalendarEvent, CalendarImportance, CalendarRecurrence, HouseholdUserId } from "../types.js";
+import { defaultEventCreator, isHouseholdUserId } from "../users.js";
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -99,6 +100,9 @@ export function normalizeEvent(raw: Partial<CalendarEvent>, existing?: CalendarE
 
   const recurrence = normalizeRecurrence(raw.recurrence ?? existing?.recurrence ?? "none");
   const description = String(raw.description ?? existing?.description ?? "").trim() || undefined;
+  const created_by = isHouseholdUserId(raw.created_by)
+    ? raw.created_by
+    : defaultEventCreator(existing?.created_by);
 
   return {
     id: String(raw.id ?? existing?.id ?? "").trim() || randomUUID(),
@@ -110,6 +114,7 @@ export function normalizeEvent(raw: Partial<CalendarEvent>, existing?: CalendarE
     importance: resolvedImportance,
     description,
     recurrence,
+    created_by,
     created_at: existing?.created_at,
     updated_at: existing?.updated_at,
   };
@@ -124,6 +129,7 @@ export type CalendarEventInput = {
   importance?: CalendarImportance;
   description?: string;
   recurrence?: CalendarRecurrence;
+  created_by?: HouseholdUserId;
 };
 
 export async function loadCalendarData(): Promise<CalendarData> {
@@ -170,8 +176,11 @@ export async function listCalendarEvents(): Promise<CalendarData & { feed_token:
   return { ...data, feed_token };
 }
 
-export async function addCalendarEvent(input: CalendarEventInput): Promise<CalendarEvent> {
-  const event = normalizeEvent(input);
+export async function addCalendarEvent(input: CalendarEventInput, defaultCreator?: HouseholdUserId): Promise<CalendarEvent> {
+  const event = normalizeEvent({
+    ...input,
+    created_by: input.created_by ?? defaultCreator ?? "egor",
+  });
   if (!event) throw new Error("Invalid event — check title, date, and times");
   const now = new Date().toISOString();
   event.created_at = now;
@@ -253,7 +262,10 @@ function appendEventLines(lines: string[], ev: CalendarEvent, now: string): void
   }
 
   lines.push("SUMMARY:" + escapeIcs(ev.title));
-  if (ev.description) lines.push("DESCRIPTION:" + escapeIcs(ev.description));
+  const creatorLabel = ev.created_by === "julia" ? "Julia" : ev.created_by === "egor" ? "Egor" : "";
+  const creatorNote = creatorLabel ? `Added by ${creatorLabel}` : "";
+  const description = [ev.description?.trim(), creatorNote].filter(Boolean).join("\n\n");
+  if (description) lines.push("DESCRIPTION:" + escapeIcs(description));
   const rrule = recurrenceRule(ev.recurrence);
   if (rrule) lines.push("RRULE:" + rrule);
   const priority = icsPriority(ev.importance);

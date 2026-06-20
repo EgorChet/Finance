@@ -11,5 +11,6 @@ import { useAuthStore } from "./stores/auth";
 const auth = useAuthStore();
 onMounted(() => {
   auth.checkStatus().catch(() => undefined);
+  auth.refreshMe().catch(() => undefined);
 });
 </script>

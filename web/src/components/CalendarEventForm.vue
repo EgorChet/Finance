@@ -15,6 +15,21 @@
       </div>
 
       <fieldset class="calendar-radio-fieldset">
+        <legend class="field-label">Added by</legend>
+        <div class="calendar-radio-group calendar-radio-group--inline">
+          <label
+            v-for="person in HOUSEHOLD_USERS"
+            :key="person.id"
+            class="calendar-radio-option calendar-radio-option--compact"
+            :class="{ 'calendar-radio-option--active': form.created_by === person.id }"
+          >
+            <input v-model="form.created_by" type="radio" name="created_by" :value="person.id" />
+            <span class="calendar-radio-label">{{ person.label }}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="calendar-radio-fieldset">
         <legend class="field-label">How long</legend>
         <div class="calendar-radio-group">
           <label
@@ -61,7 +76,8 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
-import type { CalendarEvent } from "../types";
+import type { CalendarEvent, HouseholdUserId } from "../types";
+import { HOUSEHOLD_USERS } from "../utils/users";
 import {
   CALENDAR_IMPORTANCE_OPTIONS,
   CALENDAR_RECURRENCE_OPTIONS,
@@ -73,6 +89,7 @@ import {
 
 const props = defineProps<{
   modelDate: string;
+  defaultUser?: HouseholdUserId;
   editing?: boolean;
   event?: CalendarEvent | null;
   saving?: boolean;
@@ -84,7 +101,7 @@ const emit = defineEmits<{
   delete: [];
 }>();
 
-const form = reactive(emptyEventForm(props.modelDate));
+const form = reactive(emptyEventForm(props.modelDate, props.defaultUser ?? "egor"));
 
 watch(
   () => props.event,
@@ -92,7 +109,7 @@ watch(
     if (ev) {
       Object.assign(form, eventToForm(ev));
     } else {
-      Object.assign(form, emptyEventForm(props.modelDate));
+      Object.assign(form, emptyEventForm(props.modelDate, props.defaultUser ?? "egor"));
     }
   },
   { immediate: true },
@@ -102,6 +119,13 @@ watch(
   () => props.modelDate,
   (date) => {
     if (!props.editing) form.date = date;
+  },
+);
+
+watch(
+  () => props.defaultUser,
+  (user) => {
+    if (!props.editing && user) form.created_by = user;
   },
 );
 

@@ -588,6 +588,79 @@ button {
   line-height: 1.4;
 }
 
+.login-user-picker {
+  border: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.login-user-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
+.login-user-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.login-user-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.login-user-option--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-alt));
+}
+
+.mobile-nav-user {
+  margin: 0.35rem 0 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.mobile-nav-user strong {
+  color: var(--text);
+}
+
+.calendar-creator-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+
+.calendar-creator-badge.calendar-creator-dot--egor {
+  background: color-mix(in srgb, #60a5fa 18%, var(--surface-alt));
+  color: #93c5fd;
+}
+
+.calendar-creator-badge.calendar-creator-dot--julia {
+  background: color-mix(in srgb, #f472b6 18%, var(--surface-alt));
+  color: #f9a8d4;
+}
+
+.home-event-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .app-layout {
   min-height: 100vh;
   min-height: 100dvh;

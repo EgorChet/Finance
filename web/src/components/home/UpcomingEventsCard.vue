@@ -12,7 +12,12 @@
         <li v-for="item in upcoming" :key="`${item.event.id}-${item.date}`" class="home-event-row">
           <span class="calendar-importance-dot" :class="importanceClass(item.event)" aria-hidden="true" />
           <div class="home-event-text">
-            <span class="home-event-title">{{ item.event.title }}</span>
+            <span class="home-event-title">
+              {{ item.event.title }}
+              <span v-if="item.event.created_by" class="calendar-creator-badge" :class="creatorClass(item.event.created_by)">
+                {{ userLabel(item.event.created_by) }}
+              </span>
+            </span>
             <span class="home-event-when">{{ formatEventWhen(item.event, item.date) }}</span>
           </div>
         </li>
@@ -26,6 +31,7 @@ import { computed } from "vue";
 import AppLoader from "../AppLoader.vue";
 import type { CalendarEvent } from "../../types";
 import { formatEventWhen, inferImportance, upcomingOccurrences } from "../../utils/calendarEvents";
+import { creatorClass, userLabel } from "../../utils/users";
 
 const props = defineProps<{
   loading: boolean;

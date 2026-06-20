@@ -443,6 +443,7 @@ export function demoCalendar() {
         end_time: "16:00",
         description: "Ramat Aviv",
         recurrence: "none" as const,
+        created_by: "julia" as const,
       },
       {
         id: "demo-birthday",
@@ -452,6 +453,7 @@ export function demoCalendar() {
         all_day: true,
         description: "Family dinner",
         recurrence: "yearly" as const,
+        created_by: "egor" as const,
       },
       {
         id: "demo-rent",
@@ -460,6 +462,7 @@ export function demoCalendar() {
         importance: "all_day" as const,
         all_day: true,
         recurrence: "monthly" as const,
+        created_by: "egor" as const,
       },
     ],
     feed_token: null as string | null,

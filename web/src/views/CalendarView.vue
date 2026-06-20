@@ -19,6 +19,7 @@
       <CalendarEventForm
         v-if="!auth.isDemo && showForm"
         :model-date="selectedDate"
+        :default-user="auth.userId ?? 'egor'"
         :editing="!!editingEvent"
         :event="editingEvent"
         :saving="saving"
@@ -54,7 +55,12 @@
             >
               <span class="calendar-importance-dot" :class="importanceClass(item.event)" aria-hidden="true" />
               <div class="calendar-event-text">
-                <p class="calendar-event-title">{{ item.event.title }}</p>
+                <p class="calendar-event-title">
+                  {{ item.event.title }}
+                  <span v-if="item.event.created_by" class="calendar-creator-badge" :class="creatorClass(item.event.created_by)">
+                    {{ userLabel(item.event.created_by) }}
+                  </span>
+                </p>
                 <p class="calendar-event-meta">{{ formatEventWhen(item.event, item.date) }}</p>
                 <p v-if="item.event.description" class="calendar-event-desc">{{ item.event.description }}</p>
               </div>
@@ -135,6 +141,7 @@ import {
   type CalendarPeriodFilter,
   formToPayload,
 } from "../utils/calendarEvents";
+import { creatorClass, userLabel } from "../utils/users";
 
 const auth = useAuthStore();
 const loading = ref(true);

@@ -178,6 +178,9 @@
             <button v-if="auth.isDemo" type="button" class="mobile-nav-action btn" @click="goLogin">
               Sign in for real data
             </button>
+            <p v-else-if="auth.userLabel" class="mobile-nav-user">
+              Signed in as <strong>{{ auth.userLabel }}</strong>
+            </p>
             </div>
           </div>
         </nav>

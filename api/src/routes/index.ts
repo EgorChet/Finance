@@ -65,6 +65,7 @@ import {
   updateCalendarEvent,
 } from "../services/calendarService.js";
 import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
+import { userIdFromRequest } from "../auth.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
@@ -495,7 +496,7 @@ router.get("/calendar", async (_req, res) => {
 });
 
 router.post("/calendar/events", async (req, res) => {
-  const { title, date, all_day, start_time, end_time, importance, description, recurrence } = req.body as {
+  const { title, date, all_day, start_time, end_time, importance, description, recurrence, created_by } = req.body as {
     title?: string;
     date?: string;
     all_day?: boolean;
@@ -504,22 +505,30 @@ router.post("/calendar/events", async (req, res) => {
     importance?: string;
     description?: string;
     recurrence?: string;
+    created_by?: string;
   };
   if (!title?.trim() || !date?.trim()) {
     res.status(400).json({ error: "title and date required" });
     return;
   }
   try {
-    const event = await addCalendarEvent({
-      title,
-      date,
-      all_day,
-      start_time,
-      end_time,
-      importance: importance as import("../types.js").CalendarImportance,
-      description,
-      recurrence: recurrence as import("../types.js").CalendarRecurrence,
-    });
+    const event = await addCalendarEvent(
+      {
+        title,
+        date,
+        all_day,
+        start_time,
+        end_time,
+        importance: importance as import("../types.js").CalendarImportance,
+        description,
+        recurrence: recurrence as import("../types.js").CalendarRecurrence,
+        created_by:
+          created_by === "julia" || created_by === "egor"
+            ? created_by
+            : undefined,
+      },
+      userIdFromRequest(req),
+    );
     res.json({ ok: true, event });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not add event";
@@ -533,7 +542,7 @@ router.put("/calendar/events/:id", async (req, res) => {
     res.status(400).json({ error: "id required" });
     return;
   }
-  const { title, date, all_day, start_time, end_time, importance, description, recurrence } = req.body as {
+  const { title, date, all_day, start_time, end_time, importance, description, recurrence, created_by } = req.body as {
     title?: string;
     date?: string;
     all_day?: boolean;
@@ -542,6 +551,7 @@ router.put("/calendar/events/:id", async (req, res) => {
     importance?: string;
     description?: string;
     recurrence?: string;
+    created_by?: string;
   };
   if (!title?.trim() || !date?.trim()) {
     res.status(400).json({ error: "title and date required" });
@@ -557,6 +567,7 @@ router.put("/calendar/events/:id", async (req, res) => {
       importance: importance as import("../types.js").CalendarImportance,
       description,
       recurrence: recurrence as import("../types.js").CalendarRecurrence,
+      created_by: created_by === "julia" || created_by === "egor" ? created_by : undefined,
     });
     if (!event) {
       res.status(404).json({ error: "Event not found" });

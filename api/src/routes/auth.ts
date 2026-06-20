@@ -1,23 +1,49 @@
 import { Router } from "express";
-import { authEnabled, checkPassword, createToken } from "../auth.js";
+import {
+  authEnabled,
+  bearerToken,
+  checkPassword,
+  createToken,
+  requireAuth,
+  verifyTokenDetails,
+} from "../auth.js";
+import { listAuthUsers, parseUserId, userProfile } from "../users.js";
 
 const router = Router();
 
 router.get("/status", (_req, res) => {
-  res.json({ auth_required: authEnabled() });
+  res.json({
+    auth_required: authEnabled(),
+    users: listAuthUsers(),
+  });
 });
 
 router.post("/login", (req, res) => {
-  const { password } = req.body as { password?: string };
+  const { password, user } = req.body as { password?: string; user?: string };
+  const userId = parseUserId(user) ?? "egor";
   if (!authEnabled()) {
-    res.json({ token: createToken(), auth_required: false });
+    const profile = userProfile(userId);
+    res.json({ token: createToken(userId), auth_required: false, user: userId, label: profile.label, features: profile.features });
     return;
   }
-  if (!password || !checkPassword(password)) {
+  if (!password || !checkPassword(password, userId)) {
     res.status(401).json({ error: "Invalid password" });
     return;
   }
-  res.json({ token: createToken(), auth_required: true });
+  const profile = userProfile(userId);
+  res.json({
+    token: createToken(userId),
+    auth_required: true,
+    user: userId,
+    label: profile.label,
+    features: profile.features,
+  });
+});
+
+router.get("/me", requireAuth, (req, res) => {
+  const details = verifyTokenDetails(bearerToken(req));
+  const profile = userProfile(details.userId);
+  res.json({ user: profile.id, label: profile.label, features: profile.features });
 });
 
 export default router;
