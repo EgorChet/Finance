@@ -2329,23 +2329,61 @@ table.rules select {
   align-items: start;
 }
 
-.recurring-segment-row--triple {
-  grid-template-columns: minmax(0, 35fr) minmax(0, 25fr) minmax(0, 40fr);
+.recurring-segment-row--triple,
+.recurring-add-schedule-row--triple {
+  display: flex;
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+  width: 100%;
+}
+
+.recurring-segment-row--triple > .field-group,
+.recurring-add-schedule-row--triple > .field-group {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recurring-segment-row--triple > .field-group:nth-child(1),
+.recurring-add-schedule-row--triple > .field-group:nth-child(1) {
+  flex: 35 1 0;
+}
+
+.recurring-segment-row--triple > .field-group:nth-child(2),
+.recurring-add-schedule-row--triple > .field-group:nth-child(2) {
+  flex: 25 1 0;
+}
+
+.recurring-segment-row--triple > .field-group:nth-child(3),
+.recurring-add-schedule-row--triple > .field-group:nth-child(3) {
+  flex: 35 1 0;
 }
 
 .recurring-segment-row--triple .input,
 .recurring-add-schedule-row--triple .input {
+  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
-.recurring-segment-row--triple input[type="date"] {
+.recurring-segment-row--triple input[type="date"],
+.recurring-add-schedule-row--triple input[type="date"] {
   display: block;
+  padding-left: 0.5rem;
+  padding-right: 0.25rem;
 }
 
+.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit-fields-wrapper,
 .recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit,
 .recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit {
   min-width: 0;
+  overflow: hidden;
+}
+
+.recurring-segment-row--triple input[type="date"]::-webkit-calendar-picker-indicator,
+.recurring-add-schedule-row--triple input[type="date"]::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
 }
 
 .recurring-segment-row .field-group {
@@ -2482,10 +2520,6 @@ table.rules select {
   grid-template-columns: minmax(5.5rem, 0.85fr) 1fr;
   gap: 0.5rem 0.75rem;
   align-items: start;
-}
-
-.recurring-add-schedule-row--triple {
-  grid-template-columns: minmax(0, 35fr) minmax(0, 25fr) minmax(0, 40fr);
 }
 
 .recurring-add-schedule-row .field-group {
