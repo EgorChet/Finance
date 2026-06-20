@@ -175,7 +175,6 @@ export interface CalendarEvent {
   importance?: CalendarImportance;
   description?: string;
   recurrence?: CalendarRecurrence;
-  /** Who added this event — egor or julia. */
   created_by?: HouseholdUserId;
   created_at?: string;
   updated_at?: string;

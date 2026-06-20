@@ -7,23 +7,23 @@
       </p>
 
       <template v-if="showPasswordForm">
-        <fieldset class="login-user-picker">
-          <legend class="field-label">You are</legend>
-          <div class="login-user-options">
-            <label
-              v-for="person in loginUsers"
-              :key="person.id"
-              class="login-user-option"
-              :class="{ 'login-user-option--active': selectedUser === person.id }"
-            >
-              <input v-model="selectedUser" type="radio" name="login-user" :value="person.id" />
-              <span>{{ person.label }}</span>
-            </label>
-          </div>
-        </fieldset>
-
-        <label>Password</label>
+        <label for="login-username">Your name</label>
         <input
+          id="login-username"
+          ref="usernameInput"
+          v-model="username"
+          class="input"
+          type="text"
+          :placeholder="nameHint"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          @keyup.enter="focusPassword"
+        />
+
+        <label for="login-password">Password</label>
+        <input
+          id="login-password"
           ref="passwordInput"
           v-model="password"
           class="input"
@@ -61,17 +61,17 @@
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
-import type { HouseholdUserId } from "../types";
-import { DEFAULT_HOUSEHOLD_USERS } from "../utils/users";
+import { loginNameHint } from "../utils/users";
 import { shouldShowSignInForm, wantsSignIn } from "../utils/signIn";
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
+const username = ref("");
 const password = ref("");
+const usernameInput = ref<HTMLInputElement | null>(null);
 const passwordInput = ref<HTMLInputElement | null>(null);
-const selectedUser = ref<HouseholdUserId>("egor");
-const loginUsers = computed(() => auth.householdUsers);
+const nameHint = computed(() => loginNameHint(auth.userDirectory));
 
 const showPasswordForm = computed(() => shouldShowSignInForm(auth.authRequired, route.query));
 
@@ -89,17 +89,27 @@ onMounted(async () => {
   await ensureAuthStatus();
   if (showPasswordForm.value) {
     await nextTick();
-    passwordInput.value?.focus();
+    usernameInput.value?.focus();
   }
 });
 
+function focusPassword() {
+  passwordInput.value?.focus();
+}
+
 async function doLogin() {
+  if (!username.value.trim()) {
+    auth.error = `Enter your name (${nameHint.value})`;
+    usernameInput.value?.focus();
+    return;
+  }
   if (!password.value.trim()) {
     auth.error = "Enter your password";
+    passwordInput.value?.focus();
     return;
   }
   try {
-    await auth.login(password.value, selectedUser.value);
+    await auth.login(password.value, username.value);
     await router.push({ name: "home" });
   } catch {
     /* error shown */

@@ -7,7 +7,7 @@ import {
   requireAuth,
   verifyTokenDetails,
 } from "../auth.js";
-import { listAuthUsers, parseUserId, userProfile } from "../users.js";
+import { listAuthUsers, parseUsername, parseUserId, userProfile, loginNameHint } from "../users.js";
 
 const router = Router();
 
@@ -19,8 +19,12 @@ router.get("/status", (_req, res) => {
 });
 
 router.post("/login", (req, res) => {
-  const { password, user } = req.body as { password?: string; user?: string };
-  const userId = parseUserId(user) ?? "egor";
+  const { password, user, username } = req.body as { password?: string; user?: string; username?: string };
+  const userId = parseUsername(username ?? "") ?? parseUserId(user) ?? null;
+  if (!userId) {
+    res.status(401).json({ error: `Unknown name — use ${loginNameHint()}` });
+    return;
+  }
   if (!authEnabled()) {
     const profile = userProfile(userId);
     res.json({ token: createToken(userId), auth_required: false, user: userId, label: profile.label, features: profile.features });

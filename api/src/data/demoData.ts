@@ -436,7 +436,7 @@ export function demoCalendar() {
     events: [
       {
         id: "demo-nails",
-        title: "Julia nails",
+        title: "Nail appointment",
         date: "2026-06-18",
         importance: "normal" as const,
         start_time: "14:00",

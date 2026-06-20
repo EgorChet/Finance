@@ -52,7 +52,20 @@ export function parseUserId(value: unknown): HouseholdUserId | null {
   return isHouseholdUserId(value) ? value : null;
 }
 
-/** Same family password for both — pick a name only to tag calendar events etc. */
+export function parseUsername(raw: string): HouseholdUserId | null {
+  const name = raw.trim().toLowerCase();
+  if (!name) return null;
+  const bossLabel = displayLabel("egor").toLowerCase();
+  const juliaLabel = displayLabel("julia").toLowerCase();
+  if (name === "egor" || name === bossLabel) return "egor";
+  if (name === "julia" || name === juliaLabel) return "julia";
+  return null;
+}
+
+export function loginNameHint(): string {
+  return `${displayLabel("egor")} or ${displayLabel("julia")}`;
+}
+
 export function passwordForUser(userId: HouseholdUserId): string | undefined {
   const shared = process.env.AUTH_PASSWORD?.trim();
   if (userId === "egor") {

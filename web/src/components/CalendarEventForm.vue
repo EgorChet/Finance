@@ -7,7 +7,7 @@
     <div class="calendar-form-fields">
       <div class="field-group">
         <label class="field-label">Title</label>
-        <input v-model="form.title" class="input" placeholder="e.g. Julia nails" />
+        <input v-model="form.title" class="input" placeholder="e.g. Dentist" />
       </div>
       <div class="field-group calendar-date-field">
         <label class="field-label">Date</label>

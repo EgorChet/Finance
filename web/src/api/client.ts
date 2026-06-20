@@ -73,14 +73,14 @@ export async function fetchAuthMe(token?: string) {
   }>(`${BASE}/api/auth/me`, token);
 }
 
-export async function login(password: string, user: import("../types").HouseholdUserId = "egor") {
+export async function login(password: string, username: string) {
   return post<{
     token: string;
     auth_required: boolean;
     user: import("../types").HouseholdUserId;
     label: string;
     features: import("../utils/users").UserFeatures;
-  }>(`${BASE}/api/auth/login`, { password, user });
+  }>(`${BASE}/api/auth/login`, { password, username });
 }
 
 export async function fetchMonths(demo: boolean, token?: string) {

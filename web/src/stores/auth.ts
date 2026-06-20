@@ -7,6 +7,8 @@ import {
   DEFAULT_HOUSEHOLD_USERS,
   DEFAULT_USER_LABELS,
   directoryFromUsers,
+  loginNameHint,
+  parseUsername,
   userIdFromToken,
   userLabel as labelForUser,
   type UserFeatures,
@@ -95,11 +97,16 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function login(password: string, user: HouseholdUserId = "egor") {
+  async function login(password: string, username: string) {
+    const resolved = parseUsername(username, userDirectory.value);
+    if (!resolved) {
+      error.value = `Unknown name — use ${loginNameHint(userDirectory.value)}`;
+      throw new Error(error.value);
+    }
     loading.value = true;
     error.value = "";
     try {
-      const res = await apiLogin(password, user);
+      const res = await apiLogin(password, username.trim());
       applySession({
         token: res.token,
         user: res.user,
@@ -112,7 +119,9 @@ export const useAuthStore = defineStore("auth", () => {
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/fetch|network|failed|load/i.test(msg)) {
+      if (/unknown name/i.test(msg)) {
+        error.value = msg;
+      } else if (/fetch|network|failed|load/i.test(msg)) {
         error.value = "Could not reach the server — check your connection and try again.";
       } else {
         error.value = "Wrong password";
