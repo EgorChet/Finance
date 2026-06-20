@@ -616,8 +616,6 @@ button {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .app-kaspa-logo {

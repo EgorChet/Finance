@@ -192,8 +192,9 @@ let kaspaTimer: ReturnType<typeof setInterval> | null = null;
 
 const kaspaTitle = computed(() => {
   if (!kaspaQuote.value) return "";
-  const { price_usdt, balance_kas, portfolio_usdt } = kaspaQuote.value;
-  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} portfolio`;
+  const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
+  const staleNote = stale ? " · cached" : "";
+  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} portfolio · ${source}${staleNote}`;
 });
 
 async function refreshKaspaQuote() {

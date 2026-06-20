@@ -19,10 +19,13 @@ export function formatUsdt(amount: number, decimals = 2): string {
   })} USDT`;
 }
 
-/** Spot KAS price — extra precision for sub-dollar coins. */
+/** Spot KAS price — keep sub-dollar precision (do not round to 2 dp). */
 export function formatKasUsdtPrice(price: number): string {
-  const decimals = price < 0.1 ? 4 : 2;
-  return formatUsdt(price, decimals);
+  const decimals = price < 1 ? 5 : 2;
+  return `${price.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })} USDT`;
 }
 
 const CURRENCY_PREFIX: Record<string, string> = {

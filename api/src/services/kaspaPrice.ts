@@ -34,8 +34,13 @@ export type KaspaQuote = {
   balance_kas: number;
   portfolio_usdt: number;
   updated_at: string;
+  source: string;
   stale?: boolean;
 };
+
+function roundPrice(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
 
 async function fetchFromMexc(): Promise<number | null> {
   const symbol = mexcSymbol();
@@ -110,21 +115,31 @@ async function loadCachedPrice(): Promise<MemoryCache | null> {
 
 function quoteFromCache(cached: MemoryCache, stale: boolean): KaspaQuote {
   const balance = kasBalance();
+  const price = roundPrice(cached.priceUsdt);
   return {
     enabled: true,
-    price_usdt: cached.priceUsdt,
+    price_usdt: price,
     balance_kas: balance,
-    portfolio_usdt: roundMoney(balance * cached.priceUsdt),
+    portfolio_usdt: roundMoney(balance * price),
     updated_at: new Date(cached.fetchedAt).toISOString(),
+    source: cached.source,
     stale: stale || undefined,
   };
+}
+
+function cacheNeedsRefresh(cached: MemoryCache | null, now: number): boolean {
+  if (!cached) return true;
+  if (now - cached.fetchedAt > CACHE_MS) return true;
+  // After switching to MEXC, replace older provider entries even if still "fresh".
+  if (cached.source !== "mexc") return true;
+  return false;
 }
 
 export async function getKaspaQuote(): Promise<KaspaQuote> {
   const now = Date.now();
   let cached = await loadCachedPrice();
 
-  if (!cached || now - cached.fetchedAt > CACHE_MS) {
+  if (cacheNeedsRefresh(cached, now)) {
     const fresh = await refreshPrice();
     if (fresh != null) {
       cached = memoryCache;
