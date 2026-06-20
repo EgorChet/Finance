@@ -8,6 +8,15 @@ export type UserFeatures = {
   recurring: boolean;
 };
 
+/** Everyone gets full access for now. */
+export const ALL_FEATURES: UserFeatures = {
+  portfolio: true,
+  spending: true,
+  calendar: true,
+  upload: true,
+  recurring: true,
+};
+
 export type UserProfile = {
   id: HouseholdUserId;
   label: string;

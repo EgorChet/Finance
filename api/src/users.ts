@@ -22,6 +22,9 @@ const DEFAULT_FEATURES: UserFeatures = {
   recurring: true,
 };
 
+/** Everyone gets full access for now — flip individual flags later if needed. */
+export const ALL_FEATURES: UserFeatures = { ...DEFAULT_FEATURES };
+
 export const HOUSEHOLD_USER_IDS: HouseholdUserId[] = ["egor", "julia"];
 
 function displayLabel(userId: HouseholdUserId): string {
@@ -33,7 +36,7 @@ export function userProfile(userId: HouseholdUserId): UserProfile {
   return {
     id: userId,
     label: displayLabel(userId),
-    features: { ...DEFAULT_FEATURES },
+    features: ALL_FEATURES,
   };
 }
 

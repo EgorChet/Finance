@@ -2,24 +2,17 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { authStatus, fetchAuthMe, login as apiLogin } from "../api/client";
 import type { HouseholdUserId } from "../types";
-import type { UserFeatures } from "../utils/users";
 import {
+  ALL_FEATURES,
   DEFAULT_HOUSEHOLD_USERS,
   DEFAULT_USER_LABELS,
   directoryFromUsers,
   userIdFromToken,
   userLabel as labelForUser,
+  type UserFeatures,
 } from "../utils/users";
 
 const TOKEN_KEY = "finance_auth_token";
-
-const DEFAULT_FEATURES: UserFeatures = {
-  portfolio: true,
-  spending: true,
-  calendar: true,
-  upload: true,
-  recurring: true,
-};
 
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
@@ -32,7 +25,7 @@ export const useAuthStore = defineStore("auth", () => {
   const userDirectory = ref<Record<HouseholdUserId, string>>({ ...DEFAULT_USER_LABELS });
   const householdUsers = ref(DEFAULT_HOUSEHOLD_USERS);
   const userLabel = ref(userId.value ? labelForUser(userId.value, userDirectory.value) : "");
-  const features = ref<UserFeatures>({ ...DEFAULT_FEATURES });
+  const features = ref<UserFeatures>({ ...ALL_FEATURES });
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
 
@@ -57,7 +50,7 @@ export const useAuthStore = defineStore("auth", () => {
       isDemo.value = true;
       userId.value = "egor";
       userLabel.value = labelForUser("egor", userDirectory.value);
-      features.value = { ...DEFAULT_FEATURES };
+      features.value = { ...ALL_FEATURES };
       localStorage.removeItem(TOKEN_KEY);
       return;
     }
@@ -70,7 +63,7 @@ export const useAuthStore = defineStore("auth", () => {
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
     userId.value = resolvedUser;
     userLabel.value = next.label ?? labelForUser(resolvedUser, userDirectory.value);
-    features.value = next.features ?? { ...DEFAULT_FEATURES };
+    features.value = next.features ?? { ...ALL_FEATURES };
   }
 
   async function checkStatus() {
@@ -140,9 +133,8 @@ export const useAuthStore = defineStore("auth", () => {
     demoAsOf.value = null;
   }
 
-  function can(feature: keyof UserFeatures): boolean {
-    if (isDemo.value) return true;
-    return features.value[feature] !== false;
+  function can(_feature: keyof UserFeatures): boolean {
+    return true;
   }
 
   function labelFor(id: HouseholdUserId | null | undefined): string {
