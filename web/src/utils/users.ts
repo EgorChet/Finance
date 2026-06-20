@@ -50,8 +50,8 @@ export function parseUsername(
   if (!name) return null;
   const primary = (labels.egor ?? DEFAULT_USER_LABELS.egor).toLowerCase();
   const secondary = (labels.julia ?? DEFAULT_USER_LABELS.julia).toLowerCase();
-  if (name === "egor" || (primary && name === primary)) return "egor";
-  if (name === "julia" || (secondary && name === secondary)) return "julia";
+  if (primary && name === primary) return "egor";
+  if (secondary && name === secondary) return "julia";
   return null;
 }
 

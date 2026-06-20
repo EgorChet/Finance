@@ -7,7 +7,7 @@ import {
   requireAuth,
   verifyTokenDetails,
 } from "../auth.js";
-import { listAuthUsers, parseUsername, parseUserId, userProfile } from "../users.js";
+import { listAuthUsers, parseUsername, userProfile } from "../users.js";
 
 const router = Router();
 
@@ -16,8 +16,8 @@ router.get("/status", (_req, res) => {
 });
 
 router.post("/login", (req, res) => {
-  const { password, user, username } = req.body as { password?: string; user?: string; username?: string };
-  const userId = parseUsername(username ?? "") ?? parseUserId(user) ?? null;
+  const { password, username } = req.body as { password?: string; username?: string };
+  const userId = parseUsername(username ?? "");
   if (!userId) {
     res.status(401).json({ error: "Unknown name" });
     return;

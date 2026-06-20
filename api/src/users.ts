@@ -57,8 +57,8 @@ export function parseUsername(raw: string): HouseholdUserId | null {
   if (!name) return null;
   const primaryLabel = displayLabel("egor").toLowerCase();
   const secondaryLabel = displayLabel("julia").toLowerCase();
-  if (name === "egor" || (primaryLabel && name === primaryLabel)) return "egor";
-  if (name === "julia" || (secondaryLabel && name === secondaryLabel)) return "julia";
+  if (primaryLabel && name === primaryLabel) return "egor";
+  if (secondaryLabel && name === secondaryLabel) return "julia";
   return null;
 }
 
