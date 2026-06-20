@@ -25,19 +25,21 @@
             <span class="excluded-card-date">{{ row.date ? formatTransactionDate(row.date) : "—" }}</span>
           </div>
           <p class="excluded-card-merchant">{{ row.merchant_he || row.key }}</p>
-          <p class="excluded-card-note">
-            <span v-if="row.note">{{ row.note }}</span>
-            <span v-else>Not my spend</span>
-            <span v-if="row.source === 'builtin'" class="excluded-source-pill">Default</span>
-          </p>
-          <button
-            type="button"
-            class="btn btn-ghost"
-            :disabled="auth.isDemo || restoringKey === row.key"
-            @click="restore(row)"
-          >
-            {{ restoringKey === row.key ? "Restoring…" : "Restore" }}
-          </button>
+          <div class="excluded-card-footer">
+            <p class="excluded-card-note">
+              <span v-if="row.note">{{ row.note }}</span>
+              <span v-else>Not my spend</span>
+              <span v-if="row.source === 'builtin'" class="excluded-source-pill">Default</span>
+            </p>
+            <button
+              type="button"
+              class="btn excluded-card-restore"
+              :disabled="auth.isDemo || restoringKey === row.key"
+              @click="restore(row)"
+            >
+              {{ restoringKey === row.key ? "Restoring…" : "Restore" }}
+            </button>
+          </div>
         </article>
       </div>
       <p v-if="status" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem">{{ status }}</p>
