@@ -27,9 +27,24 @@ export const ALL_FEATURES: UserFeatures = { ...DEFAULT_FEATURES };
 
 export const HOUSEHOLD_USER_IDS: HouseholdUserId[] = ["egor", "julia"];
 
+function loginLabels(): Record<HouseholdUserId, string> {
+  const fromList = process.env.AUTH_LABELS?.split(",").map((part) => part.trim()).filter(Boolean);
+  if (fromList?.length === 2) {
+    return { egor: fromList[0]!, julia: fromList[1]! };
+  }
+  return {
+    egor: process.env.AUTH_LABEL_EGOR?.trim() || "",
+    julia: process.env.AUTH_LABEL_JULIA?.trim() || "",
+  };
+}
+
+export function loginLabelsConfigured(): boolean {
+  const labels = loginLabels();
+  return Boolean(labels.egor && labels.julia);
+}
+
 function displayLabel(userId: HouseholdUserId): string {
-  if (userId === "egor") return process.env.AUTH_LABEL_EGOR?.trim() || "";
-  return process.env.AUTH_LABEL_JULIA?.trim() || "";
+  return loginLabels()[userId];
 }
 
 export function userProfile(userId: HouseholdUserId): UserProfile {
@@ -53,12 +68,14 @@ export function parseUserId(value: unknown): HouseholdUserId | null {
 }
 
 export function parseUsername(raw: string): HouseholdUserId | null {
+  if (!loginLabelsConfigured()) return null;
   const name = raw.trim().toLowerCase();
   if (!name) return null;
-  const primaryLabel = displayLabel("egor").toLowerCase();
-  const secondaryLabel = displayLabel("julia").toLowerCase();
-  if (primaryLabel && name === primaryLabel) return "egor";
-  if (secondaryLabel && name === secondaryLabel) return "julia";
+  const labels = loginLabels();
+  const primaryLabel = labels.egor.toLowerCase();
+  const secondaryLabel = labels.julia.toLowerCase();
+  if (name === primaryLabel) return "egor";
+  if (name === secondaryLabel) return "julia";
   return null;
 }
 

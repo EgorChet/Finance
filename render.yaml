@@ -11,6 +11,12 @@ services:
         sync: false
       - key: AUTH_PASSWORD
         sync: false
+      - key: AUTH_LABELS
+        sync: false
+      - key: AUTH_LABEL_EGOR
+        sync: false
+      - key: AUTH_LABEL_JULIA
+        sync: false
       - key: AUTH_SECRET
         generateValue: true
       - key: ALLOWED_ORIGINS

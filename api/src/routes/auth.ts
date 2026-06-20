@@ -7,7 +7,7 @@ import {
   requireAuth,
   verifyTokenDetails,
 } from "../auth.js";
-import { listAuthUsers, parseUsername, userProfile } from "../users.js";
+import { listAuthUsers, loginLabelsConfigured, parseUsername, userProfile } from "../users.js";
 
 const router = Router();
 
@@ -17,6 +17,10 @@ router.get("/status", (_req, res) => {
 
 router.post("/login", (req, res) => {
   const { password, username } = req.body as { password?: string; username?: string };
+  if (authEnabled() && !loginLabelsConfigured()) {
+    res.status(503).json({ error: "Sign-in unavailable" });
+    return;
+  }
   const userId = parseUsername(username ?? "");
   if (!userId) {
     res.status(401).json({ error: "Unknown name" });

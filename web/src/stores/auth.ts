@@ -120,6 +120,8 @@ export const useAuthStore = defineStore("auth", () => {
       const msg = e instanceof Error ? e.message : String(e);
       if (/unknown name/i.test(msg)) {
         error.value = "Unknown name";
+      } else if (/sign-in unavailable/i.test(msg)) {
+        error.value = "Sign-in is not configured on the server yet.";
       } else if (/fetch|network|failed|load/i.test(msg)) {
         error.value = "Could not reach the server — check your connection and try again.";
       } else {

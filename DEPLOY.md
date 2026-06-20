@@ -70,6 +70,7 @@ Re-run after big local changes if you want production to match.
 | Variable | Value |
 |----------|--------|
 | `AUTH_PASSWORD` | Shared family password (you + wife) |
+| `AUTH_LABELS` | Login names, comma-separated — e.g. two household names (required for sign-in) |
 | `AUTH_SECRET` | Long random string (Render can auto-generate) |
 | `SUPABASE_URL` | From Supabase |
 | `SUPABASE_SERVICE_KEY` | From Supabase |
