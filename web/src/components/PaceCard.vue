@@ -100,10 +100,11 @@
                   </table>
                 </div>
                 <p class="pace-simple-footnote">
-                  “Your normal at this point” averages everyday spend through today across your last
-                  {{ pace.cyclesUsed || 3 }} uploaded cycles.
-                  “Your normal month” is the average full total of those same cycles (about
-                  {{ pace.cyclesUsed || 3 }} months).
+                  “Your normal at this point” compares everyday spend through today.
+                  “On track for” weights the second half of the cycle heavier (×{{
+                    (pace.secondHalfMultiplier ?? 1.2).toFixed(2)
+                  }}, from your last {{ pace.cyclesUsed || 3 }} cycles).
+                  “Your normal month” is the average full total of those cycles.
                 </p>
               </details>
             </template>

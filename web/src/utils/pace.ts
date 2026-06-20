@@ -57,6 +57,8 @@ export interface PaceResult {
   /** Variable spend in recent cycles through tomorrow's day index in the billing month. */
   avgCyclesTomorrowVariable: number;
   avgCyclesTomorrowLabel: string;
+  /** Second-half daily weight vs first half (1.0 = flat; 1.2 = 20% heavier). */
+  secondHalfMultiplier: number;
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -177,6 +179,92 @@ function spendAtDay(
 function fullCycleTotal(bucket: CycleBucket): number {
   const cycleLength = daysBetween(bucket.start, bucket.end) + 1;
   return spendAtDay(bucket, cycleLength).total;
+}
+
+function variableThroughDay(bucket: CycleBucket, dayIndex: number): number {
+  if (dayIndex <= 0) return 0;
+  const at = spendAtDay(bucket, dayIndex);
+  return roundMoney(at.total - at.fixed);
+}
+
+/** First half of cycle weight 1; second half weight `secondHalfMultiplier` (e.g. 1.2). */
+export const DEFAULT_SECOND_HALF_MULTIPLIER = 1.2;
+
+function midpointDay(cycleLength: number): number {
+  return Math.ceil(cycleLength / 2);
+}
+
+function dayWeight(dayIndex: number, cycleLength: number, secondHalfMultiplier: number): number {
+  return dayIndex <= midpointDay(cycleLength) ? 1 : secondHalfMultiplier;
+}
+
+function totalCycleWeight(cycleLength: number, secondHalfMultiplier: number): number {
+  const mid = midpointDay(cycleLength);
+  const secondDays = cycleLength - mid;
+  return mid + secondDays * secondHalfMultiplier;
+}
+
+function weightThroughDay(dayIndex: number, cycleLength: number, secondHalfMultiplier: number): number {
+  if (dayIndex <= 0) return 0;
+  const mid = midpointDay(cycleLength);
+  if (dayIndex <= mid) return dayIndex;
+  return mid + (dayIndex - mid) * secondHalfMultiplier;
+}
+
+/** Project variable spend to cycle end using first/second-half day weights. */
+export function projectVariableWithCycleShape(
+  spendSoFar: number,
+  dayIndex: number,
+  cycleLength: number,
+  secondHalfMultiplier: number,
+): number {
+  if (dayIndex <= 0 || spendSoFar <= 0) return spendSoFar;
+  const through = weightThroughDay(dayIndex, cycleLength, secondHalfMultiplier);
+  if (through <= 0) return spendSoFar;
+  const total = totalCycleWeight(cycleLength, secondHalfMultiplier);
+  return roundMoney((spendSoFar / through) * total);
+}
+
+/** Learn second-half vs first-half daily rate from completed cycles; default 1.2. */
+export function calibrateSecondHalfMultiplier(
+  buckets: CycleBucket[],
+  cycleLength: number,
+): number {
+  const mid = midpointDay(cycleLength);
+  const secondDays = cycleLength - mid;
+  if (secondDays <= 0) return DEFAULT_SECOND_HALF_MULTIPLIER;
+
+  const ratios: number[] = [];
+  for (const bucket of buckets) {
+    const len = daysBetween(bucket.start, bucket.end) + 1;
+    const midB = midpointDay(len);
+    const secondDaysB = len - midB;
+    if (secondDaysB <= 0) continue;
+
+    const firstSpend = variableThroughDay(bucket, midB);
+    const fullVar = variableThroughDay(bucket, len);
+    const secondSpend = roundMoney(fullVar - firstSpend);
+    if (firstSpend <= 0 || secondSpend <= 0) continue;
+
+    const firstDaily = firstSpend / midB;
+    const secondDaily = secondSpend / secondDaysB;
+    const ratio = secondDaily / firstDaily;
+    if (Number.isFinite(ratio) && ratio > 0) ratios.push(ratio);
+  }
+
+  if (!ratios.length) return DEFAULT_SECOND_HALF_MULTIPLIER;
+  const avg = ratios.reduce((s, v) => s + v, 0) / ratios.length;
+  return Math.min(1.5, Math.max(1.0, roundMoney(avg * 100) / 100));
+}
+
+function extrapolateToFullCycle(
+  spendAtDay: number,
+  dayIndex: number,
+  cycleLength: number,
+  secondHalfMultiplier: number,
+): number {
+  if (dayIndex <= 0) return spendAtDay;
+  return projectVariableWithCycleShape(spendAtDay, dayIndex, cycleLength, secondHalfMultiplier);
 }
 
 function averageBreakdown(
@@ -414,9 +502,16 @@ export function computePace(
       : Math.max(currentFixedAtDay, configuredChargesTotal)
     : 0;
 
+  const secondHalfMultiplier = calibrateSecondHalfMultiplier(usedBuckets, cycle.cycleLength);
+
   const projectedVariable =
     cycle.dayIndex > 0
-      ? roundMoney((currentVariableAtDay / cycle.dayIndex) * cycle.cycleLength)
+      ? projectVariableWithCycleShape(
+          currentVariableAtDay,
+          cycle.dayIndex,
+          cycle.cycleLength,
+          secondHalfMultiplier,
+        )
       : currentVariableAtDay;
 
   const usedFullSnapshots =
@@ -435,10 +530,13 @@ export function computePace(
         )
       : 0;
 
-  function extrapolateToFullCycle(spendAtDay: number): number {
-    return cycle.dayIndex > 0
-      ? roundMoney((spendAtDay / cycle.dayIndex) * cycle.cycleLength)
-      : spendAtDay;
+  function extrapolateHistoricalVariable(spendAtDay: number): number {
+    return extrapolateToFullCycle(
+      spendAtDay,
+      cycle.dayIndex,
+      cycle.cycleLength,
+      secondHalfMultiplier,
+    );
   }
 
   /** Recurring bills (rent, loans) still land this cycle — include in month-end projection. */
@@ -449,8 +547,8 @@ export function computePace(
   const projectedTotal = roundMoney(projectionFixed + projectedVariable);
 
   const extrapolatedUsualPace = includeFixed
-    ? roundMoney(historicalAvgFixedAtDay + extrapolateToFullCycle(historicalAvgVariableAtDay))
-    : roundMoney(projectionFixed + extrapolateToFullCycle(historicalAvgVariableAtDay));
+    ? roundMoney(historicalAvgFixedAtDay + extrapolateHistoricalVariable(historicalAvgVariableAtDay))
+    : roundMoney(projectionFixed + extrapolateHistoricalVariable(historicalAvgVariableAtDay));
   const projectedAtUsualPace =
     historicalFullCycleAvg > 0 ? historicalFullCycleAvg : extrapolatedUsualPace;
 
@@ -497,6 +595,7 @@ export function computePace(
     recentCycles,
     avgCyclesTomorrowVariable,
     avgCyclesTomorrowLabel,
+    secondHalfMultiplier,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,
