@@ -1,10 +1,11 @@
-/** Kaspa spot price (USD ≈ USDT). CoinPaprika primary; CoinGecko fallback; stale cache on rate limits. */
+/** Kaspa spot price in USDT. MEXC KASUSDT primary; CoinPaprika fallback; stale cache on errors. */
 import { readKaspaPriceCache, writeKaspaPriceCache } from "../storage/index.js";
 
-const COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price?ids=kaspa&vs_currencies=usd";
+const MEXC_API = "https://api.mexc.com/api/v3/ticker/price";
 const COINPAPRIKA_URL = "https://api.coinpaprika.com/v1/tickers/kas-kaspa";
 const CACHE_MS = 600_000;
 const DEFAULT_BALANCE = 347_078.071;
+const DEFAULT_MEXC_SYMBOL = "KASUSDT";
 const USER_AGENT = "Finance/1.0 (kaspa-price)";
 
 type MemoryCache = { priceUsdt: number; fetchedAt: number; source: string };
@@ -23,6 +24,10 @@ export function kasBalance(): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_BALANCE;
 }
 
+function mexcSymbol(): string {
+  return process.env.KAS_MEXC_SYMBOL?.trim() || DEFAULT_MEXC_SYMBOL;
+}
+
 export type KaspaQuote = {
   enabled: true;
   price_usdt: number;
@@ -32,23 +37,22 @@ export type KaspaQuote = {
   stale?: boolean;
 };
 
+async function fetchFromMexc(): Promise<number | null> {
+  const symbol = mexcSymbol();
+  const res = await fetch(`${MEXC_API}?symbol=${encodeURIComponent(symbol)}`, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { price?: string };
+  const price = Number(data.price);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
 async function fetchFromCoinPaprika(): Promise<number | null> {
   const res = await fetch(COINPAPRIKA_URL, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return null;
   const data = (await res.json()) as { quotes?: { USD?: { price?: number } } };
   const price = data.quotes?.USD?.price;
-  return price != null && Number.isFinite(price) && price > 0 ? price : null;
-}
-
-async function fetchFromCoinGecko(): Promise<number | null> {
-  const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  const key = process.env.COINGECKO_DEMO_API_KEY?.trim();
-  if (key) headers["x-cg-demo-api-key"] = key;
-
-  const res = await fetch(COINGECKO_URL, { headers });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { kaspa?: { usd?: number } };
-  const price = data.kaspa?.usd;
   return price != null && Number.isFinite(price) && price > 0 ? price : null;
 }
 
@@ -67,15 +71,15 @@ async function refreshPrice(): Promise<number | null> {
 
   inflight = (async () => {
     try {
-      let price = await fetchFromCoinPaprika();
+      let price = await fetchFromMexc();
       if (price != null) {
-        await persistPrice(price, "coinpaprika");
+        await persistPrice(price, "mexc");
         return price;
       }
 
-      price = await fetchFromCoinGecko();
+      price = await fetchFromCoinPaprika();
       if (price != null) {
-        await persistPrice(price, "coingecko");
+        await persistPrice(price, "coinpaprika");
         return price;
       }
 
