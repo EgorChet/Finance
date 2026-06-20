@@ -4,45 +4,64 @@
       Demo mode — calendar is read-only. Sign in to add events and subscribe in Apple Calendar.
     </div>
     <h2 class="page-title">Calendar</h2>
-    <p class="page-lead">Family events shared between you and your partner.</p>
+    <p class="page-lead">Shared family events — appointments, birthdays, and reminders.</p>
 
     <AppLoader v-if="loading" title="Loading calendar" subtitle="Fetching events" />
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
 
-      <section v-if="!auth.isDemo && feedUrl" class="calendar-subscribe">
-        <h3 class="calendar-section-title">Subscribe in Apple Calendar</h3>
-        <p class="calendar-subscribe-lead">
-          Add this URL once on each iPhone. Events update automatically (read-only in Apple Calendar).
-        </p>
-        <div class="calendar-feed-row">
-          <input class="input calendar-feed-input" :value="feedUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
-          <button type="button" class="btn" @click="copyFeedUrl">{{ copied ? "Copied" : "Copy link" }}</button>
-        </div>
-        <details class="calendar-subscribe-help">
-          <summary>iPhone setup steps</summary>
-          <ol>
-            <li>Settings → Calendar → Accounts → Add Account → Other</li>
-            <li>Add Subscribed Calendar → paste the link above</li>
-            <li>Save — events appear in the Calendar app</li>
-          </ol>
-        </details>
-        <button type="button" class="btn btn-ghost calendar-regenerate" :disabled="regenerating" @click="regenerateToken">
-          {{ regenerating ? "Regenerating…" : "Generate new link (invalidates old one)" }}
+      <div v-if="!auth.isDemo" class="calendar-toolbar">
+        <button type="button" class="btn btn-primary" @click="openAddForm">
+          {{ showForm ? "Close form" : "+ Add event" }}
         </button>
-      </section>
-
-      <div v-if="!auth.isDemo" class="calendar-add">
-        <h3 class="calendar-section-title">Add event</h3>
-        <div class="calendar-add-fields">
-          <input v-model="newTitle" class="input" placeholder="Title" />
-          <input v-model="newDate" class="input" type="date" />
-          <input v-model="newDescription" class="input" placeholder="Note (optional)" />
-          <button type="button" class="btn btn-primary" :disabled="adding || !newTitle.trim() || !newDate" @click="addEvent">
-            {{ adding ? "Adding…" : "Add event" }}
-          </button>
-        </div>
       </div>
+
+      <CalendarEventForm
+        v-if="!auth.isDemo && showForm"
+        :model-date="selectedDate"
+        :editing="!!editingEvent"
+        :event="editingEvent"
+        :saving="saving"
+        @save="saveEvent"
+        @cancel="closeForm"
+        @delete="deleteEditing"
+      />
+
+      <section class="calendar-events-panel">
+        <fieldset class="calendar-period-filter">
+          <legend class="sr-only">Show events for</legend>
+          <div class="calendar-radio-group calendar-radio-group--inline">
+            <label
+              v-for="opt in periodOptions"
+              :key="opt.value"
+              class="calendar-radio-option calendar-radio-option--compact"
+              :class="{ 'calendar-radio-option--active': periodFilter === opt.value }"
+            >
+              <input v-model="periodFilter" type="radio" name="period" :value="opt.value" />
+              <span class="calendar-radio-label">{{ opt.label }}</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <p v-if="!filteredOccurrences.length" class="calendar-empty">{{ emptyPeriodLabel }}</p>
+        <ul v-else class="calendar-event-list">
+          <li v-for="item in filteredOccurrences" :key="`${item.event.id}-${item.date}`" class="calendar-event-item">
+            <button
+              type="button"
+              class="calendar-event-body"
+              :class="{ 'calendar-event-body--readonly': auth.isDemo }"
+              @click="startEdit(item.event)"
+            >
+              <span class="calendar-importance-dot" :class="importanceClass(item.event)" aria-hidden="true" />
+              <div class="calendar-event-text">
+                <p class="calendar-event-title">{{ item.event.title }}</p>
+                <p class="calendar-event-meta">{{ formatEventWhen(item.event, item.date) }}</p>
+                <p v-if="item.event.description" class="calendar-event-desc">{{ item.event.description }}</p>
+              </div>
+            </button>
+          </li>
+        </ul>
+      </section>
 
       <section class="calendar-month">
         <div class="calendar-month-head">
@@ -61,7 +80,7 @@
               'calendar-cell--today': cell.isToday,
               'calendar-cell--selected': cell.date === selectedDate,
             }"
-            @click="cell.inMonth && (selectedDate = cell.date)"
+            @click="selectDate(cell.date, cell.inMonth)"
           >
             <span class="calendar-cell-day">{{ cell.day }}</span>
             <span v-if="cell.eventCount" class="calendar-cell-dot" :title="`${cell.eventCount} event(s)`" />
@@ -69,59 +88,67 @@
         </div>
       </section>
 
-      <section class="calendar-events-panel">
-        <h3 class="calendar-section-title">{{ selectedLabel }}</h3>
-        <p v-if="!selectedEvents.length" class="calendar-empty">No events this day.</p>
-        <ul v-else class="calendar-event-list">
-          <li v-for="ev in selectedEvents" :key="ev.id" class="calendar-event-item">
-            <div>
-              <p class="calendar-event-title">{{ ev.title }}</p>
-              <p v-if="ev.description" class="calendar-event-desc">{{ ev.description }}</p>
-            </div>
-            <button
-              v-if="!auth.isDemo"
-              type="button"
-              class="btn btn-ghost calendar-event-delete"
-              :disabled="deletingId === ev.id"
-              @click="removeEvent(ev.id)"
-            >
-              {{ deletingId === ev.id ? "…" : "Delete" }}
-            </button>
-          </li>
-        </ul>
-      </section>
+      <details v-if="!auth.isDemo && feedUrl" class="calendar-subscribe calendar-subscribe--bottom">
+        <summary class="calendar-subscribe-summary">Subscribe in Apple Calendar</summary>
+        <p class="calendar-subscribe-lead">
+          One-time setup — paste this link on each iPhone. Updates sync automatically (read-only in Apple Calendar).
+        </p>
+        <div class="calendar-feed-row">
+          <input class="input calendar-feed-input" :value="feedUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
+          <button type="button" class="btn" @click="copyFeedUrl">{{ copied ? "Copied" : "Copy link" }}</button>
+        </div>
+        <ol class="calendar-subscribe-steps">
+          <li>Settings → Calendar → Accounts → Add Account → Other</li>
+          <li>Add Subscribed Calendar → paste the link above</li>
+          <li>Save — events appear in the Calendar app</li>
+        </ol>
+        <button type="button" class="btn btn-ghost calendar-regenerate" :disabled="regenerating" @click="regenerateToken">
+          {{ regenerating ? "Regenerating…" : "Generate new link (invalidates old one)" }}
+        </button>
+      </details>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   addCalendarEvent,
   calendarFeedUrl,
   deleteCalendarEvent,
   fetchCalendar,
   regenerateCalendarFeedToken,
+  updateCalendarEvent,
 } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
+import CalendarEventForm from "../components/CalendarEventForm.vue";
 import { useAuthStore } from "../stores/auth";
 import type { CalendarEvent } from "../types";
 import { referenceDate } from "../utils/appDate";
+import {
+  defaultPeriodFilter,
+  eventsOnDate,
+  formatEventWhen,
+  inferImportance,
+  listOccurrences,
+  periodRange,
+  type CalendarPeriodFilter,
+  formToPayload,
+} from "../utils/calendarEvents";
 
 const auth = useAuthStore();
 const loading = ref(true);
+const saving = ref(false);
 const error = ref("");
 const events = ref<CalendarEvent[]>([]);
 const feedToken = ref<string | null>(null);
+const editingEvent = ref<CalendarEvent | null>(null);
+const showForm = ref(false);
 
 const viewYear = ref(0);
 const viewMonth = ref(0);
 const selectedDate = ref("");
-const newTitle = ref("");
-const newDate = ref("");
-const newDescription = ref("");
-const adding = ref(false);
-const deletingId = ref<string | null>(null);
+const periodFilter = ref<CalendarPeriodFilter>("week");
 const copied = ref(false);
 const regenerating = ref(false);
 
@@ -131,15 +158,40 @@ const todayIso = computed(() => referenceDate(auth.isDemo, auth.demoAsOf).toISOS
 
 const feedUrl = computed(() => (feedToken.value ? calendarFeedUrl(feedToken.value) : ""));
 
-const eventsByDate = computed(() => {
-  const map = new Map<string, CalendarEvent[]>();
-  for (const ev of events.value) {
-    const list = map.get(ev.date) ?? [];
-    list.push(ev);
-    map.set(ev.date, list);
-  }
-  return map;
+const hasEventsToday = computed(() => listOccurrences(events.value, todayIso.value, todayIso.value).length > 0);
+
+const periodOptions = computed(() => {
+  const opts: { value: CalendarPeriodFilter; label: string }[] = [];
+  if (hasEventsToday.value) opts.push({ value: "today", label: "Today" });
+  opts.push({ value: "week", label: "This week" });
+  opts.push({ value: "month", label: "This month" });
+  return opts;
 });
+
+watch(hasEventsToday, (hasToday) => {
+  if (!hasToday && periodFilter.value === "today") {
+    periodFilter.value = "week";
+  }
+});
+
+const filteredOccurrences = computed(() => {
+  const [from, through] = periodRange(periodFilter.value, todayIso.value);
+  return listOccurrences(events.value, from, through);
+});
+
+const emptyPeriodLabel = computed(() => {
+  if (periodFilter.value === "today") return "Nothing scheduled for today.";
+  if (periodFilter.value === "week") return "Nothing scheduled this week.";
+  return "Nothing scheduled this month.";
+});
+
+function importanceClass(ev: CalendarEvent): string {
+  return `calendar-importance-dot--${inferImportance(ev)}`;
+}
+
+function countOnDate(dateIso: string): number {
+  return eventsOnDate(events.value, dateIso).length;
+}
 
 const monthLabel = computed(() => {
   const d = new Date(viewYear.value, viewMonth.value, 1);
@@ -168,7 +220,7 @@ const monthCells = computed(() => {
       date,
       inMonth: false,
       isToday: date === todayIso.value,
-      eventCount: eventsByDate.value.get(date)?.length ?? 0,
+      eventCount: countOnDate(date),
     });
   }
 
@@ -181,7 +233,7 @@ const monthCells = computed(() => {
       date,
       inMonth: true,
       isToday: date === todayIso.value,
-      eventCount: eventsByDate.value.get(date)?.length ?? 0,
+      eventCount: countOnDate(date),
     });
   }
 
@@ -194,19 +246,11 @@ const monthCells = computed(() => {
       date,
       inMonth: false,
       isToday: date === todayIso.value,
-      eventCount: eventsByDate.value.get(date)?.length ?? 0,
+      eventCount: countOnDate(date),
     });
   }
 
   return cells;
-});
-
-const selectedEvents = computed(() => eventsByDate.value.get(selectedDate.value) ?? []);
-
-const selectedLabel = computed(() => {
-  if (!selectedDate.value) return "Events";
-  const d = new Date(selectedDate.value + "T12:00:00");
-  return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 });
 
 function iso(d: Date): string {
@@ -221,7 +265,35 @@ function initViewDate() {
   viewYear.value = ref.getFullYear();
   viewMonth.value = ref.getMonth();
   selectedDate.value = todayIso.value;
-  newDate.value = todayIso.value;
+}
+
+function openAddForm() {
+  if (showForm.value && !editingEvent.value) {
+    closeForm();
+    return;
+  }
+  editingEvent.value = null;
+  showForm.value = true;
+}
+
+function closeForm() {
+  showForm.value = false;
+  editingEvent.value = null;
+}
+
+function selectDate(date: string, inMonth: boolean) {
+  selectedDate.value = date;
+  if (!inMonth) {
+    const d = new Date(date + "T12:00:00");
+    viewYear.value = d.getFullYear();
+    viewMonth.value = d.getMonth();
+  }
+}
+
+function startEdit(ev: CalendarEvent) {
+  if (auth.isDemo) return;
+  editingEvent.value = ev;
+  showForm.value = true;
 }
 
 function prevMonth() {
@@ -249,6 +321,7 @@ async function load() {
     const data = await fetchCalendar(auth.isDemo, auth.token || undefined);
     events.value = data.events;
     feedToken.value = data.feed_token;
+    periodFilter.value = defaultPeriodFilter(data.events, todayIso.value);
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -256,41 +329,53 @@ async function load() {
   }
 }
 
-async function addEvent() {
-  if (auth.isDemo) return;
-  adding.value = true;
-  try {
-    const res = await addCalendarEvent(
-      {
-        title: newTitle.value.trim(),
-        date: newDate.value,
-        description: newDescription.value.trim() || undefined,
-      },
-      auth.token || undefined,
-    );
-    events.value = [...events.value, res.event].sort((a, b) => a.date.localeCompare(b.date));
-    newTitle.value = "";
-    newDescription.value = "";
-    selectedDate.value = res.event.date;
-    viewYear.value = parseInt(res.event.date.slice(0, 4), 10);
-    viewMonth.value = parseInt(res.event.date.slice(5, 7), 10) - 1;
-  } catch (e) {
-    error.value = String(e);
-  } finally {
-    adding.value = false;
+function upsertEvent(event: CalendarEvent) {
+  const idx = events.value.findIndex((e) => e.id === event.id);
+  if (idx >= 0) {
+    const next = [...events.value];
+    next[idx] = event;
+    events.value = next.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+  } else {
+    events.value = [...events.value, event].sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
   }
 }
 
-async function removeEvent(id: string) {
+async function saveEvent(payload: ReturnType<typeof formToPayload>) {
   if (auth.isDemo) return;
-  deletingId.value = id;
+  saving.value = true;
+  error.value = "";
   try {
-    await deleteCalendarEvent(id, auth.token || undefined);
-    events.value = events.value.filter((e) => e.id !== id);
+    if (editingEvent.value) {
+      const res = await updateCalendarEvent(editingEvent.value.id, payload, auth.token || undefined);
+      upsertEvent(res.event);
+      editingEvent.value = res.event;
+    } else {
+      const res = await addCalendarEvent(payload, auth.token || undefined);
+      upsertEvent(res.event);
+      selectedDate.value = res.event.date;
+      viewYear.value = parseInt(res.event.date.slice(0, 4), 10);
+      viewMonth.value = parseInt(res.event.date.slice(5, 7), 10) - 1;
+      closeForm();
+    }
   } catch (e) {
     error.value = String(e);
   } finally {
-    deletingId.value = null;
+    saving.value = false;
+  }
+}
+
+async function deleteEditing() {
+  if (auth.isDemo || !editingEvent.value) return;
+  saving.value = true;
+  error.value = "";
+  try {
+    await deleteCalendarEvent(editingEvent.value.id, auth.token || undefined);
+    events.value = events.value.filter((e) => e.id !== editingEvent.value!.id);
+    closeForm();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    saving.value = false;
   }
 }
 

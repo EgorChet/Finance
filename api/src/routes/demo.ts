@@ -135,6 +135,10 @@ router.post("/calendar/events", (_req, res) => {
   res.status(403).json({ error: "Calendar disabled in demo mode" });
 });
 
+router.put("/calendar/events/:id", (_req, res) => {
+  res.status(403).json({ error: "Calendar disabled in demo mode" });
+});
+
 router.delete("/calendar/events/:id", (_req, res) => {
   res.status(403).json({ error: "Calendar disabled in demo mode" });
 });

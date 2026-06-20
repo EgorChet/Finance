@@ -20,14 +20,18 @@
       </p>
       <ul class="home-portfolio-rows">
         <li v-if="kaspa" class="home-portfolio-row" :class="{ 'home-portfolio-row--stale': kaspa.stale }">
-          <img class="home-portfolio-logo" :src="kaspaLogo" alt="" width="18" height="18" />
-          <span class="home-portfolio-label">KAS</span>
-          <span class="home-portfolio-value">{{ formatUsdt(kaspa.portfolio_usdt, 0) }}</span>
+          <div class="home-portfolio-row-left">
+            <img class="home-portfolio-logo" :src="kaspaLogo" alt="" width="18" height="18" />
+            <span class="home-portfolio-label">KAS</span>
+            <span class="home-portfolio-value">{{ formatUsdt(kaspa.portfolio_usdt, 0) }}</span>
+          </div>
           <span class="home-portfolio-meta">{{ formatKasUsdtPrice(kaspa.price_usdt) }}</span>
         </li>
         <li v-if="fxcn" class="home-portfolio-row" :class="{ 'home-portfolio-row--stale': fxcn.stale }">
-          <span class="home-portfolio-label">FXCN</span>
-          <span class="home-portfolio-value">{{ formatUsd(fxcn.portfolio_usd, 0) }}</span>
+          <div class="home-portfolio-row-left">
+            <span class="home-portfolio-label">FXCN</span>
+            <span class="home-portfolio-value">{{ formatUsd(fxcn.portfolio_usd, 0) }}</span>
+          </div>
           <span class="home-portfolio-meta">{{ formatFxcnNavPrice(fxcn.nav_usd) }}</span>
         </li>
       </ul>

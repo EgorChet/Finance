@@ -426,9 +426,33 @@ export function demoMerchants() {
 export function demoCalendar() {
   return {
     events: [
-      { id: "demo-dentist", title: "Dentist", date: "2026-06-18", description: "Demo event" },
-      { id: "demo-dinner", title: "Birthday dinner", date: "2026-06-22" },
-      { id: "demo-upload", title: "Upload July statement", date: "2026-07-10", description: "When the cycle closes" },
+      {
+        id: "demo-nails",
+        title: "Julia nails",
+        date: "2026-06-18",
+        importance: "normal" as const,
+        start_time: "14:00",
+        end_time: "16:00",
+        description: "Ramat Aviv",
+        recurrence: "none" as const,
+      },
+      {
+        id: "demo-birthday",
+        title: "Maya birthday",
+        date: "1990-08-22",
+        importance: "all_day" as const,
+        all_day: true,
+        description: "Family dinner",
+        recurrence: "yearly" as const,
+      },
+      {
+        id: "demo-rent",
+        title: "Rent reminder",
+        date: "2026-01-10",
+        importance: "all_day" as const,
+        all_day: true,
+        recurrence: "monthly" as const,
+      },
     ],
     feed_token: null as string | null,
     updated_at: null as string | null,

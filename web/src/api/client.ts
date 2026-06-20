@@ -295,10 +295,40 @@ export async function fetchCalendar(demo: boolean, token?: string) {
 }
 
 export async function addCalendarEvent(
-  body: { title: string; date: string; description?: string },
+  body: {
+    title: string;
+    date: string;
+    all_day?: boolean;
+    start_time?: string;
+    end_time?: string;
+    importance?: import("../types").CalendarImportance;
+    description?: string;
+    recurrence?: import("../types").CalendarRecurrence;
+  },
   token?: string,
 ) {
   return post<{ ok: boolean; event: CalendarEvent }>(`${prefix(false)}/calendar/events`, body, token);
+}
+
+export async function updateCalendarEvent(
+  id: string,
+  body: {
+    title: string;
+    date: string;
+    all_day?: boolean;
+    start_time?: string;
+    end_time?: string;
+    importance?: import("../types").CalendarImportance;
+    description?: string;
+    recurrence?: import("../types").CalendarRecurrence;
+  },
+  token?: string,
+) {
+  return put<{ ok: boolean; event: CalendarEvent }>(
+    `${prefix(false)}/calendar/events/${encodeURIComponent(id)}`,
+    body,
+    token,
+  );
 }
 
 export async function deleteCalendarEvent(id: string, token?: string) {

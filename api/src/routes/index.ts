@@ -62,6 +62,7 @@ import {
   deleteCalendarEvent,
   listCalendarEvents,
   regenerateFeedToken,
+  updateCalendarEvent,
 } from "../services/calendarService.js";
 import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
 
@@ -494,16 +495,76 @@ router.get("/calendar", async (_req, res) => {
 });
 
 router.post("/calendar/events", async (req, res) => {
-  const { title, date, description } = req.body as { title?: string; date?: string; description?: string };
+  const { title, date, all_day, start_time, end_time, importance, description, recurrence } = req.body as {
+    title?: string;
+    date?: string;
+    all_day?: boolean;
+    start_time?: string;
+    end_time?: string;
+    importance?: string;
+    description?: string;
+    recurrence?: string;
+  };
   if (!title?.trim() || !date?.trim()) {
     res.status(400).json({ error: "title and date required" });
     return;
   }
   try {
-    const event = await addCalendarEvent({ title, date, description });
+    const event = await addCalendarEvent({
+      title,
+      date,
+      all_day,
+      start_time,
+      end_time,
+      importance: importance as import("../types.js").CalendarImportance,
+      description,
+      recurrence: recurrence as import("../types.js").CalendarRecurrence,
+    });
     res.json({ ok: true, event });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Could not add event";
+    res.status(400).json({ error: message });
+  }
+});
+
+router.put("/calendar/events/:id", async (req, res) => {
+  const id = req.params.id?.trim();
+  if (!id) {
+    res.status(400).json({ error: "id required" });
+    return;
+  }
+  const { title, date, all_day, start_time, end_time, importance, description, recurrence } = req.body as {
+    title?: string;
+    date?: string;
+    all_day?: boolean;
+    start_time?: string;
+    end_time?: string;
+    importance?: string;
+    description?: string;
+    recurrence?: string;
+  };
+  if (!title?.trim() || !date?.trim()) {
+    res.status(400).json({ error: "title and date required" });
+    return;
+  }
+  try {
+    const event = await updateCalendarEvent(id, {
+      title,
+      date,
+      all_day,
+      start_time,
+      end_time,
+      importance: importance as import("../types.js").CalendarImportance,
+      description,
+      recurrence: recurrence as import("../types.js").CalendarRecurrence,
+    });
+    if (!event) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
+    res.json({ ok: true, event });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Could not update event";
     res.status(400).json({ error: message });
   }
 });

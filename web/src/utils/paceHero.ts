@@ -1,5 +1,5 @@
 import type { PaceResult } from "./pace";
-import { formatAboutIls, roundMoney } from "./format";
+import { formatAboutIls, formatIls, roundMoney } from "./format";
 
 export type PaceHeroTone = "ok" | "bad" | "good";
 
@@ -50,4 +50,28 @@ export function paceHeroFromResult(pace: PaceResult | null): {
   }
 
   return { line, sub, tone };
+}
+
+export function paceShortLabel(pace: PaceResult | null): { label: string; tone: PaceHeroTone } {
+  if (!pace || pace.currentSpend <= 0 || pace.historicalAvgVariableAtDay <= 0) {
+    return { label: "No pace yet", tone: "ok" };
+  }
+  const projectedVsUsualDelta = roundMoney(pace.projectedTotal - pace.projectedAtUsualPace);
+  if (Math.abs(projectedVsUsualDelta) < 50) return { label: "On track", tone: "ok" };
+  if (projectedVsUsualDelta > 0) return { label: "Over pace", tone: "bad" };
+  return { label: "Under pace", tone: "good" };
+}
+
+export function paceDetailLine(pace: PaceResult | null): string {
+  if (!pace || pace.currentSpend <= 0) return "Upload a partial statement or enter spending to compare with your usual pace.";
+  const usual = pace.historicalAvgVariableAtDay;
+  if (usual <= 0) return "Not enough history yet to compare this cycle.";
+  const gap = roundMoney(pace.vsAvgDelta);
+  if (Math.abs(gap) < 50) {
+    return `You've spent ${formatIls(pace.currentSpend)} so far — about the same as your usual ${formatIls(usual)} by day ${pace.dayIndex}.`;
+  }
+  if (gap > 0) {
+    return `${formatIls(gap)} above your usual ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
+  }
+  return `${formatIls(Math.abs(gap))} below your usual ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
 }

@@ -157,12 +157,22 @@ export interface FxcnPriceCache {
   source?: string;
 }
 
+export type CalendarRecurrence = "none" | "weekly" | "monthly" | "yearly";
+
+/** How much time the event blocks — drives default duration. */
+export type CalendarImportance = "quick" | "normal" | "important" | "all_day";
+
 export interface CalendarEvent {
   id: string;
   title: string;
-  /** All-day event date (YYYY-MM-DD). */
+  /** First occurrence date (YYYY-MM-DD). */
   date: string;
+  all_day?: boolean;
+  start_time?: string;
+  end_time?: string;
+  importance?: CalendarImportance;
   description?: string;
+  recurrence?: CalendarRecurrence;
   created_at?: string;
   updated_at?: string;
 }

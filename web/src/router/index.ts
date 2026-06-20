@@ -9,7 +9,7 @@ const router = createRouter({
       path: "/app",
       component: () => import("../layouts/AppShell.vue"),
       children: [
-        { path: "", redirect: "/app/home" },
+        { path: "", redirect: { name: "home" } },
         { path: "home", name: "home", component: () => import("../views/HomeView.vue") },
         { path: "overview", name: "overview", component: () => import("../views/OverviewView.vue") },
         { path: "calendar", name: "calendar", component: () => import("../views/CalendarView.vue") },
@@ -36,7 +36,7 @@ router.beforeEach(async (to) => {
     return "/";
   }
   if (to.path === "/" && auth.isAuthenticated) {
-    return "/app/home";
+    return { name: "home" };
   }
   return true;
 });

@@ -4,23 +4,7 @@
       Demo household — sample portfolio, calendar, and spending. Sign in for your real data.
     </div>
     <h2 class="page-title">Home</h2>
-    <p class="page-lead home-lead">Investments, what's coming up, and a snapshot of this cycle's spending.</p>
-
-    <PortfolioSummaryCard
-      :loading="portfolioLoading"
-      :refreshing="portfolioRefreshing"
-      :kaspa="kaspaQuote"
-      :fxcn="fxcnQuote"
-      :market="marketSnapshot"
-      @refresh="refreshPortfolio(true)"
-    />
-
-    <UpcomingEventsCard
-      :loading="calendarLoading"
-      :error="calendarError"
-      :events="calendarEvents"
-      :today="todayIso"
-    />
+    <p class="page-lead home-lead">This cycle's spending, what's coming up, and your investments at a glance.</p>
 
     <SpendingSnapshotCard
       :loading="spendingLoading"
@@ -30,9 +14,23 @@
       :partial="isPartialCycle"
       :month-key="currentMonthKey"
       :living-budget="livingBudgetAmount"
-      :pace-line="paceHero.line"
-      :pace-sub="paceHero.sub"
-      :pace-tone="paceHero.tone"
+      :pace="paceResult"
+    />
+
+    <UpcomingEventsCard
+      :loading="calendarLoading"
+      :error="calendarError"
+      :events="calendarEvents"
+      :today="todayIso"
+    />
+
+    <PortfolioSummaryCard
+      :loading="portfolioLoading"
+      :refreshing="portfolioRefreshing"
+      :kaspa="kaspaQuote"
+      :fxcn="fxcnQuote"
+      :market="marketSnapshot"
+      @refresh="refreshPortfolio(true)"
     />
   </div>
 </template>
@@ -81,7 +79,6 @@ import {
   loadPaceAvgCycles,
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
-import { paceHeroFromResult } from "../utils/paceHero";
 
 const auth = useAuthStore();
 
@@ -172,8 +169,6 @@ const paceResult = computed(() => {
     today: refDate.value,
   });
 });
-
-const paceHero = computed(() => paceHeroFromResult(paceResult.value));
 
 async function refreshPortfolio(force = false) {
   if (force) portfolioRefreshing.value = true;

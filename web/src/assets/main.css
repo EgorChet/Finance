@@ -3655,11 +3655,19 @@ table.rules select {
 }
 
 .home-portfolio-row {
-  display: grid;
-  grid-template-columns: auto 3.5rem 1fr auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.home-portfolio-row-left {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .home-portfolio-row--stale {
@@ -3670,20 +3678,25 @@ table.rules select {
   width: 18px;
   height: 18px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .home-portfolio-label {
   font-weight: 600;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .home-portfolio-value {
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .home-portfolio-meta {
   color: var(--text-faint);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  flex-shrink: 0;
   text-align: right;
 }
 
@@ -3721,62 +3734,106 @@ table.rules select {
   flex: 1;
 }
 
-.home-spend-total {
-  margin: 0 0 0.5rem;
+.home-spend-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
 }
 
-.home-spend-amount {
+.home-spend-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.home-spend-metric--primary {
+  grid-column: 1 / -1;
+}
+
+.home-spend-metric-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.home-spend-metric-value {
   font-size: 1.35rem;
   font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
 }
 
-.home-spend-label {
-  color: var(--text-muted);
+.home-spend-metric-value--sm {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.home-spend-metric-value--bad {
+  color: var(--danger);
+}
+
+.home-spend-metric-value--warn {
+  color: #fbbf24;
 }
 
 .home-spend-badge {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--accent);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
+  vertical-align: middle;
 }
 
-.home-pace-line {
-  margin: 0 0 0.35rem;
-  font-size: 0.95rem;
-  line-height: 1.45;
+.home-spend-pace-box {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.85rem;
 }
 
-.home-pace-line--bad {
-  color: var(--danger);
-}
-
-.home-pace-line--good {
-  color: #34d399;
-}
-
-.home-pace-sub,
-.home-budget-line {
-  margin: 0 0 0.35rem;
-  font-size: 0.85rem;
+.home-spend-pace-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
   color: var(--text-muted);
-  line-height: 1.4;
 }
 
-.home-budget-line--over {
+.home-spend-pace-badge--bad {
   color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
 }
 
-.home-budget-line--low {
-  color: #fbbf24;
+.home-spend-pace-badge--good {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 
-.home-budget-line--ok {
-  color: #34d399;
+.home-spend-pace-badge--ok {
+  color: var(--text-muted);
+}
+
+.home-spend-pace-detail {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .home-card-actions {
@@ -3811,6 +3868,173 @@ table.rules select {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem;
+}
+
+.calendar-subscribe--bottom {
+  margin-top: 0.25rem;
+}
+
+.calendar-subscribe-summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.calendar-subscribe-summary::-webkit-details-marker {
+  display: none;
+}
+
+.calendar-subscribe-steps {
+  margin: 0.65rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.calendar-toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.calendar-period-filter {
+  border: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  min-width: 0;
+}
+
+.calendar-radio-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.calendar-radio-group--inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.calendar-radio-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.calendar-radio-option--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+}
+
+.calendar-radio-option--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-alt));
+}
+
+.calendar-radio-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.calendar-radio-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.calendar-radio-hint {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.calendar-radio-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.calendar-date-field,
+.calendar-form-fields .field-group {
+  min-width: 0;
+}
+
+.calendar-date-input,
+.calendar-time-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.calendar-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.calendar-form-close {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.calendar-importance-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 0.45rem;
+  background: var(--text-faint);
+}
+
+.calendar-importance-dot--quick {
+  background: var(--text-muted);
+}
+
+.calendar-importance-dot--normal {
+  background: var(--accent);
+}
+
+.calendar-importance-dot--important {
+  background: #f59e0b;
+}
+
+.calendar-importance-dot--all_day {
+  background: #a78bfa;
+}
+
+.calendar-event-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .calendar-subscribe-lead {
@@ -3954,7 +4178,7 @@ table.rules select {
 .calendar-event-item {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: stretch;
   gap: 0.75rem;
 }
 
@@ -3974,4 +4198,91 @@ table.rules select {
   min-height: 36px;
   padding: 0.35rem 0.65rem;
   font-size: 0.82rem;
+}
+
+.calendar-form-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.calendar-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.calendar-all-day {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.calendar-time-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.calendar-notes {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.calendar-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.calendar-form-delete {
+  color: var(--danger);
+}
+
+.calendar-event-body {
+  display: flex;
+  gap: 0.55rem;
+  flex: 1;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.calendar-event-body--readonly {
+  cursor: default;
+}
+
+.calendar-event-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.home-event-when {
+  flex: 0 0 11rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.home-event-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+@media (min-width: 480px) {
+  .home-event-row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
 }

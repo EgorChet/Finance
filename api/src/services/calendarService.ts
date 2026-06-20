@@ -1,29 +1,138 @@
 import { randomBytes, randomUUID } from "crypto";
 import { readCalendar, writeCalendar } from "../storage/index.js";
-import type { CalendarData, CalendarEvent } from "../types.js";
+import type { CalendarData, CalendarEvent, CalendarImportance, CalendarRecurrence } from "../types.js";
+
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function generateFeedToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
-function normalizeEvent(raw: Partial<CalendarEvent>): CalendarEvent | null {
-  const title = String(raw.title ?? "").trim();
-  const date = String(raw.date ?? "").trim().slice(0, 10);
-  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+function parseTimeMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function normalizeImportance(value: unknown): CalendarImportance | undefined {
+  if (value === "quick" || value === "normal" || value === "important" || value === "all_day") return value;
+  return undefined;
+}
+
+function importanceDuration(importance: CalendarImportance): number | null {
+  switch (importance) {
+    case "quick":
+      return 60;
+    case "normal":
+      return 120;
+    case "important":
+      return 180;
+    default:
+      return null;
+  }
+}
+
+function applyImportance(
+  importance: CalendarImportance,
+  startTime: string,
+): { all_day: boolean; start_time?: string; end_time?: string } {
+  if (importance === "all_day") return { all_day: true };
+  const mins = importanceDuration(importance) ?? 120;
+  const start = startTime.trim();
+  if (!TIME_RE.test(start)) return { all_day: false, start_time: "10:00", end_time: defaultEndTime("10:00", mins) };
+  return { all_day: false, start_time: start, end_time: defaultEndTime(start, mins) };
+}
+
+function defaultEndTime(startTime: string, durationMinutes = 60): string {
+  const total = parseTimeMinutes(startTime) + durationMinutes;
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function normalizeRecurrence(value: unknown): CalendarRecurrence {
+  if (value === "weekly" || value === "monthly" || value === "yearly") return value;
+  return "none";
+}
+
+function isAllDay(event: CalendarEvent): boolean {
+  if (event.all_day === true) return true;
+  if (event.all_day === false) return false;
+  return !event.start_time;
+}
+
+export function normalizeEvent(raw: Partial<CalendarEvent>, existing?: CalendarEvent): CalendarEvent | null {
+  const title = String(raw.title ?? existing?.title ?? "").trim();
+  const date = String(raw.date ?? existing?.date ?? "").trim().slice(0, 10);
+  if (!title || !DATE_RE.test(date)) return null;
+
+  const importance =
+    normalizeImportance(raw.importance ?? existing?.importance) ??
+    (raw.all_day === true || existing?.all_day === true ? "all_day" : undefined);
+
+  let all_day: boolean;
+  let start_time: string | undefined;
+  let end_time: string | undefined;
+  let resolvedImportance: CalendarImportance | undefined = importance;
+
+  if (importance) {
+    const timing = applyImportance(importance, String(raw.start_time ?? existing?.start_time ?? "10:00"));
+    all_day = timing.all_day;
+    start_time = timing.start_time;
+    end_time = timing.end_time;
+  } else {
+    const startProvided = raw.start_time !== undefined ? String(raw.start_time).trim() : existing?.start_time;
+    const allDayExplicit = raw.all_day ?? existing?.all_day;
+    all_day = allDayExplicit === true || (allDayExplicit !== false && !startProvided);
+
+    if (!all_day) {
+      const start = String(raw.start_time ?? existing?.start_time ?? "10:00").trim();
+      if (!TIME_RE.test(start)) return null;
+      start_time = start;
+      const end = String(raw.end_time ?? existing?.end_time ?? defaultEndTime(start)).trim();
+      if (!TIME_RE.test(end)) return null;
+      if (parseTimeMinutes(end) <= parseTimeMinutes(start)) return null;
+      end_time = end;
+    }
+    resolvedImportance = all_day ? "all_day" : "normal";
+  }
+
+  const recurrence = normalizeRecurrence(raw.recurrence ?? existing?.recurrence ?? "none");
+  const description = String(raw.description ?? existing?.description ?? "").trim() || undefined;
+
   return {
-    id: String(raw.id ?? "").trim() || randomUUID(),
+    id: String(raw.id ?? existing?.id ?? "").trim() || randomUUID(),
     title,
     date,
-    description: raw.description?.trim() || undefined,
-    created_at: raw.created_at,
-    updated_at: raw.updated_at,
+    all_day,
+    start_time,
+    end_time,
+    importance: resolvedImportance,
+    description,
+    recurrence,
+    created_at: existing?.created_at,
+    updated_at: existing?.updated_at,
   };
 }
+
+export type CalendarEventInput = {
+  title: string;
+  date: string;
+  all_day?: boolean;
+  start_time?: string;
+  end_time?: string;
+  importance?: CalendarImportance;
+  description?: string;
+  recurrence?: CalendarRecurrence;
+};
 
 export async function loadCalendarData(): Promise<CalendarData> {
   const data = await readCalendar();
   return {
-    events: (data.events || []).slice().sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)),
+    events: (data.events || [])
+      .map((ev) => normalizeEvent(ev, ev) ?? ev)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)),
     feed_token: data.feed_token,
     updated_at: data.updated_at ?? null,
   };
@@ -61,19 +170,27 @@ export async function listCalendarEvents(): Promise<CalendarData & { feed_token:
   return { ...data, feed_token };
 }
 
-export async function addCalendarEvent(input: {
-  title: string;
-  date: string;
-  description?: string;
-}): Promise<CalendarEvent> {
+export async function addCalendarEvent(input: CalendarEventInput): Promise<CalendarEvent> {
   const event = normalizeEvent(input);
-  if (!event) throw new Error("title and date (YYYY-MM-DD) required");
+  if (!event) throw new Error("Invalid event — check title, date, and times");
   const now = new Date().toISOString();
   event.created_at = now;
   event.updated_at = now;
   const data = await readCalendar();
   const events = [...(data.events || []), event];
   await saveCalendarData({ ...data, events, feed_token: data.feed_token || (await ensureFeedToken()) });
+  return event;
+}
+
+export async function updateCalendarEvent(id: string, input: CalendarEventInput): Promise<CalendarEvent | null> {
+  const data = await readCalendar();
+  const existing = (data.events || []).find((e) => e.id === id);
+  if (!existing) return null;
+  const event = normalizeEvent({ ...input, id }, existing);
+  if (!event) throw new Error("Invalid event — check title, date, and times");
+  event.updated_at = new Date().toISOString();
+  const events = (data.events || []).map((e) => (e.id === id ? event : e));
+  await saveCalendarData({ ...data, events });
   return event;
 }
 
@@ -99,6 +216,64 @@ function addDays(date: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+function dateToIcs(date: string): string {
+  return date.replace(/-/g, "");
+}
+
+function timeToIcs(time: string): string {
+  const [h, m] = time.split(":");
+  return h.padStart(2, "0") + m.padStart(2, "0") + "00";
+}
+
+function recurrenceRule(recurrence: CalendarRecurrence | undefined): string | null {
+  switch (recurrence) {
+    case "yearly":
+      return "FREQ=YEARLY";
+    case "monthly":
+      return "FREQ=MONTHLY";
+    case "weekly":
+      return "FREQ=WEEKLY";
+    default:
+      return null;
+  }
+}
+
+function appendEventLines(lines: string[], ev: CalendarEvent, now: string): void {
+  lines.push("BEGIN:VEVENT");
+  lines.push("UID:" + ev.id + "@finance-app");
+  lines.push("DTSTAMP:" + now);
+  const dateIcs = dateToIcs(ev.date);
+
+  if (isAllDay(ev)) {
+    lines.push("DTSTART;VALUE=DATE:" + dateIcs);
+    lines.push("DTEND;VALUE=DATE:" + dateToIcs(addDays(ev.date, 1)));
+  } else if (ev.start_time && ev.end_time) {
+    lines.push("DTSTART:" + dateIcs + "T" + timeToIcs(ev.start_time));
+    lines.push("DTEND:" + dateIcs + "T" + timeToIcs(ev.end_time));
+  }
+
+  lines.push("SUMMARY:" + escapeIcs(ev.title));
+  if (ev.description) lines.push("DESCRIPTION:" + escapeIcs(ev.description));
+  const rrule = recurrenceRule(ev.recurrence);
+  if (rrule) lines.push("RRULE:" + rrule);
+  const priority = icsPriority(ev.importance);
+  if (priority) lines.push("PRIORITY:" + priority);
+  lines.push("END:VEVENT");
+}
+
+function icsPriority(importance: CalendarImportance | undefined): string | null {
+  switch (importance) {
+    case "important":
+      return "1";
+    case "quick":
+      return "9";
+    case "normal":
+      return "5";
+    default:
+      return null;
+  }
+}
+
 export function buildIcsFeed(events: CalendarEvent[]): string {
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
   const lines = [
@@ -110,14 +285,7 @@ export function buildIcsFeed(events: CalendarEvent[]): string {
     "X-WR-CALNAME:Family Calendar",
   ];
   for (const ev of events) {
-    lines.push("BEGIN:VEVENT");
-    lines.push(`UID:${ev.id}@finance-app`);
-    lines.push(`DTSTAMP:${now}`);
-    lines.push(`DTSTART;VALUE=DATE:${ev.date.replace(/-/g, "")}`);
-    lines.push(`DTEND;VALUE=DATE:${addDays(ev.date, 1).replace(/-/g, "")}`);
-    lines.push(`SUMMARY:${escapeIcs(ev.title)}`);
-    if (ev.description) lines.push(`DESCRIPTION:${escapeIcs(ev.description)}`);
-    lines.push("END:VEVENT");
+    appendEventLines(lines, ev, now);
   }
   lines.push("END:VCALENDAR");
   return lines.join("\r\n") + "\r\n";

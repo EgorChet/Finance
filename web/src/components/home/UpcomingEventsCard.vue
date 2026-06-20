@@ -9,9 +9,9 @@
       <p v-if="error" class="home-card-error">{{ error }}</p>
       <p v-else-if="!upcoming.length" class="home-card-empty">Nothing scheduled in the next 30 days.</p>
       <ul v-else class="home-events-list">
-        <li v-for="ev in upcoming" :key="ev.id" class="home-event-row">
-          <span class="home-event-date">{{ formatEventDate(ev.date) }}</span>
-          <span class="home-event-title">{{ ev.title }}</span>
+        <li v-for="item in upcoming" :key="`${item.event.id}-${item.date}`" class="home-event-row">
+          <span class="home-event-when">{{ formatEventWhen(item.event, item.date) }}</span>
+          <span class="home-event-title">{{ item.event.title }}</span>
         </li>
       </ul>
     </template>
@@ -22,6 +22,7 @@
 import { computed } from "vue";
 import AppLoader from "../AppLoader.vue";
 import type { CalendarEvent } from "../../types";
+import { formatEventWhen, upcomingOccurrences } from "../../utils/calendarEvents";
 
 const props = defineProps<{
   loading: boolean;
@@ -41,14 +42,6 @@ function addDays(date: string, days: number): string {
 
 const upcoming = computed(() => {
   const today = props.today ?? new Date().toISOString().slice(0, 10);
-  const horizon = addDays(today, 30);
-  return props.events
-    .filter((e) => e.date >= today && e.date <= horizon)
-    .slice(0, 6);
+  return upcomingOccurrences(props.events, today, addDays(today, 30), 6);
 });
-
-function formatEventDate(date: string): string {
-  const d = new Date(date + "T12:00:00");
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-}
 </script>

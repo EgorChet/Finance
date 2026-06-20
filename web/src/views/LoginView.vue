@@ -52,7 +52,7 @@ const password = ref("");
 async function doLogin() {
   try {
     await auth.login(password.value);
-    router.push("/app/home");
+    router.push({ name: "home" });
   } catch {
     /* error shown */
   }
@@ -60,11 +60,11 @@ async function doLogin() {
 
 function tryDemo() {
   auth.enterDemo();
-  router.push("/app/home");
+  router.push({ name: "home" });
 }
 
 function goApp() {
   auth.isDemo = false;
-  router.push("/app/home");
+  router.push({ name: "home" });
 }
 </script>
