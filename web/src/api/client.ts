@@ -158,8 +158,9 @@ export type KaspaQuote = {
   stale?: boolean;
 };
 
-export async function fetchKaspaQuote(demo: boolean, token?: string) {
-  return get<KaspaQuote>(`${prefix(demo)}/kaspa`, token);
+export async function fetchKaspaQuote(demo: boolean, token?: string, force = false) {
+  const q = force ? "?refresh=1" : "";
+  return get<KaspaQuote>(`${prefix(demo)}/kaspa${q}`, token);
 }
 
 /** Server-side wake — fallback when analyzer is on internal network. */

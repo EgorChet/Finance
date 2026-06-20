@@ -593,16 +593,36 @@ button {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: 0.55rem;
+  align-items: center;
+  gap: 0.35rem;
   flex-wrap: nowrap;
 }
 
-.app-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0;
+.app-kaspa-refresh {
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+}
+
+.app-kaspa-refresh:disabled {
+  opacity: 0.55;
+}
+
+.app-kaspa-refresh-icon {
+  display: inline-block;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.app-kaspa-refresh-icon--spin {
+  animation: app-kaspa-spin 0.8s linear infinite;
+}
+
+@keyframes app-kaspa-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .app-kaspa-strip {

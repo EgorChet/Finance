@@ -13,13 +13,21 @@
         </span>
       </button>
       <div class="app-header-brand">
-        <h1 class="app-title">Finance</h1>
-        <p v-if="kaspaQuote" class="app-kaspa-strip" :class="{ 'app-kaspa-strip--stale': kaspaQuote.stale }" :title="kaspaTitle">
+        <div v-if="kaspaQuote" class="app-kaspa-strip" :class="{ 'app-kaspa-strip--stale': kaspaQuote.stale }" :title="kaspaTitle">
           <img class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
           <span class="app-kaspa-item">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
           <span class="app-kaspa-sep" aria-hidden="true">·</span>
           <span class="app-kaspa-item app-kaspa-portfolio">{{ formatUsdt(kaspaQuote.portfolio_usdt, 0) }}</span>
-        </p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-icon app-kaspa-refresh"
+          :disabled="kaspaRefreshing"
+          aria-label="Refresh Kaspa price"
+          @click="refreshKaspaQuote(true)"
+        >
+          <span class="app-kaspa-refresh-icon" :class="{ 'app-kaspa-refresh-icon--spin': kaspaRefreshing }" aria-hidden="true">↻</span>
+        </button>
       </div>
       <div class="app-header-actions">
         <button type="button" class="btn btn-icon" aria-label="Menu" @click="menuOpen = !menuOpen">⋯</button>
@@ -187,6 +195,7 @@ const uploadPromptFile = ref<File | null>(null);
 const menuOpen = ref(false);
 const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
+const kaspaRefreshing = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 let kaspaTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -197,11 +206,15 @@ const kaspaTitle = computed(() => {
   return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} portfolio · ${source}${staleNote}`;
 });
 
-async function refreshKaspaQuote() {
+async function refreshKaspaQuote(force = false) {
+  if (kaspaRefreshing.value) return;
+  kaspaRefreshing.value = true;
   try {
-    kaspaQuote.value = await fetchKaspaQuote(auth.isDemo, auth.token || undefined);
+    kaspaQuote.value = await fetchKaspaQuote(auth.isDemo, auth.token || undefined, force);
   } catch {
     /* keep last quote or hide until first success */
+  } finally {
+    kaspaRefreshing.value = false;
   }
 }
 

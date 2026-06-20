@@ -97,9 +97,10 @@ router.get("/config", (_req, res) => {
   });
 });
 
-router.get("/kaspa", async (_req, res) => {
+router.get("/kaspa", async (req, res) => {
   try {
-    res.json(await getKaspaQuote());
+    const force = req.query.refresh === "1" || req.query.force === "1";
+    res.json(await getKaspaQuote({ force }));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kaspa price unavailable";
     res.status(502).json({ error: message });

@@ -135,11 +135,17 @@ function cacheNeedsRefresh(cached: MemoryCache | null, now: number): boolean {
   return false;
 }
 
-export async function getKaspaQuote(): Promise<KaspaQuote> {
+export async function getKaspaQuote(options?: { force?: boolean }): Promise<KaspaQuote> {
+  const force = options?.force ?? false;
   const now = Date.now();
-  let cached = await loadCachedPrice();
 
-  if (cacheNeedsRefresh(cached, now)) {
+  if (force) {
+    memoryCache = null;
+  }
+
+  let cached = force ? null : await loadCachedPrice();
+
+  if (force || cacheNeedsRefresh(cached, now)) {
     const fresh = await refreshPrice();
     if (fresh != null) {
       cached = memoryCache;
