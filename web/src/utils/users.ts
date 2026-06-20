@@ -23,10 +23,10 @@ export type UserProfile = {
   features: UserFeatures;
 };
 
-/** Default display labels — API may override via /auth/status. */
-export const DEFAULT_USER_LABELS: Record<HouseholdUserId, string> = {
-  egor: "",
-  julia: "",
+/** In-app names — internal ids only; login names stay on the server. */
+export const UI_USER_LABELS: Record<HouseholdUserId, string> = {
+  egor: "egor",
+  julia: "julia",
 };
 
 export const DEMO_USER_LABELS: Record<HouseholdUserId, string> = {
@@ -35,32 +35,19 @@ export const DEMO_USER_LABELS: Record<HouseholdUserId, string> = {
 };
 
 export const DEFAULT_HOUSEHOLD_USERS = (
-  Object.entries(DEFAULT_USER_LABELS) as [HouseholdUserId, string][]
+  Object.entries(UI_USER_LABELS) as [HouseholdUserId, string][]
 ).map(([id, label]) => ({ id, label }));
 
 export function isHouseholdUserId(value: unknown): value is HouseholdUserId {
   return value === "egor" || value === "julia";
 }
 
-export function parseUsername(
-  raw: string,
-  labels: Partial<Record<HouseholdUserId, string>> = DEFAULT_USER_LABELS,
-): HouseholdUserId | null {
-  const name = raw.trim().toLowerCase();
-  if (!name) return null;
-  const primary = (labels.egor ?? DEFAULT_USER_LABELS.egor).toLowerCase();
-  const secondary = (labels.julia ?? DEFAULT_USER_LABELS.julia).toLowerCase();
-  if (primary && name === primary) return "egor";
-  if (secondary && name === secondary) return "julia";
-  return null;
-}
-
 export function userLabel(
   userId: HouseholdUserId | null | undefined,
-  directory: Partial<Record<HouseholdUserId, string>> = DEFAULT_USER_LABELS,
+  directory: Partial<Record<HouseholdUserId, string>> = UI_USER_LABELS,
 ): string {
   if (!userId) return "";
-  return directory[userId] ?? DEFAULT_USER_LABELS[userId] ?? userId;
+  return directory[userId] ?? UI_USER_LABELS[userId] ?? userId;
 }
 
 export function creatorClass(userId: HouseholdUserId | undefined): string {
@@ -81,9 +68,6 @@ export function userIdFromToken(token: string | null | undefined): HouseholdUser
   }
 }
 
-export function directoryFromUsers(users: { id: HouseholdUserId; label: string }[]): Record<HouseholdUserId, string> {
-  return {
-    egor: users.find((u) => u.id === "egor")?.label ?? DEFAULT_USER_LABELS.egor,
-    julia: users.find((u) => u.id === "julia")?.label ?? DEFAULT_USER_LABELS.julia,
-  };
+export function householdUsersForUi(): { id: HouseholdUserId; label: string }[] {
+  return DEFAULT_HOUSEHOLD_USERS;
 }

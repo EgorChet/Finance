@@ -43,20 +43,20 @@ export function loginLabelsConfigured(): boolean {
   return Boolean(labels.egor && labels.julia);
 }
 
-function displayLabel(userId: HouseholdUserId): string {
-  return loginLabels()[userId];
+export function uiDisplayName(userId: HouseholdUserId): string {
+  return userId;
 }
 
 export function userProfile(userId: HouseholdUserId): UserProfile {
   return {
     id: userId,
-    label: displayLabel(userId),
+    label: uiDisplayName(userId),
     features: ALL_FEATURES,
   };
 }
 
 export function listAuthUsers(): { id: HouseholdUserId; label: string }[] {
-  return HOUSEHOLD_USER_IDS.map((id) => ({ id, label: displayLabel(id) }));
+  return HOUSEHOLD_USER_IDS.map((id) => ({ id, label: uiDisplayName(id) }));
 }
 
 export function isHouseholdUserId(value: unknown): value is HouseholdUserId {

@@ -5,9 +5,9 @@ import type { HouseholdUserId } from "../types";
 import {
   ALL_FEATURES,
   DEFAULT_HOUSEHOLD_USERS,
-  DEFAULT_USER_LABELS,
   DEMO_USER_LABELS,
-  directoryFromUsers,
+  UI_USER_LABELS,
+  householdUsersForUi,
   userIdFromToken,
   userLabel as labelForUser,
   type UserFeatures,
@@ -23,26 +23,22 @@ export const useAuthStore = defineStore("auth", () => {
   const loading = ref(false);
   const error = ref("");
   const userId = ref<HouseholdUserId | null>(token.value ? userIdFromToken(token.value) : null);
-  const userDirectory = ref<Record<HouseholdUserId, string>>({ ...DEFAULT_USER_LABELS });
   const householdUsers = ref(DEFAULT_HOUSEHOLD_USERS);
-  const userLabel = ref(userId.value ? labelForUser(userId.value, userDirectory.value) : "");
+  const userLabel = ref(userId.value ? labelForUser(userId.value) : "");
   const features = ref<UserFeatures>({ ...ALL_FEATURES });
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
 
-  function syncUsers(users: { id: HouseholdUserId; label: string }[]) {
-    if (!users.length) return;
-    householdUsers.value = users;
-    userDirectory.value = directoryFromUsers(users);
+  function syncUiUsers() {
+    householdUsers.value = householdUsersForUi();
     if (userId.value) {
-      userLabel.value = labelForUser(userId.value, userDirectory.value);
+      userLabel.value = labelForUser(userId.value);
     }
   }
 
   function applySession(next: {
     token?: string | null;
     user?: HouseholdUserId;
-    label?: string;
     features?: UserFeatures;
     demo?: boolean;
   }) {
@@ -50,7 +46,7 @@ export const useAuthStore = defineStore("auth", () => {
       token.value = null;
       isDemo.value = true;
       userId.value = "egor";
-      userLabel.value = labelForUser("egor", userDirectory.value);
+      userLabel.value = labelForUser("egor", DEMO_USER_LABELS);
       features.value = { ...ALL_FEATURES };
       localStorage.removeItem(TOKEN_KEY);
       return;
@@ -63,8 +59,9 @@ export const useAuthStore = defineStore("auth", () => {
     demoAsOf.value = null;
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
     userId.value = resolvedUser;
-    userLabel.value = next.label ?? labelForUser(resolvedUser, userDirectory.value);
+    userLabel.value = labelForUser(resolvedUser);
     features.value = next.features ?? { ...ALL_FEATURES };
+    syncUiUsers();
   }
 
   async function checkStatus() {
@@ -80,20 +77,14 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const me = await fetchAuthMe(token.value);
       userId.value = me.user;
-      userLabel.value = me.label;
+      userLabel.value = labelForUser(me.user);
       features.value = me.features;
-      if (me.users?.length) syncUsers(me.users);
-      else {
-        userDirectory.value = {
-          ...userDirectory.value,
-          [me.user]: me.label,
-        };
-      }
+      syncUiUsers();
     } catch {
       const fromToken = userIdFromToken(token.value);
       if (fromToken) {
         userId.value = fromToken;
-        userLabel.value = labelForUser(fromToken, userDirectory.value);
+        userLabel.value = labelForUser(fromToken);
       }
     }
   }
@@ -106,16 +97,8 @@ export const useAuthStore = defineStore("auth", () => {
       applySession({
         token: res.token,
         user: res.user,
-        label: res.label,
         features: res.features,
       });
-      if (res.users?.length) syncUsers(res.users);
-      else {
-        userDirectory.value = {
-          ...userDirectory.value,
-          [res.user]: res.label,
-        };
-      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (/unknown name/i.test(msg)) {
@@ -139,13 +122,15 @@ export const useAuthStore = defineStore("auth", () => {
     householdUsers.value = (
       Object.entries(DEMO_USER_LABELS) as [HouseholdUserId, string][]
     ).map(([id, label]) => ({ id, label }));
-    userDirectory.value = { ...DEMO_USER_LABELS };
-    userLabel.value = labelForUser("egor", userDirectory.value);
+    userLabel.value = labelForUser("egor", DEMO_USER_LABELS);
   }
 
   function logout() {
     applySession({ demo: true });
     demoAsOf.value = null;
+    householdUsers.value = (
+      Object.entries(DEMO_USER_LABELS) as [HouseholdUserId, string][]
+    ).map(([id, label]) => ({ id, label }));
   }
 
   function can(_feature: keyof UserFeatures): boolean {
@@ -153,7 +138,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function labelFor(id: HouseholdUserId | null | undefined): string {
-    return labelForUser(id, userDirectory.value);
+    return labelForUser(id, isDemo.value ? DEMO_USER_LABELS : UI_USER_LABELS);
   }
 
   return {
@@ -165,7 +150,6 @@ export const useAuthStore = defineStore("auth", () => {
     error,
     userId,
     userLabel,
-    userDirectory,
     householdUsers,
     features,
     isAuthenticated,
