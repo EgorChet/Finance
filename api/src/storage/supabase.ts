@@ -6,6 +6,7 @@ import type {
   ExclusionsData,
   FixedChargesData,
   FxFallbackData,
+  KaspaPriceCache,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
@@ -198,6 +199,35 @@ export async function writeFxFallback(data: FxFallbackData): Promise<void> {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "fx_fallback", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readKaspaPriceCache(): Promise<KaspaPriceCache> {
+  if (!supabaseConfigured()) return local.readKaspaPriceCache();
+  const res = await supabaseFetch("app_state?id=eq.kaspa_price&select=data");
+  if (!res.ok) return { updated_at: "", price_usdt: 0 };
+  const rows = (await res.json()) as { data: KaspaPriceCache }[];
+  const data = rows[0]?.data;
+  return {
+    updated_at: data?.updated_at ?? "",
+    price_usdt: data?.price_usdt ?? 0,
+    source: data?.source,
+  };
+}
+
+export async function writeKaspaPriceCache(data: KaspaPriceCache): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeKaspaPriceCache(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "kaspa_price", data }),
   });
   if (!res.ok) {
     const text = await res.text();

@@ -14,7 +14,7 @@
       </button>
       <div class="app-header-brand">
         <h1 class="app-title">Finance</h1>
-        <p v-if="kaspaQuote" class="app-kaspa-strip" :title="kaspaTitle">
+        <p v-if="kaspaQuote" class="app-kaspa-strip" :class="{ 'app-kaspa-strip--stale': kaspaQuote.stale }" :title="kaspaTitle">
           <img class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
           <span class="app-kaspa-item">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
           <span class="app-kaspa-sep" aria-hidden="true">·</span>
@@ -223,7 +223,7 @@ const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
 onMounted(() => {
   void refreshKaspaQuote();
-  kaspaTimer = setInterval(() => void refreshKaspaQuote(), 120_000);
+  kaspaTimer = setInterval(() => void refreshKaspaQuote(), 600_000);
 });
 
 onUnmounted(() => {

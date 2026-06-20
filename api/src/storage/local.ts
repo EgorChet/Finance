@@ -5,6 +5,7 @@ import type {
   ExclusionsData,
   FixedChargesData,
   FxFallbackData,
+  KaspaPriceCache,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
@@ -20,6 +21,7 @@ const EXCLUSIONS_PATH = path.join(DATA_DIR, "user_exclusions.json");
 const FIXED_CHARGES_PATH = path.join(DATA_DIR, "user_fixed_charges.json");
 const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
+const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const PROJECT_ROOT = path.resolve(DATA_DIR, "..");
 const STATEMENTS_DIR = path.join(PROJECT_ROOT, "statements");
 const XLSX_DIRS = [STATEMENTS_DIR];
@@ -140,6 +142,25 @@ export async function readFxFallback(): Promise<FxFallbackData> {
 export async function writeFxFallback(data: FxFallbackData): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FX_FALLBACK_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
+export async function readKaspaPriceCache(): Promise<KaspaPriceCache> {
+  try {
+    const raw = await fs.readFile(KASPA_PRICE_PATH, "utf-8");
+    const data = JSON.parse(raw) as Partial<KaspaPriceCache>;
+    return {
+      updated_at: data.updated_at ?? "",
+      price_usdt: data.price_usdt ?? 0,
+      source: data.source,
+    };
+  } catch {
+    return { updated_at: "", price_usdt: 0 };
+  }
+}
+
+export async function writeKaspaPriceCache(data: KaspaPriceCache): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(KASPA_PRICE_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
 export async function discoverXlsxFiles(): Promise<string[]> {

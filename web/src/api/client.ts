@@ -154,6 +154,7 @@ export type KaspaQuote = {
   balance_kas: number;
   portfolio_usdt: number;
   updated_at: string;
+  stale?: boolean;
 };
 
 export async function fetchKaspaQuote(demo: boolean, token?: string) {

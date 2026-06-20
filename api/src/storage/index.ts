@@ -22,3 +22,5 @@ export const readLivingBudget = store.readLivingBudget;
 export const writeLivingBudget = store.writeLivingBudget;
 export const readFxFallback = store.readFxFallback;
 export const writeFxFallback = store.writeFxFallback;
+export const readKaspaPriceCache = store.readKaspaPriceCache;
+export const writeKaspaPriceCache = store.writeKaspaPriceCache;

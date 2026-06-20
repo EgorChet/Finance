@@ -144,3 +144,9 @@ export interface FxFallbackData {
   updated: string;
   rates: Record<string, number>;
 }
+
+export interface KaspaPriceCache {
+  updated_at: string;
+  price_usdt: number;
+  source?: string;
+}

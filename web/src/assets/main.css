@@ -643,6 +643,10 @@ button {
   opacity: 0.55;
 }
 
+.app-kaspa-strip--stale {
+  opacity: 0.72;
+}
+
 .app-header-actions {
   position: relative;
   flex-shrink: 0;
