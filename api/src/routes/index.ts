@@ -12,6 +12,7 @@ import {
   normalizeProvisionalChargesAsync,
   rememberReport,
   applyMerchantRules,
+  reprocessAllStatements,
   summaryRows,
 } from "../services/reportService.js";
 import {
@@ -244,6 +245,16 @@ router.post("/sync", async (req, res) => {
   }
 
   res.json({ synced, total_months: Object.keys(data.statements).length });
+});
+
+/** Re-apply refund/FX normalization to stored statements (no re-upload). */
+router.post("/statements/reprocess", async (_req, res) => {
+  const data = await readStatements();
+  const { updated } = await reprocessAllStatements(data);
+  if (updated > 0) {
+    await writeStatements(data);
+  }
+  res.json({ ok: true, updated, total_months: Object.keys(data.statements).length });
 });
 
 router.post("/upload", upload.single("file"), async (req, res) => {

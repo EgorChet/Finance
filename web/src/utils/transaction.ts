@@ -1,10 +1,18 @@
-/** Bank credit / refund row (Leumi: transaction type contains זיכוי). */
+/** Leumi refund / credit transaction types (column 4 in Visa export). */
+const REFUND_TYPE_MARKERS = ["זיכוי", "השבת מכירה"] as const;
+
+export function isRefundTypeHe(transactionTypeHe: string | null | undefined): boolean {
+  if (!transactionTypeHe) return false;
+  return REFUND_TYPE_MARKERS.some((m) => transactionTypeHe.includes(m));
+}
+
+/** Bank credit / refund row. */
 export function isRefundTransaction(tx: {
   charge_amount: number;
   amount?: number;
   transaction_type_he?: string;
 }): boolean {
-  if (tx.transaction_type_he?.includes("זיכוי")) return true;
+  if (isRefundTypeHe(tx.transaction_type_he)) return true;
   if (tx.charge_amount < 0) return true;
   if (tx.amount != null && tx.amount < 0) return true;
   return false;

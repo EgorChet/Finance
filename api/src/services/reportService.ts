@@ -285,3 +285,16 @@ export function applyMerchantRules(data: StatementsData, rules: MerchantRules): 
   }
   return changed;
 }
+
+/** Re-run FX/refund normalization and rebuild summaries for all stored statements. */
+export async function reprocessAllStatements(data: StatementsData): Promise<{ updated: number }> {
+  let updated = 0;
+  for (const entry of Object.values(data.statements)) {
+    const before = JSON.stringify(entry.report.transactions);
+    entry.report = await finalizeReportAsync(entry.report);
+    if (JSON.stringify(entry.report.transactions) !== before) {
+      updated += 1;
+    }
+  }
+  return { updated };
+}

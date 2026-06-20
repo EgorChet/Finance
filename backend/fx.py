@@ -104,12 +104,15 @@ def detect_currency(
     return "ILS"
 
 
+REFUND_TYPE_MARKERS = ("זיכוי", "השבת מכירה")
+
+
 def is_refund_transaction(
     transaction_type_he: Optional[str],
     amount: float,
     charge_raw,
 ) -> bool:
-    if transaction_type_he and "זיכוי" in transaction_type_he:
+    if transaction_type_he and any(m in transaction_type_he for m in REFUND_TYPE_MARKERS):
         return True
     if amount < 0:
         return True

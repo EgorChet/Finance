@@ -150,5 +150,19 @@ def test_refund_renormalizes_positive_stored_charge():
     assert estimated is False
 
 
+def test_sale_return_refund_type():
+    charge, currency, estimated = resolve_charge_ils(
+        543,
+        543,
+        "SKIMS Galilot",
+        None,
+        tx_date=date(2026, 4, 2),
+        transaction_type_he="השבת מכירה",
+    )
+    assert charge == -543
+    assert currency == "ILS"
+    assert estimated is False
+
+
 def test_bgn_from_ratio():
     assert detect_currency("MAGAZIN ALKOHOL", 8.9, 17.96) == "BGN"

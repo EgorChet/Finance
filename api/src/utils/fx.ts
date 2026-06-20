@@ -95,12 +95,19 @@ function explicitCurrencyForTx(
   return tx.original_currency;
 }
 
+const REFUND_TYPE_MARKERS = ["זיכוי", "השבת מכירה"] as const;
+
+export function isRefundTypeHe(transactionTypeHe: string | null | undefined): boolean {
+  if (!transactionTypeHe) return false;
+  return REFUND_TYPE_MARKERS.some((m) => transactionTypeHe.includes(m));
+}
+
 export function isRefundTransaction(
   transactionTypeHe: string | null | undefined,
   amount: number,
   chargeRaw: number | null | undefined,
 ): boolean {
-  if (transactionTypeHe?.includes("זיכוי")) return true;
+  if (isRefundTypeHe(transactionTypeHe)) return true;
   if (amount < 0) return true;
   if (chargeRaw != null && chargeRaw < 0) return true;
   return false;

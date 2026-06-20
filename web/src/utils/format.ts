@@ -1,4 +1,6 @@
 /** Round to agorot (2 dp) — avoids float noise like 2392.2343465673. */
+import { isRefundTransaction } from "./transaction";
+
 export function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
@@ -26,6 +28,8 @@ function formatForeignAmount(amount: number, currency: string): string {
   return `${formatted} ${currency}`;
 }
 
+import { isRefundTransaction } from "./transaction";
+
 /** ILS charge with optional original foreign amount. */
 export function formatChargeAmount(tx: {
   amount: number;
@@ -34,7 +38,7 @@ export function formatChargeAmount(tx: {
   charge_estimated?: boolean;
   transaction_type_he?: string;
 }): string {
-  const refund = tx.charge_amount < 0 || tx.transaction_type_he?.includes("זיכוי");
+  const refund = isRefundTransaction(tx);
   const displayAmount = refund ? Math.abs(tx.charge_amount) : tx.charge_amount;
   const ils = formatIls(displayAmount);
   const signedIls = refund ? `−${ils}` : ils;
