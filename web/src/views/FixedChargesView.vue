@@ -12,7 +12,7 @@
           </p>
         </div>
         <p
-          v-if="saveStatus && !hasUnsavedChanges"
+          v-if="saveStatus && (!hasUnsavedChanges || saveError)"
           class="recurring-save-status"
           :class="{ 'recurring-save-status--error': saveError }"
         >
@@ -21,6 +21,7 @@
       </div>
       <div v-if="hasUnsavedChanges && !auth.isDemo" class="recurring-unsaved-bar">
         <p class="recurring-unsaved-text">You have unsaved changes</p>
+        <p v-if="saveError && saveStatus" class="recurring-form-error">{{ saveStatus }}</p>
         <div class="recurring-unsaved-actions">
           <button type="button" class="btn" :disabled="saving" @click="discardChanges">Discard</button>
           <button type="button" class="btn btn-primary" :disabled="saving" @click="saveChanges">
@@ -111,7 +112,7 @@
             <label class="field-label">Name</label>
             <input v-model="newOneTime.name_en" class="input" placeholder="e.g. Cherry watermelon market" />
           </div>
-          <div class="recurring-add-schedule-row recurring-add-schedule-row--triple">
+          <div class="charge-detail-fields">
             <div class="field-group">
               <label class="field-label">Date</label>
               <input v-model="newOneTime.charge_date" class="input" type="date" />
@@ -249,7 +250,7 @@
               </span>
             </div>
 
-            <div class="recurring-segment-row recurring-segment-row--triple">
+            <div class="charge-detail-fields">
               <div class="field-group">
                 <label class="field-label">Date</label>
                 <input
@@ -331,6 +332,8 @@ import {
 import {
   type LivingBudgetSegment,
   normalizeLivingBudgetSegment,
+  serializeLivingBudgetSegments,
+  validateLivingBudget,
 } from "../utils/livingBudget";
 
 const categories = SPENDING_CATEGORIES;
@@ -392,11 +395,18 @@ function toggleAddForm(kind: AddFormKind) {
 }
 
 function snapshot(data: ConfiguredCharge[]): string {
-  return JSON.stringify(data);
+  return JSON.stringify(
+    data.map(normalizeConfiguredCharge).sort((a, b) => segmentKey(a).localeCompare(segmentKey(b))),
+  );
 }
 
 function budgetSnapshot(data: LivingBudgetSegment[]): string {
-  return JSON.stringify(data);
+  return serializeLivingBudgetSegments(data);
+}
+
+function syncSavedSnapshots() {
+  savedSnapshot.value = snapshot(charges.value);
+  savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
 }
 
 function isChargesDirty(): boolean {
@@ -453,9 +463,19 @@ let saveChain: Promise<boolean> = Promise.resolve(true);
 async function runPersist(): Promise<boolean> {
   if (!isDirty()) return true;
 
+  if (isBudgetDirty()) {
+    const budgetError = validateLivingBudget(livingBudgetSegments.value);
+    if (budgetError) {
+      showSaveStatus(budgetError, true);
+      status.value = budgetError;
+      return false;
+    }
+  }
+
   saving.value = true;
   showSaveStatus("Saving…");
   status.value = "";
+  saveError.value = false;
   try {
     const tasks: Promise<void>[] = [];
     if (isChargesDirty()) {
@@ -465,7 +485,6 @@ async function runPersist(): Promise<boolean> {
           auth.token || undefined,
         ).then((data) => {
           charges.value = data.charges.map((c) => normalizeConfiguredCharge(c));
-          savedSnapshot.value = snapshot(charges.value);
         }),
       );
     }
@@ -476,15 +495,16 @@ async function runPersist(): Promise<boolean> {
           auth.token || undefined,
         ).then((data) => {
           livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
-          savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
         }),
       );
     }
     await Promise.all(tasks);
+    syncSavedSnapshots();
     showSaveStatus("Saved");
     return true;
   } catch (e) {
     showSaveStatus(String(e), true);
+    status.value = String(e);
     return false;
   } finally {
     saving.value = false;
@@ -728,14 +748,16 @@ async function load() {
   status.value = "";
   try {
     const token = auth.token || undefined;
-    const [chargesData, budgetData] = await Promise.all([
-      fetchFixedCharges(auth.isDemo, token),
-      fetchLivingBudget(auth.isDemo, token),
-    ]);
+    const chargesData = await fetchFixedCharges(auth.isDemo, token);
     charges.value = chargesData.charges.map((c) => normalizeConfiguredCharge(c));
-    livingBudgetSegments.value = budgetData.segments.map((s) => normalizeLivingBudgetSegment(s));
-    savedSnapshot.value = snapshot(charges.value);
-    savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
+    try {
+      const budgetData = await fetchLivingBudget(auth.isDemo, token);
+      livingBudgetSegments.value = budgetData.segments.map((s) => normalizeLivingBudgetSegment(s));
+    } catch (budgetErr) {
+      livingBudgetSegments.value = [];
+      error.value = `Could not load living budget: ${budgetErr}. Redeploy the Render API if you recently added this feature.`;
+    }
+    syncSavedSnapshots();
   } catch (e) {
     error.value = String(e);
     charges.value = [];

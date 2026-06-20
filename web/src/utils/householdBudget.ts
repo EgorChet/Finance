@@ -1,9 +1,5 @@
 import type { Transaction } from "../types";
 import { roundMoney } from "./format";
-import { DEFAULT_LIVING_BUDGET } from "./livingBudget";
-
-/** Fallback when no budget segment matches the billing cycle month. */
-export const MONTHLY_DISCRETIONARY_BUDGET = DEFAULT_LIVING_BUDGET;
 
 const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
 const CAR_LOAN_NAME_RE = /\b(car loan|הלוואת רכב)/i;
@@ -86,6 +82,6 @@ export function discretionarySpent(transactions: Transaction[]): number {
   return budgetSpendBreakdown(transactions).spent;
 }
 
-export function moneyLeft(transactions: Transaction[], budget = MONTHLY_DISCRETIONARY_BUDGET): number {
+export function moneyLeft(transactions: Transaction[], budget: number): number {
   return roundMoney(budget - discretionarySpent(transactions));
 }

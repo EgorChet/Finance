@@ -9,7 +9,7 @@
     </header>
 
     <div v-if="segments.length" class="recurring-segments">
-      <article v-for="seg in segments" :key="livingBudgetSegmentKey(seg)" class="recurring-segment-card">
+      <article v-for="seg in segments" :key="livingBudgetSegmentStableKey(seg)" class="recurring-segment-card">
         <div class="recurring-segment-head">
           <span v-if="readonly" class="recurring-segment-amount-display">{{ formatIls(seg.amount) }}</span>
           <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
@@ -82,7 +82,7 @@ import {
   type LivingBudgetSegment,
   currentYearMonth,
   isOngoingThrough,
-  livingBudgetSegmentKey,
+  livingBudgetSegmentStableKey,
   livingBudgetStatusLabel,
   livingBudgetTimelineSummary,
   ONGOING_THROUGH_MONTH,
@@ -146,7 +146,7 @@ function addSegment() {
   segments.value = [
     ...sorted,
     {
-      amount: last?.amount ?? 12000,
+      amount: last?.amount ?? 0,
       from_month: fromMonth,
       through_month: ONGOING_THROUGH_MONTH,
     },
@@ -161,7 +161,7 @@ async function removeSegment(seg: LivingBudgetSegment) {
     tone: "danger",
   });
   if (!ok) return;
-  const key = livingBudgetSegmentKey(seg);
-  segments.value = segments.value.filter((s) => livingBudgetSegmentKey(s) !== key);
+  const key = livingBudgetSegmentStableKey(seg);
+  segments.value = segments.value.filter((s) => livingBudgetSegmentStableKey(s) !== key);
 }
 </script>

@@ -1,29 +1,10 @@
-import { readFileSync } from "fs";
-import path from "path";
 import type { LivingBudgetData, LivingBudgetSegment } from "../types.js";
 import { readLivingBudget, writeLivingBudget } from "../storage/index.js";
 
-const BUILTIN_PATH = path.resolve(
-  process.env.DATA_DIR ? path.dirname(process.env.DATA_DIR) : path.join(process.cwd(), ".."),
-  "data",
-  "living_budget.json",
-);
-
 export const ONGOING_THROUGH_MONTH = "2035-12";
-export const DEFAULT_LIVING_BUDGET = 12000;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 let cached: LivingBudgetSegment[] | null = null;
-
-function loadBuiltinSegments(): LivingBudgetSegment[] {
-  try {
-    const raw = readFileSync(BUILTIN_PATH, "utf-8");
-    const data = JSON.parse(raw) as { segments?: LivingBudgetSegment[] };
-    return (data.segments || []).map(normalizeSegment);
-  } catch {
-    return [];
-  }
-}
 
 export function normalizeSegment(segment: LivingBudgetSegment): LivingBudgetSegment {
   return {
@@ -34,8 +15,7 @@ export function normalizeSegment(segment: LivingBudgetSegment): LivingBudgetSegm
 }
 
 function mergeSegments(user: LivingBudgetData): LivingBudgetSegment[] {
-  if (user.segments?.length) return user.segments.map(normalizeSegment);
-  return loadBuiltinSegments();
+  return (user.segments || []).map(normalizeSegment);
 }
 
 export async function refreshLivingBudgetCache(): Promise<void> {
@@ -44,7 +24,7 @@ export async function refreshLivingBudgetCache(): Promise<void> {
 }
 
 function ensureCache(): void {
-  if (!cached) cached = loadBuiltinSegments();
+  if (!cached) cached = [];
 }
 
 export function loadLivingBudgetSegments(): LivingBudgetSegment[] {
@@ -52,9 +32,9 @@ export function loadLivingBudgetSegments(): LivingBudgetSegment[] {
   return cached!;
 }
 
-export function livingBudgetForMonth(ym: string, segments = loadLivingBudgetSegments()): number {
+export function livingBudgetForMonth(ym: string, segments = loadLivingBudgetSegments()): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
-  return match?.amount ?? DEFAULT_LIVING_BUDGET;
+  return match?.amount ?? null;
 }
 
 function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {
@@ -87,6 +67,13 @@ export async function saveLivingBudget(segments: LivingBudgetSegment[]): Promise
   const error = validateLivingBudget(normalized);
   if (error) throw new Error(error);
   await writeLivingBudget({ segments: normalized });
-  cached = normalized;
-  return normalized;
+  cached = null;
+  await refreshLivingBudgetCache();
+  const persisted = loadLivingBudgetSegments();
+  if (persisted.length !== normalized.length) {
+    throw new Error(
+      "Living budget did not persist — check that Render has deployed the latest API and Supabase credentials are set.",
+    );
+  }
+  return persisted;
 }

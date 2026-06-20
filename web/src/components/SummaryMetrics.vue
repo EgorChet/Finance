@@ -2,27 +2,37 @@
   <div class="summary-metrics">
     <div class="metric-grid">
       <div class="metric-card metric-card-budget" :class="budgetClass">
-        <div class="metric-label">{{ budgetLabel }}</div>
-        <div class="metric-value">{{ budgetDisplayValue }}</div>
-        <p class="metric-budget-formula">{{ budgetFormula }}</p>
-        <ul class="metric-budget-breakdown">
-          <li>
-            <span>Everyday</span>
-            <span>{{ formatIls(budgetEveryday) }}</span>
-          </li>
-          <li v-if="budgetDevInstitute > 0">
-            <span>Dev Institute</span>
-            <span>{{ formatIls(budgetDevInstitute) }}</span>
-          </li>
-          <li v-if="budgetCarLoan > 0">
-            <span>Car loan</span>
-            <span>{{ formatIls(budgetCarLoan) }}</span>
-          </li>
-        </ul>
-        <p class="metric-sub-note">
-          Rent is not counted — paid outside this {{ formatIls(livingBudget) }} cap.
-          <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Edit budget</RouterLink>
-        </p>
+        <template v-if="livingBudget !== null">
+          <div class="metric-label">{{ budgetLabel }}</div>
+          <div class="metric-value">{{ budgetDisplayValue }}</div>
+          <p class="metric-budget-formula">{{ budgetFormula }}</p>
+          <ul class="metric-budget-breakdown">
+            <li>
+              <span>Everyday</span>
+              <span>{{ formatIls(budgetEveryday) }}</span>
+            </li>
+            <li v-if="budgetDevInstitute > 0">
+              <span>Dev Institute</span>
+              <span>{{ formatIls(budgetDevInstitute) }}</span>
+            </li>
+            <li v-if="budgetCarLoan > 0">
+              <span>Car loan</span>
+              <span>{{ formatIls(budgetCarLoan) }}</span>
+            </li>
+          </ul>
+          <p class="metric-sub-note">
+            Rent is not counted — paid outside this {{ formatIls(livingBudget) }} cap.
+            <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Edit budget</RouterLink>
+          </p>
+        </template>
+        <template v-else>
+          <div class="metric-label">Living budget</div>
+          <div class="metric-value metric-value-sm">Not set for this month</div>
+          <p class="metric-sub-note">
+            Add budget periods for this billing cycle on
+            <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Extra charges</RouterLink>.
+          </p>
+        </template>
       </div>
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
@@ -70,7 +80,7 @@ import {
 } from "../utils/householdBudget";
 
 const props = withDefaults(
-  defineProps<{ report: SpendingReport; livingBudget: number; retrospective?: boolean }>(),
+  defineProps<{ report: SpendingReport; livingBudget: number | null; retrospective?: boolean }>(),
   { retrospective: false },
 );
 
@@ -81,9 +91,11 @@ const budgetSpent = computed(() => budgetBreakdown.value.spent);
 const budgetEveryday = computed(() => budgetBreakdown.value.everyday);
 const budgetDevInstitute = computed(() => budgetBreakdown.value.devInstitute);
 const budgetCarLoan = computed(() => budgetBreakdown.value.carLoan);
-const budgetLeft = computed(() => moneyLeft(props.report.transactions, props.livingBudget));
-const isOverBudget = computed(() => budgetLeft.value < 0);
-const overAmount = computed(() => Math.abs(budgetLeft.value));
+const budgetLeft = computed(() =>
+  props.livingBudget !== null ? moneyLeft(props.report.transactions, props.livingBudget) : null,
+);
+const isOverBudget = computed(() => budgetLeft.value !== null && budgetLeft.value < 0);
+const overAmount = computed(() => Math.abs(budgetLeft.value ?? 0));
 
 const budgetLabel = computed(() => {
   if (isOverBudget.value) return props.retrospective ? "Overspent" : "Over budget";
@@ -91,11 +103,13 @@ const budgetLabel = computed(() => {
   return "Money left";
 });
 
-const budgetDisplayValue = computed(() =>
-  isOverBudget.value ? formatIls(overAmount.value) : formatIls(budgetLeft.value),
-);
+const budgetDisplayValue = computed(() => {
+  if (budgetLeft.value === null) return "—";
+  return isOverBudget.value ? formatIls(overAmount.value) : formatIls(budgetLeft.value);
+});
 
 const budgetFormula = computed(() => {
+  if (props.livingBudget === null || budgetLeft.value === null) return "";
   const budget = formatIls(props.livingBudget);
   const spent = formatIls(budgetSpent.value);
   if (isOverBudget.value) {
@@ -107,6 +121,7 @@ const budgetFormula = computed(() => {
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
+  if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";
   return "metric-card-budget--ok";

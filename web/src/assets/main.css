@@ -1906,6 +1906,7 @@ button {
   .browse-filter-row {
     grid-template-columns: 1fr;
   }
+
 }
 
 .mappings-search {
@@ -2398,42 +2399,21 @@ table.rules select {
   align-items: start;
 }
 
-.recurring-segment-row--triple {
-  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
+/* One-time charge fields: date full width, amount + category share a row */
+.charge-detail-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 0.65rem 0.75rem;
+  align-items: start;
 }
 
-.recurring-segment-row--triple .input,
-.recurring-add-schedule-row--triple .input {
+.charge-detail-fields .field-group {
+  margin-bottom: 0;
   min-width: 0;
-  max-width: 100%;
 }
 
-.recurring-segment-row--triple input[type="date"],
-.recurring-add-schedule-row--triple input[type="date"] {
-  width: 100%;
-  min-width: 0;
-  -webkit-min-logical-width: 0;
-  overflow: hidden;
-}
-
-.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit,
-.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-day-field,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit-day-field,
-.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-month-field,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit-month-field,
-.recurring-segment-row--triple input[type="date"]::-webkit-datetime-edit-year-field,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-datetime-edit-year-field {
-  min-width: 0;
-  padding: 0;
-}
-
-.recurring-segment-row--triple input[type="date"]::-webkit-calendar-picker-indicator,
-.recurring-add-schedule-row--triple input[type="date"]::-webkit-calendar-picker-indicator {
-  margin: 0;
-  padding: 0;
+.charge-detail-fields .field-group:first-child {
+  grid-column: 1 / -1;
 }
 
 .recurring-segment-row .field-group {
@@ -2570,10 +2550,6 @@ table.rules select {
   grid-template-columns: minmax(5.5rem, 0.85fr) 1fr;
   gap: 0.5rem 0.75rem;
   align-items: start;
-}
-
-.recurring-add-schedule-row--triple {
-  grid-template-columns: minmax(0, 40fr) minmax(0, 25fr) minmax(0, 35fr);
 }
 
 .recurring-add-schedule-row .field-group {

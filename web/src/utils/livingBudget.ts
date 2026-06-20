@@ -16,11 +16,6 @@ export interface LivingBudgetSegment {
   through_month: string;
 }
 
-export const DEFAULT_LIVING_BUDGET = 12000;
-
-/** @deprecated Use resolved budget from living budget segments. */
-export const MONTHLY_DISCRETIONARY_BUDGET = DEFAULT_LIVING_BUDGET;
-
 export function normalizeLivingBudgetSegment(segment: LivingBudgetSegment): LivingBudgetSegment {
   return {
     amount: roundMoney(segment.amount),
@@ -33,9 +28,47 @@ export function livingBudgetSegmentKey(segment: LivingBudgetSegment): string {
   return `${segment.from_month}|${segment.through_month}|${segment.amount}`;
 }
 
-export function livingBudgetForMonth(ym: string, segments: LivingBudgetSegment[]): number {
+/** Stable list key for v-for — must not include amount (typing would remount the input). */
+export function livingBudgetSegmentStableKey(segment: LivingBudgetSegment): string {
+  return `${segment.from_month}|${segment.through_month}`;
+}
+
+export function livingBudgetForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
-  return match?.amount ?? DEFAULT_LIVING_BUDGET;
+  return match?.amount ?? null;
+}
+
+function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {
+  return a.from_month <= b.through_month && b.from_month <= a.through_month;
+}
+
+export function validateLivingBudget(segments: LivingBudgetSegment[]): string | null {
+  if (!segments.length) return "Add at least one budget period before saving.";
+  for (const raw of segments) {
+    const segment = normalizeLivingBudgetSegment(raw);
+    if (!Number.isFinite(segment.amount) || segment.amount <= 0) {
+      return "Each budget amount must be a positive number.";
+    }
+    if (!/^\d{4}-\d{2}$/.test(segment.from_month) || !/^\d{4}-\d{2}$/.test(segment.through_month)) {
+      return "Each budget period needs valid from/through months.";
+    }
+    if (segment.from_month > segment.through_month) {
+      return "Budget start month must be on or before the end month.";
+    }
+  }
+  const sorted = segments.map(normalizeLivingBudgetSegment).sort((a, b) => a.from_month.localeCompare(b.from_month));
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (segmentsOverlap(sorted[i - 1], sorted[i])) {
+      return "Budget periods must not overlap — adjust the dates.";
+    }
+  }
+  return null;
+}
+
+export function serializeLivingBudgetSegments(segments: LivingBudgetSegment[]): string {
+  return JSON.stringify(
+    segments.map(normalizeLivingBudgetSegment).sort((a, b) => a.from_month.localeCompare(b.from_month)),
+  );
 }
 
 export function cycleMonthYmForOverview(
@@ -58,7 +91,7 @@ export function resolvedLivingBudget(
   report: SpendingReport | null,
   segments: LivingBudgetSegment[],
   cycleDay: number,
-): number {
+): number | null {
   const ym = cycleMonthYmForOverview(selectedMonth, report, cycleDay);
   return livingBudgetForMonth(ym, segments);
 }
