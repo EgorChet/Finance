@@ -243,8 +243,17 @@ import { goToSignIn } from "../utils/signIn";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
 
-const PORTFOLIO_ASSET_KEY = "portfolio_header_asset";
+/** v2 — default header asset is KAS (v1 may have persisted FXCN). */
+const PORTFOLIO_ASSET_KEY = "portfolio_header_asset_v2";
 type PortfolioAsset = "kas" | "fxcn";
+
+function readPortfolioAsset(): PortfolioAsset {
+  try {
+    return localStorage.getItem(PORTFOLIO_ASSET_KEY) === "fxcn" ? "fxcn" : "kas";
+  } catch {
+    return "kas";
+  }
+}
 
 const UPLOAD_STEPS = [
   "Connecting to server",
@@ -294,9 +303,7 @@ const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
 const fxcnQuote = ref<FxcnQuote | null>(null);
 const marketSnapshot = ref<MarketSnapshot | null>(null);
-const portfolioAsset = ref<PortfolioAsset>(
-  (localStorage.getItem(PORTFOLIO_ASSET_KEY) as PortfolioAsset | null) === "fxcn" ? "fxcn" : "kas",
-);
+const portfolioAsset = ref<PortfolioAsset>(readPortfolioAsset());
 const portfolioRefreshing = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 let kaspaTimer: ReturnType<typeof setInterval> | null = null;
