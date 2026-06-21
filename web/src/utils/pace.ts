@@ -58,6 +58,8 @@ export interface PaceResult {
   projectedAtUsualPaceForecast: number;
   /** Actual average full-cycle total from recent history (informational). */
   historicalActualMonthAvg: number;
+  historicalActualBillsAvg: number;
+  historicalActualEverydayAvg: number;
   projectedAtUsualPace: number;
   score: number;
   scoreLabel: string;
@@ -190,9 +192,19 @@ function spendAtDay(
   };
 }
 
-function fullCycleTotal(bucket: CycleBucket): number {
+function fullCycleFixedTotal(bucket: CycleBucket): number {
   const cycleLength = daysBetween(bucket.start, bucket.end) + 1;
-  return spendAtDay(bucket, cycleLength).total;
+  return spendAtDay(bucket, cycleLength).fixed;
+}
+
+function fullCycleVariableTotal(bucket: CycleBucket): number {
+  const cycleLength = daysBetween(bucket.start, bucket.end) + 1;
+  const atEnd = spendAtDay(bucket, cycleLength);
+  return roundMoney(atEnd.total - atEnd.fixed);
+}
+
+function fullCycleTotal(bucket: CycleBucket): number {
+  return roundMoney(fullCycleFixedTotal(bucket) + fullCycleVariableTotal(bucket));
 }
 
 function variableThroughDay(bucket: CycleBucket, dayIndex: number): number {
@@ -545,6 +557,17 @@ export function computePace(
             usedFullSnapshots.length,
         )
       : 0;
+  const historicalFullCycleAvgFixed =
+    usedFullSnapshots.length > 0
+      ? roundMoney(
+          usedFullSnapshots.reduce((s, row) => s + fullCycleFixedTotal(row.bucket), 0) /
+            usedFullSnapshots.length,
+        )
+      : 0;
+  const historicalFullCycleAvgEveryday =
+    historicalFullCycleAvg > 0
+      ? roundMoney(historicalFullCycleAvg - historicalFullCycleAvgFixed)
+      : 0;
 
   function extrapolateHistoricalVariable(spendAtDay: number): number {
     return extrapolateToFullCycle(
@@ -555,10 +578,10 @@ export function computePace(
     );
   }
 
-  /** Recurring bills (rent, loans) — not everyday charges like Cibus groceries. */
+  /** Recurring bills — configured charges, or typical full-cycle fixed if higher (incl. card subscriptions). */
   const projectionFixed = includeFixed
     ? fullCycleFixed
-    : Math.max(configuredMonthlyBills, historicalFullAvgFixedAtDay);
+    : Math.max(configuredMonthlyBills, historicalFullCycleAvgFixed);
 
   const projectedEveryday = projectedVariable;
   const projectedTotal = roundMoney(projectionFixed + projectedEveryday);
@@ -606,6 +629,8 @@ export function computePace(
     projectedEveryday,
     projectedAtUsualPaceForecast,
     historicalActualMonthAvg,
+    historicalActualBillsAvg: historicalFullCycleAvgFixed,
+    historicalActualEverydayAvg: historicalFullCycleAvgEveryday,
     projectedAtUsualPace,
     score,
     scoreLabel,

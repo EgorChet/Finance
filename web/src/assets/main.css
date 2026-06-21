@@ -3513,6 +3513,11 @@ table.rules select {
   font-weight: 500;
 }
 
+.pace-simple-table-ref--detail td {
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+}
+
 .pace-simple-table-gap td {
   padding-top: 0.5rem;
   border-top: 1px dashed var(--border);

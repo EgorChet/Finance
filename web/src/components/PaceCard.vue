@@ -111,21 +111,34 @@
                       <tr
                         v-if="historicalActualMonthAvg > 0 && Math.abs(projectedVsActualHistoryDelta) >= 50"
                         class="pace-simple-table-ref"
-                        :class="projectedVsActualHistoryDelta > 0 ? 'pace-delta-bad' : 'pace-delta-good'"
                       >
                         <td>Vs actual history</td>
                         <td>{{ formatGap(projectedVsActualHistoryDelta) }}</td>
+                      </tr>
+                      <tr
+                        v-if="pace.historicalActualEverydayAvg > 0 && Math.abs(everydayVsActualHistoryDelta) >= 50"
+                        class="pace-simple-table-ref pace-simple-table-ref--detail"
+                      >
+                        <td>↳ everyday (proj. vs actual avg)</td>
+                        <td>{{ formatGap(everydayVsActualHistoryDelta) }}</td>
+                      </tr>
+                      <tr
+                        v-if="pace.historicalActualBillsAvg > 0 && Math.abs(billsVsActualHistoryDelta) >= 50"
+                        class="pace-simple-table-ref pace-simple-table-ref--detail"
+                      >
+                        <td>↳ bills (this cycle vs actual avg)</td>
+                        <td>{{ formatGap(billsVsActualHistoryDelta) }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
                 <p class="pace-simple-footnote">
                   The everyday row above is <strong>actual</strong> spend through today.
-                  The forecast applies the same ×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }} second-half
-                  shape to <em>your</em> spend and to <em>usual</em> spend at this day — so if you're under
-                  today, the headline difference should match.
-                  “Actual avg” is what those past months really totalled (often lower bills before rent or loan
-                  changes).
+                  The headline compares your month-end <strong>forecast</strong> to the same forecast formula
+                  applied to usual spend at this day (×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }} second half).
+                  “Actual avg” is what past months really totalled — if that differs, it's usually the
+                  ×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }} projection assuming a heavier second half
+                  than you actually had, not rent or car loan (those are already in the 3‑month average).
                 </p>
               </details>
             </template>
@@ -278,6 +291,20 @@ const projectedVsActualHistoryDelta = computed(() => {
   return roundMoney(projectedTotal.value - historicalActualMonthAvg.value);
 });
 
+const everydayVsActualHistoryDelta = computed(() => {
+  const hist = pace.value?.historicalActualEverydayAvg ?? 0;
+  const proj = pace.value?.projectedEveryday ?? 0;
+  if (!hist || !displaySpend.value) return 0;
+  return roundMoney(proj - hist);
+});
+
+const billsVsActualHistoryDelta = computed(() => {
+  const hist = pace.value?.historicalActualBillsAvg ?? 0;
+  const proj = pace.value?.projectedMonthlyBills ?? 0;
+  if (!hist || !displaySpend.value) return 0;
+  return roundMoney(proj - hist);
+});
+
 const projectedDeltaClass = computed(() => {
   const d = projectedVsUsualDelta.value;
   if (d > 0) return "pace-delta-bad";
@@ -314,10 +341,6 @@ const simpleHeroSub = computed(() => {
     return `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
   }
   if (monthGap > 0 && nowGap < -50) {
-    const histGap = projectedVsActualHistoryDelta.value;
-    if (histGap > 50) {
-      return `Everyday spend is below average — your pace forecast is fine. The gap vs past months is mostly higher bills this cycle (rent, car loan…).`;
-    }
     return `Everyday spend is below average and your month-end forecast matches that.`;
   }
   if (monthGap < 0 && nowGap < -50) {
