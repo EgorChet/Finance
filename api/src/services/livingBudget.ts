@@ -4,6 +4,8 @@ import type { LivingBudgetData, LivingBudgetSegment } from "../types.js";
 import { readLivingBudget, writeLivingBudget } from "../storage/index.js";
 
 export const ONGOING_THROUGH_MONTH = "2035-12";
+/** Employer Cibus card — loaded monthly, spent as groceries; not on the Visa export. */
+export const CIBUS_MONTHLY_ALLOWANCE = 600;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 const BUILTIN_PATH = path.resolve(
@@ -52,7 +54,8 @@ export function loadLivingBudgetSegments(): LivingBudgetSegment[] {
 
 export function livingBudgetForMonth(ym: string, segments = loadLivingBudgetSegments()): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
-  return match?.amount ?? null;
+  if (!match) return null;
+  return Math.round((match.amount + CIBUS_MONTHLY_ALLOWANCE) * 100) / 100;
 }
 
 function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {

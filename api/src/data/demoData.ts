@@ -329,6 +329,15 @@ export function demoFixedCharges() {
         from_month: "2023-06",
         through_month: "2028-06",
       },
+      {
+        id: "cibus-card",
+        name_en: "Cibus card",
+        name_he: "כרטיס סיבוס",
+        amount: 600,
+        category_en: "Groceries",
+        from_month: "2024-01",
+        through_month: "2035-12",
+      },
     ],
   };
 }

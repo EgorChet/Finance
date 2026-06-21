@@ -1,5 +1,8 @@
 import type { SpendingReport } from "../types";
 import { roundMoney } from "./format";
+
+/** Employer Cibus card — loaded monthly, spent as groceries; not on the Visa export. */
+export const CIBUS_MONTHLY_ALLOWANCE = 600;
 import {
   currentYearMonth,
   isOngoingThrough,
@@ -35,7 +38,8 @@ export function livingBudgetSegmentStableKey(segment: LivingBudgetSegment): stri
 
 export function livingBudgetForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
-  return match?.amount ?? null;
+  if (!match) return null;
+  return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE);
 }
 
 function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {
@@ -99,7 +103,10 @@ export function resolvedLivingBudget(
 export function livingBudgetTimelineSummary(segments: LivingBudgetSegment[]): string {
   return [...segments]
     .sort((a, b) => a.from_month.localeCompare(b.from_month))
-    .map((s) => `₪${s.amount.toLocaleString()} (${monthRangeLabel(s.from_month, s.through_month)})`)
+    .map((s) => {
+      const total = roundMoney(s.amount + CIBUS_MONTHLY_ALLOWANCE);
+      return `₪${total.toLocaleString()} incl. Cibus (${monthRangeLabel(s.from_month, s.through_month)})`;
+    })
     .join(" → ");
 }
 

@@ -3,7 +3,8 @@
     <header class="manual-section-header">
       <h3 class="manual-section-title">Living budget</h3>
       <p class="manual-section-lead">
-        Monthly card spending cap (excludes rent). Each billing cycle uses the amount active for that month.
+        Monthly spending cap (excludes rent). Each period adds ₪600/month Cibus automatically on top of the
+        amount below — matched by a groceries charge so budget and spend stay in sync.
       </p>
       <p v-if="segments.length" class="living-budget-timeline">{{ timelineSummary }}</p>
     </header>
