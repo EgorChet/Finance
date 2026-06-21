@@ -26,6 +26,7 @@ _EUR_MERCHANT = re.compile(
     re.IGNORECASE,
 )
 _BGN_MERCHANT = re.compile(r"\b(EOOD|OOD|BALGARIYA|BURGAS|BULGARIA|AMREST KOFI)\b", re.IGNORECASE)
+_ILS_MERCHANT = re.compile(r"\bBIT\b", re.IGNORECASE)
 
 
 def _round_money(value: float) -> float:
@@ -69,6 +70,13 @@ def detect_currency(
     if _has_hebrew(merchant):
         return "ILS"
 
+    if _ILS_MERCHANT.search(merchant):
+        return "ILS"
+
+    suffix = _COUNTRY_SUFFIX.search(merchant.strip())
+    if suffix and suffix.group(1) == "IL":
+        return "ILS"
+
     if charge is not None and charge > 0 and amount > 0:
         inferred = infer_currency_from_ratio(amount, charge)
         if inferred:
@@ -77,9 +85,10 @@ def detect_currency(
     if _USD_MERCHANT.search(merchant):
         return "USD"
 
-    suffix = _COUNTRY_SUFFIX.search(merchant.strip())
     if suffix:
         cc = suffix.group(1)
+        if cc == "IL":
+            return "ILS"
         if cc == "US":
             return "USD"
         if cc == "PL":

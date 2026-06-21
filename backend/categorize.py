@@ -465,7 +465,7 @@ _NAILS_RE = re.compile(
 _BIT_RE = re.compile(
     r"|".join(
         [
-            r"^bit$",
+            r"\bbit\b",
             r"העברה\s*ב\s*bit",
             r"transfer\s*in\s*bit",
         ]

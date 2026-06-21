@@ -90,6 +90,23 @@ def test_pending_israeli_uses_amount_as_ils():
     assert estimated is True
 
 
+def test_pending_bit_merchant_with_il_suffix_is_ils():
+    charge, currency, estimated = resolve_charge_ils(
+        120,
+        None,
+        "BIT beit dagan IL",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 21),
+    )
+    assert charge == 120
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_detect_currency_il_country_suffix():
+    assert detect_currency("Some Shop IL", 50, None) == "ILS"
+
+
 def test_installment_uses_ils_slice():
     charge, _, estimated = resolve_charge_ils(
         1500,

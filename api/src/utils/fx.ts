@@ -9,6 +9,7 @@ const USD_MERCHANT =
 const EUR_MERCHANT =
   /\b(SRL|SPA|OOD|EOOD|GMBH|TERMINI|ROMA|MILANO|AUTOGRILL|UBR\*|AVIS|ZARA|COS|UNIQLO|POLENE|VIvat|PAUL AIRPORT|DEDEM SPA|PIERLUIGI|SUMUP|MANGO ROMA)\b/i;
 const BGN_MERCHANT = /\b(EOOD|OOD|BALGARIYA|BURGAS|BULGARIA|AMREST KOFI)\b/i;
+const ILS_MERCHANT = /\bBIT\b/i;
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
@@ -41,6 +42,11 @@ export function detectCurrency(
 
   if (hasHebrew(merchant)) return "ILS";
 
+  if (ILS_MERCHANT.test(merchant)) return "ILS";
+
+  const suffix = COUNTRY_SUFFIX.exec(merchant.trim());
+  if (suffix && suffix[1] === "IL") return "ILS";
+
   if (charge != null && charge > 0 && amount > 0) {
     const inferred = inferCurrencyFromRatio(amount, charge);
     if (inferred) return inferred;
@@ -48,9 +54,9 @@ export function detectCurrency(
 
   if (USD_MERCHANT.test(merchant)) return "USD";
 
-  const suffix = COUNTRY_SUFFIX.exec(merchant.trim());
   if (suffix) {
     const cc = suffix[1]!;
+    if (cc === "IL") return "ILS";
     if (cc === "US") return "USD";
     if (cc === "PL") return "PLN";
     if (["DE", "FR", "IT", "ES", "NL", "AT", "BE", "PT", "GR"].includes(cc)) return "EUR";
