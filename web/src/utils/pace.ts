@@ -76,6 +76,7 @@ export interface PaceResult {
   /** Second-half daily weight vs first half (1.0 = flat; from completed cycles). */
   secondHalfMultiplier: number;
   secondHalfFromHistory: boolean;
+  secondHalfCalibrationCycles: number;
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -216,6 +217,9 @@ function variableThroughDay(bucket: CycleBucket, dayIndex: number): number {
 
 /** Fallback when no completed cycles to learn from — flat (linear) extrapolation. */
 export const DEFAULT_SECOND_HALF_MULTIPLIER = 1;
+
+/** Always learn second-half shape from this many most recent completed cycles. */
+export const SECOND_HALF_CALIBRATION_CYCLES = 3;
 
 function midpointDay(cycleLength: number): number {
   return Math.ceil(cycleLength / 2);
@@ -534,8 +538,10 @@ export function computePace(
       : Math.max(currentFixedAtDay, configuredMonthlyBills)
     : 0;
 
+  const calibrationSnapshots = historicalSnapshots.slice(0, SECOND_HALF_CALIBRATION_CYCLES);
+  const calibrationBuckets = calibrationSnapshots.map((s) => s.bucket);
   const { multiplier: secondHalfMultiplier, fromHistory: secondHalfFromHistory } =
-    calibrateSecondHalfMultiplier(usedBuckets, cycle.cycleLength);
+    calibrateSecondHalfMultiplier(calibrationBuckets, cycle.cycleLength);
 
   const projectedVariable =
     cycle.dayIndex > 0
@@ -650,6 +656,7 @@ export function computePace(
     avgCyclesTomorrowLabel,
     secondHalfMultiplier,
     secondHalfFromHistory,
+    secondHalfCalibrationCycles: SECOND_HALF_CALIBRATION_CYCLES,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,

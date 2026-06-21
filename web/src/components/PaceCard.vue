@@ -293,9 +293,9 @@ const secondHalfShapeNote = computed(() => {
 
 const secondHalfLabel = computed(() => {
   const m = pace.value?.secondHalfMultiplier ?? 1;
-  const n = pace.value?.cyclesUsed ?? 0;
+  const n = pace.value?.secondHalfCalibrationCycles ?? 3;
   const x = `×${m.toFixed(2)}`;
-  if (pace.value?.secondHalfFromHistory && n > 0) {
+  if (pace.value?.secondHalfFromHistory) {
     return `${x} from your last ${n} completed cycles`;
   }
   return `${x} (flat — not enough history)`;
