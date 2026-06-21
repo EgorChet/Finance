@@ -15,8 +15,8 @@ export function paceHeroFromResult(pace: PaceResult | null): {
   const displaySpend = pace.currentSpend;
   const paceCompareAvg = pace.historicalAvgVariableAtDay;
   const projectedTotal = pace.projectedTotal;
-  const projectedAtUsualPace = pace.projectedAtUsualPace;
-  const projectedVsUsualDelta = roundMoney(projectedTotal - projectedAtUsualPace);
+  const projectedAtUsualPaceForecast = pace.projectedAtUsualPaceForecast;
+  const projectedVsUsualDelta = roundMoney(projectedTotal - projectedAtUsualPaceForecast);
   const nowGap = pace.vsAvgDelta;
 
   if (displaySpend <= 0 || paceCompareAvg <= 0) {
@@ -40,7 +40,7 @@ export function paceHeroFromResult(pace: PaceResult | null): {
     sub = `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
   } else if (projectedVsUsualDelta > 0 && nowGap < -50) {
     sub =
-      "Everyday spend is below average, but the month-end forecast still includes rent & bills plus a heavier second-half pace.";
+      "Everyday spend is below average and your month-end forecast matches that.";
   } else if (projectedVsUsualDelta < 0 && nowGap < -50) {
     sub = `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;
   }
@@ -57,7 +57,7 @@ export function paceShortLabel(pace: PaceResult | null): { label: string; tone: 
   if (!pace || pace.currentSpend <= 0 || pace.historicalAvgVariableAtDay <= 0) {
     return { label: "No pace yet", tone: "ok" };
   }
-  const projectedVsUsualDelta = roundMoney(pace.projectedTotal - pace.projectedAtUsualPace);
+  const projectedVsUsualDelta = roundMoney(pace.projectedTotal - pace.projectedAtUsualPaceForecast);
   if (Math.abs(projectedVsUsualDelta) < 50) return { label: "On track", tone: "ok" };
   if (projectedVsUsualDelta > 0) return { label: "Over pace", tone: "bad" };
   return { label: "Under pace", tone: "good" };

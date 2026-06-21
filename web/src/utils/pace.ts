@@ -54,6 +54,10 @@ export interface PaceResult {
   projectedMonthlyBills: number;
   /** Variable spend extrapolated to cycle end (× second-half weight). */
   projectedEveryday: number;
+  /** Same × second-half formula applied to your usual everyday spend at this day. */
+  projectedAtUsualPaceForecast: number;
+  /** Actual average full-cycle total from recent history (informational). */
+  historicalActualMonthAvg: number;
   projectedAtUsualPace: number;
   score: number;
   scoreLabel: string;
@@ -559,11 +563,13 @@ export function computePace(
   const projectedEveryday = projectedVariable;
   const projectedTotal = roundMoney(projectionFixed + projectedEveryday);
 
-  const extrapolatedUsualPace = includeFixed
+  const projectedAtUsualPaceForecast = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + extrapolateHistoricalVariable(historicalAvgVariableAtDay))
     : roundMoney(projectionFixed + extrapolateHistoricalVariable(historicalAvgVariableAtDay));
+  const historicalActualMonthAvg = historicalFullCycleAvg;
+  /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
-    historicalFullCycleAvg > 0 ? historicalFullCycleAvg : extrapolatedUsualPace;
+    historicalFullCycleAvg > 0 ? historicalFullCycleAvg : projectedAtUsualPaceForecast;
 
   let score = 50;
   if (compareAvg > 0 && currentSpend > 0) {
@@ -598,6 +604,8 @@ export function computePace(
     projectedTotal,
     projectedMonthlyBills: projectionFixed,
     projectedEveryday,
+    projectedAtUsualPaceForecast,
+    historicalActualMonthAvg,
     projectedAtUsualPace,
     score,
     scoreLabel,

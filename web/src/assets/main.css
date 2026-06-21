@@ -3503,6 +3503,16 @@ table.rules select {
   font-weight: 500;
 }
 
+.pace-simple-table-ref td {
+  padding-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.pace-simple-table-ref td:last-child {
+  font-weight: 500;
+}
+
 .pace-simple-table-gap td {
   padding-top: 0.5rem;
   border-top: 1px dashed var(--border);
