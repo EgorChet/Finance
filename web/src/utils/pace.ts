@@ -73,8 +73,9 @@ export interface PaceResult {
   /** Variable spend in recent cycles through tomorrow's day index in the billing month. */
   avgCyclesTomorrowVariable: number;
   avgCyclesTomorrowLabel: string;
-  /** Second-half daily weight vs first half (1.0 = flat; 1.2 = 20% heavier). */
+  /** Second-half daily weight vs first half (1.0 = flat; from completed cycles). */
   secondHalfMultiplier: number;
+  secondHalfFromHistory: boolean;
   cycleStart: string;
   cycleEnd: string;
   dataStale: boolean;
@@ -213,8 +214,8 @@ function variableThroughDay(bucket: CycleBucket, dayIndex: number): number {
   return roundMoney(at.total - at.fixed);
 }
 
-/** First half of cycle weight 1; second half weight `secondHalfMultiplier` (e.g. 1.2). */
-export const DEFAULT_SECOND_HALF_MULTIPLIER = 1.2;
+/** Fallback when no completed cycles to learn from — flat (linear) extrapolation. */
+export const DEFAULT_SECOND_HALF_MULTIPLIER = 1;
 
 function midpointDay(cycleLength: number): number {
   return Math.ceil(cycleLength / 2);
@@ -251,14 +252,16 @@ export function projectVariableWithCycleShape(
   return roundMoney((spendSoFar / through) * total);
 }
 
-/** Learn second-half vs first-half daily rate from completed cycles; default 1.2. */
+/** Learn second-half vs first-half daily rate from completed cycles. */
 export function calibrateSecondHalfMultiplier(
   buckets: CycleBucket[],
   cycleLength: number,
-): number {
+): { multiplier: number; fromHistory: boolean } {
   const mid = midpointDay(cycleLength);
   const secondDays = cycleLength - mid;
-  if (secondDays <= 0) return DEFAULT_SECOND_HALF_MULTIPLIER;
+  if (secondDays <= 0) {
+    return { multiplier: DEFAULT_SECOND_HALF_MULTIPLIER, fromHistory: false };
+  }
 
   const ratios: number[] = [];
   for (const bucket of buckets) {
@@ -278,10 +281,11 @@ export function calibrateSecondHalfMultiplier(
     if (Number.isFinite(ratio) && ratio > 0) ratios.push(ratio);
   }
 
-  if (!ratios.length) return DEFAULT_SECOND_HALF_MULTIPLIER;
+  if (!ratios.length) {
+    return { multiplier: DEFAULT_SECOND_HALF_MULTIPLIER, fromHistory: false };
+  }
   const avg = ratios.reduce((s, v) => s + v, 0) / ratios.length;
-  // Never below default — end of cycle is typically heavier even when recent months mixed.
-  return Math.min(1.5, Math.max(DEFAULT_SECOND_HALF_MULTIPLIER, roundMoney(avg * 100) / 100));
+  return { multiplier: roundMoney(avg * 100) / 100, fromHistory: true };
 }
 
 function extrapolateToFullCycle(
@@ -530,7 +534,8 @@ export function computePace(
       : Math.max(currentFixedAtDay, configuredMonthlyBills)
     : 0;
 
-  const secondHalfMultiplier = calibrateSecondHalfMultiplier(usedBuckets, cycle.cycleLength);
+  const { multiplier: secondHalfMultiplier, fromHistory: secondHalfFromHistory } =
+    calibrateSecondHalfMultiplier(usedBuckets, cycle.cycleLength);
 
   const projectedVariable =
     cycle.dayIndex > 0
@@ -644,6 +649,7 @@ export function computePace(
     avgCyclesTomorrowVariable,
     avgCyclesTomorrowLabel,
     secondHalfMultiplier,
+    secondHalfFromHistory,
     cycleStart: isoDate(cycle.start),
     cycleEnd: isoDate(cycle.end),
     dataStale,

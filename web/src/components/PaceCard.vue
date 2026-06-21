@@ -134,11 +134,9 @@
                 </div>
                 <p class="pace-simple-footnote">
                   The everyday row above is <strong>actual</strong> spend through today.
-                  The headline compares your month-end <strong>forecast</strong> to the same forecast formula
-                  applied to usual spend at this day (×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }} second half).
-                  “Actual avg” is what past months really totalled — if that differs, it's usually the
-                  ×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }} projection assuming a heavier second half
-                  than you actually had, not rent or car loan (those are already in the 3‑month average).
+                  The headline compares your month-end <strong>forecast</strong> to the same formula
+                  applied to usual spend at this day ({{ secondHalfLabel }}, {{ secondHalfShapeNote }}).
+                  “Actual avg” is what past months really totalled.
                 </p>
               </details>
             </template>
@@ -284,6 +282,23 @@ const historicalActualMonthAvg = computed(() => pace.value?.historicalActualMont
 const projectedVsUsualDelta = computed(() => {
   if (!paceCompareAvg.value || !displaySpend.value) return 0;
   return roundMoney(projectedTotal.value - projectedAtUsualPaceForecast.value);
+});
+
+const secondHalfShapeNote = computed(() => {
+  const m = pace.value?.secondHalfMultiplier ?? 1;
+  if (m < 0.98) return "a lighter second half";
+  if (m > 1.02) return "a heavier second half";
+  return "even spending through the month";
+});
+
+const secondHalfLabel = computed(() => {
+  const m = pace.value?.secondHalfMultiplier ?? 1;
+  const n = pace.value?.cyclesUsed ?? 0;
+  const x = `×${m.toFixed(2)}`;
+  if (pace.value?.secondHalfFromHistory && n > 0) {
+    return `${x} from your last ${n} completed cycles`;
+  }
+  return `${x} (flat — not enough history)`;
 });
 
 const projectedVsActualHistoryDelta = computed(() => {
