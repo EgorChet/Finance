@@ -88,21 +88,33 @@
                         <td>Your forecast</td>
                         <td>~{{ formatIls(projectedTotal) }}</td>
                       </tr>
-                      <tr v-if="pace.projectedMonthlyBills > 0" class="pace-simple-table-sub">
-                        <td>Includes monthly bills</td>
-                        <td>~{{ formatIls(pace.projectedMonthlyBills) }}</td>
+                      <tr v-if="pace.configuredMonthlyBills > 0" class="pace-simple-table-sub">
+                        <td>Configured bills (rent, loan…)</td>
+                        <td>~{{ formatIls(pace.configuredMonthlyBills) }}</td>
+                      </tr>
+                      <tr v-if="pace.projectedOtherFixed > 0" class="pace-simple-table-sub">
+                        <td>Other fixed (3-mo avg — subs…)</td>
+                        <td>~{{ formatIls(pace.projectedOtherFixed) }}</td>
                       </tr>
                       <tr v-if="pace.projectedEveryday > 0" class="pace-simple-table-sub">
-                        <td>Everyday (projected)</td>
+                        <td>Everyday (your projection)</td>
                         <td>~{{ formatIls(pace.projectedEveryday) }}</td>
                       </tr>
                       <tr>
                         <td>Normal pace forecast</td>
                         <td>~{{ formatIls(projectedAtUsualPaceForecast) }}</td>
                       </tr>
+                      <tr v-if="pace.projectedEverydayAtUsualPace > 0" class="pace-simple-table-sub">
+                        <td>Everyday (usual projection)</td>
+                        <td>~{{ formatIls(pace.projectedEverydayAtUsualPace) }}</td>
+                      </tr>
                       <tr class="pace-simple-table-gap" :class="projectedDeltaClass">
-                        <td>Difference</td>
+                        <td>Difference (same × on both)</td>
                         <td>{{ formatGap(projectedVsUsualDelta) }}</td>
+                      </tr>
+                      <tr v-if="Math.abs(everydayForecastGap) >= 50" class="pace-simple-table-ref pace-simple-table-ref--detail">
+                        <td>↳ from everyday pace gap today</td>
+                        <td>{{ formatGap(everydayForecastGap) }}</td>
                       </tr>
                       <tr v-if="historicalActualMonthAvg > 0" class="pace-simple-table-ref">
                         <td>Actual avg (last {{ pace.cyclesUsed || 3 }} mo)</td>
@@ -134,9 +146,12 @@
                 </div>
                 <p class="pace-simple-footnote">
                   The everyday row above is <strong>actual</strong> spend through today.
-                  The headline compares your month-end <strong>forecast</strong> to the same formula
-                  applied to usual spend at this day ({{ secondHalfLabel }}, {{ secondHalfShapeNote }}).
-                  “Actual avg” is what past months really totalled.
+                  The headline difference uses the <strong>same {{ secondHalfLabel }}</strong> on both
+                  forecasts — so ×0.61 scales your projection and the usual projection equally.
+                  The ~{{ formatIls(Math.abs(pace?.vsAvgDelta ?? 0)) }} you're
+                  {{ (pace?.vsAvgDelta ?? 0) < 0 ? "under" : "over" }} today drives the headline, not the
+                  multiplier level. “Actual avg” uses what those months really totalled; with ×0.61 your
+                  everyday projection is within {{ formatIls(Math.abs(everydayVsActualHistoryDelta)) }} of that average.
                 </p>
               </details>
             </template>
@@ -282,6 +297,13 @@ const historicalActualMonthAvg = computed(() => pace.value?.historicalActualMont
 const projectedVsUsualDelta = computed(() => {
   if (!paceCompareAvg.value || !displaySpend.value) return 0;
   return roundMoney(projectedTotal.value - projectedAtUsualPaceForecast.value);
+});
+
+const everydayForecastGap = computed(() => {
+  const usual = pace.value?.projectedEverydayAtUsualPace ?? 0;
+  const yours = pace.value?.projectedEveryday ?? 0;
+  if (!usual || !yours) return 0;
+  return roundMoney(usual - yours);
 });
 
 const secondHalfShapeNote = computed(() => {

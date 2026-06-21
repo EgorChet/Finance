@@ -52,8 +52,12 @@ export interface PaceResult {
   projectedTotal: number;
   /** Rent, car loan, etc. — not everyday categories like Cibus groceries. */
   projectedMonthlyBills: number;
+  configuredMonthlyBills: number;
+  /** Subscriptions & other fixed on card — 3-mo avg minus configured recurring. */
+  projectedOtherFixed: number;
   /** Variable spend extrapolated to cycle end (× second-half weight). */
   projectedEveryday: number;
+  projectedEverydayAtUsualPace: number;
   /** Same × second-half formula applied to your usual everyday spend at this day. */
   projectedAtUsualPaceForecast: number;
   /** Actual average full-cycle total from recent history (informational). */
@@ -595,11 +599,13 @@ export function computePace(
     : Math.max(configuredMonthlyBills, historicalFullCycleAvgFixed);
 
   const projectedEveryday = projectedVariable;
+  const projectedEverydayAtUsualPace = extrapolateHistoricalVariable(historicalAvgVariableAtDay);
   const projectedTotal = roundMoney(projectionFixed + projectedEveryday);
+  const projectedOtherFixed = roundMoney(Math.max(0, projectionFixed - configuredMonthlyBills));
 
   const projectedAtUsualPaceForecast = includeFixed
-    ? roundMoney(historicalAvgFixedAtDay + extrapolateHistoricalVariable(historicalAvgVariableAtDay))
-    : roundMoney(projectionFixed + extrapolateHistoricalVariable(historicalAvgVariableAtDay));
+    ? roundMoney(historicalAvgFixedAtDay + projectedEverydayAtUsualPace)
+    : roundMoney(projectionFixed + projectedEverydayAtUsualPace);
   const historicalActualMonthAvg = historicalFullCycleAvg;
   /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
@@ -637,7 +643,10 @@ export function computePace(
     historicalAvgVariableAtDay,
     projectedTotal,
     projectedMonthlyBills: projectionFixed,
+    configuredMonthlyBills,
+    projectedOtherFixed,
     projectedEveryday,
+    projectedEverydayAtUsualPace,
     projectedAtUsualPaceForecast,
     historicalActualMonthAvg,
     historicalActualBillsAvg: historicalFullCycleAvgFixed,
