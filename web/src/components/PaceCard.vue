@@ -81,12 +81,20 @@
                   </table>
                 </div>
                 <div class="pace-simple-table-section">
-                  <p class="pace-simple-table-title">Full month (adds rent &amp; bills)</p>
+                  <p class="pace-simple-table-title">Full month forecast (bills + projected everyday)</p>
                   <table class="pace-simple-table">
                     <tbody>
                       <tr>
                         <td>On track for</td>
                         <td>~{{ formatIls(projectedTotal) }}</td>
+                      </tr>
+                      <tr v-if="pace.projectedMonthlyBills > 0" class="pace-simple-table-sub">
+                        <td>Includes monthly bills</td>
+                        <td>~{{ formatIls(pace.projectedMonthlyBills) }}</td>
+                      </tr>
+                      <tr v-if="pace.projectedEveryday > 0" class="pace-simple-table-sub">
+                        <td>Everyday (projected)</td>
+                        <td>~{{ formatIls(pace.projectedEveryday) }}</td>
                       </tr>
                       <tr>
                         <td>Your normal month</td>
@@ -100,11 +108,11 @@
                   </table>
                 </div>
                 <p class="pace-simple-footnote">
-                  “Your normal at this point” compares everyday spend through today.
-                  “On track for” projects the rest of the cycle with a heavier second half (×{{
-                    (pace.secondHalfMultiplier ?? 1.2).toFixed(2)
-                  }}, at least ×1.2 from your last {{ pace.cyclesUsed || 3 }} cycles).
-                  “Your normal month” is the average full total of those cycles.
+                  The everyday row above is <strong>actual</strong> spend through today — no forecast.
+                  “On track for” adds rent &amp; monthly bills, then projects everyday spend to month-end
+                  assuming a heavier second half (×{{ (pace.secondHalfMultiplier ?? 1.2).toFixed(2) }}).
+                  “Your normal month” is the <strong>actual</strong> average total from your last
+                  {{ pace.cyclesUsed || 3 }} completed cycles — not a forecast.
                 </p>
               </details>
             </template>
@@ -286,7 +294,7 @@ const simpleHeroSub = computed(() => {
     return `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
   }
   if (monthGap > 0 && nowGap < -50) {
-    return `Spending is low so far, but the month-end total still looks high (bills add up).`;
+    return `Everyday spend is below average, but the month-end forecast still includes rent & bills plus a heavier second-half pace.`;
   }
   if (monthGap < 0 && nowGap < -50) {
     return `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;

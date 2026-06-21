@@ -39,7 +39,8 @@ export function paceHeroFromResult(pace: PaceResult | null): {
   } else if (projectedVsUsualDelta > 0 && nowGap > 50) {
     sub = `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
   } else if (projectedVsUsualDelta > 0 && nowGap < -50) {
-    sub = "Spending is low so far, but the month-end total still looks high (bills add up).";
+    sub =
+      "Everyday spend is below average, but the month-end forecast still includes rent & bills plus a heavier second-half pace.";
   } else if (projectedVsUsualDelta < 0 && nowGap < -50) {
     sub = `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;
   }

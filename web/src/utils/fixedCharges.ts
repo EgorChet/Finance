@@ -1,4 +1,5 @@
 import type { Transaction } from "../types";
+import { costTypeForCategory } from "../categories";
 import { roundMoney } from "./format";
 import { isoDateLocal } from "./transactionPeriod";
 
@@ -79,6 +80,19 @@ export function sumConfiguredCharges(
 ): number {
   return roundMoney(
     configuredChargesForCycle(cycleStart, charges, cycleEnd).reduce((sum, c) => sum + c.amount, 0),
+  );
+}
+
+/** Rent, loans, education… — excludes groceries-style charges like Cibus (counted as everyday). */
+export function sumConfiguredMonthlyBills(
+  cycleStart: string,
+  charges: ConfiguredCharge[],
+  cycleEnd?: string,
+): number {
+  return roundMoney(
+    configuredChargesForCycle(cycleStart, charges, cycleEnd)
+      .filter((c) => costTypeForCategory(c.category_en) === "fixed")
+      .reduce((sum, c) => sum + c.amount, 0),
   );
 }
 

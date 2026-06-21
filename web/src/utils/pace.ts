@@ -1,7 +1,12 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
 import type { ConfiguredCharge } from "./fixedCharges";
-import { configuredChargesForCycle, mergeConfiguredChargeTransactions, sumConfiguredCharges } from "./fixedCharges";
+import {
+  configuredChargesForCycle,
+  mergeConfiguredChargeTransactions,
+  sumConfiguredCharges,
+  sumConfiguredMonthlyBills,
+} from "./fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
 import { dedupeTransactionSnapshots, filterSpendTransactions } from "./transaction";
 
@@ -45,6 +50,10 @@ export interface PaceResult {
   historicalAvgFixedAtDay: number;
   historicalAvgVariableAtDay: number;
   projectedTotal: number;
+  /** Rent, car loan, etc. — not everyday categories like Cibus groceries. */
+  projectedMonthlyBills: number;
+  /** Variable spend extrapolated to cycle end (× second-half weight). */
+  projectedEveryday: number;
   projectedAtUsualPace: number;
   score: number;
   scoreLabel: string;
@@ -441,6 +450,7 @@ export function computePace(
     amount: c.amount,
   }));
   const configuredChargesTotal = sumConfiguredCharges(cycleStartIso, configuredList, cycleEndIso);
+  const configuredMonthlyBills = sumConfiguredMonthlyBills(cycleStartIso, configuredList, cycleEndIso);
 
   let currentSpend = statementSpend;
   if (manualEveryday !== null) {
@@ -501,7 +511,7 @@ export function computePace(
   const fullCycleFixed = includeFixed
     ? manualEveryday !== null
       ? configuredChargesTotal
-      : Math.max(currentFixedAtDay, configuredChargesTotal)
+      : Math.max(currentFixedAtDay, configuredMonthlyBills)
     : 0;
 
   const secondHalfMultiplier = calibrateSecondHalfMultiplier(usedBuckets, cycle.cycleLength);
@@ -541,12 +551,13 @@ export function computePace(
     );
   }
 
-  /** Recurring bills (rent, loans) still land this cycle — include in month-end projection. */
+  /** Recurring bills (rent, loans) — not everyday charges like Cibus groceries. */
   const projectionFixed = includeFixed
     ? fullCycleFixed
-    : Math.max(configuredChargesTotal, historicalFullAvgFixedAtDay);
+    : Math.max(configuredMonthlyBills, historicalFullAvgFixedAtDay);
 
-  const projectedTotal = roundMoney(projectionFixed + projectedVariable);
+  const projectedEveryday = projectedVariable;
+  const projectedTotal = roundMoney(projectionFixed + projectedEveryday);
 
   const extrapolatedUsualPace = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + extrapolateHistoricalVariable(historicalAvgVariableAtDay))
@@ -585,6 +596,8 @@ export function computePace(
     historicalAvgFixedAtDay,
     historicalAvgVariableAtDay,
     projectedTotal,
+    projectedMonthlyBills: projectionFixed,
+    projectedEveryday,
     projectedAtUsualPace,
     score,
     scoreLabel,

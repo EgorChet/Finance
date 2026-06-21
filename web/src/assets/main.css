@@ -3494,6 +3494,15 @@ table.rules select {
   word-break: break-word;
 }
 
+.pace-simple-table-sub td {
+  padding: 0.15rem 0 0.15rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.pace-simple-table-sub td:last-child {
+  font-weight: 500;
+}
+
 .pace-simple-table-gap td {
   padding-top: 0.5rem;
   border-top: 1px dashed var(--border);
