@@ -13,10 +13,8 @@ export function paceHeroFromResult(pace: PaceResult | null): {
   }
 
   const displaySpend = pace.currentSpend;
-  const paceCompareAvg = pace.historicalAvgVariableAtDay;
-  const projectedTotal = pace.projectedTotal;
-  const projectedAtUsualPaceForecast = pace.projectedAtUsualPaceForecast;
-  const projectedVsUsualDelta = roundMoney(projectedTotal - projectedAtUsualPaceForecast);
+  const paceCompareAvg = pace.historicalAvgAtDay;
+  const projectedVsUsualDelta = pace.projectedVsUsualDelta;
   const nowGap = pace.vsAvgDelta;
 
   if (displaySpend <= 0 || paceCompareAvg <= 0) {
@@ -25,24 +23,21 @@ export function paceHeroFromResult(pace: PaceResult | null): {
 
   let line: string;
   if (Math.abs(projectedVsUsualDelta) < 50) {
-    line = "You're doing fine — this month looks normal.";
+    line = "Doing fine — this month looks normal.";
   } else if (projectedVsUsualDelta > 0) {
-    line = `You're spending too fast — about ${formatAboutIls(projectedVsUsualDelta)} more than a normal month.`;
+    line = `Overspending — about ${formatAboutIls(projectedVsUsualDelta)} above a normal month.`;
   } else {
-    line = `You're spending slower than usual — about ${formatAboutIls(Math.abs(projectedVsUsualDelta))} less than a normal month.`;
+    line = `Doing fine — about ${formatAboutIls(Math.abs(projectedVsUsualDelta))} below a normal month.`;
   }
 
   let sub = "";
   if (Math.abs(projectedVsUsualDelta) < 50) {
-    if (nowGap > 50) sub = "Day-to-day spending is a bit high, but the full month still looks OK.";
-    else if (nowGap < -50) sub = "You've spent less than usual so far — nice.";
+    if (nowGap > 50) sub = "Everyday spend is a bit high so far, but the full month still looks OK.";
+    else if (nowGap < -50) sub = "You've spent less than usual so far.";
   } else if (projectedVsUsualDelta > 0 && nowGap > 50) {
-    sub = `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
-  } else if (projectedVsUsualDelta > 0 && nowGap < -50) {
-    sub =
-      "Everyday spend is below average and your month-end forecast matches that.";
+    sub = `~${formatAboutIls(nowGap)} above usual everyday spending so far.`;
   } else if (projectedVsUsualDelta < 0 && nowGap < -50) {
-    sub = `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;
+    sub = `~${formatAboutIls(Math.abs(nowGap))} below usual everyday spending so far.`;
   }
 
   let tone: PaceHeroTone = "ok";
@@ -54,25 +49,26 @@ export function paceHeroFromResult(pace: PaceResult | null): {
 }
 
 export function paceShortLabel(pace: PaceResult | null): { label: string; tone: PaceHeroTone } {
-  if (!pace || pace.currentSpend <= 0 || pace.historicalAvgVariableAtDay <= 0) {
+  if (!pace || pace.currentSpend <= 0 || pace.historicalAvgAtDay <= 0) {
     return { label: "No pace yet", tone: "ok" };
   }
-  const projectedVsUsualDelta = roundMoney(pace.projectedTotal - pace.projectedAtUsualPaceForecast);
-  if (Math.abs(projectedVsUsualDelta) < 50) return { label: "On track", tone: "ok" };
-  if (projectedVsUsualDelta > 0) return { label: "Over pace", tone: "bad" };
+  if (Math.abs(pace.projectedVsUsualDelta) < 50) return { label: "On track", tone: "ok" };
+  if (pace.projectedVsUsualDelta > 0) return { label: "Over pace", tone: "bad" };
   return { label: "Under pace", tone: "good" };
 }
 
 export function paceDetailLine(pace: PaceResult | null): string {
-  if (!pace || pace.currentSpend <= 0) return "Upload a partial statement or enter spending to compare with your usual pace.";
-  const usual = pace.historicalAvgVariableAtDay;
+  if (!pace || pace.currentSpend <= 0) {
+    return "Upload a partial statement or enter spending to compare with your usual pace.";
+  }
+  const usual = pace.historicalAvgAtDay;
   if (usual <= 0) return "Not enough history yet to compare this cycle.";
   const gap = roundMoney(pace.vsAvgDelta);
   if (Math.abs(gap) < 50) {
-    return `You've spent ${formatIls(pace.currentSpend)} so far — about the same as your usual ${formatIls(usual)} by day ${pace.dayIndex}.`;
+    return `Everyday spending ${formatIls(pace.currentSpend)} so far — about the same as your usual ${formatIls(usual)} by day ${pace.dayIndex}.`;
   }
   if (gap > 0) {
-    return `${formatIls(gap)} above your usual ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
+    return `${formatIls(gap)} above your usual everyday ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
   }
-  return `${formatIls(Math.abs(gap))} below your usual ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
+  return `${formatIls(Math.abs(gap))} below your usual everyday ${formatIls(usual)} at this point in the cycle (day ${pace.dayIndex}).`;
 }

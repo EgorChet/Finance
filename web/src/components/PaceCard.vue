@@ -59,6 +59,9 @@
 
               <details class="pace-simple-details">
                 <summary>See the numbers</summary>
+                <p class="pace-simple-details-note">
+                  Same as the Everyday spending tile — excludes rent, car loan, and Dev Institute.
+                </p>
                 <div class="pace-simple-table-wrap">
                   <table class="pace-simple-table">
                     <tbody>
@@ -131,7 +134,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
-import { formatIls, formatAboutIls, roundMoney } from "../utils/format";
+import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
@@ -152,8 +155,8 @@ const props = defineProps<{
   latestBillingDate?: string | null;
   configuredCharges?: ConfiguredCharge[];
   partialStatementActive?: boolean;
-  /** Everyday spending from partial export — matches SummaryMetrics tile. */
-  partialEverydaySpend?: number | null;
+  /** Everyday spending for the current cycle view — matches SummaryMetrics when set. */
+  cycleEverydaySpend?: number | null;
   partialTotalSpend?: number | null;
   /** Pin demo pace to sample “today” (Jun 13 2026). */
   referenceDate?: Date;
@@ -204,15 +207,13 @@ const manualSpend = computed((): number | null => {
   return n;
 });
 
-const statementSpendOverride = computed(() => {
-  if (!props.partialStatementActive) return undefined;
-  if (props.partialEverydaySpend != null) return props.partialEverydaySpend;
+const everydaySpendOverride = computed(() => {
+  if (manualSpend.value !== null) return undefined;
+  if (props.cycleEverydaySpend != null && props.cycleEverydaySpend > 0) {
+    return props.cycleEverydaySpend;
+  }
   return undefined;
 });
-
-const everydayComposition = computed(() =>
-  everydaySpendingComposition(props.cycleTransactions ?? []),
-);
 
 const pace = computed(() =>
   computePace(props.transactions, {
@@ -222,13 +223,16 @@ const pace = computed(() =>
     manualSpend: props.partialStatementActive ? null : manualSpend.value,
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
-    statementSpendOverride: statementSpendOverride.value,
-    statementVariableOverride: props.partialStatementActive ? props.partialEverydaySpend : undefined,
+    statementSpendOverride: everydaySpendOverride.value,
+    statementVariableOverride: everydaySpendOverride.value,
     today: props.referenceDate,
   }),
 );
 
-const displaySpend = computed(() => pace.value?.currentSpend ?? 0);
+const displaySpend = computed(() => {
+  if (everydaySpendOverride.value != null) return everydaySpendOverride.value;
+  return pace.value?.currentSpend ?? 0;
+});
 
 const showEntryPanel = computed(() => {
   if (props.partialStatementActive) return false;
@@ -236,16 +240,17 @@ const showEntryPanel = computed(() => {
   return true;
 });
 
+const everydayComposition = computed(() =>
+  everydaySpendingComposition(props.cycleTransactions ?? []),
+);
+
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => pace.value?.historicalAvgAtDay ?? 0);
 
 const projectedAtUsualPaceForecast = computed(() => pace.value?.projectedAtUsualPaceForecast ?? 0);
 
-const projectedVsUsualDelta = computed(() => {
-  if (!paceCompareAvg.value || !displaySpend.value) return 0;
-  return roundMoney(projectedTotal.value - projectedAtUsualPaceForecast.value);
-});
+const projectedVsUsualDelta = computed(() => pace.value?.projectedVsUsualDelta ?? 0);
 
 const projectedDeltaClass = computed(() => {
   const d = projectedVsUsualDelta.value;

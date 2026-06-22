@@ -65,7 +65,10 @@ export interface PaceResult {
   historicalActualMonthAvg: number;
   historicalActualBillsAvg: number;
   historicalActualEverydayAvg: number;
+  /** Actual average full-cycle everyday from recent history (excludes monthly bills when in everyday mode). */
+  historicalFullCycleEverydayAvg: number;
   projectedAtUsualPace: number;
+  projectedVsUsualDelta: number;
   score: number;
   scoreLabel: string;
   cyclesUsed: number;
@@ -633,10 +636,20 @@ export function computePace(
     : historicalFullCycleEverydayAvg > 0
       ? historicalFullCycleEverydayAvg
       : projectedEverydayAtUsualPace;
+  const projectedVsUsualDelta = roundMoney(projectedTotal - projectedAtUsualPaceForecast);
   const historicalActualMonthAvg = historicalFullCycleAvg;
+  const historicalActualEverydayAvg =
+    !includeFixed && historicalFullCycleEverydayAvg > 0
+      ? historicalFullCycleEverydayAvg
+      : historicalFullCycleAvgEveryday;
+
   /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
-    historicalFullCycleAvg > 0 ? historicalFullCycleAvg : projectedAtUsualPaceForecast;
+    !includeFixed && historicalFullCycleEverydayAvg > 0
+      ? historicalFullCycleEverydayAvg
+      : historicalFullCycleAvg > 0
+        ? historicalFullCycleAvg
+        : projectedAtUsualPaceForecast;
 
   let score = 50;
   if (compareAvg > 0 && currentSpend > 0) {
@@ -675,10 +688,12 @@ export function computePace(
     projectedEveryday,
     projectedEverydayAtUsualPace,
     projectedAtUsualPaceForecast,
+    historicalFullCycleEverydayAvg,
     historicalActualMonthAvg,
     historicalActualBillsAvg: historicalFullCycleAvgFixed,
-    historicalActualEverydayAvg: historicalFullCycleAvgEveryday,
+    historicalActualEverydayAvg,
     projectedAtUsualPace,
+    projectedVsUsualDelta,
     score,
     scoreLabel,
     cyclesUsed: historicalAtDay.length,

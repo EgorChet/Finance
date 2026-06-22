@@ -4059,6 +4059,14 @@ table.rules select {
   border-bottom: 1px solid var(--border);
 }
 
+.pace-simple-details-note {
+  margin: 0;
+  padding: 0.65rem 1rem 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .pace-simple-table-wrap {
   padding: 0.85rem 1rem;
 }

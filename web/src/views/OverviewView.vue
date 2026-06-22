@@ -38,7 +38,7 @@
       :latest-billing-date="latestFinalBillingDate"
       :configured-charges="configuredCharges"
       :partial-statement-active="partialStatementActive"
-      :partial-everyday-spend="partialEverydaySpend"
+      :cycle-everyday-spend="cycleEverydaySpend"
       :partial-total-spend="partialTotalSpend"
       :reference-date="refDate"
       :cycle-day="cycleDay"
@@ -336,13 +336,14 @@ const statementBilling = computed(() => {
 });
 
 const paceTransactions = computed(() => {
-  // Keep full history for pace averages; partial everyday total comes from partialEverydaySpend override.
+  // Keep full history for pace averages; current-cycle everyday total comes from cycleEverydaySpend override.
   return paceReport.value?.transactions ?? report.value?.transactions ?? [];
 });
 
-const partialEverydaySpend = computed(() => {
-  if (!isPartialForOpenCycle.value || !report.value) return null;
-  return everydaySpendingTotal(report.value.transactions);
+const cycleEverydaySpend = computed(() => {
+  if (!showPaceCard.value || !report.value) return null;
+  const total = everydaySpendingTotal(report.value.transactions);
+  return total > 0 ? total : null;
 });
 
 const partialTotalSpend = computed(() => {
