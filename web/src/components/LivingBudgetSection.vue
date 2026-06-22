@@ -57,18 +57,17 @@
               <label class="field-label">Through</label>
               <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" :disabled="disabled" />
               <label class="recurring-ongoing recurring-ongoing--compact">
-                <input
-                  type="checkbox"
-                  :checked="isOngoingThrough(seg.through_month)"
+                <ToggleSwitch
+                  :model-value="isOngoingThrough(seg.through_month)"
                   :disabled="disabled"
-                  @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
+                  @update:model-value="toggleOngoing(seg, $event)"
                 />
                 <span class="recurring-ongoing-text">No end date</span>
               </label>
             </div>
 
             <div class="recurring-segment-actions">
-              <button type="button" class="btn" :disabled="disabled" @click="stopEditSegment(seg)">Done</button>
+              <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditSegment(seg)">Done</button>
               <button
                 v-if="segments.length > 1"
                 type="button"
@@ -137,7 +136,7 @@
                 <input v-model="topup.note" class="input" placeholder="e.g. Trip to Europe" :disabled="disabled" />
               </div>
               <div class="recurring-segment-actions">
-                <button type="button" class="btn" :disabled="disabled" @click="stopEditTopup(topup)">Done</button>
+                <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditTopup(topup)">Done</button>
                 <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeMonthTopup(topup)">
                   Remove
                 </button>
@@ -157,6 +156,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import MonthSelect from "./MonthSelect.vue";
+import ToggleSwitch from "./ToggleSwitch.vue";
 import { confirm } from "../composables/useConfirm";
 import { formatIls } from "../utils/format";
 import {

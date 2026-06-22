@@ -24,7 +24,7 @@
           />
 
           <label class="browse-recurring-toggle">
-            <input v-model="includeRecurring" type="checkbox" />
+            <ToggleSwitch v-model="includeRecurring" />
             <span>Include recurring charges</span>
           </label>
 
@@ -120,6 +120,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { addExclusion, fetchMonths, fetchReport } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import TransactionList from "../components/TransactionList.vue";
 import { useAuthStore } from "../stores/auth";
 import { confirm } from "../composables/useConfirm";

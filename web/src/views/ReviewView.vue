@@ -24,21 +24,21 @@
       <summary class="review-options-summary">What to show in the queue</summary>
       <div class="review-options-body">
         <label class="review-option">
-          <input v-model="onePerMerchant" type="checkbox" />
+          <ToggleSwitch v-model="onePerMerchant" />
           <span class="review-option-text">
             <strong>One card per store</strong>
             <span class="review-option-hint">Group all charges with the same name — one label covers every charge</span>
           </span>
         </label>
         <label class="review-option">
-          <input v-model="includeLabeled" type="checkbox" />
+          <ToggleSwitch v-model="includeLabeled" />
           <span class="review-option-text">
             <strong>Show already saved</strong>
             <span class="review-option-hint">Include stores that already have an English name and category saved</span>
           </span>
         </label>
         <label class="review-option">
-          <input v-model="includeReviewed" type="checkbox" />
+          <ToggleSwitch v-model="includeReviewed" />
           <span class="review-option-text">
             <strong>Show already done</strong>
             <span class="review-option-hint">Include stores you already confirmed in this screen</span>
@@ -202,6 +202,7 @@ import {
 } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { useAuthStore } from "../stores/auth";
 import { confirm as askConfirm } from "../composables/useConfirm";
 import type { ReviewQueueItem } from "../types";

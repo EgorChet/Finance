@@ -79,7 +79,7 @@
             <label class="field-label">Through</label>
             <MonthSelect v-if="!newRecurringOngoing" v-model="newRecurring.through_month" />
             <label class="recurring-ongoing recurring-ongoing--compact">
-              <input v-model="newRecurringOngoing" type="checkbox" />
+              <ToggleSwitch v-model="newRecurringOngoing" :disabled="saving" />
               <span class="recurring-ongoing-text">No end date</span>
             </label>
           </div>
@@ -200,17 +200,17 @@
                       <label class="field-label">Through</label>
                       <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
                       <label class="recurring-ongoing recurring-ongoing--compact">
-                        <input
-                          type="checkbox"
-                          :checked="isOngoingThrough(seg.through_month)"
-                          @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
+                        <ToggleSwitch
+                          :model-value="isOngoingThrough(seg.through_month)"
+                          :disabled="saving"
+                          @update:model-value="toggleOngoing(seg, $event)"
                         />
                         <span class="recurring-ongoing-text">No end date</span>
                       </label>
                     </div>
 
                     <div class="recurring-segment-actions">
-                      <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(seg)">Done</button>
+                      <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(seg)">Done</button>
                       <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
                         Delete period
                       </button>
@@ -220,7 +220,7 @@
               </li>
             </ul>
 
-            <footer v-if="!auth.isDemo" class="recurring-card-footer">
+            <footer v-if="!auth.isDemo && isEditingGroup(group)" class="recurring-card-footer">
               <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
               <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
                 Remove bill
@@ -310,7 +310,7 @@
                   </div>
                 </div>
                 <div class="recurring-segment-actions">
-                  <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(charge)">Done</button>
+                  <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(charge)">Done</button>
                   <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
                     Delete
                   </button>
@@ -334,6 +334,7 @@ import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import LivingBudgetSection from "../components/LivingBudgetSection.vue";
 import MonthSelect from "../components/MonthSelect.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { SPENDING_CATEGORIES } from "../categories";
 import { useAuthStore } from "../stores/auth";
 import { confirm } from "../composables/useConfirm";
@@ -557,6 +558,11 @@ async function runPersist(): Promise<boolean> {
 
 function isEditingCharge(charge: ConfiguredCharge): boolean {
   return editingChargeKey.value === segmentKey(charge);
+}
+
+function isEditingGroup(group: { segments: ConfiguredCharge[] }): boolean {
+  if (!editingChargeKey.value) return false;
+  return group.segments.some((seg) => segmentKey(seg) === editingChargeKey.value);
 }
 
 function startEditCharge(charge: ConfiguredCharge) {

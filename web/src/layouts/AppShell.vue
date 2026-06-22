@@ -144,7 +144,7 @@
             </div>
             <div class="mobile-nav-footer">
             <label class="mobile-nav-action">
-              <input type="checkbox" :checked="app.lightMode" @change="app.toggleTheme()" />
+              <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
               Light mode
             </label>
             <template v-if="!auth.isDemo">
@@ -234,6 +234,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
+import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
@@ -285,6 +286,10 @@ const NAV_ITEMS = [
 const navItems = NAV_ITEMS;
 
 const app = useAppStore();
+
+function onLightModeChange(value: boolean) {
+  if (value !== app.lightMode) app.toggleTheme();
+}
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
