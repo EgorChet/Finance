@@ -58,6 +58,134 @@ export function everydaySpendingTotal(transactions: Transaction[]): number {
   return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + tx.charge_amount, 0));
 }
 
+export function isPendingTransaction(tx: Transaction): boolean {
+  return tx.charge_estimated === true;
+}
+
+export function everydaySpendingSettlement(transactions: Transaction[]): {
+  total: number;
+  posted: number;
+  pending: number;
+  postedCount: number;
+  pendingCount: number;
+} {
+  let posted = 0;
+  let pending = 0;
+  let postedCount = 0;
+  let pendingCount = 0;
+  for (const tx of everydayTransactions(transactions)) {
+    if (isPendingTransaction(tx)) {
+      pending += tx.charge_amount;
+      pendingCount += 1;
+    } else {
+      posted += tx.charge_amount;
+      postedCount += 1;
+    }
+  }
+  posted = roundMoney(posted);
+  pending = roundMoney(pending);
+  return {
+    total: roundMoney(posted + pending),
+    posted,
+    pending,
+    postedCount,
+    pendingCount,
+  };
+}
+
+export function monthlyBillsBreakdown(transactions: Transaction[]): {
+  rent: number;
+  carLoan: number;
+  devInstitute: number;
+  total: number;
+} {
+  let rent = 0;
+  let carLoan = 0;
+  let devInstitute = 0;
+  for (const tx of transactions) {
+    if (isRentTransaction(tx)) rent += tx.charge_amount;
+    else if (isCarLoanTransaction(tx)) carLoan += tx.charge_amount;
+    else if (isDevInstituteTransaction(tx)) devInstitute += tx.charge_amount;
+  }
+  rent = roundMoney(rent);
+  carLoan = roundMoney(carLoan);
+  devInstitute = roundMoney(devInstitute);
+  return { rent, carLoan, devInstitute, total: roundMoney(rent + carLoan + devInstitute) };
+}
+
+export function pendingEverydayTransactions(transactions: Transaction[]): Transaction[] {
+  return everydayTransactions(transactions).filter(isPendingTransaction);
+}
+
+export function isConfiguredChargeTransaction(tx: Transaction): boolean {
+  return tx.notes?.startsWith("fixed_charge:") === true;
+}
+
+/** Everyday charges that came from the uploaded Visa export (not Extra charges). */
+export function statementEverydayTransactions(transactions: Transaction[]): Transaction[] {
+  return everydayTransactions(transactions).filter((tx) => !isConfiguredChargeTransaction(tx));
+}
+
+export function configuredEverydayChargeRows(transactions: Transaction[]): {
+  id: string;
+  label: string;
+  amount: number;
+}[] {
+  return everydayTransactions(transactions)
+    .filter(isConfiguredChargeTransaction)
+    .map((tx) => ({
+      id: chargeId(tx) || tx.merchant_en || tx.merchant_he,
+      label: tx.merchant_en || tx.merchant_he,
+      amount: roundMoney(tx.charge_amount),
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+export function pendingStatementEverydayTransactions(transactions: Transaction[]): Transaction[] {
+  return statementEverydayTransactions(transactions).filter(isPendingTransaction);
+}
+
+export function everydaySpendingComposition(transactions: Transaction[]): {
+  total: number;
+  exportTotal: number;
+  exportPosted: number;
+  exportPending: number;
+  exportPostedCount: number;
+  exportPendingCount: number;
+  configuredTotal: number;
+  configuredRows: { id: string; label: string; amount: number }[];
+} {
+  const exportTxs = statementEverydayTransactions(transactions);
+  const configuredRows = configuredEverydayChargeRows(transactions);
+  let exportPosted = 0;
+  let exportPending = 0;
+  let exportPostedCount = 0;
+  let exportPendingCount = 0;
+  for (const tx of exportTxs) {
+    if (isPendingTransaction(tx)) {
+      exportPending += tx.charge_amount;
+      exportPendingCount += 1;
+    } else {
+      exportPosted += tx.charge_amount;
+      exportPostedCount += 1;
+    }
+  }
+  exportPosted = roundMoney(exportPosted);
+  exportPending = roundMoney(exportPending);
+  const exportTotal = roundMoney(exportPosted + exportPending);
+  const configuredTotal = roundMoney(configuredRows.reduce((sum, row) => sum + row.amount, 0));
+  return {
+    total: roundMoney(exportTotal + configuredTotal),
+    exportTotal,
+    exportPosted,
+    exportPending,
+    exportPostedCount,
+    exportPendingCount,
+    configuredTotal,
+    configuredRows,
+  };
+}
+
 export function everydaySpendingByCategory(transactions: Transaction[]): {
   category_en: string;
   total: number;

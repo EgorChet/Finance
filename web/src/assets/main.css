@@ -420,6 +420,102 @@ button {
   opacity: 0.9;
 }
 
+.metric-sub-pending {
+  color: var(--text-muted);
+}
+
+.everyday-breakdown-section {
+  margin-bottom: 1rem;
+}
+
+.everyday-breakdown-section:last-child {
+  margin-bottom: 0;
+}
+
+.everyday-breakdown-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.everyday-breakdown-section-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.everyday-breakdown-summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.everyday-breakdown-summary td {
+  padding: 0.35rem 0;
+  vertical-align: top;
+}
+
+.everyday-breakdown-summary td:last-child {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-left: 0.75rem;
+}
+
+.everyday-breakdown-summary-sub td {
+  padding-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.everyday-breakdown-summary-group td {
+  padding-top: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.everyday-breakdown-summary-group:first-child td {
+  padding-top: 0;
+}
+
+.everyday-breakdown-link {
+  color: var(--accent, #60a5fa);
+  text-decoration: none;
+}
+
+.everyday-breakdown-link:hover {
+  text-decoration: underline;
+}
+
+.everyday-breakdown-summary-total td {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.everyday-breakdown-row-note {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.everyday-breakdown-formula {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.everyday-breakdown-txs--pending {
+  margin-top: 0.25rem;
+}
+
 .everyday-breakdown-overlay {
   align-items: flex-end;
   padding: 0;

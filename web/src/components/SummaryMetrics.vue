@@ -50,6 +50,9 @@
         <div class="metric-value">{{ formatIls(everydayTotal) }}</div>
         <div class="metric-sub">
           {{ everydayPct }}% of card total
+          <span v-if="everydayBreakdownEnabled && everydaySettlement.pending > 0" class="metric-sub-pending">
+            · {{ formatIls(everydaySettlement.pending) }} pending
+          </span>
           <span v-if="everydayBreakdownEnabled" class="metric-sub-tap"> · tap for breakdown</span>
         </div>
       </component>
@@ -91,9 +94,7 @@
           <header class="everyday-breakdown-header">
             <div>
               <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">Everyday spending</h3>
-              <p class="everyday-breakdown-meta">
-                {{ formatIls(everydayTotal) }} · {{ everydayChargeCount }} charge{{ everydayChargeCount === 1 ? "" : "s" }}
-              </p>
+              <p class="everyday-breakdown-meta">{{ formatIls(everydayTotal) }}</p>
               <p class="everyday-breakdown-hint">
                 Everything on the card except rent, car loan, and Dev Institute.
               </p>
@@ -104,8 +105,117 @@
           </header>
 
           <div class="everyday-breakdown-body">
-            <p v-if="!everydayCategories.length" class="cost-breakdown-empty">No everyday charges in this snapshot.</p>
-            <template v-else>
+            <section class="everyday-breakdown-section">
+              <p class="everyday-breakdown-section-title">How this total is built</p>
+              <table class="everyday-breakdown-summary">
+                <tbody>
+                  <tr class="everyday-breakdown-summary-group">
+                    <td colspan="2">From Visa partial export</td>
+                  </tr>
+                  <tr>
+                    <td>Posted (final on statement)</td>
+                    <td>{{ formatIls(everydayComposition.exportPosted) }}</td>
+                  </tr>
+                  <tr v-if="everydayComposition.exportPending > 0">
+                    <td>
+                      Pending (still processing)
+                      <span class="everyday-breakdown-row-note">~estimated — may change on final bill</span>
+                    </td>
+                    <td>~{{ formatIls(everydayComposition.exportPending) }}</td>
+                  </tr>
+                  <tr class="everyday-breakdown-summary-sub">
+                    <td>Export subtotal</td>
+                    <td>{{ formatIls(everydayComposition.exportTotal) }}</td>
+                  </tr>
+                  <template v-if="everydayComposition.configuredTotal > 0">
+                    <tr class="everyday-breakdown-summary-group">
+                      <td colspan="2">
+                        Added from
+                        <RouterLink class="everyday-breakdown-link" to="/app/recurring">Extra charges</RouterLink>
+                        (not on Visa export)
+                      </td>
+                    </tr>
+                    <tr v-for="row in everydayComposition.configuredRows" :key="row.id">
+                      <td>{{ row.label }}</td>
+                      <td>{{ formatIls(row.amount) }}</td>
+                    </tr>
+                    <tr class="everyday-breakdown-summary-sub">
+                      <td>Configured subtotal</td>
+                      <td>{{ formatIls(everydayComposition.configuredTotal) }}</td>
+                    </tr>
+                  </template>
+                  <tr class="everyday-breakdown-summary-total">
+                    <td>Everyday total</td>
+                    <td>{{ formatIls(everydayTotal) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="everyday-breakdown-formula">
+                {{ formatIls(everydayComposition.exportTotal) }} export
+                <template v-if="everydayComposition.configuredTotal > 0">
+                  + {{ formatIls(everydayComposition.configuredTotal) }} configured
+                </template>
+                = {{ formatIls(everydayTotal) }}
+              </p>
+              <p v-if="everydayComposition.exportPending > 0" class="everyday-breakdown-section-hint">
+                Inside the export: {{ formatIls(everydayComposition.exportPosted) }} posted + ~{{ formatIls(everydayComposition.exportPending) }} pending.
+              </p>
+            </section>
+
+            <section v-if="showCardTotalSection" class="everyday-breakdown-section">
+              <p class="everyday-breakdown-section-title">Card total ({{ formatIls(report.total_spent) }})</p>
+              <p class="everyday-breakdown-section-hint">
+                Rent, car loan, and Dev Institute count toward total spent but not everyday spending.
+              </p>
+              <table class="everyday-breakdown-summary">
+                <tbody>
+                  <tr>
+                    <td>Everyday spending</td>
+                    <td>{{ formatIls(everydayTotal) }}</td>
+                  </tr>
+                  <tr v-if="monthlyBillsBreakdown.rent > 0">
+                    <td>Rent</td>
+                    <td>{{ formatIls(monthlyBillsBreakdown.rent) }}</td>
+                  </tr>
+                  <tr v-if="monthlyBillsBreakdown.carLoan > 0">
+                    <td>Car loan</td>
+                    <td>{{ formatIls(monthlyBillsBreakdown.carLoan) }}</td>
+                  </tr>
+                  <tr v-if="monthlyBillsBreakdown.devInstitute > 0">
+                    <td>Dev Institute</td>
+                    <td>{{ formatIls(monthlyBillsBreakdown.devInstitute) }}</td>
+                  </tr>
+                  <tr class="everyday-breakdown-summary-total">
+                    <td>Total on card</td>
+                    <td>{{ formatIls(report.total_spent) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <section v-if="pendingStatementCharges.length" class="everyday-breakdown-section">
+              <p class="everyday-breakdown-section-title">
+                Pending on export ({{ everydayComposition.exportPendingCount }})
+              </p>
+              <p class="everyday-breakdown-section-hint">
+                These rows have no final ₪ amount from the bank yet — we estimate from the charge or FX rate.
+              </p>
+              <TransactionList
+                class="everyday-breakdown-txs everyday-breakdown-txs--pending"
+                :transactions="pendingStatementCharges"
+                title=""
+                :show-category="true"
+                :statement-billing="billingPeriod"
+                :default-limit="25"
+              />
+            </section>
+
+            <section class="everyday-breakdown-section">
+              <p class="everyday-breakdown-section-title">
+                By category ({{ everydayChargeCount }} charge{{ everydayChargeCount === 1 ? "" : "s" }})
+              </p>
+              <p v-if="!everydayCategories.length" class="cost-breakdown-empty">No everyday charges in this snapshot.</p>
+              <template v-else>
               <div
                 v-for="row in everydayCategories"
                 :key="row.category_en"
@@ -138,6 +248,7 @@
                 />
               </div>
             </template>
+            </section>
           </div>
         </div>
       </div>
@@ -154,10 +265,14 @@ import { formatBillingPeriod, formatIls } from "../utils/format";
 import {
   budgetSpendBreakdown,
   everydaySpendingByCategory,
+  everydaySpendingComposition,
+  everydaySpendingSettlement,
   everydaySpendingTotal,
   everydayTransactions,
-  moneyLeft,
+  monthlyBillsBreakdown as getMonthlyBillsBreakdown,
   monthlyBillsTotal,
+  moneyLeft,
+  pendingStatementEverydayTransactions,
 } from "../utils/householdBudget";
 
 const props = withDefaults(
@@ -213,9 +328,16 @@ const budgetClass = computed(() => {
 });
 
 const everydayTotal = computed(() => everydaySpendingTotal(props.report.transactions));
+const everydayComposition = computed(() => everydaySpendingComposition(props.report.transactions));
+const everydaySettlement = computed(() => everydaySpendingSettlement(props.report.transactions));
 const everydayCategories = computed(() => everydaySpendingByCategory(props.report.transactions));
 const everydayChargeCount = computed(() => everydayTransactions(props.report.transactions).length);
+const pendingStatementCharges = computed(() => pendingStatementEverydayTransactions(props.report.transactions));
+const monthlyBillsBreakdown = computed(() => getMonthlyBillsBreakdown(props.report.transactions));
 const monthlyBills = computed(() => monthlyBillsTotal(props.report.transactions));
+const showCardTotalSection = computed(
+  () => monthlyBills.value > 0 || Math.abs(props.report.total_spent - everydayTotal.value) >= 0.02,
+);
 const everydayPct = computed(() =>
   props.report.total_spent ? Math.round((everydayTotal.value / props.report.total_spent) * 100) : 0,
 );
