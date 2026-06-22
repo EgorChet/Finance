@@ -149,59 +149,64 @@
         </header>
 
         <div v-if="recurringGroups.length" class="recurring-groups">
-          <section v-for="group in recurringGroups" :key="group.id" class="recurring-card">
+          <section v-for="group in recurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
             <header class="recurring-card-header">
               <div>
                 <h3 class="recurring-card-title">{{ group.name_en }}</h3>
-                <p class="recurring-card-sub">{{ group.category_en }}</p>
+                <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
               </div>
               <div v-if="!auth.isDemo" class="recurring-card-actions">
-                <button type="button" class="btn" :disabled="saving" @click="addSegment(group)">Add period</button>
+                <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
                 <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
-                  Remove bill
+                  Remove
                 </button>
               </div>
             </header>
 
-            <div class="recurring-segments">
-              <article v-for="seg in group.segments" :key="segmentKey(seg)" class="recurring-segment-card">
-                <div class="recurring-segment-head">
-                  <span v-if="auth.isDemo" class="recurring-segment-amount-display">{{ formatIls(seg.amount) }}</span>
+            <ul class="charge-compact-list">
+              <li v-for="seg in group.segments" :key="segmentKey(seg)" class="charge-compact-row-wrap">
+                <div v-if="!isEditingCharge(seg)" class="charge-compact-row">
+                  <div class="charge-compact-main">
+                    <span class="charge-compact-amount">{{ formatIls(seg.amount) }}</span>
+                    <span class="charge-compact-meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                  </div>
                   <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
                     {{ statusLabel(seg) }}
                   </span>
+                  <button
+                    v-if="!auth.isDemo"
+                    type="button"
+                    class="btn btn-ghost charge-compact-edit"
+                    :disabled="saving"
+                    @click="startEditCharge(seg)"
+                  >
+                    Edit
+                  </button>
                 </div>
 
-                <div class="recurring-segment-row">
-                  <div class="field-group">
-                    <label class="field-label">Amount (₪)</label>
-                    <input
-                      v-if="!auth.isDemo"
-                      v-model.number="seg.amount"
-                      class="input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputmode="decimal"
-                    />
-                    <p v-else class="recurring-segment-amount-display">{{ formatIls(seg.amount) }}</p>
-                  </div>
-
-                  <div class="field-group">
-                    <label class="field-label">From</label>
-                    <MonthSelect v-if="!auth.isDemo" v-model="seg.from_month" />
-                    <p v-else style="margin: 0">{{ ymToLabel(seg.from_month) }}</p>
-                  </div>
-                </div>
-
-                <div class="recurring-segment-footer">
-                  <div class="field-group recurring-segment-through">
-                    <label class="field-label">Through</label>
-                    <template v-if="!auth.isDemo">
-                      <MonthSelect
-                        v-if="!isOngoingThrough(seg.through_month)"
-                        v-model="seg.through_month"
+                <article v-else class="recurring-segment-card">
+                  <div class="recurring-segment-row">
+                    <div class="field-group">
+                      <label class="field-label">Amount (₪)</label>
+                      <input
+                        v-model.number="seg.amount"
+                        class="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputmode="decimal"
                       />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">From</label>
+                      <MonthSelect v-model="seg.from_month" />
+                    </div>
+                  </div>
+
+                  <div class="recurring-segment-footer">
+                    <div class="field-group recurring-segment-through">
+                      <label class="field-label">Through</label>
+                      <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
                       <label class="recurring-ongoing recurring-ongoing--compact">
                         <input
                           type="checkbox"
@@ -210,20 +215,18 @@
                         />
                         <span class="recurring-ongoing-text">No end date</span>
                       </label>
-                    </template>
-                    <p v-else style="margin: 0">{{ throughLabel(seg.through_month) }}</p>
-                  </div>
+                    </div>
 
-                  <div v-if="!auth.isDemo" class="recurring-segment-actions">
-                    <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
-                      {{ saving ? "…" : "Delete period" }}
-                    </button>
+                    <div class="recurring-segment-actions">
+                      <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(seg)">Done</button>
+                      <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
+                        Delete period
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </article>
-            </div>
-
-            <p class="recurring-timeline">{{ timelineSummary(group) }}</p>
+                </article>
+              </li>
+            </ul>
           </section>
         </div>
 
@@ -239,57 +242,78 @@
         </header>
 
         <div v-if="oneTimeCharges.length" class="recurring-groups">
-          <article v-for="charge in oneTimeCharges" :key="segmentKey(charge)" class="recurring-segment-card">
-            <div class="recurring-segment-head">
-              <div>
-                <strong>{{ charge.name_en }}</strong>
-                <p class="recurring-card-sub">{{ charge.category_en }}</p>
-              </div>
-              <span class="recurring-status" :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)">
-                {{ oneTimeStatusLabel(charge.charge_date!) }}
-              </span>
-            </div>
-
-            <div class="charge-detail-fields">
-              <div class="field-group">
-                <label class="field-label">Date</label>
-                <input
+          <ul class="charge-compact-list">
+            <li v-for="charge in oneTimeCharges" :key="segmentKey(charge)" class="charge-compact-row-wrap">
+              <div v-if="auth.isDemo || !isEditingCharge(charge)" class="charge-compact-row">
+                <div class="charge-compact-main">
+                  <strong class="charge-compact-name">{{ charge.name_en }}</strong>
+                  <span class="charge-compact-meta">
+                    {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
+                  </span>
+                </div>
+                <span class="recurring-status" :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)">
+                  {{ oneTimeStatusLabel(charge.charge_date!) }}
+                </span>
+                <button
                   v-if="!auth.isDemo"
-                  class="input"
-                  type="date"
-                  :value="charge.charge_date"
-                  @input="onOneTimeDateChange(charge, ($event.target as HTMLInputElement).value)"
-                />
-                <p v-else style="margin: 0">{{ dateToLabel(charge.charge_date!) }}</p>
-              </div>
-
-              <div class="field-group">
-                <label class="field-label">Amount (₪)</label>
-                <input
+                  type="button"
+                  class="btn btn-ghost charge-compact-edit"
+                  :disabled="saving"
+                  @click="startEditCharge(charge)"
+                >
+                  Edit
+                </button>
+                <button
                   v-if="!auth.isDemo"
-                  v-model.number="charge.amount"
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputmode="decimal"
-                />
-                <p v-else class="recurring-segment-amount-display">{{ formatIls(charge.amount) }}</p>
+                  type="button"
+                  class="btn btn-danger charge-compact-edit"
+                  :disabled="saving"
+                  @click="removeOneTime(charge)"
+                >
+                  Delete
+                </button>
               </div>
 
-              <div class="field-group">
-                <label class="field-label">Category</label>
-                <CategorySelect v-if="!auth.isDemo" v-model="charge.category_en" :options="categories" />
-                <p v-else style="margin: 0">{{ charge.category_en }}</p>
-              </div>
-            </div>
-
-            <div v-if="!auth.isDemo" class="recurring-segment-actions">
-              <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
-                {{ saving ? "…" : "Delete" }}
-              </button>
-            </div>
-          </article>
+              <article v-else class="recurring-segment-card">
+                <div class="charge-detail-fields">
+                  <div class="field-group">
+                    <label class="field-label">Name</label>
+                    <input v-model="charge.name_en" class="input" />
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">Date</label>
+                    <input
+                      class="input"
+                      type="date"
+                      :value="charge.charge_date"
+                      @input="onOneTimeDateChange(charge, ($event.target as HTMLInputElement).value)"
+                    />
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">Amount (₪)</label>
+                    <input
+                      v-model.number="charge.amount"
+                      class="input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputmode="decimal"
+                    />
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">Category</label>
+                    <CategorySelect v-model="charge.category_en" :options="categories" />
+                  </div>
+                </div>
+                <div class="recurring-segment-actions">
+                  <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(charge)">Done</button>
+                  <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
+                    Delete
+                  </button>
+                </div>
+              </article>
+            </li>
+          </ul>
         </div>
 
         <p v-else class="manual-empty">No one-time charges yet.</p>
@@ -351,6 +375,7 @@ const savedBudgetSnapshot = ref("");
 
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
+const editingChargeKeys = ref<Set<string>>(new Set());
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -511,6 +536,20 @@ async function runPersist(): Promise<boolean> {
   }
 }
 
+function isEditingCharge(charge: ConfiguredCharge): boolean {
+  return editingChargeKeys.value.has(segmentKey(charge));
+}
+
+function startEditCharge(charge: ConfiguredCharge) {
+  editingChargeKeys.value = new Set(editingChargeKeys.value).add(segmentKey(charge));
+}
+
+function stopEditCharge(charge: ConfiguredCharge) {
+  const next = new Set(editingChargeKeys.value);
+  next.delete(segmentKey(charge));
+  editingChargeKeys.value = next;
+}
+
 function throughLabel(throughMonth: string): string {
   return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
 }
@@ -604,6 +643,7 @@ async function removeSegment(seg: ConfiguredCharge) {
   });
   if (!ok) return;
   const key = segmentKey(seg);
+  editingChargeKeys.value.delete(key);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
 }
@@ -618,6 +658,11 @@ async function removeCharge(id: string) {
     tone: "danger",
   });
   if (!ok) return;
+  const next = new Set(editingChargeKeys.value);
+  if (group) {
+    for (const seg of group.segments) next.delete(segmentKey(seg));
+  }
+  editingChargeKeys.value = next;
   charges.value = charges.value.filter((c) => c.id !== id || isOneTimeCharge(c));
   await persistCharges();
 }
@@ -631,6 +676,7 @@ async function removeOneTime(charge: ConfiguredCharge) {
   });
   if (!ok) return;
   const key = segmentKey(charge);
+  editingChargeKeys.value.delete(key);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
 }

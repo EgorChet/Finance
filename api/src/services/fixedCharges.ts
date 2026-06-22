@@ -90,10 +90,7 @@ function normalizeCharge(charge: FixedCharge): FixedCharge {
 function mergeCharges(user: FixedChargesData): FixedCharge[] {
   const builtins = loadBuiltinCharges();
   if (!user.charges?.length) return builtins;
-  const userNorm = user.charges.map(normalizeCharge);
-  const userIds = new Set(userNorm.map((c) => c.id));
-  const missing = builtins.filter((b) => !userIds.has(b.id));
-  return [...userNorm, ...missing];
+  return user.charges.map(normalizeCharge);
 }
 
 export async function refreshFixedChargesCache(): Promise<void> {
