@@ -85,7 +85,7 @@
 
         <p v-if="!filteredOccurrences.length" class="calendar-empty">{{ emptyPeriodLabel }}</p>
         <ul v-else class="calendar-event-list">
-          <li v-for="item in filteredOccurrences" :key="`${item.event.id}-${item.date}`" class="calendar-event-item">
+          <li v-for="item in filteredOccurrences" :key="`${item.event.id}-${item.date}`" class="calendar-event-item list-row">
             <div class="calendar-event-body">
               <span class="calendar-importance-dot" :class="importanceClass(item.event)" aria-hidden="true" />
               <div class="calendar-event-text">

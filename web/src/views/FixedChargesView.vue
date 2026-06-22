@@ -153,16 +153,22 @@
                 <h3 class="recurring-card-title">{{ group.name_en }}</h3>
                 <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
               </div>
+              <div v-if="!auth.isDemo && isEditingGroup(group)" class="section-header-actions">
+                <IconButton icon="plus" label="Add period" :disabled="saving" @click="addSegment(group)" />
+              </div>
             </header>
 
             <ul class="charge-compact-list">
               <li v-for="seg in group.segments" :key="segmentKey(seg)" class="charge-compact-row-wrap">
-                <div v-if="auth.isDemo || !isEditingCharge(seg)" class="charge-compact-row">
-                  <div class="charge-compact-main">
-                    <span class="charge-compact-amount">{{ formatIls(seg.amount) }}</span>
-                    <span class="charge-compact-meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
+                  <div class="list-row__main">
+                    <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
+                    <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
                   </div>
-                  <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
+                  <span
+                    class="list-row__status recurring-status"
+                    :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
+                  >
                     {{ statusLabel(seg) }}
                   </span>
                   <button
@@ -176,7 +182,16 @@
                   </button>
                 </div>
 
-                <article v-else class="recurring-segment-card">
+                <EditPanel
+                  v-else
+                  title="Edit period"
+                  :disabled="saving"
+                  deletable
+                  :delete-label="segmentDeleteLabel(group)"
+                  @done="stopEditCharge(seg)"
+                  @cancel="cancelEditCharge(seg)"
+                  @delete="deleteSegmentOrBill(group, seg)"
+                >
                   <div class="recurring-segment-row">
                     <div class="field-group">
                       <label class="field-label">Amount (₪)</label>
@@ -194,7 +209,6 @@
                       <MonthSelect v-model="seg.from_month" />
                     </div>
                   </div>
-
                   <div class="field-group recurring-segment-through">
                     <label class="field-label">Through</label>
                     <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
@@ -207,29 +221,9 @@
                       <span class="recurring-ongoing-text">No end date</span>
                     </label>
                   </div>
-                </article>
+                </EditPanel>
               </li>
             </ul>
-
-            <footer v-if="!auth.isDemo && isEditingGroup(group)" class="recurring-edit-footer">
-              <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditingGroup(group)">
-                Done
-              </button>
-              <button type="button" class="btn" :disabled="saving" @click="cancelEditingGroup(group)">Cancel</button>
-              <button type="button" class="btn" :disabled="saving" @click="addSegment(group)">Add period</button>
-              <button
-                v-if="editingSegmentInGroup(group)"
-                type="button"
-                class="btn btn-danger"
-                :disabled="saving"
-                @click="removeSegment(editingSegmentInGroup(group)!)"
-              >
-                Delete period
-              </button>
-              <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
-                Remove bill
-              </button>
-            </footer>
           </section>
         </div>
 
@@ -261,14 +255,17 @@
         <div v-if="oneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
             <li v-for="charge in oneTimeCharges" :key="segmentKey(charge)" class="charge-compact-row-wrap">
-              <div v-if="auth.isDemo || !isEditingCharge(charge)" class="charge-compact-row">
-                <div class="charge-compact-main">
-                  <strong class="charge-compact-name">{{ charge.name_en }}</strong>
-                  <span class="charge-compact-meta">
+              <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
+                <div class="list-row__main">
+                  <strong class="list-row__label">{{ charge.name_en }}</strong>
+                  <span class="list-row__meta">
                     {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
                   </span>
                 </div>
-                <span class="recurring-status" :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)">
+                <span
+                  class="list-row__status recurring-status"
+                  :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
+                >
                   {{ oneTimeStatusLabel(charge.charge_date!) }}
                 </span>
                 <button
@@ -282,7 +279,16 @@
                 </button>
               </div>
 
-              <article v-else class="recurring-segment-card">
+              <EditPanel
+                v-else
+                title="Edit charge"
+                :disabled="saving"
+                deletable
+                delete-label="Delete charge"
+                @done="stopEditCharge(charge)"
+                @cancel="cancelEditCharge(charge)"
+                @delete="removeOneTime(charge)"
+              >
                 <div class="charge-detail-fields">
                   <div class="field-group">
                     <label class="field-label">Name</label>
@@ -313,16 +319,7 @@
                     <CategorySelect v-model="charge.category_en" :options="categories" />
                   </div>
                 </div>
-                <div class="recurring-segment-actions">
-                  <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(charge)">
-                    Done
-                  </button>
-                  <button type="button" class="btn" :disabled="saving" @click="cancelEditCharge(charge)">Cancel</button>
-                  <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
-                    Delete
-                  </button>
-                </div>
-              </article>
+              </EditPanel>
             </li>
           </ul>
         </div>
@@ -339,6 +336,8 @@ import { onBeforeRouteLeave } from "vue-router";
 import { fetchFixedCharges, fetchLivingBudget, saveFixedCharges, saveLivingBudget } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import EditPanel from "../components/EditPanel.vue";
+import IconButton from "../components/IconButton.vue";
 import LivingBudgetSection from "../components/LivingBudgetSection.vue";
 import MonthSelect from "../components/MonthSelect.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
@@ -574,19 +573,16 @@ function isEditingGroup(group: { segments: ConfiguredCharge[] }): boolean {
   return group.segments.some((seg) => segmentKey(seg) === editingChargeKey.value);
 }
 
-function editingSegmentInGroup(group: ChargeGroup): ConfiguredCharge | undefined {
-  if (!editingChargeKey.value) return undefined;
-  return group.segments.find((seg) => segmentKey(seg) === editingChargeKey.value);
+function segmentDeleteLabel(group: ChargeGroup): string {
+  return group.segments.length <= 1 ? "Remove bill" : "Delete period";
 }
 
-function stopEditingGroup(group: ChargeGroup) {
-  const seg = editingSegmentInGroup(group);
-  if (seg) stopEditCharge(seg);
-}
-
-function cancelEditingGroup(group: ChargeGroup) {
-  const seg = editingSegmentInGroup(group);
-  if (seg) cancelEditCharge(seg);
+async function deleteSegmentOrBill(group: ChargeGroup, seg: ConfiguredCharge) {
+  if (group.segments.length <= 1) {
+    await removeCharge(group.id);
+  } else {
+    await removeSegment(seg);
+  }
 }
 
 function startEditCharge(charge: ConfiguredCharge) {

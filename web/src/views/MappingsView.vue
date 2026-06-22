@@ -37,16 +37,16 @@
       </div>
       <div v-if="filteredRows.length" class="mappings-list">
         <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-          <div v-if="!isEditing(row)" class="mappings-row-read">
-            <div class="mappings-row-main">
+          <div v-if="!isEditing(row)" class="list-row">
+            <div class="list-row__main list-row__main--inline">
               <span v-if="showHebrew(row)" class="mappings-row-hebrew" dir="rtl">{{ row.Hebrew }}</span>
-              <span class="mappings-row-label">{{ primaryLabel(row) }}</span>
+              <span class="list-row__label">{{ primaryLabel(row) }}</span>
               <span v-if="row.Category" class="mappings-category-tag">{{ row.Category }}</span>
             </div>
             <button
               v-if="!auth.isDemo"
               type="button"
-            class="btn btn-edit"
+              class="btn btn-edit"
               :disabled="!!savingHebrew"
               @click="startEdit(row.Hebrew)"
             >
@@ -54,7 +54,14 @@
             </button>
           </div>
 
-          <div v-else class="mappings-row-edit-mode">
+          <EditPanel
+            v-else
+            title="Edit mapping"
+            :done-label="savingHebrew === row.Hebrew ? '…' : 'Save'"
+            :disabled="savingHebrew === row.Hebrew"
+            @done="doneEdit(row)"
+            @cancel="cancelEdit(row.Hebrew)"
+          >
             <input v-model="row.English" class="input" placeholder="English name" />
             <CategorySelect
               v-model="row.Category"
@@ -62,15 +69,7 @@
               allow-empty
               empty-label="Uncategorized"
             />
-            <div class="mappings-row-actions">
-              <button type="button" class="btn btn-primary" :disabled="savingHebrew === row.Hebrew" @click="doneEdit(row)">
-                {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
-              </button>
-              <button type="button" class="btn" :disabled="savingHebrew === row.Hebrew" @click="cancelEdit(row.Hebrew)">
-                Cancel
-              </button>
-            </div>
-          </div>
+          </EditPanel>
         </article>
       </div>
       <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
@@ -83,6 +82,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { fetchRules, saveRuleEntry, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import EditPanel from "../components/EditPanel.vue";
 import { useAuthStore } from "../stores/auth";
 import { CATEGORY_PICKLIST } from "../categories";
 import type { MerchantRow } from "../types";

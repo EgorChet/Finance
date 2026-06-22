@@ -97,6 +97,134 @@ button {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 
+.btn-icon-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface));
+  border-color: var(--danger);
+}
+
+.icon-button-glyph {
+  display: block;
+  line-height: 1;
+}
+
+.icon-button-svg {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--surface-alt, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.list-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.list-row__main--inline {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.list-row__status {
+  flex-shrink: 0;
+}
+
+.list-row__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.list-row__amount {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-row__meta {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.edit-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem;
+  background: var(--surface-alt);
+}
+
+.edit-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.edit-panel__title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.edit-panel__head .btn-icon {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.edit-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.edit-panel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.edit-panel__done {
+  min-height: 40px;
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.section-header-actions .btn-icon {
+  min-width: 40px;
+  min-height: 40px;
+}
+
 .btn-danger {
   background: color-mix(in srgb, var(--danger) 14%, var(--surface));
   border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
@@ -334,21 +462,19 @@ button {
 }
 
 .recurring-edit-footer {
+  display: none;
+}
+
+.living-budget-topups-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-  border-top: 1px solid var(--border);
+  margin-bottom: 0.35rem;
 }
 
-.recurring-edit-footer .btn {
-  min-height: 40px;
-}
-
-.recurring-edit-footer .btn-primary {
-  margin-right: auto;
+.living-budget-topups-header .living-budget-topups-title {
+  margin: 0;
 }
 
 .living-budget-topups-read,
@@ -420,6 +546,7 @@ button {
   margin: 0;
 }
 
+/* Legacy aliases — prefer .list-row in templates */
 .charge-compact-row {
   display: flex;
   align-items: center;
@@ -440,6 +567,7 @@ button {
 
 .charge-compact-name {
   font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .charge-compact-amount {
@@ -2693,36 +2821,11 @@ button {
   padding: 1.5rem 0;
 }
 
-.mappings-row-read {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.mappings-row-main {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  gap: 0.45rem;
-  min-width: 0;
-  overflow: hidden;
-}
-
 .mappings-row-hebrew {
   flex-shrink: 0;
   max-width: 42%;
   font-size: 0.85rem;
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mappings-row-label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2740,23 +2843,6 @@ button {
   white-space: nowrap;
 }
 
-
-.mappings-row-edit-mode {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.mappings-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-top: 0.35rem;
-}
-
-.mappings-row-actions .btn-primary {
-  margin-right: auto;
-}
 
 .mappings-list {
   display: flex;
@@ -3016,6 +3102,10 @@ table.rules select {
 }
 
 .manual-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
@@ -3123,7 +3213,8 @@ table.rules select {
 
 .recurring-card-header {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
 }
@@ -3232,22 +3323,7 @@ table.rules select {
 }
 
 .recurring-segment-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding-top: 0.65rem;
-  border-top: 1px solid var(--border);
-}
-
-.recurring-segment-actions .btn {
-  min-height: 40px;
-  padding: 0.45rem 0.85rem;
-  font-size: 0.88rem;
-}
-
-.recurring-segment-actions .btn-primary {
-  margin-right: auto;
+  display: none;
 }
 
 .recurring-ongoing {
