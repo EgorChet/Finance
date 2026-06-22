@@ -1,5 +1,3 @@
-import { readFileSync } from "fs";
-import path from "path";
 import type { LivingBudgetData, LivingBudgetSegment } from "../types.js";
 import { readLivingBudget, writeLivingBudget } from "../storage/index.js";
 
@@ -8,22 +6,7 @@ export const ONGOING_THROUGH_MONTH = "2035-12";
 export const CIBUS_MONTHLY_ALLOWANCE = 600;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
-const BUILTIN_PATH = path.resolve(
-  process.env.DATA_DIR || path.join(process.cwd(), "data"),
-  "living_budget.json",
-);
-
 let cached: LivingBudgetSegment[] | null = null;
-
-function loadBuiltinSegments(): LivingBudgetSegment[] {
-  try {
-    const raw = readFileSync(BUILTIN_PATH, "utf-8");
-    const data = JSON.parse(raw) as { segments?: LivingBudgetSegment[] };
-    return (data.segments || []).map(normalizeSegment);
-  } catch {
-    return [];
-  }
-}
 
 export function normalizeSegment(segment: LivingBudgetSegment): LivingBudgetSegment {
   return {
@@ -33,18 +16,17 @@ export function normalizeSegment(segment: LivingBudgetSegment): LivingBudgetSegm
   };
 }
 
-function mergeSegments(user: LivingBudgetData): LivingBudgetSegment[] {
-  if (user.segments?.length) return user.segments.map(normalizeSegment);
-  return loadBuiltinSegments();
+function segmentsFromStorage(user: LivingBudgetData): LivingBudgetSegment[] {
+  return (user.segments || []).map(normalizeSegment);
 }
 
 export async function refreshLivingBudgetCache(): Promise<void> {
   const user = await readLivingBudget();
-  cached = mergeSegments(user);
+  cached = segmentsFromStorage(user);
 }
 
 function ensureCache(): void {
-  if (!cached) cached = loadBuiltinSegments();
+  if (!cached) cached = [];
 }
 
 export function loadLivingBudgetSegments(): LivingBudgetSegment[] {

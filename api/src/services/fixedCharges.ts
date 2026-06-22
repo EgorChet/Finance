@@ -1,14 +1,6 @@
-import { readFileSync } from "fs";
-import path from "path";
 import type { FixedCharge, FixedChargesData, SpendingReport, Transaction } from "../types.js";
 import { readFixedCharges, writeFixedCharges } from "../storage/index.js";
 import { monthLabelFromIso } from "../utils/dates.js";
-
-const BUILTIN_PATH = path.resolve(
-  process.env.DATA_DIR ? path.dirname(process.env.DATA_DIR) : path.join(process.cwd(), ".."),
-  "data",
-  "fixed_charges.json",
-);
 
 const ONGOING_THROUGH_MONTH = "2035-12";
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -49,16 +41,6 @@ export function fixedChargeDateForBilling(
 
 let cached: FixedCharge[] | null = null;
 
-function loadBuiltinCharges(): FixedCharge[] {
-  try {
-    const raw = readFileSync(BUILTIN_PATH, "utf-8");
-    const data = JSON.parse(raw) as { charges?: FixedCharge[] };
-    return (data.charges || []).map(normalizeCharge);
-  } catch {
-    return [];
-  }
-}
-
 function normalizeCharge(charge: FixedCharge): FixedCharge {
   const schedule = charge.schedule === "once" ? "once" : "monthly";
   const amount = Math.round(charge.amount * 100) / 100;
@@ -87,19 +69,17 @@ function normalizeCharge(charge: FixedCharge): FixedCharge {
   };
 }
 
-function mergeCharges(user: FixedChargesData): FixedCharge[] {
-  const builtins = loadBuiltinCharges();
-  if (!user.charges?.length) return builtins;
-  return user.charges.map(normalizeCharge);
+function chargesFromStorage(user: FixedChargesData): FixedCharge[] {
+  return (user.charges || []).map(normalizeCharge);
 }
 
 export async function refreshFixedChargesCache(): Promise<void> {
   const user = await readFixedCharges();
-  cached = mergeCharges(user);
+  cached = chargesFromStorage(user);
 }
 
 function ensureCache(): void {
-  if (!cached) cached = loadBuiltinCharges();
+  if (!cached) cached = [];
 }
 
 export function loadFixedCharges(): FixedCharge[] {

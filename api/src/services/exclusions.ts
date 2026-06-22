@@ -1,41 +1,14 @@
-import { readFileSync } from "fs";
-import path from "path";
 import type { ExcludedEntry, ExcludedItemView, ExclusionsData, SpendingReport, Transaction } from "../types.js";
 import { readExclusions, writeExclusions } from "../storage/index.js";
 import { rebuildReportSummaries } from "./fixedCharges.js";
 import { normalizeReviewKey } from "./reviewService.js";
 
-const BUILTIN_PATH = path.resolve(
-  process.env.DATA_DIR ? path.dirname(process.env.DATA_DIR) : path.join(process.cwd(), ".."),
-  "data",
-  "excluded_transactions.json",
-);
-
 let cachedKeys: Set<string> | null = null;
 let cachedEntries: ExcludedEntry[] | null = null;
-
-function loadBuiltinEntries(): ExcludedEntry[] {
-  try {
-    const raw = readFileSync(BUILTIN_PATH, "utf-8");
-    const data = JSON.parse(raw) as { entries?: ExcludedEntry[] };
-    return (data.entries || []).map((e) => ({
-      key: normalizeReviewKey(e.key.trim()),
-      note: e.note,
-      source: "builtin" as const,
-    }));
-  } catch {
-    return [];
-  }
-}
 
 function mergeExclusions(user: ExclusionsData): ExcludedEntry[] {
   const restored = new Set((user.restored_keys || []).map(normalizeReviewKey));
   const byKey = new Map<string, ExcludedEntry>();
-
-  for (const entry of loadBuiltinEntries()) {
-    if (!entry.key || restored.has(entry.key)) continue;
-    byKey.set(entry.key, entry);
-  }
 
   for (const entry of user.entries || []) {
     const key = normalizeReviewKey(entry.key.trim());

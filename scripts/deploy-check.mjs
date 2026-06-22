@@ -32,7 +32,7 @@ for (const f of ["data/statements.json", "data/merchant_rules.json"]) {
   else warn(`${f} missing locally — seed step will fail until you export data`);
 }
 
-if (existsSync(path.join(dataDir, "fixed_charges.json"))) ok("fixed_charges.json present (ships with API Docker image)");
+if (existsSync(path.join(dataDir, "fixed_charges.json"))) ok("fixed_charges.json present (optional seed template for Supabase)");
 
 const gitignore = readFileSync(path.join(root, ".gitignore"), "utf-8");
 if (gitignore.includes("data/statements.json")) ok("statements.json is gitignored");
