@@ -1,119 +1,43 @@
 <template>
   <section id="living-budget" class="manual-section living-budget-section">
-    <header class="manual-section-header charge-section-header">
+    <header class="manual-section-header">
       <div>
         <h3 class="manual-section-title">Living budget</h3>
         <p class="manual-section-lead">
           Monthly cap (excludes rent). +₪600/month Cibus is added automatically and matched as a groceries charge.
         </p>
       </div>
-      <button
-        v-if="!readonly"
-        type="button"
-        class="btn btn-ghost charge-section-edit-btn"
-        :disabled="disabled"
-        @click="editing = !editing"
-      >
-        {{ editing ? "Done" : "Edit" }}
-      </button>
     </header>
 
-    <ul v-if="segments.length && (!editing || readonly)" class="charge-compact-list">
-      <li v-for="seg in segments" :key="livingBudgetSegmentStableKey(seg)" class="charge-compact-row">
-        <div class="charge-compact-main">
-          <span class="charge-compact-amount">{{ formatIls(seg.amount + CIBUS_MONTHLY_ALLOWANCE) }}</span>
-          <span class="charge-compact-meta">incl. Cibus · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
-        </div>
-        <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
-          {{ livingBudgetStatusLabel(seg) }}
-        </span>
-      </li>
-    </ul>
+    <div v-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
 
-    <div v-else-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
-
-    <div v-if="editing && !readonly" class="recurring-segments">
-      <article v-for="seg in segments" :key="livingBudgetSegmentStableKey(seg)" class="recurring-segment-card">
-        <div class="recurring-segment-row">
-          <div class="field-group">
-            <label class="field-label">Amount (₪)</label>
-            <input
-              v-model.number="seg.amount"
-              class="input"
-              type="number"
-              min="0"
-              step="1"
-              inputmode="decimal"
-              :disabled="disabled"
-            />
-          </div>
-          <div class="field-group">
-            <label class="field-label">From</label>
-            <MonthSelect v-model="seg.from_month" :disabled="disabled" />
-          </div>
-        </div>
-
-        <div class="recurring-segment-footer">
-          <div class="field-group recurring-segment-through">
-            <label class="field-label">Through</label>
-            <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" :disabled="disabled" />
-            <label class="recurring-ongoing recurring-ongoing--compact">
-              <input
-                type="checkbox"
-                :checked="isOngoingThrough(seg.through_month)"
-                :disabled="disabled"
-                @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
-              />
-              <span class="recurring-ongoing-text">No end date</span>
-            </label>
-          </div>
-
-          <div v-if="segments.length > 1" class="recurring-segment-actions">
-            <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeSegment(seg)">
-              Delete period
-            </button>
-          </div>
-        </div>
-      </article>
-    </div>
-
-    <div v-if="editing && !readonly" class="living-budget-toolbar">
-      <button type="button" class="btn" :disabled="disabled" @click="addSegment">Add period</button>
-    </div>
-
-    <div v-if="sortedMonthTopups.length && (!editing || readonly)" class="living-budget-topups-read">
-      <h4 class="living-budget-topups-title">Extra for specific months</h4>
-      <ul class="charge-compact-list">
-        <li v-for="topup in sortedMonthTopups" :key="livingBudgetMonthTopupStableKey(topup)" class="charge-compact-row">
+    <ul v-else class="charge-compact-list">
+      <li v-for="seg in segments" :key="livingBudgetSegmentStableKey(seg)" class="charge-compact-row-wrap">
+        <div v-if="readonly || !isEditingSegment(seg)" class="charge-compact-row">
           <div class="charge-compact-main">
-            <span class="charge-compact-amount">+{{ formatIls(topup.extra) }}</span>
-            <span class="charge-compact-meta">
-              {{ ymToLabel(topup.month) }}<template v-if="topup.note"> · {{ topup.note }}</template>
-            </span>
+            <span class="charge-compact-amount">{{ formatIls(seg.amount + CIBUS_MONTHLY_ALLOWANCE) }}</span>
+            <span class="charge-compact-meta">incl. Cibus · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
           </div>
-        </li>
-      </ul>
-    </div>
+          <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
+            {{ livingBudgetStatusLabel(seg) }}
+          </span>
+          <button
+            v-if="!readonly"
+            type="button"
+            class="btn btn-ghost charge-compact-edit"
+            :disabled="disabled"
+            @click="startEditSegment(seg)"
+          >
+            Edit
+          </button>
+        </div>
 
-    <div v-if="editing && !readonly" class="living-budget-topups-edit">
-      <h4 class="living-budget-topups-title">Extra for specific months</h4>
-      <p class="living-budget-topups-lead">One-off boost to the cap for a single month — travel, hosting, etc.</p>
-
-      <div v-if="sortedMonthTopups.length" class="recurring-segments">
-        <article
-          v-for="topup in sortedMonthTopups"
-          :key="livingBudgetMonthTopupStableKey(topup)"
-          class="recurring-segment-card"
-        >
-          <div class="recurring-segment-row living-budget-topup-row">
-            <div class="field-group living-budget-topup-month">
-              <label class="field-label">Month</label>
-              <MonthSelect v-model="topup.month" :disabled="disabled" />
-            </div>
-            <div class="field-group living-budget-topup-amount">
-              <label class="field-label">Extra (₪)</label>
+        <article v-else class="recurring-segment-card">
+          <div class="recurring-segment-row">
+            <div class="field-group">
+              <label class="field-label">Amount (₪)</label>
               <input
-                v-model.number="topup.extra"
+                v-model.number="seg.amount"
                 class="input"
                 type="number"
                 min="0"
@@ -122,22 +46,108 @@
                 :disabled="disabled"
               />
             </div>
-          </div>
-          <div class="recurring-segment-footer">
-            <div class="field-group living-budget-topup-note">
-              <label class="field-label">Note (optional)</label>
-              <input v-model="topup.note" class="input" placeholder="e.g. Trip to Europe" :disabled="disabled" />
+            <div class="field-group">
+              <label class="field-label">From</label>
+              <MonthSelect v-model="seg.from_month" :disabled="disabled" />
             </div>
+          </div>
+
+          <div class="recurring-segment-footer">
+            <div class="field-group recurring-segment-through">
+              <label class="field-label">Through</label>
+              <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" :disabled="disabled" />
+              <label class="recurring-ongoing recurring-ongoing--compact">
+                <input
+                  type="checkbox"
+                  :checked="isOngoingThrough(seg.through_month)"
+                  :disabled="disabled"
+                  @change="toggleOngoing(seg, ($event.target as HTMLInputElement).checked)"
+                />
+                <span class="recurring-ongoing-text">No end date</span>
+              </label>
+            </div>
+
             <div class="recurring-segment-actions">
-              <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeMonthTopup(topup)">
-                Remove
+              <button type="button" class="btn" :disabled="disabled" @click="stopEditSegment(seg)">Done</button>
+              <button
+                v-if="segments.length > 1"
+                type="button"
+                class="btn btn-danger"
+                :disabled="disabled"
+                @click="removeSegment(seg)"
+              >
+                Delete period
               </button>
             </div>
           </div>
         </article>
-      </div>
+      </li>
+    </ul>
 
-      <div class="living-budget-toolbar">
+    <div v-if="!readonly" class="living-budget-toolbar">
+      <button type="button" class="btn" :disabled="disabled" @click="addSegment">Add period</button>
+    </div>
+
+    <div v-if="sortedMonthTopups.length || !readonly" class="living-budget-topups-read">
+      <h4 class="living-budget-topups-title">Extra for specific months</h4>
+      <p v-if="!readonly" class="living-budget-topups-lead">One-off boost to the cap for a single month — travel, hosting, etc.</p>
+
+      <ul v-if="sortedMonthTopups.length" class="charge-compact-list">
+        <li v-for="topup in sortedMonthTopups" :key="livingBudgetMonthTopupStableKey(topup)" class="charge-compact-row-wrap">
+          <div v-if="readonly || !isEditingTopup(topup)" class="charge-compact-row">
+            <div class="charge-compact-main">
+              <span class="charge-compact-amount">+{{ formatIls(topup.extra) }}</span>
+              <span class="charge-compact-meta">
+                {{ ymToLabel(topup.month) }}<template v-if="topup.note"> · {{ topup.note }}</template>
+              </span>
+            </div>
+            <button
+              v-if="!readonly"
+              type="button"
+              class="btn btn-ghost charge-compact-edit"
+              :disabled="disabled"
+              @click="startEditTopup(topup)"
+            >
+              Edit
+            </button>
+          </div>
+
+          <article v-else class="recurring-segment-card">
+            <div class="recurring-segment-row living-budget-topup-row">
+              <div class="field-group living-budget-topup-month">
+                <label class="field-label">Month</label>
+                <MonthSelect v-model="topup.month" :disabled="disabled" />
+              </div>
+              <div class="field-group living-budget-topup-amount">
+                <label class="field-label">Extra (₪)</label>
+                <input
+                  v-model.number="topup.extra"
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="decimal"
+                  :disabled="disabled"
+                />
+              </div>
+            </div>
+            <div class="recurring-segment-footer">
+              <div class="field-group living-budget-topup-note">
+                <label class="field-label">Note (optional)</label>
+                <input v-model="topup.note" class="input" placeholder="e.g. Trip to Europe" :disabled="disabled" />
+              </div>
+              <div class="recurring-segment-actions">
+                <button type="button" class="btn" :disabled="disabled" @click="stopEditTopup(topup)">Done</button>
+                <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeMonthTopup(topup)">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </article>
+        </li>
+      </ul>
+
+      <div v-if="!readonly" class="living-budget-toolbar">
         <button type="button" class="btn" :disabled="disabled" @click="addMonthTopup">Add extra for month</button>
       </div>
     </div>
@@ -174,11 +184,42 @@ const props = withDefaults(
 
 const segments = defineModel<LivingBudgetSegment[]>("segments", { required: true });
 const monthTopups = defineModel<LivingBudgetMonthTopup[]>("monthTopups", { required: true });
-const editing = ref(false);
+const editingSegmentKey = ref<string | null>(null);
+const editingTopupKey = ref<string | null>(null);
 
 const sortedMonthTopups = computed(() =>
   [...monthTopups.value].sort((a, b) => a.month.localeCompare(b.month)),
 );
+
+function isEditingSegment(seg: LivingBudgetSegment): boolean {
+  return editingSegmentKey.value === livingBudgetSegmentStableKey(seg);
+}
+
+function isEditingTopup(topup: LivingBudgetMonthTopup): boolean {
+  return editingTopupKey.value === livingBudgetMonthTopupStableKey(topup);
+}
+
+function startEditSegment(seg: LivingBudgetSegment) {
+  editingTopupKey.value = null;
+  editingSegmentKey.value = livingBudgetSegmentStableKey(seg);
+}
+
+function stopEditSegment(seg: LivingBudgetSegment) {
+  if (editingSegmentKey.value === livingBudgetSegmentStableKey(seg)) {
+    editingSegmentKey.value = null;
+  }
+}
+
+function startEditTopup(topup: LivingBudgetMonthTopup) {
+  editingSegmentKey.value = null;
+  editingTopupKey.value = livingBudgetMonthTopupStableKey(topup);
+}
+
+function stopEditTopup(topup: LivingBudgetMonthTopup) {
+  if (editingTopupKey.value === livingBudgetMonthTopupStableKey(topup)) {
+    editingTopupKey.value = null;
+  }
+}
 
 function throughLabel(throughMonth: string): string {
   return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
@@ -221,14 +262,14 @@ function addSegment() {
       fromMonth = nextMonthAfter(last.through_month);
     }
   }
-  segments.value = [
-    ...sorted,
-    {
-      amount: last?.amount ?? 0,
-      from_month: fromMonth,
-      through_month: ONGOING_THROUGH_MONTH,
-    },
-  ];
+  const newSeg: LivingBudgetSegment = {
+    amount: last?.amount ?? 0,
+    from_month: fromMonth,
+    through_month: ONGOING_THROUGH_MONTH,
+  };
+  segments.value = [...sorted, newSeg];
+  editingTopupKey.value = null;
+  editingSegmentKey.value = livingBudgetSegmentStableKey(newSeg);
 }
 
 async function removeSegment(seg: LivingBudgetSegment) {
@@ -240,6 +281,7 @@ async function removeSegment(seg: LivingBudgetSegment) {
   });
   if (!ok) return;
   const key = livingBudgetSegmentStableKey(seg);
+  if (editingSegmentKey.value === key) editingSegmentKey.value = null;
   segments.value = segments.value.filter((s) => livingBudgetSegmentStableKey(s) !== key);
 }
 
@@ -249,7 +291,10 @@ function addMonthTopup() {
   while (used.has(month)) {
     month = nextMonthAfter(month);
   }
-  monthTopups.value = [...monthTopups.value, { month, extra: 500 }];
+  const newTopup: LivingBudgetMonthTopup = { month, extra: 500 };
+  monthTopups.value = [...monthTopups.value, newTopup];
+  editingSegmentKey.value = null;
+  editingTopupKey.value = month;
 }
 
 async function removeMonthTopup(topup: LivingBudgetMonthTopup) {
@@ -261,6 +306,7 @@ async function removeMonthTopup(topup: LivingBudgetMonthTopup) {
   });
   if (!ok) return;
   const key = livingBudgetMonthTopupStableKey(topup);
+  if (editingTopupKey.value === key) editingTopupKey.value = null;
   monthTopups.value = monthTopups.value.filter((t) => livingBudgetMonthTopupStableKey(t) !== key);
 }
 </script>

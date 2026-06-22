@@ -5,8 +5,6 @@ services:
       dockerfile: analyzer_api/Dockerfile
     ports:
       - "8001:8001"
-    volumes:
-      - ./data:/app/data
 
   api:
     build:
@@ -14,15 +12,15 @@ services:
       dockerfile: api/Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       PORT: "3000"
       ANALYZER_URL: http://analyzer:8001
       DATA_DIR: /app/data
-      STORAGE: local
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret}
     volumes:
-      - ./data:/app/data
       - ./statements:/app/statements
     depends_on:
       - analyzer

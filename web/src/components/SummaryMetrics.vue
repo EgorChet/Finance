@@ -37,6 +37,7 @@
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
         <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
+        <div class="metric-sub">{{ everydayPct }}% everyday · {{ monthlyBillsPct }}% bills</div>
       </div>
       <component
         :is="everydayCardTag"
@@ -64,18 +65,6 @@
       <div class="metric-card">
         <div class="metric-label">Transactions</div>
         <div class="metric-value">{{ report.transaction_count.toLocaleString() }}</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Billing</div>
-        <div class="metric-value metric-value-sm">
-          {{ billingPeriod || "—" }}
-        </div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Statements</div>
-        <div class="metric-value metric-value-sm">
-          {{ (report.metadata.statement_count as number) || 1 }} month(s)
-        </div>
       </div>
     </div>
 
@@ -144,43 +133,6 @@
                 ~{{ formatIls(everydayComposition.exportPending) }} on the export is still processing and may change when the bank finalises it.
               </p>
             </section>
-
-            <section class="everyday-breakdown-section">
-              <p class="everyday-breakdown-section-title">By category</p>
-              <p v-if="!everydayCategories.length" class="cost-breakdown-empty">No charges in this snapshot yet.</p>
-              <template v-else>
-              <div
-                v-for="row in everydayCategories"
-                :key="row.category_en"
-                class="everyday-breakdown-category"
-                :class="{ 'everyday-breakdown-category--open': expandedCategory === row.category_en }"
-              >
-                <button
-                  type="button"
-                  class="cost-breakdown-row"
-                  :aria-expanded="expandedCategory === row.category_en"
-                  @click="toggleCategory(row.category_en)"
-                >
-                  <span>{{ row.category_en }}</span>
-                  <span class="cost-breakdown-amount">
-                    {{ formatIls(row.total) }}
-                    <span class="category-accordion-chevron" aria-hidden="true">
-                      {{ expandedCategory === row.category_en ? "▾" : "▸" }}
-                    </span>
-                  </span>
-                </button>
-                <TransactionList
-                  v-if="expandedCategory === row.category_en"
-                  class="everyday-breakdown-txs"
-                  :transactions="transactionsForCategory(row.category_en)"
-                  title="Charges"
-                  :show-category="false"
-                  :statement-billing="billingPeriod"
-                  :default-limit="25"
-                />
-              </div>
-            </template>
-            </section>
           </div>
         </div>
       </div>
@@ -190,17 +142,13 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
-import TransactionList from "./TransactionList.vue";
 import type { SpendingReport } from "../types";
-import { rollupCategory } from "../categories";
-import { formatBillingPeriod, formatIls } from "../utils/format";
+import { formatIls } from "../utils/format";
 import {
   budgetSpendBreakdown,
-  everydaySpendingByCategory,
   everydaySpendingComposition,
   everydaySpendingSettlement,
   everydaySpendingTotal,
-  everydayTransactions,
   monthlyBillsTotal,
   moneyLeft,
 } from "../utils/householdBudget";
@@ -211,10 +159,7 @@ const props = withDefaults(
 );
 
 const everydayBreakdownOpen = ref(false);
-const expandedCategory = ref<string | null>(null);
 const closeBtn = ref<HTMLButtonElement | null>(null);
-
-const billingPeriod = computed(() => formatBillingPeriod(props.report.metadata));
 
 const budgetBreakdown = computed(() => budgetSpendBreakdown(props.report.transactions));
 const budgetSpent = computed(() => budgetBreakdown.value.spent);
@@ -260,7 +205,6 @@ const budgetClass = computed(() => {
 const everydayTotal = computed(() => everydaySpendingTotal(props.report.transactions));
 const everydayComposition = computed(() => everydaySpendingComposition(props.report.transactions));
 const everydaySettlement = computed(() => everydaySpendingSettlement(props.report.transactions));
-const everydayCategories = computed(() => everydaySpendingByCategory(props.report.transactions));
 const monthlyBills = computed(() => monthlyBillsTotal(props.report.transactions));
 const everydayPct = computed(() =>
   props.report.total_spent ? Math.round((everydayTotal.value / props.report.total_spent) * 100) : 0,
@@ -272,25 +216,13 @@ const monthlyBillsPct = computed(() =>
 const everydayBreakdownEnabled = computed(() => props.partial && everydayTotal.value > 0);
 const everydayCardTag = computed(() => (everydayBreakdownEnabled.value ? "button" : "div"));
 
-function transactionsForCategory(category: string) {
-  return everydayTransactions(props.report.transactions).filter(
-    (tx) => rollupCategory(tx.category_en?.trim() || "Uncategorized") === category,
-  );
-}
-
 function openEverydayBreakdown() {
   if (!everydayBreakdownEnabled.value) return;
-  expandedCategory.value = null;
   everydayBreakdownOpen.value = true;
 }
 
 function closeEverydayBreakdown() {
   everydayBreakdownOpen.value = false;
-  expandedCategory.value = null;
-}
-
-function toggleCategory(category: string) {
-  expandedCategory.value = expandedCategory.value === category ? null : category;
 }
 
 function onKeydown(e: KeyboardEvent) {

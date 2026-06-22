@@ -23,6 +23,11 @@
             autocomplete="off"
           />
 
+          <label class="browse-recurring-toggle">
+            <input v-model="includeRecurring" type="checkbox" />
+            <span>Include recurring charges</span>
+          </label>
+
           <div class="browse-filter-row">
             <label class="field-group browse-field">
               <span class="field-label">Month</span>
@@ -121,6 +126,8 @@ import { confirm } from "../composables/useConfirm";
 import type { MonthItem, Transaction } from "../types";
 import { CATEGORY_PICKLIST, rollupCategory } from "../categories";
 import { formatIls } from "../utils/format";
+import { loadBrowseIncludeRecurring, saveBrowseIncludeRecurring } from "../utils/browsePreferences";
+import { isSystemRecurringTransaction } from "../utils/householdBudget";
 import { transactionKey } from "../utils/transactionKey";
 
 type AmountPreset = { id: string; label: string; min: number | null; max: number | null };
@@ -143,6 +150,11 @@ const categoryFilter = ref("");
 const minAmount = ref("");
 const maxAmount = ref("");
 const excludingKey = ref<string | null>(null);
+const includeRecurring = ref(loadBrowseIncludeRecurring());
+
+watch(includeRecurring, (value) => {
+  saveBrowseIncludeRecurring(value);
+});
 
 const categoryOptions = CATEGORY_PICKLIST;
 
@@ -171,6 +183,7 @@ const filteredTransactions = computed(() => {
   const cat = categoryFilter.value;
 
   return allTransactions.value.filter((tx) => {
+    if (!includeRecurring.value && isSystemRecurringTransaction(tx)) return false;
     if (q) {
       const merchant = `${tx.merchant_en} ${tx.merchant_he}`.toLowerCase();
       if (!merchant.includes(q)) return false;

@@ -26,17 +26,21 @@ for (const f of ["web/package.json", "api/package.json", "render.yaml", "supabas
   else warn(`Missing ${f}`);
 }
 
-for (const f of ["data/statements.json", "data/merchant_rules.json"]) {
-  const p = path.join(dataDir, f.replace("data/", ""));
-  if (existsSync(p)) ok(`Local ${f} exists (ready to seed Supabase)`);
-  else warn(`${f} missing locally — seed step will fail until you export data`);
-}
-
-if (existsSync(path.join(dataDir, "fixed_charges.json"))) ok("fixed_charges.json present (optional seed template for Supabase)");
-
 const gitignore = readFileSync(path.join(root, ".gitignore"), "utf-8");
 if (gitignore.includes("data/statements.json")) ok("statements.json is gitignored");
 else warn("Add data/statements.json to .gitignore before pushing to a public repo");
+
+for (const f of ["fixed_charges.json", "living_budget.json", "excluded_transactions.json"]) {
+  if (existsSync(path.join(dataDir, f))) {
+    warn(`${f} still present locally — seed Supabase then remove (should not be committed)`);
+  } else {
+    ok(`No committed ${f} (user data belongs in Supabase)`);
+  }
+}
+
+if (existsSync(path.join(dataDir, "statements.json"))) {
+  ok("Local statements.json exists (optional — use scripts/seed-supabase.mjs to upload)");
+}
 
 console.log("\nFinance deploy checklist\n");
 for (const c of checks) {

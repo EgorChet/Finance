@@ -1,7 +1,9 @@
 import * as local from "./local.js";
 import * as supabase from "./supabase.js";
 
-const useSupabase = process.env.STORAGE === "supabase" && supabase.supabaseConfigured();
+/** Use Supabase whenever credentials are set; set STORAGE=local to force file storage for offline dev. */
+const useSupabase =
+  supabase.supabaseConfigured() && process.env.STORAGE !== "local";
 
 const store = useSupabase ? supabase : local;
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
  * One-time upload of local data/*.json into Supabase app_state.
+ * Missing files are seeded with empty defaults — all user data lives in Supabase after this.
  *
  * Usage:
  *   SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/seed-supabase.mjs
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -20,13 +21,24 @@ if (!url || !key) {
   process.exit(1);
 }
 
+const EMPTY = {
+  statements: { statements: {}, updated_at: null },
+  rules: {},
+  review: { reviewed_transactions: [], reviewed_merchants: [] },
+  living_budget: { segments: [], month_topups: [], updated_at: null },
+  fixed_charges: { charges: [], updated_at: null },
+  exclusions: { entries: [], restored_keys: [], updated_at: null },
+  calendar: { events: [], updated_at: null },
+};
+
 const rows = [
   { id: "statements", file: "statements.json" },
   { id: "rules", file: "merchant_rules.json" },
   { id: "review", file: "review_progress.json" },
-  { id: "living_budget", file: "living_budget.json" },
-  { id: "fixed_charges", file: "fixed_charges.json" },
-  { id: "exclusions", file: "excluded_transactions.json" },
+  { id: "living_budget", file: "living_budget.json", alt: "user_living_budget.json" },
+  { id: "fixed_charges", file: "fixed_charges.json", alt: "user_fixed_charges.json" },
+  { id: "exclusions", file: "excluded_transactions.json", alt: "user_exclusions.json" },
+  { id: "calendar", file: "user_calendar.json" },
 ];
 
 async function upsert(id, data) {
@@ -46,10 +58,21 @@ async function upsert(id, data) {
   console.log(`✓ ${id}`);
 }
 
-for (const { id, file } of rows) {
-  const filePath = path.join(dataDir, file);
-  const data = JSON.parse(readFileSync(filePath, "utf-8"));
-  await upsert(id, data);
+function loadRow({ id, file, alt }) {
+  for (const name of [file, alt].filter(Boolean)) {
+    const filePath = path.join(dataDir, name);
+    if (existsSync(filePath)) {
+      console.log(`  → ${name}`);
+      return JSON.parse(readFileSync(filePath, "utf-8"));
+    }
+  }
+  console.log(`  → (empty default)`);
+  return EMPTY[id];
 }
 
-console.log("Done — production API can now read your data from Supabase.");
+for (const row of rows) {
+  const data = loadRow(row);
+  await upsert(row.id, data);
+}
+
+console.log("Done — app data is in Supabase.");

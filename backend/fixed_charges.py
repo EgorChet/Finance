@@ -1,15 +1,11 @@
 """Recurring monthly charges applied on top of card statement totals."""
 from __future__ import annotations
 
-import json
 from dataclasses import replace
 from datetime import date
-from pathlib import Path
 
 from analyzer import SpendingReport, analyze_spending
 from models import Transaction
-
-FIXED_CHARGES_PATH = Path(__file__).resolve().parent.parent / "data" / "fixed_charges.json"
 
 # Matches default pace card cycle start; configured charges land on this day each month.
 DEFAULT_BILLING_CYCLE_DAY = 10
@@ -56,11 +52,8 @@ def _normalize_charge(charge: dict) -> dict:
 
 
 def _load_charges() -> list[dict]:
-    if not FIXED_CHARGES_PATH.exists():
-        return []
-    with FIXED_CHARGES_PATH.open(encoding="utf-8") as f:
-        data = json.load(f)
-    return [_normalize_charge(c) for c in data.get("charges", [])]
+    """Fixed charges are applied by the Node API from Supabase, not local files."""
+    return []
 
 
 def month_key(billing_date: date | str | None) -> str | None:

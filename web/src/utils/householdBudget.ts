@@ -1,5 +1,6 @@
 import { rollupCategory } from "../categories";
 import type { Transaction } from "../types";
+import { parseInstallment } from "./transaction";
 import { roundMoney } from "./format";
 
 const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
@@ -119,6 +120,13 @@ export function pendingEverydayTransactions(transactions: Transaction[]): Transa
 
 export function isConfiguredChargeTransaction(tx: Transaction): boolean {
   return tx.notes?.startsWith("fixed_charge:") === true;
+}
+
+/** Configured Extra charges and installment payment rows — hidden in Browse by default. */
+export function isSystemRecurringTransaction(tx: Transaction): boolean {
+  if (isConfiguredChargeTransaction(tx)) return true;
+  if (parseInstallment(tx.notes)) return true;
+  return false;
 }
 
 /** Everyday charges that came from the uploaded Visa export (not Extra charges). */

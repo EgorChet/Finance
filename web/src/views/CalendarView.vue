@@ -362,21 +362,8 @@ function selectDate(date: string, inMonth: boolean) {
     viewMonth.value = d.getMonth();
   }
 
-  const dayEvents = eventsOnDate(events.value, date);
   scrollToEvents();
-
-  if (auth.isDemo) return;
-
-  if (dayEvents.length === 1) {
-    startEdit(dayEvents[0]!);
-  } else if (dayEvents.length === 0) {
-    if (auth.isDemo) return;
-    editingEvent.value = null;
-    showForm.value = true;
-    scrollToForm();
-  } else {
-    closeForm();
-  }
+  closeForm();
 }
 
 function startEdit(ev: CalendarEvent) {

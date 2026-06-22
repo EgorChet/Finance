@@ -298,6 +298,10 @@ button {
   max-width: 7rem;
 }
 
+.recurring-card-actions--inline {
+  margin: 0 0 0.65rem;
+}
+
 .living-budget-section {
   margin-bottom: 1.5rem;
 }
@@ -704,10 +708,6 @@ button {
   word-break: break-word;
 }
 
-.everyday-breakdown-txs--pending {
-  margin-top: 0.25rem;
-}
-
 .everyday-breakdown-overlay {
   align-items: flex-end;
   padding: 0;
@@ -792,35 +792,6 @@ button {
   min-height: 0;
   min-width: 0;
   -webkit-overflow-scrolling: touch;
-}
-
-.everyday-breakdown-category .cost-breakdown-row > span:first-child {
-  min-width: 0;
-  flex: 1;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.everyday-breakdown-category .cost-breakdown-amount {
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.everyday-breakdown-category--open .cost-breakdown-row {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-}
-
-.everyday-breakdown-txs {
-  margin: 0.35rem 0 0.5rem;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.everyday-breakdown-txs .tx-row,
-.everyday-breakdown-txs .tx-row-top,
-.everyday-breakdown-txs .tx-row-meta {
-  min-width: 0;
-  max-width: 100%;
 }
 
 .section-title {
@@ -2516,6 +2487,17 @@ button {
   margin-bottom: 1rem;
 }
 
+.mappings-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mappings-toolbar-row .mappings-search {
+  flex: 1;
+  min-width: 0;
+}
+
 .browse-filters {
   display: flex;
   flex-direction: column;
@@ -2525,6 +2507,22 @@ button {
 
 .browse-search {
   width: 100%;
+}
+
+.browse-recurring-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.browse-recurring-toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  cursor: pointer;
 }
 
 .browse-filter-row {
@@ -2626,42 +2624,58 @@ button {
   padding: 1.5rem 0;
 }
 
-.mappings-actions {
-  display: flex;
-  flex-wrap: wrap;
+.mappings-row-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 0.85fr) auto;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  align-items: center;
+  min-width: 0;
 }
 
-.mappings-actions .btn {
-  flex: 1 1 calc(50% - 0.25rem);
-  min-height: 44px;
+.mappings-row-fields .input,
+.mappings-row-fields .select-field {
+  min-width: 0;
+  min-height: 40px;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
 }
 
-.mappings-add-form {
+.mappings-row-done {
+  min-height: 40px;
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+  white-space: nowrap;
+}
+
+.mappings-row-read {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.65rem;
-  margin-bottom: 1rem;
-  padding: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-alt);
+  min-width: 0;
 }
 
-.mappings-add-submit {
-  min-height: 44px;
+.mappings-row-summary {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--text);
 }
 
-.mappings-add-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.mappings-row-summary span:first-child {
+  font-weight: 600;
 }
 
-.mappings-add-actions .btn {
-  flex: 1 1 calc(50% - 0.25rem);
-  min-height: 44px;
+.mappings-row-dot {
+  margin: 0 0.2rem;
+  color: var(--text-muted);
+}
+
+.mappings-row-edit {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0.35rem 0.65rem;
 }
 
 .mappings-list {
@@ -2678,7 +2692,7 @@ button {
 }
 
 .mappings-card-hebrew {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   font-size: 1.05rem;
   font-weight: 600;
 }

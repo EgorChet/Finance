@@ -16,10 +16,6 @@
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <h2 class="overview-page-title">Spending overview</h2>
-    <div v-if="partialCycleBanner && !reportLoading" class="demo-banner partial-statement-banner">
-      {{ partialCycleBanner }}
-      <span v-if="isPartialMonthSelected"> Tap <strong>Everyday spending</strong> for the full breakdown (export + pending + Extra charges).</span>
-    </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <AppLoader
       v-if="reportLoading"
@@ -251,16 +247,6 @@ const partialStatementActive = computed(() => isPartialForOpenCycle.value);
 const isLiveTransactionView = computed(
   () => isLiveCycleSelected.value || isPartialForOpenCycle.value,
 );
-
-const partialCycleBanner = computed(() => {
-  if (partialStatementActive.value) {
-    return "Partial snapshot for this cycle — pace and categories from your latest export. Re-upload anytime; choose Final when the bill is complete.";
-  }
-  if (isLiveCycleSelected.value && !findPartialMonth(months.value, activeCycleStart.value!, cycleDay.value)) {
-    return "No statement yet — enter spending below or upload a partial export from the bank.";
-  }
-  return "";
-});
 
 const selectedOpenCycle = computed(() =>
   displayMonths.value.find((m) => m.key === selectedMonth.value) ?? null,

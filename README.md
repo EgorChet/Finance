@@ -11,7 +11,7 @@ Parse Leumi Visa exports (Hebrew), summarize spending in English, remember month
 pip install -r requirements.txt
 uvicorn analyzer_api.main:app --port 8001
 
-# 2. Node API (new terminal)
+# 2. Node API (new terminal) — copy .env.example to .env and set Supabase keys
 cd api && npm install && npm run dev
 
 # 3. Vue app (new terminal)
@@ -37,21 +37,25 @@ When deployed, set `AUTH_PASSWORD` and `AUTH_SECRET` on the API (Render).
 
 Locally, leave `AUTH_PASSWORD` empty to skip login.
 
-## Data files
+## Data
 
-| Path | Purpose |
-|------|---------|
-| `data/statements.json` | Analyzed monthly bills |
-| `data/merchant_rules.json` | Your English names + categories per place |
-| `data/review_progress.json` | Review queue progress |
-| `statements/*.xlsx` | Raw bank exports (`YYYY-MM-visa-2553.xlsx`) |
-| `fixed_charges.json` | Recurring monthly charges added on top of card totals |
+All personal data (statements, merchant rules, fixed charges, living budget, exclusions, calendar) lives in **Supabase** (`app_state` table). Nothing is hardcoded in the repo.
+
+For local dev, copy `.env.example` → `.env` and set `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`. The API reads and writes through Supabase automatically.
+
+To seed Supabase from any local JSON you still have on disk:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/seed-supabase.mjs
+```
 
 Put `.xlsx` files in `statements/` and click **Sync** in the app, or run:
 
 ```bash
 python cli.py --sync
 ```
+
+(`cli.py` saves to local `data/statements.json` only — use the web app + Supabase for the full workflow.)
 
 ## Deploy (free tier, password-protected)
 
@@ -81,6 +85,6 @@ web/            Vue 3 SPA
 api/            Node.js Express API
 analyzer_api/   Python FastAPI wrapper
 backend/        Core Python parsing & analysis
-data/           JSON persistence
+data/           Runtime cache only (gitignored); Supabase is source of truth
 statements/     Bank .xlsx exports (gitignored)
 ```

@@ -8,12 +8,21 @@ output/
 statements/*.xlsx
 *.xlsx
 
-# Personal finance data — use Supabase in production, never commit
+# Personal finance data — lives in Supabase; local copies are runtime cache only
 data/statements.json
 data/merchant_rules.json
 data/review_progress.json
 data/translation_cache.json
 data/fx_fallback.json
+data/fixed_charges.json
+data/living_budget.json
+data/excluded_transactions.json
+data/user_fixed_charges.json
+data/user_living_budget.json
+data/user_exclusions.json
+data/user_calendar.json
+data/kaspa_price.json
+data/fxcn_price.json
 
 node_modules/
 api/dist/

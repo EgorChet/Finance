@@ -8,63 +8,80 @@
       subtitle="Fetching your saved labels and categories"
     />
     <template v-else>
-    <div v-if="statusMessage" class="demo-banner" :class="{ 'import-error': statusIsError }">
-      {{ statusMessage }}
-    </div>
-    <div class="mappings-toolbar">
-      <input
-        v-model="searchQuery"
-        class="input mappings-search"
-        type="search"
-        placeholder="Search Hebrew, English, or category"
-        autocomplete="off"
-      />
-      <p class="mappings-search-meta">
-        <template v-if="searchQuery.trim()">
-          {{ filteredRows.length }} of {{ rows.length }} mappings
-        </template>
-        <template v-else>{{ rows.length }} mappings</template>
-      </p>
-    </div>
-    <div v-if="!auth.isDemo" class="mappings-actions">
-      <button class="btn btn-primary" :disabled="saving || !hasUnsavedChanges" @click="save">
-        {{ saveButtonLabel }}
-      </button>
-      <button class="btn" @click="exportJson">Export</button>
-      <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
-        {{ importing ? "Importing…" : "Import" }}
-      </button>
-      <button class="btn" type="button" @click="showAddForm = !showAddForm">
-        {{ showAddForm ? "Cancel" : "Add mapping" }}
-      </button>
-      <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
-    </div>
-    <div v-if="showAddForm && !auth.isDemo" class="mappings-add-form">
-      <input v-model="newHebrew" class="input" placeholder="Hebrew name" />
-      <input v-model="newEnglish" class="input" placeholder="English name" />
-      <CategorySelect v-model="newCategory" :options="categories" allow-empty empty-label="Category" />
-      <button class="btn btn-primary mappings-add-submit" @click="addRule">Add</button>
-    </div>
-    <div v-if="filteredRows.length" class="mappings-list">
-      <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-        <p class="mappings-card-hebrew" dir="rtl">{{ row.Hebrew }}</p>
-        <div class="field-group">
-          <label class="field-label">English</label>
-          <input v-model="row.English" class="input" :readonly="auth.isDemo" />
-        </div>
-        <div class="field-group">
-          <label class="field-label">Category</label>
-          <CategorySelect
-            v-model="row.Category"
-            :options="categories"
-            :disabled="auth.isDemo"
-            allow-empty
-            empty-label="Uncategorized"
+      <div v-if="statusMessage" class="demo-banner" :class="{ 'import-error': statusIsError }">
+        {{ statusMessage }}
+      </div>
+      <div class="mappings-toolbar">
+        <div class="mappings-toolbar-row">
+          <input
+            v-model="searchQuery"
+            class="input mappings-search"
+            type="search"
+            placeholder="Search Hebrew, English, or category"
+            autocomplete="off"
           />
+          <template v-if="!auth.isDemo">
+            <button type="button" class="btn btn-icon" aria-label="Export mappings" @click="exportJson">↓</button>
+            <button
+              type="button"
+              class="btn btn-icon"
+              aria-label="Import mappings"
+              :disabled="importing"
+              @click="importInput?.click()"
+            >
+              ↑
+            </button>
+            <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
+          </template>
         </div>
-      </article>
-    </div>
-    <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
+        <p class="mappings-search-meta">
+          <template v-if="searchQuery.trim()">
+            {{ filteredRows.length }} of {{ rows.length }} mappings
+          </template>
+          <template v-else>{{ rows.length }} mappings</template>
+        </p>
+      </div>
+      <div v-if="filteredRows.length" class="mappings-list">
+        <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
+          <p class="mappings-card-hebrew" dir="rtl">{{ row.Hebrew }}</p>
+
+          <div v-if="auth.isDemo || editingHebrew !== row.Hebrew" class="mappings-row-read">
+            <p class="mappings-row-summary">
+              <span>{{ row.English || "—" }}</span>
+              <span v-if="row.Category" class="mappings-row-dot">·</span>
+              <span v-if="row.Category">{{ row.Category }}</span>
+            </p>
+            <button
+              v-if="!auth.isDemo"
+              type="button"
+              class="btn btn-ghost mappings-row-edit"
+              :disabled="!!savingHebrew"
+              @click="startEdit(row.Hebrew)"
+            >
+              Edit
+            </button>
+          </div>
+
+          <div v-else class="mappings-row-fields">
+            <input v-model="row.English" class="input" placeholder="English name" />
+            <CategorySelect
+              v-model="row.Category"
+              :options="categories"
+              allow-empty
+              empty-label="Uncategorized"
+            />
+            <button
+              type="button"
+              class="btn btn-primary mappings-row-done"
+              :disabled="savingHebrew === row.Hebrew"
+              @click="doneEdit(row)"
+            >
+              {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
+            </button>
+          </div>
+        </article>
+      </div>
+      <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
     </template>
   </div>
 </template>
@@ -83,20 +100,17 @@ const categories = CATEGORY_PICKLIST;
 const auth = useAuthStore();
 const rows = ref<MerchantRow[]>([]);
 const loading = ref(true);
-const hydrated = ref(false);
-const savedSnapshot = ref("");
-const saving = ref(false);
+const savedSnapshot = ref("{}");
+const savingHebrew = ref<string | null>(null);
 const importing = ref(false);
 const importInput = ref<HTMLInputElement | null>(null);
 const statusMessage = ref("");
 const statusIsError = ref(false);
-const newHebrew = ref("");
-const newEnglish = ref("");
-const newCategory = ref("");
 const searchQuery = ref("");
-const showAddForm = ref(false);
-/** Hebrew keys that matched the last search — stays stable while you edit fields. */
+const editingHebrew = ref<string | null>(null);
 const matchedHebrewKeys = ref<string[] | null>(null);
+
+let statusTimer: ReturnType<typeof setTimeout> | null = null;
 
 function rowMatchesQuery(row: MerchantRow, q: string): boolean {
   return (
@@ -125,41 +139,8 @@ const filteredRows = computed(() => {
 
 type RuleEntry = { english: string; category?: string };
 
-function serializeRules(rules: Record<string, RuleEntry>): string {
-  return JSON.stringify(rules, Object.keys(rules).sort());
-}
-
-function syncSnapshot() {
-  savedSnapshot.value = serializeRules(rulesFromRows());
-}
-
-function getDirtyEntries(): Array<{ hebrew: string; english: string; category?: string }> {
-  const current = rulesFromRows();
-  const saved = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
-  const dirty: Array<{ hebrew: string; english: string; category?: string }> = [];
-  for (const [hebrew, rule] of Object.entries(current)) {
-    const prev = saved[hebrew];
-    const category = rule.category || undefined;
-    const prevCategory = prev?.category || undefined;
-    if (!prev || prev.english !== rule.english || prevCategory !== category) {
-      dirty.push({ hebrew, english: rule.english, category });
-    }
-  }
-  return dirty;
-}
-
-const dirtyCount = computed(() => (hydrated.value ? getDirtyEntries().length : 0));
-const hasUnsavedChanges = computed(() => dirtyCount.value > 0);
-
-const saveButtonLabel = computed(() => {
-  if (saving.value) return "Saving…";
-  if (!hasUnsavedChanges.value) return "Save changes";
-  if (dirtyCount.value === 1) return "Save 1 change";
-  return `Save ${dirtyCount.value} changes`;
-});
-
 function rulesFromRows() {
-  const rules: Record<string, { english: string; category?: string }> = {};
+  const rules: Record<string, RuleEntry> = {};
   for (const row of rows.value) {
     rules[row.Hebrew] = {
       english: row.English.trim(),
@@ -179,14 +160,65 @@ function rowsFromRules(rules: Record<string, { english: string; category?: strin
     .sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
 }
 
+function syncSnapshot() {
+  savedSnapshot.value = JSON.stringify(rulesFromRows(), Object.keys(rulesFromRows()).sort());
+}
+
+function savedEntry(hebrew: string): RuleEntry | undefined {
+  const saved = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
+  return saved[hebrew];
+}
+
+function rowEntry(row: MerchantRow): RuleEntry {
+  return { english: row.English.trim(), category: row.Category || undefined };
+}
+
+function rowIsDirty(hebrew: string): boolean {
+  const row = rows.value.find((r) => r.Hebrew === hebrew);
+  if (!row) return false;
+  const prev = savedEntry(hebrew);
+  const next = rowEntry(row);
+  if (!prev) return true;
+  return prev.english !== next.english || (prev.category || undefined) !== next.category;
+}
+
 function setStatus(message: string, isError = false) {
   statusMessage.value = message;
   statusIsError.value = isError;
+  if (statusTimer) clearTimeout(statusTimer);
+  if (!isError && message) {
+    statusTimer = setTimeout(() => {
+      statusMessage.value = "";
+    }, 2500);
+  }
+}
+
+async function persistRow(hebrew: string): Promise<boolean> {
+  const row = rows.value.find((r) => r.Hebrew === hebrew);
+  if (!row || auth.isDemo) return true;
+  if (!rowIsDirty(hebrew)) return true;
+
+  const token = auth.token || undefined;
+  const entry = { hebrew, english: row.English.trim(), category: row.Category || undefined };
+  savingHebrew.value = hebrew;
+  try {
+    const result = await saveRuleEntry(entry, token);
+    if (!result.ok) throw new Error("Server did not confirm save.");
+    const snap = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
+    snap[hebrew] = { english: entry.english, category: entry.category };
+    savedSnapshot.value = JSON.stringify(snap, Object.keys(snap).sort());
+    return true;
+  } catch (e) {
+    setStatus(e instanceof Error ? e.message : "Save failed", true);
+    return false;
+  } finally {
+    if (savingHebrew.value === hebrew) savingHebrew.value = null;
+  }
 }
 
 async function load() {
   loading.value = true;
-  hydrated.value = false;
+  editingHebrew.value = null;
   setStatus("");
   try {
     const rules = await fetchRules(auth.isDemo, auth.token || undefined);
@@ -197,55 +229,24 @@ async function load() {
     setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
     syncSnapshot();
   } finally {
-    hydrated.value = true;
     loading.value = false;
   }
 }
 
-function addRule() {
-  if (!newHebrew.value.trim()) return;
-  rows.value.push({
-    Hebrew: newHebrew.value.trim(),
-    English: newEnglish.value.trim(),
-    Category: newCategory.value.trim(),
-  });
-  rows.value.sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
-  showAddForm.value = false;
-  refreshSearchMatches();
-  newHebrew.value = "";
-  newEnglish.value = "";
-  newCategory.value = "";
+async function startEdit(hebrew: string) {
+  if (editingHebrew.value && editingHebrew.value !== hebrew) {
+    const ok = await persistRow(editingHebrew.value);
+    if (!ok) return;
+    editingHebrew.value = null;
+  }
+  editingHebrew.value = hebrew;
 }
 
-async function save() {
-  if (auth.isDemo) return;
-  const dirty = getDirtyEntries();
-  if (!dirty.length) {
-    setStatus("No changes to save.");
-    return;
-  }
-
-  saving.value = true;
-  setStatus("");
-  const token = auth.token || undefined;
-  try {
-    if (dirty.length === 1) {
-      const result = await saveRuleEntry(dirty[0], token);
-      if (!result.ok) throw new Error("Server did not confirm save.");
-    } else {
-      const result = await saveRules(rulesFromRows(), token);
-      if (!result.saved) throw new Error("Server did not confirm save.");
-    }
-    const rules = await fetchRules(false, token);
-    rows.value = rowsFromRules(rules);
-    syncSnapshot();
-    refreshSearchMatches();
-    setStatus(dirty.length === 1 ? "Saved 1 mapping." : `Saved ${dirty.length} mappings.`);
-  } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Save failed", true);
-  } finally {
-    saving.value = false;
-  }
+async function doneEdit(row: MerchantRow) {
+  const ok = await persistRow(row.Hebrew);
+  if (!ok) return;
+  editingHebrew.value = null;
+  setStatus("Saved.");
 }
 
 function exportJson() {
@@ -263,6 +264,7 @@ async function importJson(e: Event) {
   if (!file || auth.isDemo) return;
 
   importing.value = true;
+  editingHebrew.value = null;
   setStatus("");
   try {
     const imported = JSON.parse(await file.text()) as Record<string, { english: string; category?: string }>;
@@ -298,7 +300,7 @@ async function importJson(e: Event) {
     rows.value = rowsFromRules(rules);
     syncSnapshot();
     refreshSearchMatches();
-    setStatus(`Imported and saved ${added + updated} mapping${added + updated === 1 ? "" : "s"}.`);
+    setStatus(`Imported ${added + updated} mapping${added + updated === 1 ? "" : "s"}.`);
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Import failed", true);
   } finally {

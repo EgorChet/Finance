@@ -188,11 +188,13 @@ AUTH_PASSWORDS=your-password,wife-password
 
 ## Keep data off GitHub
 
-These files are gitignored — do **not** force-add them:
+Personal data lives in **Supabase**, not in the repo. These paths are gitignored — do **not** force-add them:
 
 - `data/statements.json`
 - `data/merchant_rules.json`
 - `data/review_progress.json`
+- `data/fixed_charges.json`, `data/living_budget.json`, `data/excluded_transactions.json`
+- `data/user_*.json` (local API cache when `STORAGE=local`)
 - `statements/*.xlsx`
 
 If they were committed before, use a **private** repo or remove them from git history before going public.

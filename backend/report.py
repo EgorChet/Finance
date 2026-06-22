@@ -50,7 +50,7 @@ def format_report(report: SpendingReport) -> str:
             lines.append(f"  - {name}")
         lines.append("")
         lines.append(
-            "Tip: add entries in the app under Merchant mappings, or edit data/merchant_rules.json"
+            "Tip: add entries in the app under Merchant mappings"
         )
         lines.append("")
 
