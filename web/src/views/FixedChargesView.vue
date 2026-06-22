@@ -41,28 +41,7 @@
 
       <LivingBudgetSection v-model="livingBudgetSegments" :readonly="auth.isDemo" :disabled="saving" />
 
-      <div v-if="!auth.isDemo" class="recurring-add-toolbar">
-        <button
-          type="button"
-          class="btn"
-          :class="{ 'btn-primary': activeAddForm === 'recurring' }"
-          :disabled="saving"
-          @click="toggleAddForm('recurring')"
-        >
-          {{ activeAddForm === "recurring" ? "Cancel" : "Add recurring bill" }}
-        </button>
-        <button
-          type="button"
-          class="btn"
-          :class="{ 'btn-primary': activeAddForm === 'once' }"
-          :disabled="saving"
-          @click="toggleAddForm('once')"
-        >
-          {{ activeAddForm === "once" ? "Cancel" : "Add one-time charge" }}
-        </button>
-      </div>
-
-      <section v-if="activeAddForm === 'recurring' && !auth.isDemo" class="recurring-add recurring-add--panel">
+      <section v-if="activeAddForm === 'recurring' && !auth.isDemo && recurringEditing" class="recurring-add recurring-add--panel">
         <h3 class="recurring-add-title">New recurring bill</h3>
         <div class="recurring-add-fields">
           <div class="field-group">
@@ -105,7 +84,7 @@
         </div>
       </section>
 
-      <section v-if="activeAddForm === 'once' && !auth.isDemo" class="recurring-add recurring-add--panel">
+      <section v-if="activeAddForm === 'once' && !auth.isDemo && oneTimeEditing" class="recurring-add recurring-add--panel">
         <h3 class="recurring-add-title">New one-time charge</h3>
         <div class="recurring-add-fields">
           <div class="field-group">
@@ -143,10 +122,33 @@
       <p v-if="status" class="recurring-form-error">{{ status }}</p>
 
       <section class="manual-section">
-        <header class="manual-section-header">
-          <h3 class="manual-section-title">Recurring monthly</h3>
-          <p class="manual-section-lead">Rent, loans, subscriptions — same amount every month.</p>
+        <header class="manual-section-header charge-section-header">
+          <div>
+            <h3 class="manual-section-title">Recurring monthly</h3>
+            <p class="manual-section-lead">Rent, loans, subscriptions — same amount every month.</p>
+          </div>
+          <button
+            v-if="!auth.isDemo"
+            type="button"
+            class="btn btn-ghost charge-section-edit-btn"
+            :disabled="saving"
+            @click="toggleRecurringEditing"
+          >
+            {{ recurringEditing ? "Done" : "Edit" }}
+          </button>
         </header>
+
+        <div v-if="recurringEditing && !auth.isDemo" class="recurring-add-toolbar recurring-add-toolbar--inline">
+          <button
+            type="button"
+            class="btn"
+            :class="{ 'btn-primary': activeAddForm === 'recurring' }"
+            :disabled="saving"
+            @click="toggleAddForm('recurring')"
+          >
+            {{ activeAddForm === "recurring" ? "Cancel" : "Add recurring bill" }}
+          </button>
+        </div>
 
         <div v-if="recurringGroups.length" class="recurring-groups">
           <section v-for="group in recurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
@@ -155,17 +157,17 @@
                 <h3 class="recurring-card-title">{{ group.name_en }}</h3>
                 <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
               </div>
-              <div v-if="!auth.isDemo" class="recurring-card-actions">
+              <div v-if="recurringEditing && !auth.isDemo" class="recurring-card-actions">
                 <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
                 <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
-                  Remove
+                  Remove bill
                 </button>
               </div>
             </header>
 
             <ul class="charge-compact-list">
               <li v-for="seg in group.segments" :key="segmentKey(seg)" class="charge-compact-row-wrap">
-                <div v-if="!isEditingCharge(seg)" class="charge-compact-row">
+                <div v-if="!recurringEditing || auth.isDemo" class="charge-compact-row">
                   <div class="charge-compact-main">
                     <span class="charge-compact-amount">{{ formatIls(seg.amount) }}</span>
                     <span class="charge-compact-meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
@@ -173,15 +175,6 @@
                   <span class="recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
                     {{ statusLabel(seg) }}
                   </span>
-                  <button
-                    v-if="!auth.isDemo"
-                    type="button"
-                    class="btn btn-ghost charge-compact-edit"
-                    :disabled="saving"
-                    @click="startEditCharge(seg)"
-                  >
-                    Edit
-                  </button>
                 </div>
 
                 <article v-else class="recurring-segment-card">
@@ -218,7 +211,6 @@
                     </div>
 
                     <div class="recurring-segment-actions">
-                      <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(seg)">Done</button>
                       <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
                         Delete period
                       </button>
@@ -234,17 +226,40 @@
       </section>
 
       <section class="manual-section">
-        <header class="manual-section-header">
-          <h3 class="manual-section-title">One-time charges</h3>
-          <p class="manual-section-lead">
-            Purchases on another card, cash, or anything that happens once — shown on the exact date in spending.
-          </p>
+        <header class="manual-section-header charge-section-header">
+          <div>
+            <h3 class="manual-section-title">One-time charges</h3>
+            <p class="manual-section-lead">
+              Purchases on another card, cash, or anything that happens once — shown on the exact date in spending.
+            </p>
+          </div>
+          <button
+            v-if="!auth.isDemo"
+            type="button"
+            class="btn btn-ghost charge-section-edit-btn"
+            :disabled="saving"
+            @click="toggleOneTimeEditing"
+          >
+            {{ oneTimeEditing ? "Done" : "Edit" }}
+          </button>
         </header>
+
+        <div v-if="oneTimeEditing && !auth.isDemo" class="recurring-add-toolbar recurring-add-toolbar--inline">
+          <button
+            type="button"
+            class="btn"
+            :class="{ 'btn-primary': activeAddForm === 'once' }"
+            :disabled="saving"
+            @click="toggleAddForm('once')"
+          >
+            {{ activeAddForm === "once" ? "Cancel" : "Add one-time charge" }}
+          </button>
+        </div>
 
         <div v-if="oneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
             <li v-for="charge in oneTimeCharges" :key="segmentKey(charge)" class="charge-compact-row-wrap">
-              <div v-if="auth.isDemo || !isEditingCharge(charge)" class="charge-compact-row">
+              <div v-if="auth.isDemo || !oneTimeEditing" class="charge-compact-row">
                 <div class="charge-compact-main">
                   <strong class="charge-compact-name">{{ charge.name_en }}</strong>
                   <span class="charge-compact-meta">
@@ -254,24 +269,6 @@
                 <span class="recurring-status" :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)">
                   {{ oneTimeStatusLabel(charge.charge_date!) }}
                 </span>
-                <button
-                  v-if="!auth.isDemo"
-                  type="button"
-                  class="btn btn-ghost charge-compact-edit"
-                  :disabled="saving"
-                  @click="startEditCharge(charge)"
-                >
-                  Edit
-                </button>
-                <button
-                  v-if="!auth.isDemo"
-                  type="button"
-                  class="btn btn-danger charge-compact-edit"
-                  :disabled="saving"
-                  @click="removeOneTime(charge)"
-                >
-                  Delete
-                </button>
               </div>
 
               <article v-else class="recurring-segment-card">
@@ -306,7 +303,6 @@
                   </div>
                 </div>
                 <div class="recurring-segment-actions">
-                  <button type="button" class="btn" :disabled="saving" @click="stopEditCharge(charge)">Done</button>
                   <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
                     Delete
                   </button>
@@ -375,7 +371,8 @@ const savedBudgetSnapshot = ref("");
 
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
-const editingChargeKeys = ref<Set<string>>(new Set());
+const recurringEditing = ref(false);
+const oneTimeEditing = ref(false);
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -471,6 +468,9 @@ async function discardChanges() {
   if (!ok) return;
   charges.value = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
   livingBudgetSegments.value = JSON.parse(savedBudgetSnapshot.value) as LivingBudgetSegment[];
+  recurringEditing.value = false;
+  oneTimeEditing.value = false;
+  activeAddForm.value = null;
   status.value = "";
   saveStatus.value = "";
 }
@@ -536,18 +536,18 @@ async function runPersist(): Promise<boolean> {
   }
 }
 
-function isEditingCharge(charge: ConfiguredCharge): boolean {
-  return editingChargeKeys.value.has(segmentKey(charge));
+function toggleRecurringEditing() {
+  recurringEditing.value = !recurringEditing.value;
+  if (!recurringEditing.value) {
+    if (activeAddForm.value === "recurring") activeAddForm.value = null;
+  }
 }
 
-function startEditCharge(charge: ConfiguredCharge) {
-  editingChargeKeys.value = new Set(editingChargeKeys.value).add(segmentKey(charge));
-}
-
-function stopEditCharge(charge: ConfiguredCharge) {
-  const next = new Set(editingChargeKeys.value);
-  next.delete(segmentKey(charge));
-  editingChargeKeys.value = next;
+function toggleOneTimeEditing() {
+  oneTimeEditing.value = !oneTimeEditing.value;
+  if (!oneTimeEditing.value) {
+    if (activeAddForm.value === "once") activeAddForm.value = null;
+  }
 }
 
 function throughLabel(throughMonth: string): string {
@@ -643,7 +643,6 @@ async function removeSegment(seg: ConfiguredCharge) {
   });
   if (!ok) return;
   const key = segmentKey(seg);
-  editingChargeKeys.value.delete(key);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
 }
@@ -658,11 +657,6 @@ async function removeCharge(id: string) {
     tone: "danger",
   });
   if (!ok) return;
-  const next = new Set(editingChargeKeys.value);
-  if (group) {
-    for (const seg of group.segments) next.delete(segmentKey(seg));
-  }
-  editingChargeKeys.value = next;
   charges.value = charges.value.filter((c) => c.id !== id || isOneTimeCharge(c));
   await persistCharges();
 }
@@ -676,7 +670,6 @@ async function removeOneTime(charge: ConfiguredCharge) {
   });
   if (!ok) return;
   const key = segmentKey(charge);
-  editingChargeKeys.value.delete(key);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
 }

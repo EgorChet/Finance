@@ -2868,6 +2868,10 @@ table.rules select {
   margin-bottom: 1rem;
 }
 
+.recurring-add-toolbar--inline {
+  margin-top: 0.75rem;
+}
+
 .recurring-add-toolbar .btn {
   flex: 1;
   min-width: 10rem;
