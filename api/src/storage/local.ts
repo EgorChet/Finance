@@ -121,9 +121,13 @@ export async function readLivingBudget(): Promise<LivingBudgetData> {
   try {
     const raw = await fs.readFile(LIVING_BUDGET_PATH, "utf-8");
     const data = JSON.parse(raw) as LivingBudgetData;
-    return { segments: data.segments || [], updated_at: data.updated_at ?? null };
+    return {
+      segments: data.segments || [],
+      month_topups: data.month_topups || [],
+      updated_at: data.updated_at ?? null,
+    };
   } catch {
-    return { segments: [], updated_at: null };
+    return { segments: [], month_topups: [], updated_at: null };
   }
 }
 

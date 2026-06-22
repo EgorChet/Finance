@@ -135,8 +135,16 @@ export interface LivingBudgetSegment {
   through_month: string;
 }
 
+/** One-off extra cap for a single calendar month (added on top of the active period). */
+export interface LivingBudgetMonthTopup {
+  month: string;
+  extra: number;
+  note?: string;
+}
+
 export interface LivingBudgetData {
   segments: LivingBudgetSegment[];
+  month_topups?: LivingBudgetMonthTopup[];
   updated_at?: string | null;
 }
 

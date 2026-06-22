@@ -261,6 +261,30 @@ button {
   margin-top: 0.75rem;
 }
 
+.living-budget-topups-read,
+.living-budget-topups-edit {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.living-budget-topups-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.living-budget-topups-lead {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.living-budget-topup-note {
+  flex: 1;
+  min-width: 12rem;
+}
+
 .living-budget-section {
   margin-bottom: 1.5rem;
 }

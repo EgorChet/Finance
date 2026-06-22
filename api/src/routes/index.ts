@@ -48,6 +48,7 @@ import {
   validateFixedCharges,
 } from "../services/fixedCharges.js";
 import {
+  loadLivingBudgetData,
   loadLivingBudgetSegments,
   refreshLivingBudgetCache,
   saveLivingBudget,
@@ -64,7 +65,7 @@ import {
   regenerateFeedToken,
   updateCalendarEvent,
 } from "../services/calendarService.js";
-import type { FixedCharge, LivingBudgetSegment, MerchantRules } from "../types.js";
+import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, MerchantRules } from "../types.js";
 import { userIdFromRequest } from "../auth.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -196,23 +197,25 @@ router.put("/fixed-charges", async (req, res) => {
 });
 
 router.get("/living-budget", async (_req, res) => {
-  res.json({ segments: loadLivingBudgetSegments() });
+  const data = loadLivingBudgetData();
+  res.json({ segments: data.segments, month_topups: data.month_topups || [] });
 });
 
 router.put("/living-budget", async (req, res) => {
-  const body = req.body as { segments?: LivingBudgetSegment[] };
+  const body = req.body as { segments?: LivingBudgetSegment[]; month_topups?: LivingBudgetMonthTopup[] };
   const segments = body.segments;
+  const monthTopups = Array.isArray(body.month_topups) ? body.month_topups : [];
   if (!Array.isArray(segments)) {
     res.status(400).json({ error: "segments array required" });
     return;
   }
-  const error = validateLivingBudget(segments);
+  const error = validateLivingBudget(segments, monthTopups);
   if (error) {
     res.status(400).json({ error });
     return;
   }
-  const saved = await saveLivingBudget(segments);
-  res.json({ saved: true, segments: saved });
+  const saved = await saveLivingBudget(segments, monthTopups);
+  res.json({ saved: true, segments: saved.segments, month_topups: saved.month_topups || [] });
 });
 
 router.get("/exclusions", async (_req, res) => {

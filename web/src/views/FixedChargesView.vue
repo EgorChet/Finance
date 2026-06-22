@@ -39,7 +39,12 @@
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
 
-      <LivingBudgetSection v-model="livingBudgetSegments" :readonly="auth.isDemo" :disabled="saving" />
+      <LivingBudgetSection
+        v-model:segments="livingBudgetSegments"
+        v-model:month-topups="livingBudgetMonthTopups"
+        :readonly="auth.isDemo"
+        :disabled="saving"
+      />
 
       <section v-if="activeAddForm === 'recurring' && !auth.isDemo && recurringEditing" class="recurring-add recurring-add--panel">
         <h3 class="recurring-add-title">New recurring bill</h3>
@@ -350,9 +355,11 @@ import {
   ymToLabel,
 } from "../utils/fixedCharges";
 import {
+  type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
+  normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
-  serializeLivingBudgetSegments,
+  serializeLivingBudget,
   validateLivingBudget,
 } from "../utils/livingBudget";
 
@@ -366,6 +373,7 @@ const saveStatus = ref("");
 const saveError = ref(false);
 const charges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
+const livingBudgetMonthTopups = ref<LivingBudgetMonthTopup[]>([]);
 const savedSnapshot = ref("");
 const savedBudgetSnapshot = ref("");
 
@@ -422,13 +430,13 @@ function snapshot(data: ConfiguredCharge[]): string {
   );
 }
 
-function budgetSnapshot(data: LivingBudgetSegment[]): string {
-  return serializeLivingBudgetSegments(data);
+function budgetSnapshot(segments: LivingBudgetSegment[], monthTopups: LivingBudgetMonthTopup[]): string {
+  return serializeLivingBudget({ segments, month_topups: monthTopups });
 }
 
 function syncSavedSnapshots() {
   savedSnapshot.value = snapshot(charges.value);
-  savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value);
+  savedBudgetSnapshot.value = budgetSnapshot(livingBudgetSegments.value, livingBudgetMonthTopups.value);
 }
 
 function isChargesDirty(): boolean {
@@ -436,7 +444,7 @@ function isChargesDirty(): boolean {
 }
 
 function isBudgetDirty(): boolean {
-  return budgetSnapshot(livingBudgetSegments.value) !== savedBudgetSnapshot.value;
+  return budgetSnapshot(livingBudgetSegments.value, livingBudgetMonthTopups.value) !== savedBudgetSnapshot.value;
 }
 
 function isDirty(): boolean {
@@ -467,7 +475,12 @@ async function discardChanges() {
   });
   if (!ok) return;
   charges.value = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
-  livingBudgetSegments.value = JSON.parse(savedBudgetSnapshot.value) as LivingBudgetSegment[];
+  const savedBudget = JSON.parse(savedBudgetSnapshot.value) as {
+    segments: LivingBudgetSegment[];
+    month_topups?: LivingBudgetMonthTopup[];
+  };
+  livingBudgetSegments.value = savedBudget.segments;
+  livingBudgetMonthTopups.value = savedBudget.month_topups || [];
   recurringEditing.value = false;
   oneTimeEditing.value = false;
   activeAddForm.value = null;
@@ -489,7 +502,7 @@ async function runPersist(): Promise<boolean> {
   if (!isDirty()) return true;
 
   if (isBudgetDirty()) {
-    const budgetError = validateLivingBudget(livingBudgetSegments.value);
+    const budgetError = validateLivingBudget(livingBudgetSegments.value, livingBudgetMonthTopups.value);
     if (budgetError) {
       showSaveStatus(budgetError, true);
       status.value = budgetError;
@@ -516,10 +529,14 @@ async function runPersist(): Promise<boolean> {
     if (isBudgetDirty()) {
       tasks.push(
         saveLivingBudget(
-          livingBudgetSegments.value.map((s) => normalizeLivingBudgetSegment(s)),
+          {
+            segments: livingBudgetSegments.value.map((s) => normalizeLivingBudgetSegment(s)),
+            month_topups: livingBudgetMonthTopups.value.map((t) => normalizeLivingBudgetMonthTopup(t)),
+          },
           auth.token || undefined,
         ).then((data) => {
           livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
+          livingBudgetMonthTopups.value = (data.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
         }),
       );
     }
@@ -792,8 +809,10 @@ async function load() {
     try {
       const budgetData = await fetchLivingBudget(auth.isDemo, token);
       livingBudgetSegments.value = budgetData.segments.map((s) => normalizeLivingBudgetSegment(s));
+      livingBudgetMonthTopups.value = (budgetData.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
     } catch (budgetErr) {
       livingBudgetSegments.value = [];
+      livingBudgetMonthTopups.value = [];
       error.value = `Could not load living budget: ${budgetErr}. Redeploy the Render API if you recently added this feature.`;
     }
     syncSavedSnapshots();
@@ -801,6 +820,7 @@ async function load() {
     error.value = String(e);
     charges.value = [];
     livingBudgetSegments.value = [];
+    livingBudgetMonthTopups.value = [];
   } finally {
     loading.value = false;
   }

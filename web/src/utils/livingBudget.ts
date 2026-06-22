@@ -19,6 +19,18 @@ export interface LivingBudgetSegment {
   through_month: string;
 }
 
+/** One-off extra cap for a single calendar month (added on top of the active period). */
+export interface LivingBudgetMonthTopup {
+  month: string;
+  extra: number;
+  note?: string;
+}
+
+export interface LivingBudgetData {
+  segments: LivingBudgetSegment[];
+  month_topups?: LivingBudgetMonthTopup[];
+}
+
 export function normalizeLivingBudgetSegment(segment: LivingBudgetSegment): LivingBudgetSegment {
   return {
     amount: roundMoney(segment.amount),
@@ -36,7 +48,36 @@ export function livingBudgetSegmentStableKey(segment: LivingBudgetSegment): stri
   return `${segment.from_month}|${segment.through_month}`;
 }
 
-export function livingBudgetForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
+export function normalizeLivingBudgetMonthTopup(topup: LivingBudgetMonthTopup): LivingBudgetMonthTopup {
+  const note = topup.note?.trim();
+  return {
+    month: topup.month.trim(),
+    extra: roundMoney(topup.extra),
+    ...(note ? { note } : {}),
+  };
+}
+
+export function livingBudgetMonthTopupStableKey(topup: LivingBudgetMonthTopup): string {
+  return topup.month;
+}
+
+export function monthTopupExtraForMonth(ym: string, monthTopups: LivingBudgetMonthTopup[]): number {
+  return roundMoney(
+    monthTopups.filter((t) => t.month === ym).reduce((sum, t) => sum + normalizeLivingBudgetMonthTopup(t).extra, 0),
+  );
+}
+
+export function livingBudgetForMonth(
+  ym: string,
+  segments: LivingBudgetSegment[],
+  monthTopups: LivingBudgetMonthTopup[] = [],
+): number | null {
+  const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
+  if (!match) return null;
+  return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE + monthTopupExtraForMonth(ym, monthTopups));
+}
+
+export function livingBudgetBaseForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
   if (!match) return null;
   return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE);
@@ -46,7 +87,7 @@ function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolea
   return a.from_month <= b.through_month && b.from_month <= a.through_month;
 }
 
-export function validateLivingBudget(segments: LivingBudgetSegment[]): string | null {
+export function validateLivingBudgetSegments(segments: LivingBudgetSegment[]): string | null {
   if (!segments.length) return "Add at least one budget period before saving.";
   for (const raw of segments) {
     const segment = normalizeLivingBudgetSegment(raw);
@@ -69,10 +110,52 @@ export function validateLivingBudget(segments: LivingBudgetSegment[]): string | 
   return null;
 }
 
+export function validateLivingBudgetMonthTopups(
+  monthTopups: LivingBudgetMonthTopup[],
+  segments: LivingBudgetSegment[],
+): string | null {
+  const seen = new Set<string>();
+  for (const raw of monthTopups) {
+    const topup = normalizeLivingBudgetMonthTopup(raw);
+    if (!/^\d{4}-\d{2}$/.test(topup.month)) {
+      return "Each monthly extra needs a valid month (YYYY-MM).";
+    }
+    if (!Number.isFinite(topup.extra) || topup.extra <= 0) {
+      return "Each monthly extra must be a positive amount.";
+    }
+    if (seen.has(topup.month)) {
+      return `Only one extra amount per month — merge duplicates for ${ymToLabel(topup.month)}.`;
+    }
+    seen.add(topup.month);
+    if (livingBudgetBaseForMonth(topup.month, segments) === null) {
+      return `No base budget covers ${ymToLabel(topup.month)} — add a period first.`;
+    }
+  }
+  return null;
+}
+
+export function validateLivingBudget(
+  segments: LivingBudgetSegment[],
+  monthTopups: LivingBudgetMonthTopup[] = [],
+): string | null {
+  const segmentError = validateLivingBudgetSegments(segments);
+  if (segmentError) return segmentError;
+  return validateLivingBudgetMonthTopups(monthTopups, segments);
+}
+
 export function serializeLivingBudgetSegments(segments: LivingBudgetSegment[]): string {
   return JSON.stringify(
     segments.map(normalizeLivingBudgetSegment).sort((a, b) => a.from_month.localeCompare(b.from_month)),
   );
+}
+
+export function serializeLivingBudget(data: LivingBudgetData): string {
+  return JSON.stringify({
+    segments: data.segments.map(normalizeLivingBudgetSegment).sort((a, b) => a.from_month.localeCompare(b.from_month)),
+    month_topups: (data.month_topups || [])
+      .map(normalizeLivingBudgetMonthTopup)
+      .sort((a, b) => a.month.localeCompare(b.month)),
+  });
 }
 
 export function cycleMonthYmForOverview(
@@ -95,9 +178,10 @@ export function resolvedLivingBudget(
   report: SpendingReport | null,
   segments: LivingBudgetSegment[],
   cycleDay: number,
+  monthTopups: LivingBudgetMonthTopup[] = [],
 ): number | null {
   const ym = cycleMonthYmForOverview(selectedMonth, report, cycleDay);
-  return livingBudgetForMonth(ym, segments);
+  return livingBudgetForMonth(ym, segments, monthTopups);
 }
 
 export function livingBudgetTimelineSummary(segments: LivingBudgetSegment[]): string {

@@ -351,6 +351,7 @@ export function demoLivingBudget() {
       { amount: 12000, from_month: "2026-01", through_month: "2026-06" },
       { amount: 13250, from_month: "2026-07", through_month: "2035-12" },
     ],
+    month_topups: [],
   };
 }
 

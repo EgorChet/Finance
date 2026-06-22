@@ -160,10 +160,14 @@ export async function writeFixedCharges(data: FixedChargesData): Promise<void> {
 export async function readLivingBudget(): Promise<LivingBudgetData> {
   if (!supabaseConfigured()) return local.readLivingBudget();
   const res = await supabaseFetch("app_state?id=eq.living_budget&select=data");
-  if (!res.ok) return { segments: [], updated_at: null };
+  if (!res.ok) return { segments: [], month_topups: [], updated_at: null };
   const rows = (await res.json()) as { data: LivingBudgetData }[];
   const data = rows[0]?.data;
-  return { segments: data?.segments || [], updated_at: data?.updated_at ?? null };
+  return {
+    segments: data?.segments || [],
+    month_topups: data?.month_topups || [],
+    updated_at: data?.updated_at ?? null,
+  };
 }
 
 export async function writeLivingBudget(data: LivingBudgetData): Promise<void> {

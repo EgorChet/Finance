@@ -63,6 +63,7 @@ import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
 import {
+  normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
 } from "../utils/livingBudget";
@@ -105,6 +106,7 @@ const months = ref<MonthItem[]>([]);
 const currentMonthKey = ref<string | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<ReturnType<typeof normalizeLivingBudgetSegment>[]>([]);
+const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonthTopup>[]>([]);
 const cycleDay = ref(loadCycleDay());
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
@@ -144,7 +146,13 @@ const isPartialCycle = computed(() => {
 });
 
 const livingBudgetAmount = computed(() =>
-  resolveLivingBudgetAmount(currentMonthKey.value, spendingReport.value, livingBudgetSegments.value, cycleDay.value),
+  resolveLivingBudgetAmount(
+    currentMonthKey.value,
+    spendingReport.value,
+    livingBudgetSegments.value,
+    cycleDay.value,
+    livingBudgetMonthTopups.value,
+  ),
 );
 
 const paceTransactions = computed(() => paceReport.value?.transactions ?? spendingReport.value?.transactions ?? []);
@@ -250,8 +258,10 @@ async function loadSpending() {
     try {
       const budget = await fetchLivingBudget(demo, token);
       livingBudgetSegments.value = budget.segments.map(normalizeLivingBudgetSegment);
+      livingBudgetMonthTopups.value = (budget.month_topups || []).map(normalizeLivingBudgetMonthTopup);
     } catch {
       livingBudgetSegments.value = [];
+      livingBudgetMonthTopups.value = [];
     }
 
     const monthKey = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);

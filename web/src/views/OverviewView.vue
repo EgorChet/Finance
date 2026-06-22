@@ -157,7 +157,9 @@ import {
 import { transactionKey } from "../utils/transactionKey";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
+  type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
+  normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
 } from "../utils/livingBudget";
@@ -171,6 +173,7 @@ const report = ref<SpendingReport | null>(null);
 const paceReport = ref<SpendingReport | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
+const livingBudgetMonthTopups = ref<LivingBudgetMonthTopup[]>([]);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
@@ -318,6 +321,7 @@ const resolvedLivingBudget = computed(() =>
     report.value,
     livingBudgetSegments.value,
     cycleDay.value,
+    livingBudgetMonthTopups.value,
   ),
 );
 
@@ -462,8 +466,10 @@ async function refreshLivingBudget() {
   try {
     const data = await fetchLivingBudget(demo, token);
     livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
+    livingBudgetMonthTopups.value = (data.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
   } catch {
     livingBudgetSegments.value = [];
+    livingBudgetMonthTopups.value = [];
   }
 }
 
