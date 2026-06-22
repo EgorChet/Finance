@@ -3937,6 +3937,50 @@ table.rules select {
   margin-top: 0.65rem;
 }
 
+.pace-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pace-verdict-status {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pace-verdict-delta {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-verdict--ok .pace-verdict-status,
+.pace-verdict--ok .pace-verdict-delta {
+  color: #34d399;
+}
+
+.pace-verdict--good .pace-verdict-status,
+.pace-verdict--good .pace-verdict-delta {
+  color: #34d399;
+}
+
+.pace-verdict--warn .pace-verdict-status {
+  color: var(--text);
+}
+
+.pace-verdict--warn .pace-verdict-delta {
+  color: #fbbf24;
+}
+
+.pace-verdict--bad .pace-verdict-status,
+.pace-verdict--bad .pace-verdict-delta {
+  color: var(--danger);
+}
+
 .pace-simple {
   display: flex;
   flex-direction: column;
@@ -4068,6 +4112,17 @@ table.rules select {
 
 .pace-simple-table-gap.pace-delta-bad td:last-child {
   color: var(--danger);
+}
+
+.pace-simple-table-sub td {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+}
+
+.pace-simple-table-sub td:first-child {
+  padding-left: 0.85rem;
 }
 
 .pace-simple-fallback {

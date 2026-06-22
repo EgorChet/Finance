@@ -52,15 +52,10 @@
         <section class="pace-panel pace-panel-metrics">
           <div class="pace-simple">
             <template v-if="displaySpend > 0 && paceCompareAvg > 0">
-              <p class="pace-simple-hero" :class="simpleHeroClass">{{ simpleHeroLine }}</p>
-              <p v-if="simpleHeroSub" class="pace-simple-hero-sub">{{ simpleHeroSub }}</p>
-
-              <p class="pace-simple-glance">
-                <strong>{{ formatIls(displaySpend) }}</strong> so far · usual
-                <strong>{{ formatIls(paceCompareAvg) }}</strong> · month-end
-                <strong>~{{ formatIls(projectedTotal) }}</strong> vs usual
-                <strong>~{{ formatIls(projectedAtUsualPaceForecast) }}</strong>
-              </p>
+              <div class="pace-verdict" :class="verdictToneClass">
+                <p class="pace-verdict-status">{{ verdictStatus }}</p>
+                <p class="pace-verdict-delta">{{ verdictDelta }}</p>
+              </div>
 
               <details class="pace-simple-details">
                 <summary>See the numbers</summary>
@@ -71,11 +66,19 @@
                         <td colspan="2">So far this cycle</td>
                       </tr>
                       <tr>
-                        <td>Spent so far</td>
+                        <td>Everyday spending</td>
                         <td>{{ formatIls(displaySpend) }}</td>
                       </tr>
+                      <tr v-if="everydayComposition.exportTotal > 0" class="pace-simple-table-sub">
+                        <td>On Visa export</td>
+                        <td>{{ formatIls(everydayComposition.exportTotal) }}</td>
+                      </tr>
+                      <tr v-if="everydayComposition.configuredTotal > 0" class="pace-simple-table-sub">
+                        <td>Extra charges</td>
+                        <td>{{ formatIls(everydayComposition.configuredTotal) }}</td>
+                      </tr>
                       <tr>
-                        <td>Usual at this point</td>
+                        <td>Usual everyday at this point</td>
                         <td>{{ formatIls(paceCompareAvg) }}</td>
                       </tr>
                       <tr class="pace-simple-table-gap" :class="deltaClass">
@@ -86,11 +89,11 @@
                         <td colspan="2">Month-end estimate</td>
                       </tr>
                       <tr>
-                        <td>Your month</td>
+                        <td>Your everyday month</td>
                         <td>~{{ formatIls(projectedTotal) }}</td>
                       </tr>
                       <tr>
-                        <td>Usual month</td>
+                        <td>Usual everyday month</td>
                         <td>~{{ formatIls(projectedAtUsualPaceForecast) }}</td>
                       </tr>
                       <tr class="pace-simple-table-gap" :class="projectedDeltaClass">
@@ -129,6 +132,7 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatAboutIls, roundMoney } from "../utils/format";
+import { everydaySpendingComposition } from "../utils/householdBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
   computePace,
@@ -143,11 +147,13 @@ import {
 
 const props = defineProps<{
   transactions: Transaction[];
+  /** Current cycle transactions for everyday breakdown (matches SummaryMetrics). */
+  cycleTransactions?: Transaction[];
   latestBillingDate?: string | null;
   configuredCharges?: ConfiguredCharge[];
   partialStatementActive?: boolean;
-  /** Everyday portion from the partial export (matches SummaryMetrics). */
-  partialVariableSpend?: number | null;
+  /** Everyday spending from partial export — matches SummaryMetrics tile. */
+  partialEverydaySpend?: number | null;
   partialTotalSpend?: number | null;
   /** Pin demo pace to sample “today” (Jun 13 2026). */
   referenceDate?: Date;
@@ -200,9 +206,13 @@ const manualSpend = computed((): number | null => {
 
 const statementSpendOverride = computed(() => {
   if (!props.partialStatementActive) return undefined;
-  if (props.partialVariableSpend != null) return props.partialVariableSpend;
+  if (props.partialEverydaySpend != null) return props.partialEverydaySpend;
   return undefined;
 });
+
+const everydayComposition = computed(() =>
+  everydaySpendingComposition(props.cycleTransactions ?? []),
+);
 
 const pace = computed(() =>
   computePace(props.transactions, {
@@ -213,7 +223,7 @@ const pace = computed(() =>
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
     statementSpendOverride: statementSpendOverride.value,
-    statementVariableOverride: props.partialStatementActive ? props.partialVariableSpend : undefined,
+    statementVariableOverride: props.partialStatementActive ? props.partialEverydaySpend : undefined,
     today: props.referenceDate,
   }),
 );
@@ -244,48 +254,34 @@ const projectedDeltaClass = computed(() => {
   return "";
 });
 
-const simpleHeroLine = computed(() => {
+const verdictStatus = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
-
-  if (Math.abs(monthGap) < 50) {
-    return "You're doing fine — this month looks normal.";
-  }
-  if (monthGap > 0) {
-    return `You're spending too fast — about ${formatAboutIls(monthGap)} more than a normal month.`;
-  }
-  return `You're spending slower than usual — about ${formatAboutIls(Math.abs(monthGap))} less than a normal month.`;
+  if (Math.abs(monthGap) < 50) return "Doing fine";
+  if (monthGap > 0) return "Overspending";
+  return "Doing fine";
 });
 
-const simpleHeroSub = computed(() => {
-  const nowGap = pace.value?.vsAvgDelta ?? 0;
+const verdictDelta = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
-
   if (Math.abs(monthGap) < 50) {
-    if (nowGap > 50) {
-      return `Day-to-day spending is a bit high, but the full month still looks OK.`;
-    }
-    if (nowGap < -50) {
-      return `You've spent less than usual so far — nice.`;
-    }
-    return "";
+    const nowGap = pace.value?.vsAvgDelta ?? 0;
+    if (Math.abs(nowGap) < 50) return "About the same as your usual month";
+    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
+    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
   }
-  if (monthGap > 0 && nowGap > 50) {
-    return `You've already spent about ${formatAboutIls(nowGap)} more than you usually have by now.`;
-  }
-  if (monthGap > 0 && nowGap < -50) {
-    return `Everyday spend is below average and your month-end forecast matches that.`;
-  }
-  if (monthGap < 0 && nowGap < -50) {
-    return `You've spent about ${formatAboutIls(Math.abs(nowGap))} less than usual so far.`;
-  }
-  return "";
+  if (monthGap > 0) return `~${formatAboutIls(monthGap)} above your usual month`;
+  return `~${formatAboutIls(Math.abs(monthGap))} below your usual month`;
 });
 
-const simpleHeroClass = computed(() => {
+const verdictToneClass = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
-  if (Math.abs(monthGap) < 50) return "pace-simple-hero--ok";
-  if (monthGap > 0) return "pace-simple-hero--bad";
-  return "pace-simple-hero--good";
+  if (Math.abs(monthGap) < 50) {
+    const nowGap = pace.value?.vsAvgDelta ?? 0;
+    if (nowGap > 50) return "pace-verdict--warn";
+    return "pace-verdict--ok";
+  }
+  if (monthGap > 0) return "pace-verdict--bad";
+  return "pace-verdict--good";
 });
 
 function formatGap(delta: number): string {

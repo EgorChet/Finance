@@ -1,5 +1,6 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
+import { isMonthlyBillTransaction } from "./householdBudget";
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
@@ -141,7 +142,7 @@ function cycleKey(start: Date): string {
 
 function includeTransaction(tx: Transaction, includeFixed: boolean): boolean {
   if (includeFixed) return true;
-  return costTypeForCategory(tx.category_en || "Uncategorized") !== "fixed";
+  return !isMonthlyBillTransaction(tx);
 }
 
 function isFixedChargeTx(tx: Transaction): boolean {

@@ -34,10 +34,11 @@
     <PaceCard
       v-if="showPaceCard"
       :transactions="paceTransactions"
+      :cycle-transactions="report?.transactions ?? []"
       :latest-billing-date="latestFinalBillingDate"
       :configured-charges="configuredCharges"
       :partial-statement-active="partialStatementActive"
-      :partial-variable-spend="partialVariableSpend"
+      :partial-everyday-spend="partialEverydaySpend"
       :partial-total-spend="partialTotalSpend"
       :reference-date="refDate"
       :cycle-day="cycleDay"
@@ -125,8 +126,8 @@ import { confirm } from "../composables/useConfirm";
 import type { MonthItem, SpendingReport, Transaction } from "../types";
 import {
   rollupCategoriesForDisplay,
-  splitFixedVariable,
 } from "../categories";
+import { everydaySpendingTotal } from "../utils/householdBudget";
 import {
   buildCycleReport,
   cycleStartForDate,
@@ -335,13 +336,13 @@ const statementBilling = computed(() => {
 });
 
 const paceTransactions = computed(() => {
-  // Keep full history for pace averages; partial totals come from partialVariableSpend overrides.
+  // Keep full history for pace averages; partial everyday total comes from partialEverydaySpend override.
   return paceReport.value?.transactions ?? report.value?.transactions ?? [];
 });
 
-const partialVariableSpend = computed(() => {
+const partialEverydaySpend = computed(() => {
   if (!isPartialForOpenCycle.value || !report.value) return null;
-  return splitFixedVariable(report.value.by_category).variable;
+  return everydaySpendingTotal(report.value.transactions);
 });
 
 const partialTotalSpend = computed(() => {
