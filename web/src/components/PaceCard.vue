@@ -238,7 +238,7 @@ const showEntryPanel = computed(() => {
 
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
-const paceCompareAvg = computed(() => pace.value?.historicalAvgVariableAtDay ?? 0);
+const paceCompareAvg = computed(() => pace.value?.historicalAvgAtDay ?? 0);
 
 const projectedAtUsualPaceForecast = computed(() => pace.value?.projectedAtUsualPaceForecast ?? 0);
 

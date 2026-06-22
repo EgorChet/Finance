@@ -507,7 +507,7 @@ export function computePace(
       ? roundMoney(historicalVariableAtDay.reduce((s, v) => s + v, 0) / historicalVariableAtDay.length)
       : 0;
 
-  const compareAvg = includeFixed ? historicalAvgAtDay : historicalAvgVariableAtDay;
+  const compareAvg = historicalAvgAtDay;
   const vsAvgDelta = roundMoney(currentSpend - compareAvg);
 
   // Fixed bills (rent, loans) land at cycle start — extrapolate variable spend only.
@@ -531,8 +531,13 @@ export function computePace(
     }
   } else if (currentBucket) {
     const atDay = spendAtDay(currentBucket, cycle.dayIndex);
-    currentFixedAtDay = atDay.fixed;
-    currentVariableAtDay = roundMoney(atDay.total - atDay.fixed);
+    if (includeFixed) {
+      currentFixedAtDay = atDay.fixed;
+      currentVariableAtDay = roundMoney(atDay.total - atDay.fixed);
+    } else {
+      currentFixedAtDay = 0;
+      currentVariableAtDay = atDay.total;
+    }
   } else {
     currentVariableAtDay = currentSpend;
   }
@@ -600,13 +605,16 @@ export function computePace(
     : Math.max(configuredMonthlyBills, historicalFullCycleAvgFixed);
 
   const projectedEveryday = projectedVariable;
-  const projectedEverydayAtUsualPace = extrapolateHistoricalVariable(historicalAvgVariableAtDay);
-  const projectedTotal = roundMoney(projectionFixed + projectedEveryday);
+  const usualAtDayBaseline = includeFixed ? historicalAvgVariableAtDay : historicalAvgAtDay;
+  const projectedEverydayAtUsualPace = extrapolateHistoricalVariable(usualAtDayBaseline);
+  const projectedTotal = includeFixed
+    ? roundMoney(projectionFixed + projectedEveryday)
+    : projectedEveryday;
   const projectedOtherFixed = roundMoney(Math.max(0, projectionFixed - configuredMonthlyBills));
 
   const projectedAtUsualPaceForecast = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + projectedEverydayAtUsualPace)
-    : roundMoney(projectionFixed + projectedEverydayAtUsualPace);
+    : projectedEverydayAtUsualPace;
   const historicalActualMonthAvg = historicalFullCycleAvg;
   /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
