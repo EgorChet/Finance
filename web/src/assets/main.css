@@ -540,6 +540,8 @@ button {
 
 .everyday-breakdown-section {
   margin-bottom: 1rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .everyday-breakdown-section:last-child {
@@ -561,6 +563,8 @@ button {
 
 .everyday-breakdown-summary {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.88rem;
 }
@@ -570,12 +574,20 @@ button {
   vertical-align: top;
 }
 
+.everyday-breakdown-summary td:first-child {
+  width: 62%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  padding-right: 0.5rem;
+}
+
 .everyday-breakdown-summary td:last-child {
+  width: 38%;
   text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  padding-left: 0.75rem;
+  padding-left: 0.25rem;
 }
 
 .everyday-breakdown-summary-sub td {
@@ -624,6 +636,8 @@ button {
   font-size: 0.82rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .everyday-breakdown-txs--pending {
@@ -633,6 +647,8 @@ button {
 .everyday-breakdown-overlay {
   align-items: flex-end;
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 @media (min-width: 560px) {
@@ -643,15 +659,18 @@ button {
 }
 
 .everyday-breakdown-dialog {
-  width: min(100%, 520px);
-  max-height: min(88vh, 720px);
+  width: 100%;
+  max-width: 520px;
+  min-width: 0;
+  max-height: min(88dvh, 720px);
   display: flex;
   flex-direction: column;
-  padding: 1rem 1rem 1.15rem;
+  padding: 1rem 1rem max(1.15rem, env(safe-area-inset-bottom));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px 12px 0 0;
   box-shadow: 0 12px 40px rgb(0 0 0 / 18%);
+  overflow: hidden;
 }
 
 @media (min-width: 560px) {
@@ -666,6 +685,12 @@ button {
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+.everyday-breakdown-header > div:first-child {
+  min-width: 0;
+  flex: 1;
 }
 
 .everyday-breakdown-title {
@@ -691,9 +716,23 @@ button {
 }
 
 .everyday-breakdown-body {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-height: 0;
-  padding-right: 0.1rem;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.everyday-breakdown-category .cost-breakdown-row > span:first-child {
+  min-width: 0;
+  flex: 1;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.everyday-breakdown-category .cost-breakdown-amount {
+  flex-shrink: 0;
+  text-align: right;
 }
 
 .everyday-breakdown-category--open .cost-breakdown-row {
@@ -702,6 +741,15 @@ button {
 
 .everyday-breakdown-txs {
   margin: 0.35rem 0 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.everyday-breakdown-txs .tx-row,
+.everyday-breakdown-txs .tx-row-top,
+.everyday-breakdown-txs .tx-row-meta {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .section-title {
