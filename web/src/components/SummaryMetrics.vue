@@ -99,7 +99,13 @@
                 Everything on the card except rent, car loan, and Dev Institute.
               </p>
             </div>
-            <button ref="closeBtn" type="button" class="btn btn-ghost everyday-breakdown-close" @click="closeEverydayBreakdown">
+            <button
+              ref="closeBtn"
+              type="button"
+              class="btn everyday-breakdown-close"
+              aria-label="Close everyday spending breakdown"
+              @click="closeEverydayBreakdown"
+            >
               Close
             </button>
           </header>

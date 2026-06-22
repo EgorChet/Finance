@@ -713,6 +713,13 @@ button {
 
 .everyday-breakdown-close {
   flex-shrink: 0;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0.45rem 0.85rem;
+  min-height: 36px;
 }
 
 .everyday-breakdown-body {
