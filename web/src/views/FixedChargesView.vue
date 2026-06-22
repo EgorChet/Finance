@@ -12,14 +12,14 @@
           </p>
         </div>
         <p
-          v-if="saveStatus && (!hasUnsavedChanges || saveError)"
+          v-if="!loading && saveStatus && (!hasUnsavedChanges || saveError)"
           class="recurring-save-status"
           :class="{ 'recurring-save-status--error': saveError }"
         >
           {{ saveStatus }}
         </p>
       </div>
-      <div v-if="hasUnsavedChanges && !auth.isDemo" class="recurring-unsaved-bar">
+      <div v-if="!loading && hasUnsavedChanges && !auth.isDemo" class="recurring-unsaved-bar">
         <p class="recurring-unsaved-text">You have unsaved changes</p>
         <p v-if="saveError && saveStatus" class="recurring-form-error">{{ saveStatus }}</p>
         <div class="recurring-unsaved-actions">
@@ -366,6 +366,7 @@ import {
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
 const loading = ref(true);
+const hydrated = ref(false);
 const saving = ref(false);
 const error = ref("");
 const status = ref("");
@@ -406,7 +407,7 @@ const oneTimeCharges = computed(() =>
     .filter(isOneTimeCharge)
     .sort((a, b) => (b.charge_date ?? "").localeCompare(a.charge_date ?? "")),
 );
-const hasUnsavedChanges = computed(() => isDirty());
+const hasUnsavedChanges = computed(() => hydrated.value && isDirty());
 
 watch(newRecurringOngoing, (on) => {
   if (on) newRecurring.value.through_month = ONGOING_THROUGH_MONTH;
@@ -800,6 +801,7 @@ async function addOneTime() {
 
 async function load() {
   loading.value = true;
+  hydrated.value = false;
   error.value = "";
   status.value = "";
   try {
@@ -821,13 +823,15 @@ async function load() {
     charges.value = [];
     livingBudgetSegments.value = [];
     livingBudgetMonthTopups.value = [];
+    syncSavedSnapshots();
   } finally {
+    hydrated.value = true;
     loading.value = false;
   }
 }
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (!auth.isDemo && isDirty()) {
+  if (!auth.isDemo && hasUnsavedChanges.value) {
     e.preventDefault();
   }
 }
