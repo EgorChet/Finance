@@ -604,17 +604,35 @@ export function computePace(
     ? fullCycleFixed
     : Math.max(configuredMonthlyBills, historicalFullCycleAvgFixed);
 
+  const historicalFullCycleEverydayAvg =
+    !includeFixed && usedSnapshots.length > 0
+      ? roundMoney(
+          usedSnapshots.reduce((s, row) => s + fullCycleTotal(row.bucket), 0) / usedSnapshots.length,
+        )
+      : 0;
+
   const projectedEveryday = projectedVariable;
   const usualAtDayBaseline = includeFixed ? historicalAvgVariableAtDay : historicalAvgAtDay;
   const projectedEverydayAtUsualPace = extrapolateHistoricalVariable(usualAtDayBaseline);
-  const projectedTotal = includeFixed
-    ? roundMoney(projectionFixed + projectedEveryday)
-    : projectedEveryday;
+
+  let projectedTotal: number;
+  if (!includeFixed && historicalFullCycleEverydayAvg > 0 && compareAvg > 0 && currentSpend > 0) {
+    // Scale typical full-cycle everyday by how far ahead/behind you are now — avoids
+    // extrapolating front-loaded subscriptions as if they repeat all month.
+    projectedTotal = roundMoney(historicalFullCycleEverydayAvg * (currentSpend / compareAvg));
+  } else if (includeFixed) {
+    projectedTotal = roundMoney(projectionFixed + projectedEveryday);
+  } else {
+    projectedTotal = projectedEveryday;
+  }
+
   const projectedOtherFixed = roundMoney(Math.max(0, projectionFixed - configuredMonthlyBills));
 
   const projectedAtUsualPaceForecast = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + projectedEverydayAtUsualPace)
-    : projectedEverydayAtUsualPace;
+    : historicalFullCycleEverydayAvg > 0
+      ? historicalFullCycleEverydayAvg
+      : projectedEverydayAtUsualPace;
   const historicalActualMonthAvg = historicalFullCycleAvg;
   /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
