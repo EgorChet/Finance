@@ -38,11 +38,21 @@
         <div class="metric-label">Total spent</div>
         <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
       </div>
-      <div class="metric-card">
+      <component
+        :is="everydayCardTag"
+        class="metric-card"
+        :class="{ 'metric-card-clickable': everydayBreakdownEnabled, active: everydayBreakdownOpen }"
+        :type="everydayBreakdownEnabled ? 'button' : undefined"
+        :aria-expanded="everydayBreakdownEnabled ? everydayBreakdownOpen : undefined"
+        @click="openEverydayBreakdown"
+      >
         <div class="metric-label">Everyday spending</div>
         <div class="metric-value">{{ formatIls(everydayTotal) }}</div>
-        <div class="metric-sub">{{ everydayPct }}% of card total</div>
-      </div>
+        <div class="metric-sub">
+          {{ everydayPct }}% of card total
+          <span v-if="everydayBreakdownEnabled" class="metric-sub-tap"> · tap for breakdown</span>
+        </div>
+      </component>
       <div class="metric-card">
         <div class="metric-label">Monthly bills</div>
         <div class="metric-value">{{ formatIls(monthlyBills) }}</div>
@@ -65,24 +75,99 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="everydayBreakdownOpen"
+        class="confirm-overlay everyday-breakdown-overlay"
+        @click.self="closeEverydayBreakdown"
+      >
+        <div
+          class="everyday-breakdown-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="everyday-breakdown-title"
+        >
+          <header class="everyday-breakdown-header">
+            <div>
+              <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">Everyday spending</h3>
+              <p class="everyday-breakdown-meta">
+                {{ formatIls(everydayTotal) }} · {{ everydayChargeCount }} charge{{ everydayChargeCount === 1 ? "" : "s" }}
+              </p>
+              <p class="everyday-breakdown-hint">
+                Everything on the card except rent, car loan, and Dev Institute.
+              </p>
+            </div>
+            <button ref="closeBtn" type="button" class="btn btn-ghost everyday-breakdown-close" @click="closeEverydayBreakdown">
+              Close
+            </button>
+          </header>
+
+          <div class="everyday-breakdown-body">
+            <p v-if="!everydayCategories.length" class="cost-breakdown-empty">No everyday charges in this snapshot.</p>
+            <template v-else>
+              <div
+                v-for="row in everydayCategories"
+                :key="row.category_en"
+                class="everyday-breakdown-category"
+                :class="{ 'everyday-breakdown-category--open': expandedCategory === row.category_en }"
+              >
+                <button
+                  type="button"
+                  class="cost-breakdown-row"
+                  :aria-expanded="expandedCategory === row.category_en"
+                  @click="toggleCategory(row.category_en)"
+                >
+                  <span>{{ row.category_en }}</span>
+                  <span class="cost-breakdown-amount">
+                    {{ formatIls(row.total) }}
+                    <span class="cost-breakdown-pct">{{ categoryPct(row.total) }}%</span>
+                    <span class="category-accordion-chevron" aria-hidden="true">
+                      {{ expandedCategory === row.category_en ? "▾" : "▸" }}
+                    </span>
+                  </span>
+                </button>
+                <TransactionList
+                  v-if="expandedCategory === row.category_en"
+                  class="everyday-breakdown-txs"
+                  :transactions="transactionsForCategory(row.category_en)"
+                  title="Charges"
+                  :show-category="false"
+                  :statement-billing="billingPeriod"
+                  :default-limit="25"
+                />
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import TransactionList from "./TransactionList.vue";
 import type { SpendingReport } from "../types";
+import { rollupCategory } from "../categories";
 import { formatBillingPeriod, formatIls } from "../utils/format";
 import {
   budgetSpendBreakdown,
+  everydaySpendingByCategory,
   everydaySpendingTotal,
+  everydayTransactions,
   moneyLeft,
   monthlyBillsTotal,
 } from "../utils/householdBudget";
 
 const props = withDefaults(
-  defineProps<{ report: SpendingReport; livingBudget: number | null; retrospective?: boolean }>(),
-  { retrospective: false },
+  defineProps<{ report: SpendingReport; livingBudget: number | null; retrospective?: boolean; partial?: boolean }>(),
+  { retrospective: false, partial: false },
 );
+
+const everydayBreakdownOpen = ref(false);
+const expandedCategory = ref<string | null>(null);
+const closeBtn = ref<HTMLButtonElement | null>(null);
 
 const billingPeriod = computed(() => formatBillingPeriod(props.report.metadata));
 
@@ -128,6 +213,8 @@ const budgetClass = computed(() => {
 });
 
 const everydayTotal = computed(() => everydaySpendingTotal(props.report.transactions));
+const everydayCategories = computed(() => everydaySpendingByCategory(props.report.transactions));
+const everydayChargeCount = computed(() => everydayTransactions(props.report.transactions).length);
 const monthlyBills = computed(() => monthlyBillsTotal(props.report.transactions));
 const everydayPct = computed(() =>
   props.report.total_spent ? Math.round((everydayTotal.value / props.report.total_spent) * 100) : 0,
@@ -135,4 +222,52 @@ const everydayPct = computed(() =>
 const monthlyBillsPct = computed(() =>
   props.report.total_spent ? Math.round((monthlyBills.value / props.report.total_spent) * 100) : 0,
 );
+
+const everydayBreakdownEnabled = computed(() => props.partial && everydayTotal.value > 0);
+const everydayCardTag = computed(() => (everydayBreakdownEnabled.value ? "button" : "div"));
+
+function categoryPct(total: number): string {
+  if (!everydayTotal.value) return "0";
+  return String(Math.round((total / everydayTotal.value) * 100));
+}
+
+function transactionsForCategory(category: string) {
+  return everydayTransactions(props.report.transactions).filter(
+    (tx) => rollupCategory(tx.category_en?.trim() || "Uncategorized") === category,
+  );
+}
+
+function openEverydayBreakdown() {
+  if (!everydayBreakdownEnabled.value) return;
+  expandedCategory.value = null;
+  everydayBreakdownOpen.value = true;
+}
+
+function closeEverydayBreakdown() {
+  everydayBreakdownOpen.value = false;
+  expandedCategory.value = null;
+}
+
+function toggleCategory(category: string) {
+  expandedCategory.value = expandedCategory.value === category ? null : category;
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") closeEverydayBreakdown();
+}
+
+watch(everydayBreakdownOpen, (open) => {
+  document.body.style.overflow = open ? "hidden" : "";
+  if (open) {
+    document.addEventListener("keydown", onKeydown);
+    void nextTick(() => closeBtn.value?.focus());
+  } else {
+    document.removeEventListener("keydown", onKeydown);
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
+  if (everydayBreakdownOpen.value) document.body.style.overflow = "";
+});
 </script>

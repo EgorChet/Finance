@@ -1,3 +1,4 @@
+import { rollupCategory } from "../categories";
 import type { Transaction } from "../types";
 import { roundMoney } from "./format";
 
@@ -48,11 +49,36 @@ export function monthlyBillsTotal(transactions: Transaction[]): number {
   );
 }
 
+export function everydayTransactions(transactions: Transaction[]): Transaction[] {
+  return transactions.filter((tx) => !isMonthlyBillTransaction(tx));
+}
+
 /** Everything on the card except rent, car loan, and Dev Institute. */
 export function everydaySpendingTotal(transactions: Transaction[]): number {
-  return roundMoney(
-    transactions.filter((tx) => !isMonthlyBillTransaction(tx)).reduce((s, tx) => s + tx.charge_amount, 0),
-  );
+  return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + tx.charge_amount, 0));
+}
+
+export function everydaySpendingByCategory(transactions: Transaction[]): {
+  category_en: string;
+  total: number;
+  count: number;
+}[] {
+  const map = new Map<string, { total: number; count: number }>();
+  for (const tx of everydayTransactions(transactions)) {
+    const cat = rollupCategory(tx.category_en?.trim() || "Uncategorized");
+    const cur = map.get(cat) || { total: 0, count: 0 };
+    cur.total += tx.charge_amount;
+    cur.count += 1;
+    map.set(cat, cur);
+  }
+  return [...map.entries()]
+    .map(([category_en, { total, count }]) => ({
+      category_en,
+      total: roundMoney(total),
+      count,
+    }))
+    .filter((row) => row.total !== 0)
+    .sort((a, b) => b.total - a.total);
 }
 
 /** What counts against the ₪12k (all card spend except rent). */

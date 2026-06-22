@@ -32,6 +32,7 @@
       :report="report"
       :living-budget="resolvedLivingBudget"
       :retrospective="budgetRetrospective"
+      :partial="isPartialForOpenCycle"
     />
     <PaceCard
       v-if="showPaceCard"
