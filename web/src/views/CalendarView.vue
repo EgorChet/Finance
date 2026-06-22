@@ -102,7 +102,7 @@
             <button
               v-if="!auth.isDemo"
               type="button"
-              class="btn btn-ghost calendar-event-edit"
+              class="btn btn-edit calendar-event-edit"
               @click="startEdit(item.event)"
             >
               Edit

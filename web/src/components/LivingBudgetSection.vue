@@ -24,7 +24,7 @@
           <button
             v-if="!readonly"
             type="button"
-            class="btn btn-ghost charge-compact-edit"
+            class="btn btn-edit"
             :disabled="disabled"
             @click="startEditSegment(seg)"
           >
@@ -52,32 +52,31 @@
             </div>
           </div>
 
-          <div class="recurring-segment-footer">
-            <div class="field-group recurring-segment-through">
-              <label class="field-label">Through</label>
-              <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" :disabled="disabled" />
-              <label class="recurring-ongoing recurring-ongoing--compact">
-                <ToggleSwitch
-                  :model-value="isOngoingThrough(seg.through_month)"
-                  :disabled="disabled"
-                  @update:model-value="toggleOngoing(seg, $event)"
-                />
-                <span class="recurring-ongoing-text">No end date</span>
-              </label>
-            </div>
-
-            <div class="recurring-segment-actions">
-              <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditSegment(seg)">Done</button>
-              <button
-                v-if="segments.length > 1"
-                type="button"
-                class="btn btn-danger"
+          <div class="field-group recurring-segment-through">
+            <label class="field-label">Through</label>
+            <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" :disabled="disabled" />
+            <label class="recurring-ongoing recurring-ongoing--compact">
+              <ToggleSwitch
+                :model-value="isOngoingThrough(seg.through_month)"
                 :disabled="disabled"
-                @click="removeSegment(seg)"
-              >
-                Delete period
-              </button>
-            </div>
+                @update:model-value="toggleOngoing(seg, $event)"
+              />
+              <span class="recurring-ongoing-text">No end date</span>
+            </label>
+          </div>
+
+          <div class="recurring-segment-actions">
+            <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditSegment(seg)">Done</button>
+            <button type="button" class="btn" :disabled="disabled" @click="cancelEditSegment(seg)">Cancel</button>
+            <button
+              v-if="segments.length > 1"
+              type="button"
+              class="btn btn-danger"
+              :disabled="disabled"
+              @click="removeSegment(seg)"
+            >
+              Delete period
+            </button>
           </div>
         </article>
       </li>
@@ -103,7 +102,7 @@
             <button
               v-if="!readonly"
               type="button"
-              class="btn btn-ghost charge-compact-edit"
+              class="btn btn-edit"
               :disabled="disabled"
               @click="startEditTopup(topup)"
             >
@@ -130,17 +129,16 @@
                 />
               </div>
             </div>
-            <div class="recurring-segment-footer">
-              <div class="field-group living-budget-topup-note">
-                <label class="field-label">Note (optional)</label>
-                <input v-model="topup.note" class="input" placeholder="e.g. Trip to Europe" :disabled="disabled" />
-              </div>
-              <div class="recurring-segment-actions">
-                <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditTopup(topup)">Done</button>
-                <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeMonthTopup(topup)">
-                  Remove
-                </button>
-              </div>
+            <div class="field-group living-budget-topup-note">
+              <label class="field-label">Note (optional)</label>
+              <input v-model="topup.note" class="input" placeholder="e.g. Trip to Europe" :disabled="disabled" />
+            </div>
+            <div class="recurring-segment-actions">
+              <button type="button" class="btn btn-primary" :disabled="disabled" @click="stopEditTopup(topup)">Done</button>
+              <button type="button" class="btn" :disabled="disabled" @click="cancelEditTopup(topup)">Cancel</button>
+              <button type="button" class="btn btn-danger" :disabled="disabled" @click="removeMonthTopup(topup)">
+                Remove
+              </button>
             </div>
           </article>
         </li>
@@ -186,6 +184,10 @@ const segments = defineModel<LivingBudgetSegment[]>("segments", { required: true
 const monthTopups = defineModel<LivingBudgetMonthTopup[]>("monthTopups", { required: true });
 const editingSegmentKey = ref<string | null>(null);
 const editingTopupKey = ref<string | null>(null);
+const segmentEditSnapshot = ref<LivingBudgetSegment | null>(null);
+const topupEditSnapshot = ref<LivingBudgetMonthTopup | null>(null);
+const segmentIsNew = ref(false);
+const topupIsNew = ref(false);
 
 const sortedMonthTopups = computed(() =>
   [...monthTopups.value].sort((a, b) => a.month.localeCompare(b.month)),
@@ -201,24 +203,68 @@ function isEditingTopup(topup: LivingBudgetMonthTopup): boolean {
 
 function startEditSegment(seg: LivingBudgetSegment) {
   editingTopupKey.value = null;
+  topupEditSnapshot.value = null;
+  topupIsNew.value = false;
   editingSegmentKey.value = livingBudgetSegmentStableKey(seg);
+  segmentEditSnapshot.value = { ...seg };
+  segmentIsNew.value = false;
 }
 
 function stopEditSegment(seg: LivingBudgetSegment) {
   if (editingSegmentKey.value === livingBudgetSegmentStableKey(seg)) {
+    segmentEditSnapshot.value = null;
+    segmentIsNew.value = false;
     editingSegmentKey.value = null;
   }
 }
 
+function cancelEditSegment(seg: LivingBudgetSegment) {
+  const key = livingBudgetSegmentStableKey(seg);
+  if (editingSegmentKey.value !== key) return;
+
+  if (segmentIsNew.value) {
+    segments.value = segments.value.filter((s) => livingBudgetSegmentStableKey(s) !== key);
+  } else if (segmentEditSnapshot.value) {
+    const idx = segments.value.findIndex((s) => livingBudgetSegmentStableKey(s) === key);
+    if (idx >= 0) segments.value[idx] = { ...segmentEditSnapshot.value };
+  }
+
+  segmentEditSnapshot.value = null;
+  segmentIsNew.value = false;
+  editingSegmentKey.value = null;
+}
+
 function startEditTopup(topup: LivingBudgetMonthTopup) {
   editingSegmentKey.value = null;
+  segmentEditSnapshot.value = null;
+  segmentIsNew.value = false;
   editingTopupKey.value = livingBudgetMonthTopupStableKey(topup);
+  topupEditSnapshot.value = { ...topup };
+  topupIsNew.value = false;
 }
 
 function stopEditTopup(topup: LivingBudgetMonthTopup) {
   if (editingTopupKey.value === livingBudgetMonthTopupStableKey(topup)) {
+    topupEditSnapshot.value = null;
+    topupIsNew.value = false;
     editingTopupKey.value = null;
   }
+}
+
+function cancelEditTopup(topup: LivingBudgetMonthTopup) {
+  const key = livingBudgetMonthTopupStableKey(topup);
+  if (editingTopupKey.value !== key) return;
+
+  if (topupIsNew.value) {
+    monthTopups.value = monthTopups.value.filter((t) => livingBudgetMonthTopupStableKey(t) !== key);
+  } else if (topupEditSnapshot.value) {
+    const idx = monthTopups.value.findIndex((t) => livingBudgetMonthTopupStableKey(t) === key);
+    if (idx >= 0) monthTopups.value[idx] = { ...topupEditSnapshot.value };
+  }
+
+  topupEditSnapshot.value = null;
+  topupIsNew.value = false;
+  editingTopupKey.value = null;
 }
 
 function throughLabel(throughMonth: string): string {
@@ -269,7 +315,11 @@ function addSegment() {
   };
   segments.value = [...sorted, newSeg];
   editingTopupKey.value = null;
+  topupEditSnapshot.value = null;
+  topupIsNew.value = false;
   editingSegmentKey.value = livingBudgetSegmentStableKey(newSeg);
+  segmentEditSnapshot.value = { ...newSeg };
+  segmentIsNew.value = true;
 }
 
 async function removeSegment(seg: LivingBudgetSegment) {
@@ -294,7 +344,11 @@ function addMonthTopup() {
   const newTopup: LivingBudgetMonthTopup = { month, extra: 500 };
   monthTopups.value = [...monthTopups.value, newTopup];
   editingSegmentKey.value = null;
-  editingTopupKey.value = month;
+  segmentEditSnapshot.value = null;
+  segmentIsNew.value = false;
+  editingTopupKey.value = livingBudgetMonthTopupStableKey(newTopup);
+  topupEditSnapshot.value = { ...newTopup };
+  topupIsNew.value = true;
 }
 
 async function removeMonthTopup(topup: LivingBudgetMonthTopup) {

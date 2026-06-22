@@ -49,13 +49,7 @@
       >
         <div class="metric-label">Everyday spending</div>
         <div class="metric-value">{{ formatIls(everydayTotal) }}</div>
-        <div class="metric-sub">
-          {{ everydayPct }}% of card total
-          <span v-if="everydayBreakdownEnabled && everydaySettlement.pending > 0" class="metric-sub-pending">
-            · {{ formatIls(everydaySettlement.pending) }} pending
-          </span>
-        </div>
-        <span v-if="everydayBreakdownEnabled" class="metric-breakdown-cta">View breakdown →</span>
+        <div class="metric-sub">{{ everydayPct }}% of total</div>
       </component>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Monthly bills</div>
@@ -147,7 +141,6 @@ import { formatIls } from "../utils/format";
 import {
   budgetSpendBreakdown,
   everydaySpendingComposition,
-  everydaySpendingSettlement,
   everydaySpendingTotal,
   monthlyBillsTotal,
   moneyLeft,
@@ -210,7 +203,6 @@ const budgetClass = computed(() => {
 
 const everydayTotal = computed(() => everydaySpendingTotal(props.report.transactions));
 const everydayComposition = computed(() => everydaySpendingComposition(props.report.transactions));
-const everydaySettlement = computed(() => everydaySpendingSettlement(props.report.transactions));
 const monthlyBills = computed(() => monthlyBillsTotal(props.report.transactions));
 const everydayPct = computed(() =>
   props.report.total_spent ? Math.round((everydayTotal.value / props.report.total_spent) * 100) : 0,

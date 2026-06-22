@@ -46,7 +46,7 @@
             <button
               v-if="!auth.isDemo"
               type="button"
-              class="btn mappings-row-edit"
+            class="btn btn-edit"
               :disabled="!!savingHebrew"
               @click="startEdit(row.Hebrew)"
             >
@@ -63,16 +63,11 @@
               empty-label="Uncategorized"
             />
             <div class="mappings-row-actions">
+              <button type="button" class="btn btn-primary" :disabled="savingHebrew === row.Hebrew" @click="doneEdit(row)">
+                {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
+              </button>
               <button type="button" class="btn" :disabled="savingHebrew === row.Hebrew" @click="cancelEdit(row.Hebrew)">
                 Cancel
-              </button>
-              <button
-                type="button"
-                class="btn btn-primary"
-                :disabled="savingHebrew === row.Hebrew"
-                @click="doneEdit(row)"
-              >
-                {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
               </button>
             </div>
           </div>

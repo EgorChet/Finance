@@ -168,7 +168,7 @@
                   <button
                     v-if="!auth.isDemo"
                     type="button"
-                    class="btn btn-ghost charge-compact-edit"
+                    class="btn btn-edit"
                     :disabled="saving"
                     @click="startEditCharge(seg)"
                   >
@@ -195,33 +195,37 @@
                     </div>
                   </div>
 
-                  <div class="recurring-segment-footer">
-                    <div class="field-group recurring-segment-through">
-                      <label class="field-label">Through</label>
-                      <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
-                      <label class="recurring-ongoing recurring-ongoing--compact">
-                        <ToggleSwitch
-                          :model-value="isOngoingThrough(seg.through_month)"
-                          :disabled="saving"
-                          @update:model-value="toggleOngoing(seg, $event)"
-                        />
-                        <span class="recurring-ongoing-text">No end date</span>
-                      </label>
-                    </div>
-
-                    <div class="recurring-segment-actions">
-                      <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(seg)">Done</button>
-                      <button type="button" class="btn btn-danger" :disabled="saving" @click="removeSegment(seg)">
-                        Delete period
-                      </button>
-                    </div>
+                  <div class="field-group recurring-segment-through">
+                    <label class="field-label">Through</label>
+                    <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
+                    <label class="recurring-ongoing recurring-ongoing--compact">
+                      <ToggleSwitch
+                        :model-value="isOngoingThrough(seg.through_month)"
+                        :disabled="saving"
+                        @update:model-value="toggleOngoing(seg, $event)"
+                      />
+                      <span class="recurring-ongoing-text">No end date</span>
+                    </label>
                   </div>
                 </article>
               </li>
             </ul>
 
-            <footer v-if="!auth.isDemo && isEditingGroup(group)" class="recurring-card-footer">
-              <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
+            <footer v-if="!auth.isDemo && isEditingGroup(group)" class="recurring-edit-footer">
+              <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditingGroup(group)">
+                Done
+              </button>
+              <button type="button" class="btn" :disabled="saving" @click="cancelEditingGroup(group)">Cancel</button>
+              <button type="button" class="btn" :disabled="saving" @click="addSegment(group)">Add period</button>
+              <button
+                v-if="editingSegmentInGroup(group)"
+                type="button"
+                class="btn btn-danger"
+                :disabled="saving"
+                @click="removeSegment(editingSegmentInGroup(group)!)"
+              >
+                Delete period
+              </button>
               <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
                 Remove bill
               </button>
@@ -270,7 +274,7 @@
                 <button
                   v-if="!auth.isDemo"
                   type="button"
-                  class="btn btn-ghost charge-compact-edit"
+                  class="btn btn-edit"
                   :disabled="saving"
                   @click="startEditCharge(charge)"
                 >
@@ -310,7 +314,10 @@
                   </div>
                 </div>
                 <div class="recurring-segment-actions">
-                  <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(charge)">Done</button>
+                  <button type="button" class="btn btn-primary" :disabled="saving" @click="stopEditCharge(charge)">
+                    Done
+                  </button>
+                  <button type="button" class="btn" :disabled="saving" @click="cancelEditCharge(charge)">Cancel</button>
                   <button type="button" class="btn btn-danger" :disabled="saving" @click="removeOneTime(charge)">
                     Delete
                   </button>
@@ -385,6 +392,7 @@ const savedBudgetSnapshot = ref("");
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
 const editingChargeKey = ref<string | null>(null);
+const chargeEditSnapshot = ref<ConfiguredCharge | null>(null);
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -486,6 +494,7 @@ async function discardChanges() {
   livingBudgetSegments.value = savedBudget.segments;
   livingBudgetMonthTopups.value = savedBudget.month_topups || [];
   editingChargeKey.value = null;
+  chargeEditSnapshot.value = null;
   activeAddForm.value = null;
   status.value = "";
   saveStatus.value = "";
@@ -565,14 +574,49 @@ function isEditingGroup(group: { segments: ConfiguredCharge[] }): boolean {
   return group.segments.some((seg) => segmentKey(seg) === editingChargeKey.value);
 }
 
+function editingSegmentInGroup(group: ChargeGroup): ConfiguredCharge | undefined {
+  if (!editingChargeKey.value) return undefined;
+  return group.segments.find((seg) => segmentKey(seg) === editingChargeKey.value);
+}
+
+function stopEditingGroup(group: ChargeGroup) {
+  const seg = editingSegmentInGroup(group);
+  if (seg) stopEditCharge(seg);
+}
+
+function cancelEditingGroup(group: ChargeGroup) {
+  const seg = editingSegmentInGroup(group);
+  if (seg) cancelEditCharge(seg);
+}
+
 function startEditCharge(charge: ConfiguredCharge) {
+  chargeEditSnapshot.value = normalizeConfiguredCharge({ ...charge });
   editingChargeKey.value = segmentKey(charge);
 }
 
 function stopEditCharge(charge: ConfiguredCharge) {
   if (editingChargeKey.value === segmentKey(charge)) {
+    chargeEditSnapshot.value = null;
     editingChargeKey.value = null;
   }
+}
+
+function cancelEditCharge(charge: ConfiguredCharge) {
+  const key = segmentKey(charge);
+  if (editingChargeKey.value !== key) return;
+
+  const savedCharges = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
+  const wasPersisted = savedCharges.some((c) => segmentKey(c) === key);
+
+  if (wasPersisted && chargeEditSnapshot.value) {
+    const idx = charges.value.findIndex((c) => segmentKey(c) === key);
+    if (idx >= 0) charges.value[idx] = { ...chargeEditSnapshot.value };
+  } else {
+    charges.value = charges.value.filter((c) => segmentKey(c) !== key);
+  }
+
+  chargeEditSnapshot.value = null;
+  editingChargeKey.value = null;
 }
 
 function throughLabel(throughMonth: string): string {

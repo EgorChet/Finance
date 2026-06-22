@@ -86,6 +86,17 @@ button {
   background: transparent;
 }
 
+.btn-edit {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
 .btn-danger {
   background: color-mix(in srgb, var(--danger) 14%, var(--surface));
   border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
@@ -322,17 +333,22 @@ button {
   margin-top: 0.75rem;
 }
 
-.recurring-card-footer {
+.recurring-edit-footer {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.65rem;
   padding-top: 0.65rem;
   border-top: 1px solid var(--border);
 }
 
-.recurring-card-footer .btn {
-  min-height: 36px;
+.recurring-edit-footer .btn {
+  min-height: 40px;
+}
+
+.recurring-edit-footer .btn-primary {
+  margin-right: auto;
 }
 
 .living-budget-topups-read,
@@ -438,11 +454,6 @@ button {
   line-height: 1.35;
 }
 
-.charge-compact-edit {
-  flex-shrink: 0;
-  min-height: 36px;
-  padding: 0.35rem 0.65rem;
-}
 
 .recurring-card--compact {
   padding: 0.85rem 1rem;
@@ -606,23 +617,6 @@ button {
   color: var(--text-muted);
   font-size: 0.85rem;
   margin-left: 0.35rem;
-}
-
-.metric-sub-pending {
-  color: var(--text-muted);
-}
-
-.metric-breakdown-cta {
-  display: block;
-  margin-top: 0.45rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--accent, #60a5fa);
-}
-
-.metric-card-clickable .metric-breakdown-cta {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .metric-sub-tap {
@@ -2746,12 +2740,6 @@ button {
   white-space: nowrap;
 }
 
-.mappings-row-edit {
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0.4rem 0.75rem;
-  font-size: 0.88rem;
-}
 
 .mappings-row-edit-mode {
   display: flex;
@@ -2760,9 +2748,14 @@ button {
 }
 
 .mappings-row-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  padding-top: 0.35rem;
+}
+
+.mappings-row-actions .btn-primary {
+  margin-right: auto;
 }
 
 .mappings-list {
@@ -3221,16 +3214,14 @@ table.rules select {
 
 .recurring-segment-footer {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.65rem;
   margin-top: 0.65rem;
 }
 
 .recurring-segment-footer .recurring-segment-through {
-  flex: 1;
   min-width: 0;
-  max-width: 14rem;
+  max-width: 16rem;
   margin-bottom: 0;
 }
 
@@ -3242,19 +3233,21 @@ table.rules select {
 
 .recurring-segment-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-.recurring-segment-footer .recurring-segment-actions {
-  margin-top: 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
 }
 
 .recurring-segment-actions .btn {
   min-height: 40px;
   padding: 0.45rem 0.85rem;
   font-size: 0.88rem;
+}
+
+.recurring-segment-actions .btn-primary {
+  margin-right: auto;
 }
 
 .recurring-ongoing {
@@ -3864,6 +3857,18 @@ table.rules select {
   color: var(--text-muted);
 }
 
+.pace-simple-glance {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.pace-simple-glance strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .pace-simple-details {
   margin-top: 0.35rem;
   border: 1px solid var(--border);
@@ -3898,19 +3903,8 @@ table.rules select {
   border-bottom: 1px solid var(--border);
 }
 
-.pace-simple-table-section {
-  padding: 0.85rem 1rem 0;
-}
-
-.pace-simple-table-section:last-of-type {
-  padding-bottom: 0.85rem;
-}
-
-.pace-simple-table-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--text-muted);
+.pace-simple-table-wrap {
+  padding: 0.85rem 1rem;
 }
 
 .pace-simple-table {
@@ -3937,28 +3931,17 @@ table.rules select {
   word-break: break-word;
 }
 
-.pace-simple-table-sub td {
-  padding: 0.15rem 0 0.15rem 0.65rem;
-  font-size: 0.82rem;
-}
-
-.pace-simple-table-sub td:last-child {
-  font-weight: 500;
-}
-
-.pace-simple-table-ref td {
-  padding-top: 0.5rem;
-  font-size: 0.82rem;
+.pace-simple-table-group td {
+  padding: 0.65rem 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.pace-simple-table-ref td:last-child {
-  font-weight: 500;
-}
-
-.pace-simple-table-ref--detail td {
-  padding-left: 1.1rem;
-  font-size: 0.78rem;
+.pace-simple-table-group:first-child td {
+  padding-top: 0;
 }
 
 .pace-simple-table-gap td {
@@ -3973,15 +3956,6 @@ table.rules select {
 
 .pace-simple-table-gap.pace-delta-bad td:last-child {
   color: var(--danger);
-}
-
-.pace-simple-footnote {
-  margin: 0;
-  padding: 0.75rem 1rem 1rem;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
 }
 
 .pace-simple-fallback {

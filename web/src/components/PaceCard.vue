@@ -55,104 +55,51 @@
               <p class="pace-simple-hero" :class="simpleHeroClass">{{ simpleHeroLine }}</p>
               <p v-if="simpleHeroSub" class="pace-simple-hero-sub">{{ simpleHeroSub }}</p>
 
+              <p class="pace-simple-glance">
+                <strong>{{ formatIls(displaySpend) }}</strong> so far · usual
+                <strong>{{ formatIls(paceCompareAvg) }}</strong> · month-end
+                <strong>~{{ formatIls(projectedTotal) }}</strong> vs usual
+                <strong>~{{ formatIls(projectedAtUsualPaceForecast) }}</strong>
+              </p>
+
               <details class="pace-simple-details">
                 <summary>See the numbers</summary>
-                <div class="pace-simple-table-section">
-                  <p class="pace-simple-table-title">Everyday spending (shops, food, delivery)</p>
+                <div class="pace-simple-table-wrap">
                   <table class="pace-simple-table">
                     <tbody>
+                      <tr class="pace-simple-table-group">
+                        <td colspan="2">So far this cycle</td>
+                      </tr>
                       <tr>
-                        <td>You so far</td>
+                        <td>Spent so far</td>
                         <td>{{ formatIls(displaySpend) }}</td>
                       </tr>
                       <tr>
-                        <td>Your normal at this point</td>
+                        <td>Usual at this point</td>
                         <td>{{ formatIls(paceCompareAvg) }}</td>
-                      </tr>
-                      <tr v-if="pace.avgCyclesTomorrowLabel && pace.avgCyclesTomorrowVariable > 0">
-                        <td>{{ avgTomorrowRowLabel }}</td>
-                        <td>{{ formatIls(pace.avgCyclesTomorrowVariable) }}</td>
                       </tr>
                       <tr class="pace-simple-table-gap" :class="deltaClass">
                         <td>Difference</td>
                         <td>{{ formatGap(pace?.vsAvgDelta ?? 0) }}</td>
                       </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div class="pace-simple-table-section">
-                  <p class="pace-simple-table-title">Full month forecast (same formula both sides)</p>
-                  <table class="pace-simple-table">
-                    <tbody>
+                      <tr class="pace-simple-table-group">
+                        <td colspan="2">Month-end estimate</td>
+                      </tr>
                       <tr>
-                        <td>Your forecast</td>
+                        <td>Your month</td>
                         <td>~{{ formatIls(projectedTotal) }}</td>
                       </tr>
-                      <tr v-if="pace.configuredMonthlyBills > 0" class="pace-simple-table-sub">
-                        <td>Configured bills (rent, loan…)</td>
-                        <td>~{{ formatIls(pace.configuredMonthlyBills) }}</td>
-                      </tr>
-                      <tr v-if="pace.projectedOtherFixed > 0" class="pace-simple-table-sub">
-                        <td>Other fixed (3-mo avg — subs…)</td>
-                        <td>~{{ formatIls(pace.projectedOtherFixed) }}</td>
-                      </tr>
-                      <tr v-if="pace.projectedEveryday > 0" class="pace-simple-table-sub">
-                        <td>Everyday (your projection)</td>
-                        <td>~{{ formatIls(pace.projectedEveryday) }}</td>
-                      </tr>
                       <tr>
-                        <td>Normal pace forecast</td>
+                        <td>Usual month</td>
                         <td>~{{ formatIls(projectedAtUsualPaceForecast) }}</td>
                       </tr>
-                      <tr v-if="pace.projectedEverydayAtUsualPace > 0" class="pace-simple-table-sub">
-                        <td>Everyday (usual projection)</td>
-                        <td>~{{ formatIls(pace.projectedEverydayAtUsualPace) }}</td>
-                      </tr>
                       <tr class="pace-simple-table-gap" :class="projectedDeltaClass">
-                        <td>Difference (same × on both)</td>
+                        <td>Difference</td>
                         <td>{{ formatGap(projectedVsUsualDelta) }}</td>
-                      </tr>
-                      <tr v-if="Math.abs(everydayForecastGap) >= 50" class="pace-simple-table-ref pace-simple-table-ref--detail">
-                        <td>↳ from everyday pace gap today</td>
-                        <td>{{ formatGap(everydayForecastGap) }}</td>
-                      </tr>
-                      <tr v-if="historicalActualMonthAvg > 0" class="pace-simple-table-ref">
-                        <td>Actual avg (last {{ pace.cyclesUsed || 3 }} mo)</td>
-                        <td>~{{ formatIls(historicalActualMonthAvg) }}</td>
-                      </tr>
-                      <tr
-                        v-if="historicalActualMonthAvg > 0 && Math.abs(projectedVsActualHistoryDelta) >= 50"
-                        class="pace-simple-table-ref"
-                      >
-                        <td>Vs actual history</td>
-                        <td>{{ formatGap(projectedVsActualHistoryDelta) }}</td>
-                      </tr>
-                      <tr
-                        v-if="pace.historicalActualEverydayAvg > 0 && Math.abs(everydayVsActualHistoryDelta) >= 50"
-                        class="pace-simple-table-ref pace-simple-table-ref--detail"
-                      >
-                        <td>↳ everyday (proj. vs actual avg)</td>
-                        <td>{{ formatGap(everydayVsActualHistoryDelta) }}</td>
-                      </tr>
-                      <tr
-                        v-if="pace.historicalActualBillsAvg > 0 && Math.abs(billsVsActualHistoryDelta) >= 50"
-                        class="pace-simple-table-ref pace-simple-table-ref--detail"
-                      >
-                        <td>↳ bills (this cycle vs actual avg)</td>
-                        <td>{{ formatGap(billsVsActualHistoryDelta) }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                <p class="pace-simple-footnote">
-                  The everyday row above is <strong>actual</strong> spend through today.
-                  The headline difference uses the <strong>same {{ secondHalfLabel }}</strong> on both
-                  forecasts — so ×0.61 scales your projection and the usual projection equally.
-                  The ~{{ formatIls(Math.abs(pace?.vsAvgDelta ?? 0)) }} you're
-                  {{ (pace?.vsAvgDelta ?? 0) < 0 ? "under" : "over" }} today drives the headline, not the
-                  multiplier level. “Actual avg” uses what those months really totalled; with ×0.61 your
-                  everyday projection is within {{ formatIls(Math.abs(everydayVsActualHistoryDelta)) }} of that average.
-                </p>
               </details>
             </template>
 
@@ -283,63 +230,11 @@ const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => pace.value?.historicalAvgVariableAtDay ?? 0);
 
-const avgTomorrowRowLabel = computed(() => {
-  const n = pace.value?.cyclesUsed ?? 0;
-  const label = pace.value?.avgCyclesTomorrowLabel ?? "";
-  if (!n || !label) return "";
-  return `${n}-mo avg by ${label}`;
-});
-
 const projectedAtUsualPaceForecast = computed(() => pace.value?.projectedAtUsualPaceForecast ?? 0);
-
-const historicalActualMonthAvg = computed(() => pace.value?.historicalActualMonthAvg ?? 0);
 
 const projectedVsUsualDelta = computed(() => {
   if (!paceCompareAvg.value || !displaySpend.value) return 0;
   return roundMoney(projectedTotal.value - projectedAtUsualPaceForecast.value);
-});
-
-const everydayForecastGap = computed(() => {
-  const usual = pace.value?.projectedEverydayAtUsualPace ?? 0;
-  const yours = pace.value?.projectedEveryday ?? 0;
-  if (!usual || !yours) return 0;
-  return roundMoney(usual - yours);
-});
-
-const secondHalfShapeNote = computed(() => {
-  const m = pace.value?.secondHalfMultiplier ?? 1;
-  if (m < 0.98) return "a lighter second half";
-  if (m > 1.02) return "a heavier second half";
-  return "even spending through the month";
-});
-
-const secondHalfLabel = computed(() => {
-  const m = pace.value?.secondHalfMultiplier ?? 1;
-  const n = pace.value?.secondHalfCalibrationCycles ?? 3;
-  const x = `×${m.toFixed(2)}`;
-  if (pace.value?.secondHalfFromHistory) {
-    return `${x} from your last ${n} completed cycles`;
-  }
-  return `${x} (flat — not enough history)`;
-});
-
-const projectedVsActualHistoryDelta = computed(() => {
-  if (!historicalActualMonthAvg.value || !displaySpend.value) return 0;
-  return roundMoney(projectedTotal.value - historicalActualMonthAvg.value);
-});
-
-const everydayVsActualHistoryDelta = computed(() => {
-  const hist = pace.value?.historicalActualEverydayAvg ?? 0;
-  const proj = pace.value?.projectedEveryday ?? 0;
-  if (!hist || !displaySpend.value) return 0;
-  return roundMoney(proj - hist);
-});
-
-const billsVsActualHistoryDelta = computed(() => {
-  const hist = pace.value?.historicalActualBillsAvg ?? 0;
-  const proj = pace.value?.projectedMonthlyBills ?? 0;
-  if (!hist || !displaySpend.value) return 0;
-  return roundMoney(proj - hist);
 });
 
 const projectedDeltaClass = computed(() => {
