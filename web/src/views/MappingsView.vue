@@ -37,7 +37,7 @@
       </div>
       <div v-if="filteredRows.length" class="mappings-list">
         <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-          <div v-if="auth.isDemo || editingHebrew !== row.Hebrew" class="mappings-row-read">
+          <div v-if="!isEditing(row)" class="mappings-row-read">
             <div class="mappings-row-main">
               <span v-if="showHebrew(row)" class="mappings-row-hebrew" dir="rtl">{{ row.Hebrew }}</span>
               <span class="mappings-row-label">{{ primaryLabel(row) }}</span>
@@ -129,8 +129,8 @@ function primaryLabel(row: MerchantRow): string {
 function rowMatchesQuery(row: MerchantRow, q: string): boolean {
   return (
     row.Hebrew.toLowerCase().includes(q) ||
-    row.English.toLowerCase().includes(q) ||
-    row.Category.toLowerCase().includes(q)
+    (row.English || "").toLowerCase().includes(q) ||
+    (row.Category || "").toLowerCase().includes(q)
   );
 }
 
@@ -145,10 +145,24 @@ function refreshSearchMatches() {
 
 watch(searchQuery, refreshSearchMatches);
 
+function isEditing(row: MerchantRow): boolean {
+  return !auth.isDemo && editingHebrew.value === row.Hebrew;
+}
+
 const filteredRows = computed(() => {
-  if (!matchedHebrewKeys.value) return rows.value;
-  const keys = new Set(matchedHebrewKeys.value);
-  return rows.value.filter((row) => keys.has(row.Hebrew));
+  let list: MerchantRow[];
+  if (!matchedHebrewKeys.value) {
+    list = rows.value;
+  } else {
+    const keys = new Set(matchedHebrewKeys.value);
+    list = rows.value.filter((row) => keys.has(row.Hebrew));
+  }
+  const editing = editingHebrew.value;
+  if (editing && !list.some((row) => row.Hebrew === editing)) {
+    const pinned = rows.value.find((row) => row.Hebrew === editing);
+    if (pinned) list = [pinned, ...list];
+  }
+  return list;
 });
 
 type RuleEntry = { english: string; category?: string };
@@ -175,7 +189,12 @@ function rowsFromRules(rules: Record<string, { english: string; category?: strin
 }
 
 function syncSnapshot() {
-  savedSnapshot.value = JSON.stringify(rulesFromRows(), Object.keys(rulesFromRows()).sort());
+  const rules = rulesFromRows();
+  const sorted: Record<string, RuleEntry> = {};
+  for (const key of Object.keys(rules).sort()) {
+    sorted[key] = rules[key]!;
+  }
+  savedSnapshot.value = JSON.stringify(sorted);
 }
 
 function savedEntry(hebrew: string): RuleEntry | undefined {
@@ -259,20 +278,23 @@ async function startEdit(hebrew: string) {
   if (editingHebrew.value && editingHebrew.value !== hebrew) {
     const ok = await persistRow(editingHebrew.value);
     if (!ok) return;
-    editingHebrew.value = null;
   }
   editingHebrew.value = hebrew;
+  const row = rows.value.find((r) => r.Hebrew === hebrew);
+  if (row) row.Category = row.Category || "";
 }
 
 function cancelEdit(hebrew: string) {
   restoreRow(hebrew);
-  if (editingHebrew.value === hebrew) editingHebrew.value = null;
+  editingHebrew.value = null;
+  refreshSearchMatches();
 }
 
 async function doneEdit(row: MerchantRow) {
   const ok = await persistRow(row.Hebrew);
   if (!ok) return;
   editingHebrew.value = null;
+  refreshSearchMatches();
   setStatus("Saved.");
 }
 
