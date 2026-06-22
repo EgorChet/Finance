@@ -153,23 +153,7 @@
                 <h3 class="recurring-card-title">{{ group.name_en }}</h3>
                 <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
               </div>
-              <button
-                v-if="!auth.isDemo"
-                type="button"
-                class="btn btn-ghost"
-                :disabled="saving"
-                @click="toggleGroupManage(group.id)"
-              >
-                {{ editingGroupId === group.id ? "Done" : "Manage" }}
-              </button>
             </header>
-
-            <div v-if="editingGroupId === group.id && !auth.isDemo" class="recurring-card-actions recurring-card-actions--inline">
-              <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
-              <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
-                Remove bill
-              </button>
-            </div>
 
             <ul class="charge-compact-list">
               <li v-for="seg in group.segments" :key="segmentKey(seg)" class="charge-compact-row-wrap">
@@ -235,6 +219,13 @@
                 </article>
               </li>
             </ul>
+
+            <footer v-if="!auth.isDemo" class="recurring-card-footer">
+              <button type="button" class="btn btn-ghost" :disabled="saving" @click="addSegment(group)">Add period</button>
+              <button type="button" class="btn btn-danger" :disabled="saving" @click="removeCharge(group.id)">
+                Remove bill
+              </button>
+            </footer>
           </section>
         </div>
 
@@ -393,7 +384,6 @@ const savedBudgetSnapshot = ref("");
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
 const editingChargeKey = ref<string | null>(null);
-const editingGroupId = ref<string | null>(null);
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -495,7 +485,6 @@ async function discardChanges() {
   livingBudgetSegments.value = savedBudget.segments;
   livingBudgetMonthTopups.value = savedBudget.month_topups || [];
   editingChargeKey.value = null;
-  editingGroupId.value = null;
   activeAddForm.value = null;
   status.value = "";
   saveStatus.value = "";
@@ -571,7 +560,6 @@ function isEditingCharge(charge: ConfiguredCharge): boolean {
 }
 
 function startEditCharge(charge: ConfiguredCharge) {
-  editingGroupId.value = null;
   editingChargeKey.value = segmentKey(charge);
 }
 
@@ -579,15 +567,6 @@ function stopEditCharge(charge: ConfiguredCharge) {
   if (editingChargeKey.value === segmentKey(charge)) {
     editingChargeKey.value = null;
   }
-}
-
-function toggleGroupManage(groupId: string) {
-  if (editingGroupId.value === groupId) {
-    editingGroupId.value = null;
-    return;
-  }
-  editingChargeKey.value = null;
-  editingGroupId.value = groupId;
 }
 
 function throughLabel(throughMonth: string): string {

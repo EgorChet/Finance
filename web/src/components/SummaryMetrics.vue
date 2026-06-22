@@ -57,12 +57,12 @@
         </div>
         <span v-if="everydayBreakdownEnabled" class="metric-breakdown-cta">View breakdown →</span>
       </component>
-      <div class="metric-card">
+      <div v-if="!compact" class="metric-card">
         <div class="metric-label">Monthly bills</div>
         <div class="metric-value">{{ formatIls(monthlyBills) }}</div>
         <div class="metric-sub">{{ monthlyBillsPct }}% · rent, car loan, Dev Institute</div>
       </div>
-      <div class="metric-card">
+      <div v-if="!compact" class="metric-card">
         <div class="metric-label">Transactions</div>
         <div class="metric-value">{{ report.transaction_count.toLocaleString() }}</div>
       </div>
@@ -154,8 +154,14 @@ import {
 } from "../utils/householdBudget";
 
 const props = withDefaults(
-  defineProps<{ report: SpendingReport; livingBudget: number | null; retrospective?: boolean; partial?: boolean }>(),
-  { retrospective: false, partial: false },
+  defineProps<{
+    report: SpendingReport;
+    livingBudget: number | null;
+    retrospective?: boolean;
+    partial?: boolean;
+    compact?: boolean;
+  }>(),
+  { retrospective: false, partial: false, compact: false },
 );
 
 const everydayBreakdownOpen = ref(false);

@@ -7,16 +7,28 @@
     <h2 class="page-title">Home</h2>
     <p class="page-lead home-lead">This cycle's spending, what's coming up, and your investments at a glance.</p>
 
-    <SpendingSnapshotCard
-      :loading="spendingLoading"
-      :error="spendingError"
-      :report="spendingReport"
-      :cycle-label="cycleLabel"
-      :partial="isPartialCycle"
-      :month-key="currentMonthKey"
-      :living-budget="livingBudgetAmount"
-      :pace="paceResult"
-    />
+    <section class="home-card home-spending-section">
+      <header class="home-card-head">
+        <h3 class="home-card-title">Spending</h3>
+        <span v-if="cycleLabel" class="home-card-meta">{{ cycleLabel }}</span>
+      </header>
+      <AppLoader v-if="spendingLoading" title="Loading spending" subtitle="Fetching this cycle" />
+      <template v-else>
+        <p v-if="spendingError" class="home-card-error">{{ spendingError }}</p>
+        <template v-else-if="spendingReport">
+          <SummaryMetrics
+            compact
+            :report="spendingReport"
+            :living-budget="livingBudgetAmount"
+            :partial="isPartialCycle"
+          />
+          <div class="home-card-actions">
+            <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
+          </div>
+        </template>
+        <p v-else class="home-card-empty">Upload a statement to see spending for this cycle.</p>
+      </template>
+    </section>
 
     <UpcomingEventsCard
       :loading="calendarLoading"
@@ -53,12 +65,12 @@ import {
   type KaspaQuote,
   type MarketSnapshot,
 } from "../api/client";
+import AppLoader from "../components/AppLoader.vue";
+import SummaryMetrics from "../components/SummaryMetrics.vue";
 import PortfolioSummaryCard from "../components/home/PortfolioSummaryCard.vue";
-import SpendingSnapshotCard from "../components/home/SpendingSnapshotCard.vue";
 import UpcomingEventsCard from "../components/home/UpcomingEventsCard.vue";
 import { useAuthStore } from "../stores/auth";
 import { goToSignIn } from "../utils/signIn";
-import { splitFixedVariable } from "../categories";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
@@ -70,7 +82,6 @@ import {
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
   buildCycleReport,
-  computePace,
   cycleNeedsOpenTab,
   cycleStartForDate,
   cycleStartForStatementBilling,
@@ -81,7 +92,7 @@ import {
   isCycleMonthKey,
   loadCycleDay,
   loadManualCycleSpend,
-  loadPaceAvgCycles,
+  loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
 } from "../utils/pace";
 
@@ -155,32 +166,9 @@ const livingBudgetAmount = computed(() =>
   ),
 );
 
-const paceTransactions = computed(() => paceReport.value?.transactions ?? spendingReport.value?.transactions ?? []);
-
-const partialVariableSpend = computed(() => {
-  const key = currentMonthKey.value;
-  if (!key || !spendingReport.value) return undefined;
-  const month = months.value.find((m) => m.key === key);
-  if (!month?.partial) return undefined;
-  const start = cycleStartForStatementBilling(month.billing_date, cycleDay.value);
-  if (!cycleNeedsOpenTab(start, cycleDay.value, months.value)) return undefined;
-  return splitFixedVariable(spendingReport.value.by_category).variable;
-});
-
-const paceResult = computed(() => {
-  const txs = paceTransactions.value;
-  if (!txs.length && !configuredCharges.value.length) return null;
-  const partialActive = partialVariableSpend.value != null;
-  return computePace(txs, {
-    cycleDay: cycleDay.value,
-    includeFixed: false,
-    latestBillingDate: months.value.filter((m) => !isCycleMonthKey(m.key)).sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0]?.billing_date ?? null,
-    manualSpend: partialActive ? null : loadManualCycleSpend(cycleStartForDate(refDate.value, cycleDay.value)),
-    avgCycles: loadPaceAvgCycles(),
-    configuredCharges: configuredCharges.value,
-    statementVariableOverride: partialActive ? partialVariableSpend.value : undefined,
-    today: refDate.value,
-  });
+const overviewLink = computed(() => {
+  if (!currentMonthKey.value) return { name: "overview" as const };
+  return { name: "overview" as const, query: { month: currentMonthKey.value } };
 });
 
 async function refreshPortfolio(force = false) {
@@ -233,7 +221,7 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
     }
   }
   return buildCycleReport(txs, start, end, {
-    includeFixed: true,
+    includeFixed: loadPaceIncludeFixed(),
     manualSpend: partial ? null : loadManualCycleSpend(start),
     configuredCharges: configuredCharges.value,
   });

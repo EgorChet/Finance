@@ -21,15 +21,9 @@
             autocomplete="off"
           />
           <template v-if="!auth.isDemo">
-            <button type="button" class="btn btn-icon" aria-label="Export mappings" @click="exportJson">↓</button>
-            <button
-              type="button"
-              class="btn btn-icon"
-              aria-label="Import mappings"
-              :disabled="importing"
-              @click="importInput?.click()"
-            >
-              ↑
+            <button type="button" class="btn" @click="exportJson">Export</button>
+            <button type="button" class="btn" :disabled="importing" @click="importInput?.click()">
+              {{ importing ? "Importing…" : "Import" }}
             </button>
             <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
           </template>
@@ -43,18 +37,16 @@
       </div>
       <div v-if="filteredRows.length" class="mappings-list">
         <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-          <p class="mappings-card-hebrew" dir="rtl">{{ row.Hebrew }}</p>
-
           <div v-if="auth.isDemo || editingHebrew !== row.Hebrew" class="mappings-row-read">
-            <p class="mappings-row-summary">
-              <span>{{ row.English || "—" }}</span>
-              <span v-if="row.Category" class="mappings-row-dot">·</span>
-              <span v-if="row.Category">{{ row.Category }}</span>
-            </p>
+            <div class="mappings-row-main">
+              <span v-if="showHebrew(row)" class="mappings-row-hebrew" dir="rtl">{{ row.Hebrew }}</span>
+              <span class="mappings-row-label">{{ primaryLabel(row) }}</span>
+              <span v-if="row.Category" class="mappings-category-tag">{{ row.Category }}</span>
+            </div>
             <button
               v-if="!auth.isDemo"
               type="button"
-              class="btn btn-ghost mappings-row-edit"
+              class="btn mappings-row-edit"
               :disabled="!!savingHebrew"
               @click="startEdit(row.Hebrew)"
             >
@@ -62,7 +54,7 @@
             </button>
           </div>
 
-          <div v-else class="mappings-row-fields">
+          <div v-else class="mappings-row-edit-mode">
             <input v-model="row.English" class="input" placeholder="English name" />
             <CategorySelect
               v-model="row.Category"
@@ -70,14 +62,19 @@
               allow-empty
               empty-label="Uncategorized"
             />
-            <button
-              type="button"
-              class="btn btn-primary mappings-row-done"
-              :disabled="savingHebrew === row.Hebrew"
-              @click="doneEdit(row)"
-            >
-              {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
-            </button>
+            <div class="mappings-row-actions">
+              <button type="button" class="btn" :disabled="savingHebrew === row.Hebrew" @click="cancelEdit(row.Hebrew)">
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="savingHebrew === row.Hebrew"
+                @click="doneEdit(row)"
+              >
+                {{ savingHebrew === row.Hebrew ? "…" : "Save" }}
+              </button>
+            </div>
           </div>
         </article>
       </div>
@@ -111,6 +108,23 @@ const editingHebrew = ref<string | null>(null);
 const matchedHebrewKeys = ref<string[] | null>(null);
 
 let statusTimer: ReturnType<typeof setTimeout> | null = null;
+
+function labelsMatch(hebrew: string, english: string): boolean {
+  const h = hebrew.trim().toLowerCase();
+  const e = english.trim().toLowerCase();
+  return h.length > 0 && e.length > 0 && h === e;
+}
+
+function showHebrew(row: MerchantRow): boolean {
+  const h = row.Hebrew.trim();
+  if (!h) return false;
+  if (!row.English.trim()) return true;
+  return !labelsMatch(row.Hebrew, row.English);
+}
+
+function primaryLabel(row: MerchantRow): string {
+  return row.English.trim() || row.Hebrew.trim() || "—";
+}
 
 function rowMatchesQuery(row: MerchantRow, q: string): boolean {
   return (
@@ -182,6 +196,14 @@ function rowIsDirty(hebrew: string): boolean {
   return prev.english !== next.english || (prev.category || undefined) !== next.category;
 }
 
+function restoreRow(hebrew: string) {
+  const row = rows.value.find((r) => r.Hebrew === hebrew);
+  const prev = savedEntry(hebrew);
+  if (!row || !prev) return;
+  row.English = prev.english;
+  row.Category = prev.category || "";
+}
+
 function setStatus(message: string, isError = false) {
   statusMessage.value = message;
   statusIsError.value = isError;
@@ -240,6 +262,11 @@ async function startEdit(hebrew: string) {
     editingHebrew.value = null;
   }
   editingHebrew.value = hebrew;
+}
+
+function cancelEdit(hebrew: string) {
+  restoreRow(hebrew);
+  if (editingHebrew.value === hebrew) editingHebrew.value = null;
 }
 
 async function doneEdit(row: MerchantRow) {
