@@ -160,6 +160,19 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.list-row__amounts {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.list-row__amount--cibus {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .list-row__meta {
   font-size: 0.82rem;
   color: var(--text-muted);
@@ -238,6 +251,7 @@ button {
 }
 
 .toggle-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -256,16 +270,23 @@ button {
   width: 0;
   height: 0;
   margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .toggle-switch-track {
   position: relative;
-  width: 2.4rem;
-  height: 1.35rem;
+  display: block;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 1.5rem;
+  min-height: 1.5rem;
   border-radius: 999px;
-  background: var(--border);
-  transition: background 0.15s ease;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, var(--border));
+  background: color-mix(in srgb, var(--text-muted) 18%, var(--surface));
+  transition: background 0.15s ease, border-color 0.15s ease;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .toggle-switch-track::after {
@@ -3319,7 +3340,7 @@ table.rules select {
 .recurring-segment-through {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
 .recurring-segment-actions {
@@ -3329,15 +3350,15 @@ table.rules select {
 .recurring-ongoing {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 44px;
-  padding: 0.35rem 0;
+  gap: 0.65rem;
+  min-height: auto;
+  padding: 0.15rem 0;
   cursor: pointer;
   user-select: none;
 }
 
 .recurring-ongoing--compact {
-  min-height: 44px;
+  min-height: auto;
   margin: 0;
 }
 

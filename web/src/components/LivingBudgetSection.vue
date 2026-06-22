@@ -15,11 +15,14 @@
     <div v-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
 
     <ul v-else class="charge-compact-list">
-      <li v-for="seg in segments" :key="livingBudgetSegmentStableKey(seg)" class="charge-compact-row-wrap">
-        <div v-if="readonly || !isEditingSegment(seg)" class="list-row">
+      <li v-for="(seg, index) in segments" :key="`budget-seg-${index}`" class="charge-compact-row-wrap">
+        <div v-if="readonly || !isEditingSegment(index)" class="list-row">
           <div class="list-row__main">
-            <span class="list-row__amount">{{ formatIls(seg.amount + CIBUS_MONTHLY_ALLOWANCE) }}</span>
-            <span class="list-row__meta">incl. Cibus · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+            <div class="list-row__amounts">
+              <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
+              <span class="list-row__amount list-row__amount--cibus">+{{ formatIls(CIBUS_MONTHLY_ALLOWANCE) }}</span>
+            </div>
+            <span class="list-row__meta">Cibus · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
           </div>
           <span class="list-row__status recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
             {{ livingBudgetStatusLabel(seg) }}
@@ -29,7 +32,7 @@
             type="button"
             class="btn btn-edit"
             :disabled="disabled"
-            @click="startEditSegment(seg)"
+            @click="startEditSegment(index)"
           >
             Edit
           </button>
@@ -38,11 +41,12 @@
         <EditPanel
           v-else
           title="Edit period"
+          done-label="Save"
           :disabled="disabled"
           deletable
           :delete-label="segmentDeleteLabel"
-          @done="stopEditSegment(seg)"
-          @cancel="cancelEditSegment(seg)"
+          @done="finishEditSegment(index)"
+          @cancel="cancelEditSegment(index)"
           @delete="removeSegment(seg)"
         >
           <div class="recurring-segment-row">
@@ -87,7 +91,7 @@
       <p v-if="!readonly" class="living-budget-topups-lead">One-off boost to the cap for a single month — travel, hosting, etc.</p>
 
       <ul v-if="sortedMonthTopups.length" class="charge-compact-list">
-        <li v-for="topup in sortedMonthTopups" :key="livingBudgetMonthTopupStableKey(topup)" class="charge-compact-row-wrap">
+        <li v-for="(topup, index) in sortedMonthTopups" :key="topupRowKey(topup, index)" class="charge-compact-row-wrap">
           <div v-if="readonly || !isEditingTopup(topup)" class="list-row">
             <div class="list-row__main">
               <span class="list-row__amount">+{{ formatIls(topup.extra) }}</span>
@@ -109,10 +113,11 @@
           <EditPanel
             v-else
             title="Edit monthly extra"
+            done-label="Save"
             :disabled="disabled"
             deletable
             delete-label="Remove extra"
-            @done="stopEditTopup(topup)"
+            @done="finishEditTopup(topup)"
             @cancel="cancelEditTopup(topup)"
             @delete="removeMonthTopup(topup)"
           >
@@ -159,8 +164,6 @@ import {
   CIBUS_MONTHLY_ALLOWANCE,
   currentYearMonth,
   isOngoingThrough,
-  livingBudgetMonthTopupStableKey,
-  livingBudgetSegmentStableKey,
   livingBudgetStatusLabel,
   monthRangeLabel,
   ONGOING_THROUGH_MONTH,
@@ -168,7 +171,7 @@ import {
   ymToLabel,
 } from "../utils/livingBudget";
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     readonly?: boolean;
     disabled?: boolean;
@@ -176,10 +179,12 @@ const props = withDefaults(
   { readonly: false, disabled: false },
 );
 
+const emit = defineEmits<{ save: [] }>();
+
 const segments = defineModel<LivingBudgetSegment[]>("segments", { required: true });
 const monthTopups = defineModel<LivingBudgetMonthTopup[]>("monthTopups", { required: true });
-const editingSegmentKey = ref<string | null>(null);
-const editingTopupKey = ref<string | null>(null);
+const editingSegmentIndex = ref<number | null>(null);
+const editingTopup = ref<LivingBudgetMonthTopup | null>(null);
 const segmentEditSnapshot = ref<LivingBudgetSegment | null>(null);
 const topupEditSnapshot = ref<LivingBudgetMonthTopup | null>(null);
 const segmentIsNew = ref(false);
@@ -193,78 +198,79 @@ const segmentDeleteLabel = computed(() =>
   segments.value.length <= 1 ? "Remove budget period" : "Delete period",
 );
 
-function isEditingSegment(seg: LivingBudgetSegment): boolean {
-  return editingSegmentKey.value === livingBudgetSegmentStableKey(seg);
+function topupRowKey(topup: LivingBudgetMonthTopup, index: number): string {
+  if (editingTopup.value === topup) return `topup-editing-${index}`;
+  return `topup-${topup.month}-${index}`;
+}
+
+function isEditingSegment(index: number): boolean {
+  return editingSegmentIndex.value === index;
 }
 
 function isEditingTopup(topup: LivingBudgetMonthTopup): boolean {
-  return editingTopupKey.value === livingBudgetMonthTopupStableKey(topup);
+  return editingTopup.value === topup;
 }
 
-function startEditSegment(seg: LivingBudgetSegment) {
-  editingTopupKey.value = null;
+function startEditSegment(index: number) {
+  editingTopup.value = null;
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  editingSegmentKey.value = livingBudgetSegmentStableKey(seg);
-  segmentEditSnapshot.value = { ...seg };
+  editingSegmentIndex.value = index;
+  segmentEditSnapshot.value = { ...segments.value[index] };
   segmentIsNew.value = false;
 }
 
-function stopEditSegment(seg: LivingBudgetSegment) {
-  if (editingSegmentKey.value === livingBudgetSegmentStableKey(seg)) {
-    segmentEditSnapshot.value = null;
-    segmentIsNew.value = false;
-    editingSegmentKey.value = null;
-  }
+async function finishEditSegment(index: number) {
+  if (editingSegmentIndex.value !== index) return;
+  editingSegmentIndex.value = null;
+  segmentEditSnapshot.value = null;
+  segmentIsNew.value = false;
+  emit("save");
 }
 
-function cancelEditSegment(seg: LivingBudgetSegment) {
-  const key = livingBudgetSegmentStableKey(seg);
-  if (editingSegmentKey.value !== key) return;
+function cancelEditSegment(index: number) {
+  if (editingSegmentIndex.value !== index) return;
 
   if (segmentIsNew.value) {
-    segments.value = segments.value.filter((s) => livingBudgetSegmentStableKey(s) !== key);
+    segments.value = segments.value.filter((_, i) => i !== index);
   } else if (segmentEditSnapshot.value) {
-    const idx = segments.value.findIndex((s) => livingBudgetSegmentStableKey(s) === key);
-    if (idx >= 0) segments.value[idx] = { ...segmentEditSnapshot.value };
+    segments.value[index] = { ...segmentEditSnapshot.value };
   }
 
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
-  editingSegmentKey.value = null;
+  editingSegmentIndex.value = null;
 }
 
 function startEditTopup(topup: LivingBudgetMonthTopup) {
-  editingSegmentKey.value = null;
+  editingSegmentIndex.value = null;
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
-  editingTopupKey.value = livingBudgetMonthTopupStableKey(topup);
+  editingTopup.value = topup;
   topupEditSnapshot.value = { ...topup };
   topupIsNew.value = false;
 }
 
-function stopEditTopup(topup: LivingBudgetMonthTopup) {
-  if (editingTopupKey.value === livingBudgetMonthTopupStableKey(topup)) {
-    topupEditSnapshot.value = null;
-    topupIsNew.value = false;
-    editingTopupKey.value = null;
-  }
+async function finishEditTopup(topup: LivingBudgetMonthTopup) {
+  if (editingTopup.value !== topup) return;
+  editingTopup.value = null;
+  topupEditSnapshot.value = null;
+  topupIsNew.value = false;
+  emit("save");
 }
 
 function cancelEditTopup(topup: LivingBudgetMonthTopup) {
-  const key = livingBudgetMonthTopupStableKey(topup);
-  if (editingTopupKey.value !== key) return;
+  if (editingTopup.value !== topup) return;
 
   if (topupIsNew.value) {
-    monthTopups.value = monthTopups.value.filter((t) => livingBudgetMonthTopupStableKey(t) !== key);
+    monthTopups.value = monthTopups.value.filter((t) => t !== topup);
   } else if (topupEditSnapshot.value) {
-    const idx = monthTopups.value.findIndex((t) => livingBudgetMonthTopupStableKey(t) === key);
-    if (idx >= 0) monthTopups.value[idx] = { ...topupEditSnapshot.value };
+    Object.assign(topup, topupEditSnapshot.value);
   }
 
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  editingTopupKey.value = null;
+  editingTopup.value = null;
 }
 
 function throughLabel(throughMonth: string): string {
@@ -314,10 +320,10 @@ function addSegment() {
     through_month: ONGOING_THROUGH_MONTH,
   };
   segments.value = [...sorted, newSeg];
-  editingTopupKey.value = null;
+  editingTopup.value = null;
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  editingSegmentKey.value = livingBudgetSegmentStableKey(newSeg);
+  editingSegmentIndex.value = segments.value.length - 1;
   segmentEditSnapshot.value = { ...newSeg };
   segmentIsNew.value = true;
 }
@@ -330,9 +336,13 @@ async function removeSegment(seg: LivingBudgetSegment) {
     tone: "danger",
   });
   if (!ok) return;
-  const key = livingBudgetSegmentStableKey(seg);
-  if (editingSegmentKey.value === key) editingSegmentKey.value = null;
-  segments.value = segments.value.filter((s) => livingBudgetSegmentStableKey(s) !== key);
+  const index = segments.value.indexOf(seg);
+  if (editingSegmentIndex.value === index) editingSegmentIndex.value = null;
+  else if (editingSegmentIndex.value !== null && editingSegmentIndex.value > index) {
+    editingSegmentIndex.value -= 1;
+  }
+  segments.value = segments.value.filter((s) => s !== seg);
+  emit("save");
 }
 
 function addMonthTopup() {
@@ -343,10 +353,10 @@ function addMonthTopup() {
   }
   const newTopup: LivingBudgetMonthTopup = { month, extra: 500 };
   monthTopups.value = [...monthTopups.value, newTopup];
-  editingSegmentKey.value = null;
+  editingSegmentIndex.value = null;
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
-  editingTopupKey.value = livingBudgetMonthTopupStableKey(newTopup);
+  editingTopup.value = newTopup;
   topupEditSnapshot.value = { ...newTopup };
   topupIsNew.value = true;
 }
@@ -359,8 +369,8 @@ async function removeMonthTopup(topup: LivingBudgetMonthTopup) {
     tone: "danger",
   });
   if (!ok) return;
-  const key = livingBudgetMonthTopupStableKey(topup);
-  if (editingTopupKey.value === key) editingTopupKey.value = null;
-  monthTopups.value = monthTopups.value.filter((t) => livingBudgetMonthTopupStableKey(t) !== key);
+  if (editingTopup.value === topup) editingTopup.value = null;
+  monthTopups.value = monthTopups.value.filter((t) => t !== topup);
+  emit("save");
 }
 </script>

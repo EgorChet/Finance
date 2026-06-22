@@ -8,26 +8,16 @@
         <div>
           <h2 class="page-title">Extra charges</h2>
           <p class="page-lead" style="margin-bottom: 0">
-            Living budget cap, recurring monthly bills, and one-time charges. Review edits, then save when ready.
+            Living budget cap, recurring monthly bills, and one-time charges.
           </p>
         </div>
         <p
-          v-if="!loading && saveStatus && (!hasUnsavedChanges || saveError)"
+          v-if="!loading && saveStatus"
           class="recurring-save-status"
           :class="{ 'recurring-save-status--error': saveError }"
         >
           {{ saveStatus }}
         </p>
-      </div>
-      <div v-if="!loading && hasUnsavedChanges && !auth.isDemo" class="recurring-unsaved-bar">
-        <p class="recurring-unsaved-text">You have unsaved changes</p>
-        <p v-if="saveError && saveStatus" class="recurring-form-error">{{ saveStatus }}</p>
-        <div class="recurring-unsaved-actions">
-          <button type="button" class="btn" :disabled="saving" @click="discardChanges">Discard</button>
-          <button type="button" class="btn btn-primary" :disabled="saving" @click="saveChanges">
-            {{ saving ? "Saving…" : "Save changes" }}
-          </button>
-        </div>
       </div>
     </div>
 
@@ -44,6 +34,7 @@
         v-model:month-topups="livingBudgetMonthTopups"
         :readonly="auth.isDemo"
         :disabled="saving"
+        @save="persistCharges"
       />
 
       <section v-if="activeAddForm === 'recurring' && !auth.isDemo" class="recurring-add recurring-add--panel">
@@ -159,7 +150,7 @@
             </header>
 
             <ul class="charge-compact-list">
-              <li v-for="seg in group.segments" :key="segmentKey(seg)" class="charge-compact-row-wrap">
+              <li v-for="(seg, segIndex) in group.segments" :key="`${group.id}-${segIndex}`" class="charge-compact-row-wrap">
                 <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
                   <div class="list-row__main">
                     <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
@@ -185,10 +176,11 @@
                 <EditPanel
                   v-else
                   title="Edit period"
+                  done-label="Save"
                   :disabled="saving"
                   deletable
                   :delete-label="segmentDeleteLabel(group)"
-                  @done="stopEditCharge(seg)"
+                  @done="finishEditCharge(seg)"
                   @cancel="cancelEditCharge(seg)"
                   @delete="deleteSegmentOrBill(group, seg)"
                 >
@@ -254,7 +246,7 @@
 
         <div v-if="oneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
-            <li v-for="charge in oneTimeCharges" :key="segmentKey(charge)" class="charge-compact-row-wrap">
+            <li v-for="charge in oneTimeCharges" :key="charge.id" class="charge-compact-row-wrap">
               <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
                 <div class="list-row__main">
                   <strong class="list-row__label">{{ charge.name_en }}</strong>
@@ -282,10 +274,11 @@
               <EditPanel
                 v-else
                 title="Edit charge"
+                done-label="Save"
                 :disabled="saving"
                 deletable
                 delete-label="Delete charge"
-                @done="stopEditCharge(charge)"
+                @done="finishEditCharge(charge)"
                 @cancel="cancelEditCharge(charge)"
                 @delete="removeOneTime(charge)"
               >
@@ -390,7 +383,7 @@ const savedBudgetSnapshot = ref("");
 
 type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
-const editingChargeKey = ref<string | null>(null);
+const editingCharge = ref<ConfiguredCharge | null>(null);
 const chargeEditSnapshot = ref<ConfiguredCharge | null>(null);
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -473,32 +466,6 @@ function showSaveStatus(message: string, isError = false) {
   }
 }
 
-async function saveChanges() {
-  await persistCharges();
-}
-
-async function discardChanges() {
-  const ok = await confirm({
-    title: "Discard changes?",
-    message: "Your unsaved edits will be lost.",
-    confirmLabel: "Discard",
-    tone: "danger",
-  });
-  if (!ok) return;
-  charges.value = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
-  const savedBudget = JSON.parse(savedBudgetSnapshot.value) as {
-    segments: LivingBudgetSegment[];
-    month_topups?: LivingBudgetMonthTopup[];
-  };
-  livingBudgetSegments.value = savedBudget.segments;
-  livingBudgetMonthTopups.value = savedBudget.month_topups || [];
-  editingChargeKey.value = null;
-  chargeEditSnapshot.value = null;
-  activeAddForm.value = null;
-  status.value = "";
-  saveStatus.value = "";
-}
-
 async function persistCharges(): Promise<boolean> {
   if (auth.isDemo) return true;
   if (!isDirty()) return true;
@@ -565,12 +532,11 @@ async function runPersist(): Promise<boolean> {
 }
 
 function isEditingCharge(charge: ConfiguredCharge): boolean {
-  return editingChargeKey.value === segmentKey(charge);
+  return editingCharge.value === charge;
 }
 
 function isEditingGroup(group: { segments: ConfiguredCharge[] }): boolean {
-  if (!editingChargeKey.value) return false;
-  return group.segments.some((seg) => segmentKey(seg) === editingChargeKey.value);
+  return group.segments.some((seg) => editingCharge.value === seg);
 }
 
 function segmentDeleteLabel(group: ChargeGroup): string {
@@ -587,32 +553,36 @@ async function deleteSegmentOrBill(group: ChargeGroup, seg: ConfiguredCharge) {
 
 function startEditCharge(charge: ConfiguredCharge) {
   chargeEditSnapshot.value = normalizeConfiguredCharge({ ...charge });
-  editingChargeKey.value = segmentKey(charge);
+  editingCharge.value = charge;
 }
 
-function stopEditCharge(charge: ConfiguredCharge) {
-  if (editingChargeKey.value === segmentKey(charge)) {
-    chargeEditSnapshot.value = null;
-    editingChargeKey.value = null;
-  }
+async function finishEditCharge(charge: ConfiguredCharge) {
+  if (editingCharge.value !== charge) return;
+  chargeEditSnapshot.value = null;
+  editingCharge.value = null;
+  await persistCharges();
 }
 
 function cancelEditCharge(charge: ConfiguredCharge) {
-  const key = segmentKey(charge);
-  if (editingChargeKey.value !== key) return;
+  if (editingCharge.value !== charge || !chargeEditSnapshot.value) {
+    editingCharge.value = null;
+    chargeEditSnapshot.value = null;
+    return;
+  }
 
   const savedCharges = JSON.parse(savedSnapshot.value) as ConfiguredCharge[];
-  const wasPersisted = savedCharges.some((c) => segmentKey(c) === key);
+  const snapKey = segmentKey(chargeEditSnapshot.value);
+  const wasPersisted = savedCharges.some((c) => segmentKey(c) === snapKey);
+  const idx = charges.value.indexOf(charge);
 
-  if (wasPersisted && chargeEditSnapshot.value) {
-    const idx = charges.value.findIndex((c) => segmentKey(c) === key);
-    if (idx >= 0) charges.value[idx] = { ...chargeEditSnapshot.value };
+  if (wasPersisted && idx >= 0) {
+    charges.value[idx] = { ...chargeEditSnapshot.value };
   } else {
-    charges.value = charges.value.filter((c) => segmentKey(c) !== key);
+    charges.value = charges.value.filter((c) => c !== charge);
   }
 
   chargeEditSnapshot.value = null;
-  editingChargeKey.value = null;
+  editingCharge.value = null;
 }
 
 function throughLabel(throughMonth: string): string {
@@ -707,6 +677,10 @@ async function removeSegment(seg: ConfiguredCharge) {
     tone: "danger",
   });
   if (!ok) return;
+  if (editingCharge.value === seg) {
+    editingCharge.value = null;
+    chargeEditSnapshot.value = null;
+  }
   const key = segmentKey(seg);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
@@ -722,6 +696,10 @@ async function removeCharge(id: string) {
     tone: "danger",
   });
   if (!ok) return;
+  if (group?.segments.some((s) => editingCharge.value === s)) {
+    editingCharge.value = null;
+    chargeEditSnapshot.value = null;
+  }
   charges.value = charges.value.filter((c) => c.id !== id || isOneTimeCharge(c));
   await persistCharges();
 }
@@ -734,6 +712,10 @@ async function removeOneTime(charge: ConfiguredCharge) {
     tone: "danger",
   });
   if (!ok) return;
+  if (editingCharge.value === charge) {
+    editingCharge.value = null;
+    chargeEditSnapshot.value = null;
+  }
   const key = segmentKey(charge);
   charges.value = charges.value.filter((c) => segmentKey(c) !== key);
   await persistCharges();
@@ -885,12 +867,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 
 onBeforeRouteLeave(async () => {
   if (auth.isDemo || !isDirty()) return true;
-  return confirm({
-    title: "Unsaved changes",
-    message: "You have unsaved changes. Leave without saving?",
-    confirmLabel: "Leave without saving",
-    cancelLabel: "Stay",
-  });
+  await persistCharges();
+  return true;
 });
 
 onMounted(() => {
