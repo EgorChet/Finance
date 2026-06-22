@@ -8,9 +8,6 @@
       <slot />
     </div>
     <footer class="edit-panel__foot">
-      <button type="button" class="btn btn-primary edit-panel__done" :disabled="disabled" @click="$emit('done')">
-        {{ doneLabel }}
-      </button>
       <IconButton
         v-if="deletable"
         icon="trash"
@@ -19,6 +16,9 @@
         :disabled="disabled"
         @click="$emit('delete')"
       />
+      <button type="button" class="btn btn-primary edit-panel__done" :disabled="disabled" @click="$emit('done')">
+        {{ doneLabel }}
+      </button>
     </footer>
   </article>
 </template>

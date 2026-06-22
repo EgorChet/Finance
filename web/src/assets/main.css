@@ -10,6 +10,8 @@
   --text-faint: #6b7280;
   --accent: #38bdf8;
   --danger: #f87171;
+  --toggle-off: #475569;
+  --toggle-thumb: #ffffff;
 }
 
 [data-theme="light"] {
@@ -23,6 +25,8 @@
   --text-faint: #94a3b8;
   --accent: #0284c7;
   --danger: #dc2626;
+  --toggle-off: #cbd5e1;
+  --toggle-thumb: #ffffff;
 }
 
 * {
@@ -115,8 +119,9 @@ button {
 
 .icon-button-svg {
   display: block;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  flex-shrink: 0;
 }
 
 .list-row {
@@ -203,7 +208,11 @@ button {
 .edit-panel__head .btn-icon {
   min-width: 36px;
   min-height: 36px;
-  padding: 0;
+}
+
+.edit-panel__foot .btn-icon {
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .edit-panel__body {
@@ -224,6 +233,7 @@ button {
 
 .edit-panel__done {
   min-height: 40px;
+  margin-left: auto;
 }
 
 .section-header-actions {
@@ -282,8 +292,8 @@ button {
   height: 1.5rem;
   min-height: 1.5rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, var(--border));
-  background: color-mix(in srgb, var(--text-muted) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--toggle-off) 75%, var(--text-muted));
+  background: var(--toggle-off);
   transition: background 0.15s ease, border-color 0.15s ease;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -297,13 +307,15 @@ button {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 20%);
+  background: var(--toggle-thumb);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 20%, transparent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 28%);
   transition: transform 0.15s ease;
 }
 
 .toggle-switch-input:checked + .toggle-switch-track {
   background: var(--accent);
+  border-color: var(--accent);
 }
 
 .toggle-switch-input:checked + .toggle-switch-track::after {
@@ -1633,10 +1645,13 @@ button {
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 44px;
   min-height: 44px;
-  padding: 0.35rem 0.65rem;
-  font-size: 1.25rem;
+  padding: 0;
+  font-size: 1.35rem;
   line-height: 1;
 }
 
