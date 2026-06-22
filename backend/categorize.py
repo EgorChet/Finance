@@ -130,7 +130,6 @@ _CLOTHES_RE = re.compile(
         [
             r"\bzara\b",
             r"זארה",
-            r"ארקפה\s*ביג\s*גלילות",  # bank mislabel for Zara at Big Fashion Galilot
             r"\bnike\b",
             r"נייקי",
             r"calvin\s*klein",

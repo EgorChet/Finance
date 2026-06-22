@@ -3,7 +3,7 @@ export function normalizeSavedMerchantEnglish(english: string): string {
   return english.trim();
 }
 
-/** Roll up chain branch names to a single display label (API copy — keep in sync with web). */
+/** Roll up chain/brand names only — never by mall (Big Galilot has many unrelated stores). */
 export function canonicalMerchantEnglish(english: string, hebrew = ""): string {
   const n = english.trim();
   if (!n) return n;
