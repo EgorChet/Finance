@@ -1,3 +1,8 @@
+/** Trim user-entered English — saved mappings are never rewritten by chain roll-up rules. */
+export function normalizeSavedMerchantEnglish(english: string): string {
+  return english.trim();
+}
+
 /** Roll up chain branch names to a single display label (API copy — keep in sync with web). */
 export function canonicalMerchantEnglish(english: string, hebrew = ""): string {
   const n = english.trim();
@@ -25,7 +30,7 @@ export function normalizeMerchantRules(rules: Record<string, { english: string; 
   for (const [hebrew, rule] of Object.entries(rules)) {
     out[hebrew] = {
       ...rule,
-      english: canonicalMerchantEnglish(rule.english || "", hebrew),
+      english: normalizeSavedMerchantEnglish(rule.english || ""),
     };
   }
   return out;

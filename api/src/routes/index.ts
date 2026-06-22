@@ -22,7 +22,7 @@ import {
   suggestEnglish,
   transactionKey as reviewTransactionKey,
 } from "../services/reviewService.js";
-import { canonicalMerchantEnglish, normalizeMerchantRules } from "../utils/merchantVendor.js";
+import { normalizeMerchantRules } from "../utils/merchantVendor.js";
 import {
   discoverXlsxFiles,
   fileHash,
@@ -281,7 +281,7 @@ router.post("/rules/entry", async (req, res) => {
   };
   const rules = await readRules();
   rules[hebrew] = {
-    english: canonicalMerchantEnglish(english, hebrew),
+    english: (english || "").trim(),
     category: category || null,
   };
   await writeRules(rules);
@@ -454,7 +454,7 @@ router.post("/review/confirm", async (req, res) => {
 
   const rules = await readRules();
   rules[hebrew] = {
-    english: canonicalMerchantEnglish(english, hebrew),
+    english: (english || "").trim(),
     category: category || null,
   };
   await writeRules(rules);

@@ -1,6 +1,7 @@
 /**
  * Roll up chain branch names to a single display label (Arcaffe, Super Pharm, …).
  * Hebrew keys stay unique in rules; English names group merchants in charts.
+ * Only used for auto-labeled transactions — not for user-saved mappings.
  */
 export function canonicalMerchantEnglish(english: string, hebrew = ""): string {
   const n = english.trim();

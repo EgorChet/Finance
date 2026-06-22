@@ -76,7 +76,6 @@ import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import { useAuthStore } from "../stores/auth";
 import { CATEGORY_PICKLIST } from "../categories";
-import { canonicalMerchantEnglish } from "../utils/merchantVendor";
 import type { MerchantRow } from "../types";
 
 const categories = CATEGORY_PICKLIST;
@@ -126,7 +125,7 @@ function rulesFromRows() {
   const rules: Record<string, { english: string; category?: string }> = {};
   for (const row of rows.value) {
     rules[row.Hebrew] = {
-      english: canonicalMerchantEnglish(row.English, row.Hebrew),
+      english: row.English.trim(),
       category: row.Category || undefined,
     };
   }
@@ -222,10 +221,7 @@ async function importJson(e: Event) {
     for (const [he, rule] of Object.entries(imported)) {
       const hebrew = he.trim();
       if (!hebrew || !rule || typeof rule !== "object") continue;
-      const english = canonicalMerchantEnglish(
-        typeof rule.english === "string" ? rule.english : "",
-        hebrew,
-      );
+      const english = typeof rule.english === "string" ? rule.english.trim() : "";
       const category = typeof rule.category === "string" ? rule.category : "";
       const existing = rows.value.find((r) => r.Hebrew === hebrew);
       if (existing) {

@@ -271,7 +271,7 @@ export function applyMerchantRules(data: StatementsData, rules: MerchantRules): 
     for (const tx of entry.report.transactions) {
       const rule = rules[tx.merchant_he];
       if (rule?.english) {
-        const fromRule = canonicalMerchantEnglish(rule.english, tx.merchant_he);
+        const fromRule = rule.english.trim();
         if (tx.merchant_en !== fromRule) {
           tx.merchant_en = fromRule;
           changed += 1;
