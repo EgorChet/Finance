@@ -182,7 +182,11 @@ async function save() {
   saving.value = true;
   setStatus("");
   try {
-    await saveRules(rulesFromRows(), auth.token || undefined);
+    const result = await saveRules(rulesFromRows(), auth.token || undefined);
+    if (!result.saved) throw new Error("Server did not confirm save.");
+    const rules = await fetchRules(false, auth.token || undefined);
+    rows.value = rowsFromRules(rules);
+    refreshSearchMatches();
     setStatus(`Saved ${rows.value.length} merchant rules to the server.`);
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Save failed", true);
@@ -240,6 +244,9 @@ async function importJson(e: Event) {
 
     const result = await saveRules(rulesFromRows(), auth.token || undefined);
     if (!result.saved) throw new Error("Server did not confirm save.");
+    const rules = await fetchRules(false, auth.token || undefined);
+    rows.value = rowsFromRules(rules);
+    refreshSearchMatches();
     setStatus(`Imported and saved ${rows.value.length} merchant rules.`);
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Import failed", true);

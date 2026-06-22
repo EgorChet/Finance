@@ -251,12 +251,26 @@ router.post("/exclusions/remove", async (req, res) => {
 });
 
 router.put("/rules", async (req, res) => {
-  const rules = normalizeMerchantRules(req.body as MerchantRules);
-  await writeRules(rules);
-  const statements = await readStatements();
-  const updated = applyMerchantRules(statements, rules);
-  await writeStatements(statements);
-  res.json({ saved: true, updated_transactions: updated });
+  try {
+    const rules = normalizeMerchantRules(req.body as MerchantRules);
+    await writeRules(rules);
+    const persisted = normalizeMerchantRules(await readRules());
+    const sent = JSON.stringify(rules, Object.keys(rules).sort());
+    const got = JSON.stringify(persisted, Object.keys(persisted).sort());
+    if (sent !== got) {
+      res.status(500).json({
+        error: "Merchant rules did not persist — check that Render has deployed the latest API and Supabase credentials are set.",
+      });
+      return;
+    }
+    const statements = await readStatements();
+    const updated = applyMerchantRules(statements, rules);
+    await writeStatements(statements);
+    res.json({ saved: true, updated_transactions: updated });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Save failed";
+    res.status(500).json({ error: message });
+  }
 });
 
 router.post("/rules/entry", async (req, res) => {

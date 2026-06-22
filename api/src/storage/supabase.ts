@@ -74,11 +74,15 @@ export async function writeRules(rules: MerchantRules): Promise<void> {
     await local.writeRules(rules);
     return;
   }
-  await supabaseFetch("app_state", {
+  const res = await supabaseFetch("app_state", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "rules", data: rules }),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
 }
 
 export async function readReviewProgress(): Promise<ReviewProgressData> {
@@ -94,11 +98,15 @@ export async function writeReviewProgress(data: ReviewProgressData): Promise<voi
     await local.writeReviewProgress(data);
     return;
   }
-  await supabaseFetch("app_state", {
+  const res = await supabaseFetch("app_state", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "review", data }),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
 }
 
 export async function readExclusions(): Promise<ExclusionsData> {
