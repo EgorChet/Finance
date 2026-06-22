@@ -561,6 +561,57 @@ button {
   line-height: 1.4;
 }
 
+.everyday-breakdown-simple {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.everyday-breakdown-simple-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+  min-width: 0;
+}
+
+.everyday-breakdown-simple-row > span:first-child {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.everyday-breakdown-simple-row strong,
+.everyday-breakdown-simple-row > span:last-child {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.everyday-breakdown-simple-row--sub {
+  padding-left: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.everyday-breakdown-simple-row--total {
+  margin-top: 0.35rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.everyday-breakdown-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .everyday-breakdown-summary {
   width: 100%;
   max-width: 100%;
