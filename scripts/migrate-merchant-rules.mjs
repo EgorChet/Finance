@@ -26,9 +26,6 @@ function canonicalMerchantEnglish(english, hebrew = "") {
   if (!n) return n;
   const text = `${hebrew} ${n}`;
 
-  if (/ארקפה\s*ביג\s*גלילות|arcaffe.*big.*galilot|zara.*big\s*fashion/i.test(text)) {
-    return "Zara Big Fashion Galilot";
-  }
   if (/leumi\s*bonus|לאומי\s*בונוס/i.test(text)) return "Leumi Bonus";
   if (/arcaff|ארקפה/i.test(text)) return "Arcaffe";
   if (/good\s*[- ]?pharm|גוד\s*פארם/i.test(text)) return "Good Pharm";

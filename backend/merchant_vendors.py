@@ -3,10 +3,6 @@ from __future__ import annotations
 
 import re
 
-_ZARA_BIG_GALILOT = re.compile(
-    r"ארקפה\s*ביג\s*גלילות|arcaffe.*big.*galilot|zara.*big\s*fashion",
-    re.IGNORECASE,
-)
 _LEUMI_BONUS = re.compile(r"leumi\s*bonus|לאומי\s*בונוס", re.IGNORECASE)
 _ARCAFFE = re.compile(r"arcaff|ארקפה", re.IGNORECASE)
 _GOOD_PHARM = re.compile(r"good\s*[- ]?pharm|גוד\s*פארם", re.IGNORECASE)
@@ -24,8 +20,6 @@ def canonical_merchant_english(english: str, hebrew: str = "") -> str:
         return n
     text = f"{hebrew} {n}".strip()
 
-    if _ZARA_BIG_GALILOT.search(text):
-        return "Zara Big Fashion Galilot"
     if _LEUMI_BONUS.search(text):
         return "Leumi Bonus"
     if _ARCAFFE.search(text):
