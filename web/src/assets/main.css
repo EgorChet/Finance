@@ -416,12 +416,25 @@ button {
   margin-left: 0.35rem;
 }
 
-.metric-sub-tap {
-  opacity: 0.9;
-}
-
 .metric-sub-pending {
   color: var(--text-muted);
+}
+
+.metric-breakdown-cta {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent, #60a5fa);
+}
+
+.metric-card-clickable .metric-breakdown-cta {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.metric-sub-tap {
+  opacity: 0.9;
 }
 
 .everyday-breakdown-section {

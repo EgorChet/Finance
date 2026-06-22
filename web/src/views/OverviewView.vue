@@ -18,6 +18,7 @@
     <h2 class="overview-page-title">Spending overview</h2>
     <div v-if="partialCycleBanner && !reportLoading" class="demo-banner partial-statement-banner">
       {{ partialCycleBanner }}
+      <span v-if="isPartialMonthSelected"> Tap <strong>Everyday spending</strong> for the full breakdown (export + pending + Extra charges).</span>
     </div>
     <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <AppLoader
@@ -32,7 +33,7 @@
       :report="report"
       :living-budget="resolvedLivingBudget"
       :retrospective="budgetRetrospective"
-      :partial="isPartialForOpenCycle"
+      :partial="isPartialMonthSelected"
     />
     <PaceCard
       v-if="showPaceCard"
@@ -225,6 +226,12 @@ const isLiveCycleSelected = computed(() => {
     return selectedOpenCycle.value?.inProgress === true;
   }
   return start === cycleStartForDate(refDate.value, cycleDay.value);
+});
+
+const isPartialMonthSelected = computed(() => {
+  const month = months.value.find((m) => m.key === selectedMonth.value);
+  if (month?.partial) return true;
+  return report.value?.metadata?.provisional === true;
 });
 
 const isPartialForOpenCycle = computed(() => {

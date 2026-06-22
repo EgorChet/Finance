@@ -53,8 +53,8 @@
           <span v-if="everydayBreakdownEnabled && everydaySettlement.pending > 0" class="metric-sub-pending">
             · {{ formatIls(everydaySettlement.pending) }} pending
           </span>
-          <span v-if="everydayBreakdownEnabled" class="metric-sub-tap"> · tap for breakdown</span>
         </div>
+        <span v-if="everydayBreakdownEnabled" class="metric-breakdown-cta">View breakdown →</span>
       </component>
       <div class="metric-card">
         <div class="metric-label">Monthly bills</div>
