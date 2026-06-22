@@ -285,6 +285,19 @@ button {
   min-width: 12rem;
 }
 
+/* Month + year need more room than the amount field */
+.living-budget-topup-row {
+  grid-template-columns: minmax(10rem, 1.45fr) minmax(4.5rem, 0.55fr);
+}
+
+.living-budget-topup-month {
+  min-width: 0;
+}
+
+.living-budget-topup-amount .input {
+  max-width: 7rem;
+}
+
 .living-budget-section {
   margin-bottom: 1.5rem;
 }

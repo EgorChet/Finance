@@ -105,12 +105,12 @@
           :key="livingBudgetMonthTopupStableKey(topup)"
           class="recurring-segment-card"
         >
-          <div class="recurring-segment-row">
-            <div class="field-group">
+          <div class="recurring-segment-row living-budget-topup-row">
+            <div class="field-group living-budget-topup-month">
               <label class="field-label">Month</label>
               <MonthSelect v-model="topup.month" :disabled="disabled" />
             </div>
-            <div class="field-group">
+            <div class="field-group living-budget-topup-amount">
               <label class="field-label">Extra (₪)</label>
               <input
                 v-model.number="topup.extra"
