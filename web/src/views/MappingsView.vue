@@ -27,8 +27,8 @@
       </p>
     </div>
     <div v-if="!auth.isDemo" class="mappings-actions">
-      <button class="btn btn-primary" :disabled="saving" @click="save">
-        {{ saving ? "Saving…" : "Save all" }}
+      <button class="btn btn-primary" :disabled="saving || !hasUnsavedChanges" @click="save">
+        {{ saveButtonLabel }}
       </button>
       <button class="btn" @click="exportJson">Export</button>
       <button class="btn" type="button" :disabled="importing" @click="importInput?.click()">
@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { fetchRules, saveRules } from "../api/client";
+import { fetchRules, saveRuleEntry, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import { useAuthStore } from "../stores/auth";
@@ -83,6 +83,8 @@ const categories = CATEGORY_PICKLIST;
 const auth = useAuthStore();
 const rows = ref<MerchantRow[]>([]);
 const loading = ref(true);
+const hydrated = ref(false);
+const savedSnapshot = ref("");
 const saving = ref(false);
 const importing = ref(false);
 const importInput = ref<HTMLInputElement | null>(null);
@@ -121,6 +123,41 @@ const filteredRows = computed(() => {
   return rows.value.filter((row) => keys.has(row.Hebrew));
 });
 
+type RuleEntry = { english: string; category?: string };
+
+function serializeRules(rules: Record<string, RuleEntry>): string {
+  return JSON.stringify(rules, Object.keys(rules).sort());
+}
+
+function syncSnapshot() {
+  savedSnapshot.value = serializeRules(rulesFromRows());
+}
+
+function getDirtyEntries(): Array<{ hebrew: string; english: string; category?: string }> {
+  const current = rulesFromRows();
+  const saved = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
+  const dirty: Array<{ hebrew: string; english: string; category?: string }> = [];
+  for (const [hebrew, rule] of Object.entries(current)) {
+    const prev = saved[hebrew];
+    const category = rule.category || undefined;
+    const prevCategory = prev?.category || undefined;
+    if (!prev || prev.english !== rule.english || prevCategory !== category) {
+      dirty.push({ hebrew, english: rule.english, category });
+    }
+  }
+  return dirty;
+}
+
+const dirtyCount = computed(() => (hydrated.value ? getDirtyEntries().length : 0));
+const hasUnsavedChanges = computed(() => dirtyCount.value > 0);
+
+const saveButtonLabel = computed(() => {
+  if (saving.value) return "Saving…";
+  if (!hasUnsavedChanges.value) return "Save changes";
+  if (dirtyCount.value === 1) return "Save 1 change";
+  return `Save ${dirtyCount.value} changes`;
+});
+
 function rulesFromRows() {
   const rules: Record<string, { english: string; category?: string }> = {};
   for (const row of rows.value) {
@@ -149,14 +186,18 @@ function setStatus(message: string, isError = false) {
 
 async function load() {
   loading.value = true;
+  hydrated.value = false;
   setStatus("");
   try {
     const rules = await fetchRules(auth.isDemo, auth.token || undefined);
     rows.value = rowsFromRules(rules);
+    syncSnapshot();
     refreshSearchMatches();
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
+    syncSnapshot();
   } finally {
+    hydrated.value = true;
     loading.value = false;
   }
 }
@@ -178,15 +219,28 @@ function addRule() {
 
 async function save() {
   if (auth.isDemo) return;
+  const dirty = getDirtyEntries();
+  if (!dirty.length) {
+    setStatus("No changes to save.");
+    return;
+  }
+
   saving.value = true;
   setStatus("");
+  const token = auth.token || undefined;
   try {
-    const result = await saveRules(rulesFromRows(), auth.token || undefined);
-    if (!result.saved) throw new Error("Server did not confirm save.");
-    const rules = await fetchRules(false, auth.token || undefined);
+    if (dirty.length === 1) {
+      const result = await saveRuleEntry(dirty[0], token);
+      if (!result.ok) throw new Error("Server did not confirm save.");
+    } else {
+      const result = await saveRules(rulesFromRows(), token);
+      if (!result.saved) throw new Error("Server did not confirm save.");
+    }
+    const rules = await fetchRules(false, token);
     rows.value = rowsFromRules(rules);
+    syncSnapshot();
     refreshSearchMatches();
-    setStatus(`Saved ${rows.value.length} merchant rules to the server.`);
+    setStatus(dirty.length === 1 ? "Saved 1 mapping." : `Saved ${dirty.length} mappings.`);
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Save failed", true);
   } finally {
@@ -242,8 +296,9 @@ async function importJson(e: Event) {
     if (!result.saved) throw new Error("Server did not confirm save.");
     const rules = await fetchRules(false, auth.token || undefined);
     rows.value = rowsFromRules(rules);
+    syncSnapshot();
     refreshSearchMatches();
-    setStatus(`Imported and saved ${rows.value.length} merchant rules.`);
+    setStatus(`Imported and saved ${added + updated} mapping${added + updated === 1 ? "" : "s"}.`);
   } catch (e) {
     setStatus(e instanceof Error ? e.message : "Import failed", true);
   } finally {

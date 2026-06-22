@@ -274,21 +274,30 @@ router.put("/rules", async (req, res) => {
 });
 
 router.post("/rules/entry", async (req, res) => {
-  const { hebrew, english, category } = req.body as {
-    hebrew: string;
-    english: string;
-    category?: string;
-  };
-  const rules = await readRules();
-  rules[hebrew] = {
-    english: (english || "").trim(),
-    category: category || null,
-  };
-  await writeRules(rules);
-  const statements = await readStatements();
-  const updated = applyMerchantRules(statements, rules);
-  await writeStatements(statements);
-  res.json({ ok: true, updated_transactions: updated });
+  try {
+    const { hebrew, english, category } = req.body as {
+      hebrew: string;
+      english: string;
+      category?: string;
+    };
+    if (!hebrew?.trim()) {
+      res.status(400).json({ error: "hebrew required" });
+      return;
+    }
+    const rules = await readRules();
+    rules[hebrew.trim()] = {
+      english: (english || "").trim(),
+      category: category || null,
+    };
+    await writeRules(rules);
+    const statements = await readStatements();
+    const updated = applyMerchantRules(statements, rules);
+    await writeStatements(statements);
+    res.json({ ok: true, updated_transactions: updated });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Save failed";
+    res.status(500).json({ error: message });
+  }
 });
 
 router.get("/merchants", async (req, res) => {
