@@ -58,22 +58,24 @@
               </div>
 
               <div v-if="budgetContext" class="pace-money-left-glance">
+                <p class="pace-money-left-glance-title">Money left in budget</p>
                 <div class="pace-money-left-glance-grid" :class="{ 'pace-money-left-glance-grid--solo': !showLastCycleCompare }">
                   <div class="pace-money-left-glance-item">
-                    <span class="pace-money-left-glance-label">Money left</span>
+                    <span class="pace-money-left-glance-label">Today</span>
                     <strong>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</strong>
                   </div>
                   <template v-if="showLastCycleCompare">
                     <div class="pace-money-left-glance-item">
-                      <span class="pace-money-left-glance-label">Money left then{{ lastCycleDayLabel }}</span>
+                      <span class="pace-money-left-glance-label">Same date last cycle{{ lastCycleDayLabel }}</span>
                       <strong>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</strong>
                     </div>
                     <div class="pace-money-left-glance-item" :class="moneyLeftVsLastCycleGlanceClass">
-                      <span class="pace-money-left-glance-label">Net vs last cycle</span>
+                      <span class="pace-money-left-glance-label">Difference</span>
                       <strong>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</strong>
                     </div>
                   </template>
                 </div>
+                <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
               <details class="pace-simple-details">
@@ -122,6 +124,27 @@
                         <td>Difference</td>
                         <td>{{ formatGap(projectedVsUsualDelta) }}</td>
                       </tr>
+                      <template v-if="budgetContext">
+                        <tr class="pace-simple-table-group">
+                          <td colspan="2">Living budget</td>
+                        </tr>
+                        <tr>
+                          <td>Money left</td>
+                          <td>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</td>
+                        </tr>
+                        <tr v-if="showLastCycleCompare">
+                          <td>Money left then{{ lastCycleDayLabel }}</td>
+                          <td>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</td>
+                        </tr>
+                        <tr
+                          v-if="showLastCycleCompare"
+                          class="pace-simple-table-gap"
+                          :class="moneyLeftVsLastCycleTableClass"
+                        >
+                          <td>Net vs last cycle</td>
+                          <td>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</td>
+                        </tr>
+                      </template>
                     </tbody>
                   </table>
                 </div>
@@ -155,7 +178,7 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
-import { computePaceBudgetContext } from "../utils/paceBudget";
+import { computePaceBudgetContext, paceBudgetNote } from "../utils/paceBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "../utils/livingBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
@@ -337,6 +360,11 @@ const lastCycleDayLabel = computed(() => {
   return ` (${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`;
 });
 
+const budgetNote = computed(() => {
+  if (!budgetContext.value) return "";
+  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
+});
+
 const budgetProjectedDelta = computed(() =>
   budgetContext.value
     ? budgetContext.value.projectedMoneyLeft - budgetContext.value.usualProjectedMoneyLeft
@@ -347,6 +375,13 @@ const moneyLeftVsLastCycleGlanceClass = computed(() => {
   const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
   if (d > 0) return "pace-money-left-glance-item--good";
   if (d < 0) return "pace-money-left-glance-item--bad";
+  return "";
+});
+
+const moneyLeftVsLastCycleTableClass = computed(() => {
+  const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
+  if (d > 0) return "pace-delta-good";
+  if (d < 0) return "pace-delta-bad";
   return "";
 });
 
