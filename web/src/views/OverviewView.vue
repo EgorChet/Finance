@@ -46,6 +46,8 @@
       :living-budget="resolvedLivingBudget"
       :living-budget-base="livingBudgetBaseAmount"
       :living-budget-topup="livingBudgetTopupExtra"
+      :living-budget-segments="livingBudgetSegments"
+      :living-budget-month-topups="livingBudgetMonthTopups"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard

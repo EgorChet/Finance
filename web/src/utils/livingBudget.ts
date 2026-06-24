@@ -83,6 +83,26 @@ export function livingBudgetBaseForMonth(ym: string, segments: LivingBudgetSegme
   return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE);
 }
 
+/** Previous calendar month as YYYY-MM. */
+export function previousCalendarMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  let month = m - 1;
+  let year = y;
+  if (month < 1) {
+    month = 12;
+    year -= 1;
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function livingBudgetForPreviousMonth(
+  ym: string,
+  segments: LivingBudgetSegment[],
+  monthTopups: LivingBudgetMonthTopup[] = [],
+): number | null {
+  return livingBudgetForMonth(previousCalendarMonth(ym), segments, monthTopups);
+}
+
 function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {
   return a.from_month <= b.through_month && b.from_month <= a.through_month;
 }
