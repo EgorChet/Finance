@@ -67,6 +67,8 @@ export interface PaceBudgetContext {
   budgetVsLastCycle: number | null;
   /** Money left now minus money left at the same day last cycle. */
   moneyLeftVsLastCycle: number | null;
+  /** Calendar date in the previous cycle matching today's day index. */
+  lastCycleComparisonDay: string | null;
   projectedMoneyLeftAtLastCycleBudget: number | null;
   headroomFromHigherBudget: number | null;
   /** Month-end: projected left vs projected left at last cycle's cap. */
@@ -116,6 +118,7 @@ export function computePaceBudgetContext(
   let spentVsLastCycleAtDay: number | null = null;
   let budgetVsLastCycle: number | null = null;
   let moneyLeftVsLastCycle: number | null = null;
+  let lastCycleComparisonDay: string | null = null;
   let projectedMoneyLeftAtLastCycleBudget: number | null = null;
   let headroomFromHigherBudget: number | null = null;
   let projectedMoneyLeftVsLastCycleCap: number | null = null;
@@ -137,6 +140,9 @@ export function computePaceBudgetContext(
     lastCycleSpentAtDay = spentOnCapThroughDay(allTransactions, prevStart, prevEnd, dayIndex);
 
     if (lastCycleBudget != null && lastCycleBudget > 0) {
+      const sameDay = parseIsoDate(prevStart);
+      sameDay.setDate(sameDay.getDate() + dayIndex - 1);
+      lastCycleComparisonDay = isoDate(sameDay);
       lastCycleMoneyLeftAtDay = roundMoney(lastCycleBudget - lastCycleSpentAtDay);
       spentVsLastCycleAtDay = roundMoney(spentOnCap - lastCycleSpentAtDay);
       budgetVsLastCycle = roundMoney(livingBudget - lastCycleBudget);
@@ -165,6 +171,7 @@ export function computePaceBudgetContext(
     spentVsLastCycleAtDay,
     budgetVsLastCycle,
     moneyLeftVsLastCycle,
+    lastCycleComparisonDay,
     projectedMoneyLeftAtLastCycleBudget,
     headroomFromHigherBudget,
     projectedMoneyLeftVsLastCycleCap,
@@ -172,35 +179,21 @@ export function computePaceBudgetContext(
 }
 
 /** Plain-language budget line under the pace verdict. */
-export function paceBudgetNote(
-  ctx: PaceBudgetContext,
-  projectedVsUsualDelta: number,
-  dayIndex: number,
-): string {
-  const { projectedMoneyLeft, livingBudget, moneyLeftVsLastCycle, spentVsLastCycleAtDay, budgetVsLastCycle } =
-    ctx;
+export function paceBudgetNote(ctx: PaceBudgetContext, projectedVsUsualDelta: number): string {
+  const { moneyLeft, lastCycleMoneyLeftAtDay, moneyLeftVsLastCycle, lastCycleComparisonDay } = ctx;
 
-  if (
-    moneyLeftVsLastCycle != null &&
-    spentVsLastCycleAtDay != null &&
-    budgetVsLastCycle != null &&
-    Math.abs(budgetVsLastCycle) >= 50
-  ) {
-    const spentPart =
-      Math.abs(spentVsLastCycleAtDay) >= 50
-        ? spentVsLastCycleAtDay > 0
-          ? `${formatAboutIls(spentVsLastCycleAtDay)} more spent than day ${dayIndex} last cycle`
-          : `${formatAboutIls(Math.abs(spentVsLastCycleAtDay))} less spent than day ${dayIndex} last cycle`
-        : `about the same spend as day ${dayIndex} last cycle`;
-    const budgetPart = `${formatAboutIls(Math.abs(budgetVsLastCycle))} higher budget`;
-    if (moneyLeftVsLastCycle >= 50) {
-      return `${spentPart}, but ${budgetPart} — ${formatAboutIls(moneyLeftVsLastCycle)} more left than last cycle at this point.`;
+  if (lastCycleMoneyLeftAtDay != null && moneyLeftVsLastCycle != null && lastCycleComparisonDay) {
+    const dayLabel = formatComparisonDay(lastCycleComparisonDay);
+    if (Math.abs(moneyLeftVsLastCycle) < 50) {
+      return `Money left ${formatIls(moneyLeft)} today — about the same as ${formatIls(lastCycleMoneyLeftAtDay)} on ${dayLabel} last cycle.`;
     }
-    if (moneyLeftVsLastCycle <= -50) {
-      return `${spentPart} and only ${formatAboutIls(Math.abs(budgetVsLastCycle))} higher budget — ${formatAboutIls(Math.abs(moneyLeftVsLastCycle))} less left than last cycle at this point.`;
+    if (moneyLeftVsLastCycle > 0) {
+      return `Money left ${formatIls(moneyLeft)} today vs ${formatIls(lastCycleMoneyLeftAtDay)} on ${dayLabel} last cycle — ${formatAboutIls(moneyLeftVsLastCycle)} more left.`;
     }
+    return `Money left ${formatIls(moneyLeft)} today vs ${formatIls(lastCycleMoneyLeftAtDay)} on ${dayLabel} last cycle — ${formatAboutIls(Math.abs(moneyLeftVsLastCycle))} less left.`;
   }
 
+  const { projectedMoneyLeft, livingBudget, headroomFromHigherBudget } = ctx;
   const overPace = projectedVsUsualDelta > 50;
   const injection =
     ctx.topupExtra > 0 ? ` (includes ${formatIls(ctx.topupExtra)} extra this month)` : "";
@@ -210,8 +203,8 @@ export function paceBudgetNote(
       return `On track for ~${formatAboutIls(projectedMoneyLeft)} left in your ${formatIls(livingBudget)} budget${injection}.`;
     }
     if (projectedMoneyLeft < -50) {
-      if (ctx.headroomFromHigherBudget != null && ctx.headroomFromHigherBudget > 0) {
-        return `Would finish ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over this cycle's cap — ${formatAboutIls(ctx.headroomFromHigherBudget)} more room than last cycle's budget.`;
+      if (headroomFromHigherBudget != null && headroomFromHigherBudget > 0) {
+        return `Would finish ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over this cycle's cap — ${formatAboutIls(headroomFromHigherBudget)} more room than last cycle's budget.`;
       }
       return `Would finish ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over your ${formatIls(livingBudget)} budget.`;
     }
@@ -222,10 +215,15 @@ export function paceBudgetNote(
     return `Above your usual pace, but still ~${formatAboutIls(projectedMoneyLeft)} left in budget${injection}.`;
   }
   if (projectedMoneyLeft < -50) {
-    if (ctx.headroomFromHigherBudget != null && ctx.headroomFromHigherBudget > 0) {
-      return `Above usual pace — ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over at month-end, but ${formatAboutIls(ctx.headroomFromHigherBudget)} more room than last cycle's ${formatIls(ctx.lastCycleBudget!)} cap.`;
+    if (headroomFromHigherBudget != null && headroomFromHigherBudget > 0) {
+      return `Above usual pace — ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over at month-end, but ${formatAboutIls(headroomFromHigherBudget)} more room than last cycle's ${formatIls(ctx.lastCycleBudget!)} cap.`;
     }
     return `Above usual pace and would finish ~${formatAboutIls(Math.abs(projectedMoneyLeft))} over your ${formatIls(livingBudget)} budget.`;
   }
   return `Above usual pace — only ~${formatAboutIls(Math.max(0, projectedMoneyLeft))} left in budget at month-end.`;
+}
+
+function formatComparisonDay(iso: string): string {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }

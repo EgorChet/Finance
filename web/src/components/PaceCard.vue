@@ -55,6 +55,26 @@
               <div class="pace-verdict" :class="verdictToneClass">
                 <p class="pace-verdict-status">{{ verdictStatus }}</p>
                 <p class="pace-verdict-delta">{{ verdictDelta }}</p>
+              </div>
+
+              <div v-if="budgetContext" class="pace-money-left-glance">
+                <p class="pace-money-left-glance-title">Money left in budget</p>
+                <div class="pace-money-left-glance-grid" :class="{ 'pace-money-left-glance-grid--solo': !showLastCycleCompare }">
+                  <div class="pace-money-left-glance-item">
+                    <span class="pace-money-left-glance-label">Today</span>
+                    <strong>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</strong>
+                  </div>
+                  <template v-if="showLastCycleCompare">
+                    <div class="pace-money-left-glance-item">
+                      <span class="pace-money-left-glance-label">Same date last cycle{{ lastCycleDayLabel }}</span>
+                      <strong>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</strong>
+                    </div>
+                    <div class="pace-money-left-glance-item" :class="moneyLeftVsLastCycleGlanceClass">
+                      <span class="pace-money-left-glance-label">Difference</span>
+                      <strong>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</strong>
+                    </div>
+                  </template>
+                </div>
                 <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
@@ -120,41 +140,8 @@
                           <td>Spent on cap</td>
                           <td>{{ formatIls(budgetContext.spentOnCap) }}</td>
                         </tr>
-                        <tr :class="moneyLeftNowClass">
-                          <td>Money left</td>
-                          <td>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</td>
-                        </tr>
-                        <template v-if="showLastCycleCompare">
-                          <tr class="pace-simple-table-group">
-                            <td colspan="2">vs last cycle (day {{ cycleInfo.dayIndex }})</td>
-                          </tr>
-                          <tr>
-                            <td>Last cycle's budget</td>
-                            <td>{{ formatIls(budgetContext.lastCycleBudget!) }}</td>
-                          </tr>
-                          <tr v-if="budgetContext.budgetVsLastCycle != null" :class="budgetVsLastCycleClass">
-                            <td>Higher budget</td>
-                            <td>{{ formatGap(budgetContext.budgetVsLastCycle) }}</td>
-                          </tr>
-                          <tr>
-                            <td>Spent then</td>
-                            <td>{{ formatIls(budgetContext.lastCycleSpentAtDay!) }}</td>
-                          </tr>
-                          <tr v-if="budgetContext.spentVsLastCycleAtDay != null" :class="spentVsLastCycleClass">
-                            <td>Spent vs then</td>
-                            <td>{{ formatGap(budgetContext.spentVsLastCycleAtDay) }}</td>
-                          </tr>
-                          <tr>
-                            <td>Money left then</td>
-                            <td>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</td>
-                          </tr>
-                          <tr class="pace-simple-table-gap" :class="moneyLeftVsLastCycleClass">
-                            <td>Net vs last cycle</td>
-                            <td>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</td>
-                          </tr>
-                        </template>
                         <tr class="pace-simple-table-group">
-                          <td colspan="2">Month-end (this cycle's cap)</td>
+                          <td colspan="2">Month-end estimate</td>
                         </tr>
                         <tr>
                           <td>Your projected left</td>
@@ -168,23 +155,6 @@
                           <td>Pace gap</td>
                           <td>{{ formatGap(budgetProjectedDelta) }}</td>
                         </tr>
-                        <template v-if="showLastCycleCompare && budgetContext.projectedMoneyLeftAtLastCycleBudget != null">
-                          <tr class="pace-simple-table-group">
-                            <td colspan="2">Month-end (last cycle's cap)</td>
-                          </tr>
-                          <tr>
-                            <td>Your projected left</td>
-                            <td>~{{ formatMoneyLeft(budgetContext.projectedMoneyLeftAtLastCycleBudget) }}</td>
-                          </tr>
-                          <tr
-                            v-if="budgetContext.headroomFromHigherBudget != null"
-                            class="pace-simple-table-gap"
-                            :class="headroomFromBudgetClass"
-                          >
-                            <td>Extra room from higher budget</td>
-                            <td>{{ formatGap(budgetContext.headroomFromHigherBudget) }}</td>
-                          </tr>
-                        </template>
                       </template>
                     </tbody>
                   </table>
@@ -392,23 +362,18 @@ const budgetContext = computed(() => {
   );
 });
 
-const showLastCycleCompare = computed(() => {
-  const ctx = budgetContext.value;
-  return (
-    ctx?.lastCycleBudget != null &&
-    ctx.lastCycleBudget > 0 &&
-    ctx.lastCycleMoneyLeftAtDay != null &&
-    ctx.moneyLeftVsLastCycle != null
-  );
+const showLastCycleCompare = computed(() => budgetContext.value?.lastCycleMoneyLeftAtDay != null);
+
+const lastCycleDayLabel = computed(() => {
+  const day = budgetContext.value?.lastCycleComparisonDay;
+  if (!day) return "";
+  const d = new Date(day + "T12:00:00");
+  return ` (${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`;
 });
 
 const budgetNote = computed(() => {
   if (!budgetContext.value) return "";
-  return paceBudgetNote(
-    budgetContext.value,
-    projectedVsUsualDelta.value,
-    cycleInfo.value.dayIndex,
-  );
+  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
 });
 
 const budgetProjectedDelta = computed(() =>
@@ -417,45 +382,17 @@ const budgetProjectedDelta = computed(() =>
     : 0,
 );
 
+const moneyLeftVsLastCycleGlanceClass = computed(() => {
+  const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
+  if (d > 0) return "pace-money-left-glance-item--good";
+  if (d < 0) return "pace-money-left-glance-item--bad";
+  return "";
+});
+
 const budgetProjectedDeltaClass = computed(() => {
   const d = budgetProjectedDelta.value;
   if (d > 0) return "pace-delta-good";
   if (d < 0) return "pace-delta-bad";
-  return "";
-});
-
-const budgetVsLastCycleClass = computed(() => {
-  const d = budgetContext.value?.budgetVsLastCycle ?? 0;
-  if (d > 0) return "pace-delta-good";
-  if (d < 0) return "pace-delta-bad";
-  return "";
-});
-
-const spentVsLastCycleClass = computed(() => {
-  const d = budgetContext.value?.spentVsLastCycleAtDay ?? 0;
-  if (d > 0) return "pace-delta-bad";
-  if (d < 0) return "pace-delta-good";
-  return "";
-});
-
-const moneyLeftVsLastCycleClass = computed(() => {
-  const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
-  if (d > 0) return "pace-delta-good";
-  if (d < 0) return "pace-delta-bad";
-  return "";
-});
-
-const headroomFromBudgetClass = computed(() => {
-  const d = budgetContext.value?.headroomFromHigherBudget ?? 0;
-  if (d > 0) return "pace-delta-good";
-  if (d < 0) return "pace-delta-bad";
-  return "";
-});
-
-const moneyLeftNowClass = computed(() => {
-  const left = budgetContext.value?.moneyLeft ?? 0;
-  if (left < 0) return "pace-simple-table-gap pace-delta-bad";
-  if (left <= (props.livingBudget ?? 0) * 0.2) return "pace-simple-table-gap pace-delta-bad";
   return "";
 });
 
