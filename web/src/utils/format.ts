@@ -12,6 +12,11 @@ export function formatIls(amount: number, decimals = 2): string {
   })}`;
 }
 
+/** Whole shekels — rounded to nearest ₪1, no agorot. */
+export function formatIlsWhole(amount: number): string {
+  return `₪${Math.round(amount).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
 export function formatRub(amount: number, decimals = 0): string {
   return `${roundMoney(amount).toLocaleString("en-US", {
     minimumFractionDigits: decimals,

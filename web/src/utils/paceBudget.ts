@@ -2,7 +2,7 @@ import type { Transaction } from "../types";
 import { budgetSpendBreakdown, moneyLeft } from "./householdBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "./livingBudget";
 import { livingBudgetForMonth } from "./livingBudget";
-import { formatAboutIls, formatIls, roundMoney } from "./format";
+import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "./format";
 import { getCycleRangeForStart } from "./pace";
 
 function parseIsoDate(dateStr: string): Date {
@@ -225,14 +225,14 @@ export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
 
   const spentVsLastMonth = spentVsLast != null && spentVsLast > 50;
   const spentAmount = spentVsLastMonth
-    ? formatIls(spentVsLast, 0)
-    : formatIls(Math.abs(paceGap), 0);
+    ? formatIlsWhole(spentVsLast)
+    : formatIlsWhole(Math.abs(paceGap));
 
   return {
     status: "Overspending",
     spentAmount,
     spentVsLastMonth,
-    moneyLeftAmount: formatIls(netVsLast, 0),
+    moneyLeftAmount: formatIlsWhole(netVsLast),
     reason: "Reason: budget injection",
   };
 }
