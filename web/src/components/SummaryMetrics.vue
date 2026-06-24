@@ -145,6 +145,8 @@ import {
   monthlyBillsTotal,
   moneyLeft,
 } from "../utils/householdBudget";
+import { paceHealthBudgetClass } from "../utils/paceBudget";
+import type { PaceHealthTone } from "../utils/paceHealth";
 
 const props = withDefaults(
   defineProps<{
@@ -153,8 +155,10 @@ const props = withDefaults(
     retrospective?: boolean;
     partial?: boolean;
     compact?: boolean;
+    /** Live-cycle pace tone — green / yellow / red money-left card. */
+    paceTone?: PaceHealthTone | null;
   }>(),
-  { retrospective: false, partial: false, compact: false },
+  { retrospective: false, partial: false, compact: false, paceTone: null },
 );
 
 const everydayBreakdownOpen = ref(false);
@@ -195,6 +199,7 @@ const budgetFormula = computed(() => {
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
+  if (props.paceTone) return paceHealthBudgetClass(props.paceTone);
   if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";

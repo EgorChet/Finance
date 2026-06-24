@@ -21,6 +21,7 @@
             :report="spendingReport"
             :living-budget="livingBudgetAmount"
             :partial="isPartialCycle"
+            :pace-tone="summaryPaceTone"
           />
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
@@ -74,10 +75,15 @@ import { goToSignIn } from "../utils/signIn";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
+import { everydaySpendingTotal } from "../utils/householdBudget";
+import { computePaceHealth } from "../utils/paceHealth";
 import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
+  livingBudgetBaseForMonth,
+  monthTopupExtraForMonth,
+  cycleMonthYmForOverview,
 } from "../utils/livingBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
@@ -167,6 +173,49 @@ const livingBudgetAmount = computed(() =>
     livingBudgetMonthTopups.value,
   ),
 );
+
+const livingBudgetCycleYm = computed(() =>
+  cycleMonthYmForOverview(currentMonthKey.value, spendingReport.value, cycleDay.value),
+);
+
+const livingBudgetTopupExtra = computed(() =>
+  monthTopupExtraForMonth(livingBudgetCycleYm.value, livingBudgetMonthTopups.value),
+);
+
+const livingBudgetBaseAmount = computed(() =>
+  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
+);
+
+const summaryPaceTone = computed(() => {
+  if (!spendingReport.value || !currentMonthKey.value || !isCycleMonthKey(currentMonthKey.value)) {
+    return null;
+  }
+  const start = cycleStartFromMonthKey(currentMonthKey.value);
+  const partial = findPartialMonth(months.value, start, cycleDay.value);
+  const statementAt = partial?.saved_at ?? null;
+  const hasStatementSpend = everydaySpendingTotal(spendingReport.value.transactions) > 0;
+  return computePaceHealth({
+    transactions: paceReport.value?.transactions ?? spendingReport.value.transactions,
+    cycleTransactions: spendingReport.value.transactions,
+    cycleDay: cycleDay.value,
+    referenceDate: refDate.value,
+    livingBudget: livingBudgetAmount.value,
+    livingBudgetBase: livingBudgetBaseAmount.value,
+    livingBudgetTopup: livingBudgetTopupExtra.value,
+    budgetSegments: livingBudgetSegments.value,
+    budgetMonthTopups: livingBudgetMonthTopups.value,
+    manualSpend: isPartialCycle.value
+      ? null
+      : effectiveManualCycleSpend(start, {
+          statementSavedAt: statementAt,
+          hasStatementSpend,
+        }),
+    cycleEverydaySpend: hasStatementSpend
+      ? everydaySpendingTotal(spendingReport.value.transactions)
+      : null,
+    cycleStart: start,
+  });
+});
 
 const overviewLink = computed(() => {
   if (!currentMonthKey.value) return { name: "overview" as const };

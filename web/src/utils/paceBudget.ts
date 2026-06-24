@@ -203,3 +203,54 @@ export function paceBudgetNote(ctx: PaceBudgetContext, projectedVsUsualDelta: nu
   }
   return `Above usual pace — only ~${formatAboutIls(Math.max(0, projectedMoneyLeft))} left in budget at month-end.`;
 }
+
+/** Overspending but monthly injection + last-cycle cushion — short yellow verdict copy. */
+export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
+  status: string;
+  delta: string;
+} | null {
+  const paceGap = roundMoney(ctx.projectedMoneyLeft - ctx.usualProjectedMoneyLeft);
+  const netVsLast = ctx.moneyLeftVsLastCycle;
+
+  if (ctx.topupExtra <= 0 || netVsLast == null || paceGap >= -50 || netVsLast <= 50) {
+    return null;
+  }
+
+  const reserve = roundMoney(netVsLast + paceGap);
+  if (reserve <= 0) return null;
+
+  return {
+    status: "Overspending",
+    delta: `~${formatAboutIls(Math.abs(paceGap))} over pace — extra budget covers it. ~${formatAboutIls(netVsLast)} vs last cycle, ~${formatAboutIls(reserve)} headroom.`,
+  };
+}
+
+export type PaceHealthTone = "good" | "warn" | "bad";
+
+/** Green = on pace, yellow = over pace but injection covers it, red = over pace uncovered. */
+export function paceHealthTone(
+  ctx: PaceBudgetContext | null,
+  projectedVsUsualDelta: number,
+): PaceHealthTone {
+  if (ctx) {
+    const paceGap = roundMoney(ctx.projectedMoneyLeft - ctx.usualProjectedMoneyLeft);
+    const overspending = projectedVsUsualDelta > 50 || paceGap < -50;
+    if (!overspending) return "good";
+    if (paceInjectionCushionVerdict(ctx)) return "warn";
+    return "bad";
+  }
+  if (projectedVsUsualDelta > 50) return "bad";
+  return "good";
+}
+
+export function paceHealthVerdictClass(tone: PaceHealthTone): string {
+  if (tone === "good") return "pace-verdict--good";
+  if (tone === "warn") return "pace-verdict--warn";
+  return "pace-verdict--bad";
+}
+
+export function paceHealthBudgetClass(tone: PaceHealthTone): string {
+  if (tone === "good") return "metric-card-budget--ok";
+  if (tone === "warn") return "metric-card-budget--low";
+  return "metric-card-budget--over";
+}

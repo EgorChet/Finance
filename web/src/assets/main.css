@@ -3997,10 +3997,7 @@ table.rules select {
   color: #34d399;
 }
 
-.pace-verdict--warn .pace-verdict-status {
-  color: var(--text);
-}
-
+.pace-verdict--warn .pace-verdict-status,
 .pace-verdict--warn .pace-verdict-delta {
   color: #fbbf24;
 }

@@ -30,6 +30,7 @@
       :living-budget="resolvedLivingBudget"
       :retrospective="budgetRetrospective"
       :partial="isPartialMonthSelected"
+      :pace-tone="summaryPaceTone"
     />
     <PaceCard
       v-if="showPaceCard"
@@ -134,6 +135,7 @@ import {
   rollupCategoriesForDisplay,
 } from "../categories";
 import { everydaySpendingTotal } from "../utils/householdBudget";
+import { computePaceHealth } from "../utils/paceHealth";
 import {
   buildCycleReport,
   cycleStartForDate,
@@ -367,6 +369,33 @@ const cycleEverydaySpend = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
   const total = everydaySpendingTotal(report.value.transactions);
   return total > 0 ? total : null;
+});
+
+const summaryPaceTone = computed(() => {
+  if (!showPaceCard.value || !report.value) return null;
+  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
+  const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
+  return computePaceHealth({
+    transactions: paceTransactions.value,
+    cycleTransactions: report.value.transactions,
+    cycleDay: cycleDay.value,
+    referenceDate: refDate.value,
+    livingBudget: resolvedLivingBudget.value,
+    livingBudgetBase: livingBudgetBaseAmount.value,
+    livingBudgetTopup: livingBudgetTopupExtra.value,
+    budgetSegments: livingBudgetSegments.value,
+    budgetMonthTopups: livingBudgetMonthTopups.value,
+    latestBillingDate: latestFinalBillingDate.value,
+    configuredCharges: configuredCharges.value,
+    manualSpend: partialStatementActive.value
+      ? null
+      : effectiveManualCycleSpend(start, {
+          statementSavedAt: statementSavedAt.value,
+          hasStatementSpend,
+        }),
+    cycleEverydaySpend: cycleEverydaySpend.value,
+    cycleStart: start,
+  });
 });
 
 const statementSavedAt = computed((): string | null => {

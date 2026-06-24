@@ -158,7 +158,7 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
-import { computePaceBudgetContext, paceBudgetNote } from "../utils/paceBudget";
+import { computePaceBudgetContext, paceBudgetNote, paceHealthTone, paceHealthVerdictClass, paceInjectionCushionVerdict } from "../utils/paceBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "../utils/livingBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
@@ -340,8 +340,14 @@ const lastCycleDayLabel = computed(() => {
   return ` (${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`;
 });
 
+const injectionCushionVerdict = computed(() =>
+  budgetContext.value ? paceInjectionCushionVerdict(budgetContext.value) : null,
+);
+
+const paceTone = computed(() => paceHealthTone(budgetContext.value, projectedVsUsualDelta.value));
+
 const budgetNote = computed(() => {
-  if (!budgetContext.value) return "";
+  if (!budgetContext.value || injectionCushionVerdict.value) return "";
   return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
 });
 
@@ -360,6 +366,9 @@ const projectedDeltaClass = computed(() => {
 });
 
 const verdictStatus = computed(() => {
+  if (injectionCushionVerdict.value) return injectionCushionVerdict.value.status;
+  if (paceTone.value === "bad" || paceTone.value === "warn") return "Overspending";
+
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) return "Doing fine";
   if (monthGap > 0) return "Overspending";
@@ -367,6 +376,8 @@ const verdictStatus = computed(() => {
 });
 
 const verdictDelta = computed(() => {
+  if (injectionCushionVerdict.value) return injectionCushionVerdict.value.delta;
+
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
@@ -378,20 +389,7 @@ const verdictDelta = computed(() => {
   return `~${formatAboutIls(Math.abs(monthGap))} below your usual month`;
 });
 
-const verdictToneClass = computed(() => {
-  const monthGap = projectedVsUsualDelta.value;
-  const projectedLeft = budgetContext.value?.projectedMoneyLeft;
-  if (Math.abs(monthGap) < 50) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (nowGap > 50) return "pace-verdict--warn";
-    return "pace-verdict--ok";
-  }
-  if (monthGap > 0) {
-    if (projectedLeft != null && projectedLeft >= 500) return "pace-verdict--warn";
-    return "pace-verdict--bad";
-  }
-  return "pace-verdict--good";
-});
+const verdictToneClass = computed(() => paceHealthVerdictClass(paceTone.value));
 
 function formatMoneyLeft(amount: number): string {
   if (amount < 0) return `${formatIls(Math.abs(amount))} over`;
