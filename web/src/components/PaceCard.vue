@@ -58,24 +58,22 @@
               </div>
 
               <div v-if="budgetContext" class="pace-money-left-glance">
-                <p class="pace-money-left-glance-title">Money left in budget</p>
                 <div class="pace-money-left-glance-grid" :class="{ 'pace-money-left-glance-grid--solo': !showLastCycleCompare }">
                   <div class="pace-money-left-glance-item">
-                    <span class="pace-money-left-glance-label">Today</span>
+                    <span class="pace-money-left-glance-label">Money left</span>
                     <strong>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</strong>
                   </div>
                   <template v-if="showLastCycleCompare">
                     <div class="pace-money-left-glance-item">
-                      <span class="pace-money-left-glance-label">Same date last cycle{{ lastCycleDayLabel }}</span>
+                      <span class="pace-money-left-glance-label">Money left then{{ lastCycleDayLabel }}</span>
                       <strong>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</strong>
                     </div>
                     <div class="pace-money-left-glance-item" :class="moneyLeftVsLastCycleGlanceClass">
-                      <span class="pace-money-left-glance-label">Difference</span>
+                      <span class="pace-money-left-glance-label">Net vs last cycle</span>
                       <strong>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</strong>
                     </div>
                   </template>
                 </div>
-                <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
               <details class="pace-simple-details">
@@ -124,38 +122,6 @@
                         <td>Difference</td>
                         <td>{{ formatGap(projectedVsUsualDelta) }}</td>
                       </tr>
-                      <template v-if="budgetContext">
-                        <tr class="pace-simple-table-group">
-                          <td colspan="2">Living budget</td>
-                        </tr>
-                        <tr>
-                          <td>Budget this cycle</td>
-                          <td>{{ formatIls(budgetContext.livingBudget) }}</td>
-                        </tr>
-                        <tr v-if="budgetContext.topupExtra > 0" class="pace-simple-table-sub">
-                          <td>Extra this month</td>
-                          <td>+{{ formatIls(budgetContext.topupExtra) }}</td>
-                        </tr>
-                        <tr>
-                          <td>Spent on cap</td>
-                          <td>{{ formatIls(budgetContext.spentOnCap) }}</td>
-                        </tr>
-                        <tr class="pace-simple-table-group">
-                          <td colspan="2">Month-end estimate</td>
-                        </tr>
-                        <tr>
-                          <td>Your projected left</td>
-                          <td>~{{ formatMoneyLeft(budgetContext.projectedMoneyLeft) }}</td>
-                        </tr>
-                        <tr>
-                          <td>At usual spending pace</td>
-                          <td>~{{ formatMoneyLeft(budgetContext.usualProjectedMoneyLeft) }}</td>
-                        </tr>
-                        <tr class="pace-simple-table-gap" :class="budgetProjectedDeltaClass">
-                          <td>Pace gap</td>
-                          <td>{{ formatGap(budgetProjectedDelta) }}</td>
-                        </tr>
-                      </template>
                     </tbody>
                   </table>
                 </div>
@@ -189,7 +155,7 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
-import { computePaceBudgetContext, paceBudgetNote } from "../utils/paceBudget";
+import { computePaceBudgetContext } from "../utils/paceBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "../utils/livingBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
@@ -371,11 +337,6 @@ const lastCycleDayLabel = computed(() => {
   return ` (${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`;
 });
 
-const budgetNote = computed(() => {
-  if (!budgetContext.value) return "";
-  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
-});
-
 const budgetProjectedDelta = computed(() =>
   budgetContext.value
     ? budgetContext.value.projectedMoneyLeft - budgetContext.value.usualProjectedMoneyLeft
@@ -389,13 +350,6 @@ const moneyLeftVsLastCycleGlanceClass = computed(() => {
   return "";
 });
 
-const budgetProjectedDeltaClass = computed(() => {
-  const d = budgetProjectedDelta.value;
-  if (d > 0) return "pace-delta-good";
-  if (d < 0) return "pace-delta-bad";
-  return "";
-});
-
 const projectedDeltaClass = computed(() => {
   const d = projectedVsUsualDelta.value;
   if (d > 0) return "pace-delta-bad";
@@ -404,6 +358,15 @@ const projectedDeltaClass = computed(() => {
 });
 
 const verdictStatus = computed(() => {
+  const ctx = budgetContext.value;
+  const netVsLast = ctx?.moneyLeftVsLastCycle;
+  const paceGap = budgetProjectedDelta.value;
+  const injection = ctx?.topupExtra ?? 0;
+
+  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
+    return "Doing okay";
+  }
+
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) return "Doing fine";
   if (monthGap > 0) return "Overspending";
@@ -411,6 +374,28 @@ const verdictStatus = computed(() => {
 });
 
 const verdictDelta = computed(() => {
+  const ctx = budgetContext.value;
+  const netVsLast = ctx?.moneyLeftVsLastCycle;
+  const paceGap = budgetProjectedDelta.value;
+  const injection = ctx?.topupExtra ?? 0;
+
+  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
+    return `${formatGap(netVsLast)} vs last cycle — extra budget's covering the faster pace`;
+  }
+
+  if (netVsLast != null && Math.abs(netVsLast) >= 50 && ctx?.lastCycleMoneyLeftAtDay != null) {
+    const monthGap = projectedVsUsualDelta.value;
+    if (monthGap > 50 && netVsLast > 0) {
+      return `${formatGap(netVsLast)} vs last cycle despite ~${formatAboutIls(monthGap)} above usual pace`;
+    }
+    if (netVsLast > 0) {
+      return `${formatGap(netVsLast)} vs last cycle at this point`;
+    }
+    if (netVsLast < 0) {
+      return `${formatGap(netVsLast)} vs last cycle at this point`;
+    }
+  }
+
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
@@ -423,14 +408,24 @@ const verdictDelta = computed(() => {
 });
 
 const verdictToneClass = computed(() => {
+  const ctx = budgetContext.value;
+  const netVsLast = ctx?.moneyLeftVsLastCycle;
+  const paceGap = budgetProjectedDelta.value;
+  const injection = ctx?.topupExtra ?? 0;
+
+  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
+    return "pace-verdict--ok";
+  }
+
   const monthGap = projectedVsUsualDelta.value;
-  const projectedLeft = budgetContext.value?.projectedMoneyLeft;
+  const projectedLeft = ctx?.projectedMoneyLeft;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
     if (nowGap > 50) return "pace-verdict--warn";
     return "pace-verdict--ok";
   }
   if (monthGap > 0) {
+    if (netVsLast != null && netVsLast > 50) return "pace-verdict--warn";
     if (projectedLeft != null && projectedLeft >= 500) return "pace-verdict--warn";
     return "pace-verdict--bad";
   }
