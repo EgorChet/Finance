@@ -10,14 +10,20 @@ permissions:
   pages: write
   id-token: write
 
-# Do not cancel in-progress Pages deploys — that can leave GitHub stuck in deployment_queued.
+# Cancel superseded runs before they reach Pages — avoids "Deployment cancelled" when
+# several pushes land close together (with cancel-in-progress: false, GitHub Pages
+# cancels in-flight deploys instead, leaving red runs and no live update).
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,15 +44,6 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
