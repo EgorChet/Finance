@@ -4,7 +4,9 @@ import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "./livingBudget
 import {
   computePace,
   cycleStartForDate,
+  effectiveManualCycleSpend,
   getBillingCycle,
+  loadPaceAvgCycles,
   type PaceAvgCycles,
 } from "./pace";
 import {
@@ -77,6 +79,54 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
   );
 
   return paceHealthTone(ctx, pace.projectedVsUsualDelta);
+}
+
+/** Single entry point for live-cycle pace coloring — keeps Home, Overview, and PaceCard in sync. */
+export interface LivePaceHealthInput {
+  transactions: Transaction[];
+  cycleTransactions: Transaction[];
+  cycleDay: number;
+  referenceDate: Date;
+  livingBudget: number | null;
+  livingBudgetBase?: number | null;
+  livingBudgetTopup?: number;
+  budgetSegments?: LivingBudgetSegment[];
+  budgetMonthTopups?: LivingBudgetMonthTopup[];
+  latestBillingDate?: string | null;
+  configuredCharges?: ConfiguredCharge[];
+  cycleStart: string;
+  statementSavedAt?: string | null;
+  hasStatementSpend: boolean;
+  partialStatementActive: boolean;
+  cycleEverydaySpend?: number | null;
+  avgCycles?: PaceAvgCycles;
+}
+
+export function computeLivePaceHealth(input: LivePaceHealthInput): PaceHealthTone | null {
+  if (input.livingBudget == null || input.livingBudget <= 0) return null;
+
+  return computePaceHealth({
+    transactions: input.transactions,
+    cycleTransactions: input.cycleTransactions,
+    cycleDay: input.cycleDay,
+    referenceDate: input.referenceDate,
+    livingBudget: input.livingBudget,
+    livingBudgetBase: input.livingBudgetBase,
+    livingBudgetTopup: input.livingBudgetTopup,
+    budgetSegments: input.budgetSegments,
+    budgetMonthTopups: input.budgetMonthTopups,
+    latestBillingDate: input.latestBillingDate,
+    configuredCharges: input.configuredCharges,
+    avgCycles: input.avgCycles ?? loadPaceAvgCycles(),
+    cycleStart: input.cycleStart,
+    cycleEverydaySpend: input.cycleEverydaySpend,
+    manualSpend: input.partialStatementActive
+      ? null
+      : effectiveManualCycleSpend(input.cycleStart, {
+          statementSavedAt: input.statementSavedAt ?? null,
+          hasStatementSpend: input.hasStatementSpend,
+        }),
+  });
 }
 
 export type { PaceHealthTone };

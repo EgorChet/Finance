@@ -50,6 +50,7 @@
       :living-budget-topup="livingBudgetTopupExtra"
       :living-budget-segments="livingBudgetSegments"
       :living-budget-month-topups="livingBudgetMonthTopups"
+      :pace-tone="summaryPaceTone"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -136,7 +137,7 @@ import {
   rollupCategoriesForDisplay,
 } from "../categories";
 import { everydaySpendingTotal } from "../utils/householdBudget";
-import { computePaceHealth } from "../utils/paceHealth";
+import { computeLivePaceHealth } from "../utils/paceHealth";
 import {
   buildCycleReport,
   cycleStartForDate,
@@ -150,7 +151,6 @@ import {
   isCycleMonthKey,
   latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
-  loadPaceAvgCycles,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
@@ -377,7 +377,7 @@ const summaryPaceTone = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
   const start = cycleStartForDate(refDate.value, cycleDay.value);
   const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
-  return computePaceHealth({
+  return computeLivePaceHealth({
     transactions: paceTransactions.value,
     cycleTransactions: report.value.transactions,
     cycleDay: cycleDay.value,
@@ -389,15 +389,11 @@ const summaryPaceTone = computed(() => {
     budgetMonthTopups: livingBudgetMonthTopups.value,
     latestBillingDate: latestFinalBillingDate.value,
     configuredCharges: configuredCharges.value,
-    avgCycles: loadPaceAvgCycles(),
-    manualSpend: partialStatementActive.value
-      ? null
-      : effectiveManualCycleSpend(start, {
-          statementSavedAt: statementSavedAt.value,
-          hasStatementSpend,
-        }),
-    cycleEverydaySpend: cycleEverydaySpend.value,
     cycleStart: start,
+    statementSavedAt: statementSavedAt.value,
+    hasStatementSpend,
+    partialStatementActive: partialStatementActive.value,
+    cycleEverydaySpend: cycleEverydaySpend.value,
   });
 });
 

@@ -22,7 +22,7 @@
             :living-budget="livingBudgetAmount"
             :partial="isPartialCycle"
             :pace-tone="summaryPaceTone"
-            :pace-colored="!!currentMonthKey && isCycleMonthKey(currentMonthKey)"
+            :pace-colored="showPaceHealth"
           />
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
@@ -77,7 +77,7 @@ import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
 import { everydaySpendingTotal } from "../utils/householdBudget";
-import { computePaceHealth } from "../utils/paceHealth";
+import { computeLivePaceHealth } from "../utils/paceHealth";
 import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
@@ -99,11 +99,11 @@ import {
   getCycleRangeForStart,
   isCycleMonthKey,
   loadCycleDay,
-  loadPaceAvgCycles,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
   pruneStaleManualCycleSpend,
+  latestFinalBillingDate as getLatestFinalBillingDate,
 } from "../utils/pace";
 
 const auth = useAuthStore();
@@ -188,15 +188,23 @@ const livingBudgetBaseAmount = computed(() =>
   livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
 );
 
-const summaryPaceTone = computed(() => {
-  if (!spendingReport.value || !currentMonthKey.value || !isCycleMonthKey(currentMonthKey.value)) {
-    return null;
+const showPaceHealth = computed(() => {
+  if (!spendingReport.value || !currentMonthKey.value) return false;
+  if (isPartialCycle.value) {
+    return everydaySpendingTotal(spendingReport.value.transactions) > 0;
   }
+  if (!isCycleMonthKey(currentMonthKey.value)) return false;
   const start = cycleStartFromMonthKey(currentMonthKey.value);
+  return cycleNeedsOpenTab(start, cycleDay.value, months.value);
+});
+
+const summaryPaceTone = computed(() => {
+  if (!showPaceHealth.value || !spendingReport.value) return null;
+  const start = cycleStartForDate(refDate.value, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
   const statementAt = partial?.saved_at ?? null;
   const hasStatementSpend = everydaySpendingTotal(spendingReport.value.transactions) > 0;
-  return computePaceHealth({
+  return computeLivePaceHealth({
     transactions: paceReport.value?.transactions ?? spendingReport.value.transactions,
     cycleTransactions: spendingReport.value.transactions,
     cycleDay: cycleDay.value,
@@ -206,17 +214,15 @@ const summaryPaceTone = computed(() => {
     livingBudgetTopup: livingBudgetTopupExtra.value,
     budgetSegments: livingBudgetSegments.value,
     budgetMonthTopups: livingBudgetMonthTopups.value,
-    avgCycles: loadPaceAvgCycles(),
-    manualSpend: isPartialCycle.value
-      ? null
-      : effectiveManualCycleSpend(start, {
-          statementSavedAt: statementAt,
-          hasStatementSpend,
-        }),
+    latestBillingDate: getLatestFinalBillingDate(months.value),
+    configuredCharges: configuredCharges.value,
+    cycleStart: start,
+    statementSavedAt: statementAt,
+    hasStatementSpend,
+    partialStatementActive: isPartialCycle.value,
     cycleEverydaySpend: hasStatementSpend
       ? everydaySpendingTotal(spendingReport.value.transactions)
       : null,
-    cycleStart: cycleStartForDate(refDate.value, cycleDay.value),
   });
 });
 

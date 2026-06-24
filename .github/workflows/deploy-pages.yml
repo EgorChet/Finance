@@ -10,17 +10,16 @@ permissions:
   pages: write
   id-token: write
 
-# Cancel superseded runs before they reach Pages — avoids "Deployment cancelled" when
-# several pushes land close together (with cancel-in-progress: false, GitHub Pages
-# cancels in-flight deploys instead, leaving red runs and no live update).
+# One deploy at a time; let in-flight deploys finish (cancel-in-progress causes
+# "Deployment cancelled" when pushes land during the Pages upload step).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -47,3 +46,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        timeout-minutes: 20

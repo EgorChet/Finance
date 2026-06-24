@@ -165,6 +165,7 @@ import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
 import { computePaceBudgetContext, paceBudgetNote, paceHealthTone, paceHealthVerdictClass, paceInjectionCushionVerdict } from "../utils/paceBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "../utils/livingBudget";
+import type { PaceHealthTone } from "../utils/paceHealth";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
   computePace,
@@ -202,6 +203,8 @@ const props = defineProps<{
   livingBudgetTopup?: number;
   livingBudgetSegments?: LivingBudgetSegment[];
   livingBudgetMonthTopups?: LivingBudgetMonthTopup[];
+  /** When set (e.g. from Overview), keeps verdict color in sync with the money-left card. */
+  paceTone?: PaceHealthTone | null;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -349,7 +352,9 @@ const injectionCushionVerdict = computed(() =>
   budgetContext.value ? paceInjectionCushionVerdict(budgetContext.value) : null,
 );
 
-const paceTone = computed(() => paceHealthTone(budgetContext.value, projectedVsUsualDelta.value));
+const paceTone = computed(
+  () => props.paceTone ?? paceHealthTone(budgetContext.value, projectedVsUsualDelta.value),
+);
 
 const budgetNote = computed(() => {
   if (!budgetContext.value || injectionCushionVerdict.value) return "";
