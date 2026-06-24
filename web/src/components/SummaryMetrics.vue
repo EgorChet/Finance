@@ -157,8 +157,10 @@ const props = withDefaults(
     compact?: boolean;
     /** Live-cycle pace tone — green / yellow / red money-left card. */
     paceTone?: PaceHealthTone | null;
+    /** When true, use pace tone instead of raw budget-left coloring. */
+    paceColored?: boolean;
   }>(),
-  { retrospective: false, partial: false, compact: false, paceTone: null },
+  { retrospective: false, partial: false, compact: false, paceTone: null, paceColored: false },
 );
 
 const everydayBreakdownOpen = ref(false);
@@ -199,7 +201,9 @@ const budgetFormula = computed(() => {
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
-  if (props.paceTone) return paceHealthBudgetClass(props.paceTone);
+  if (props.paceColored) {
+    return props.paceTone ? paceHealthBudgetClass(props.paceTone) : "";
+  }
   if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";

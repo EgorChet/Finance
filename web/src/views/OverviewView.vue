@@ -31,6 +31,7 @@
       :retrospective="budgetRetrospective"
       :partial="isPartialMonthSelected"
       :pace-tone="summaryPaceTone"
+      :pace-colored="showPaceCard"
     />
     <PaceCard
       v-if="showPaceCard"
@@ -149,6 +150,7 @@ import {
   isCycleMonthKey,
   latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
+  loadPaceAvgCycles,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
@@ -373,7 +375,7 @@ const cycleEverydaySpend = computed(() => {
 
 const summaryPaceTone = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
+  const start = cycleStartForDate(refDate.value, cycleDay.value);
   const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
   return computePaceHealth({
     transactions: paceTransactions.value,
@@ -387,6 +389,7 @@ const summaryPaceTone = computed(() => {
     budgetMonthTopups: livingBudgetMonthTopups.value,
     latestBillingDate: latestFinalBillingDate.value,
     configuredCharges: configuredCharges.value,
+    avgCycles: loadPaceAvgCycles(),
     manualSpend: partialStatementActive.value
       ? null
       : effectiveManualCycleSpend(start, {

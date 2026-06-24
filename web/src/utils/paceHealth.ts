@@ -5,6 +5,7 @@ import {
   computePace,
   cycleStartForDate,
   getBillingCycle,
+  type PaceAvgCycles,
 } from "./pace";
 import {
   computePaceBudgetContext,
@@ -27,6 +28,8 @@ export interface PaceHealthOptions {
   manualSpend?: number | null;
   cycleEverydaySpend?: number | null;
   cycleStart?: string;
+  /** Match PaceCard — defaults to 3 (same as loadPaceAvgCycles). */
+  avgCycles?: PaceAvgCycles;
 }
 
 export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | null {
@@ -47,6 +50,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
     includeFixed: false,
     latestBillingDate: options.latestBillingDate ?? null,
     manualSpend: options.manualSpend ?? null,
+    avgCycles: options.avgCycles ?? 3,
     configuredCharges: options.configuredCharges ?? [],
     statementSpendOverride: statementOverride,
     statementVariableOverride: statementOverride,

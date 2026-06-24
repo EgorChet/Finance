@@ -22,6 +22,7 @@
             :living-budget="livingBudgetAmount"
             :partial="isPartialCycle"
             :pace-tone="summaryPaceTone"
+            :pace-colored="!!currentMonthKey && isCycleMonthKey(currentMonthKey)"
           />
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
@@ -98,6 +99,7 @@ import {
   getCycleRangeForStart,
   isCycleMonthKey,
   loadCycleDay,
+  loadPaceAvgCycles,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
@@ -204,6 +206,7 @@ const summaryPaceTone = computed(() => {
     livingBudgetTopup: livingBudgetTopupExtra.value,
     budgetSegments: livingBudgetSegments.value,
     budgetMonthTopups: livingBudgetMonthTopups.value,
+    avgCycles: loadPaceAvgCycles(),
     manualSpend: isPartialCycle.value
       ? null
       : effectiveManualCycleSpend(start, {
@@ -213,7 +216,7 @@ const summaryPaceTone = computed(() => {
     cycleEverydaySpend: hasStatementSpend
       ? everydaySpendingTotal(spendingReport.value.transactions)
       : null,
-    cycleStart: start,
+    cycleStart: cycleStartForDate(refDate.value, cycleDay.value),
   });
 });
 
