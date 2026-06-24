@@ -55,26 +55,6 @@
               <div class="pace-verdict" :class="verdictToneClass">
                 <p class="pace-verdict-status">{{ verdictStatus }}</p>
                 <p class="pace-verdict-delta">{{ verdictDelta }}</p>
-              </div>
-
-              <div v-if="budgetContext" class="pace-money-left-glance">
-                <p class="pace-money-left-glance-title">Money left in budget</p>
-                <div class="pace-money-left-glance-grid" :class="{ 'pace-money-left-glance-grid--solo': !showLastCycleCompare }">
-                  <div class="pace-money-left-glance-item">
-                    <span class="pace-money-left-glance-label">Today</span>
-                    <strong>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</strong>
-                  </div>
-                  <template v-if="showLastCycleCompare">
-                    <div class="pace-money-left-glance-item">
-                      <span class="pace-money-left-glance-label">Same date last cycle{{ lastCycleDayLabel }}</span>
-                      <strong>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</strong>
-                    </div>
-                    <div class="pace-money-left-glance-item" :class="moneyLeftVsLastCycleGlanceClass">
-                      <span class="pace-money-left-glance-label">Difference</span>
-                      <strong>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</strong>
-                    </div>
-                  </template>
-                </div>
                 <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
@@ -365,19 +345,6 @@ const budgetNote = computed(() => {
   return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
 });
 
-const budgetProjectedDelta = computed(() =>
-  budgetContext.value
-    ? budgetContext.value.projectedMoneyLeft - budgetContext.value.usualProjectedMoneyLeft
-    : 0,
-);
-
-const moneyLeftVsLastCycleGlanceClass = computed(() => {
-  const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
-  if (d > 0) return "pace-money-left-glance-item--good";
-  if (d < 0) return "pace-money-left-glance-item--bad";
-  return "";
-});
-
 const moneyLeftVsLastCycleTableClass = computed(() => {
   const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
   if (d > 0) return "pace-delta-good";
@@ -393,15 +360,6 @@ const projectedDeltaClass = computed(() => {
 });
 
 const verdictStatus = computed(() => {
-  const ctx = budgetContext.value;
-  const netVsLast = ctx?.moneyLeftVsLastCycle;
-  const paceGap = budgetProjectedDelta.value;
-  const injection = ctx?.topupExtra ?? 0;
-
-  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
-    return "Doing okay";
-  }
-
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) return "Doing fine";
   if (monthGap > 0) return "Overspending";
@@ -409,28 +367,6 @@ const verdictStatus = computed(() => {
 });
 
 const verdictDelta = computed(() => {
-  const ctx = budgetContext.value;
-  const netVsLast = ctx?.moneyLeftVsLastCycle;
-  const paceGap = budgetProjectedDelta.value;
-  const injection = ctx?.topupExtra ?? 0;
-
-  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
-    return `${formatGap(netVsLast)} vs last cycle — extra budget's covering the faster pace`;
-  }
-
-  if (netVsLast != null && Math.abs(netVsLast) >= 50 && ctx?.lastCycleMoneyLeftAtDay != null) {
-    const monthGap = projectedVsUsualDelta.value;
-    if (monthGap > 50 && netVsLast > 0) {
-      return `${formatGap(netVsLast)} vs last cycle despite ~${formatAboutIls(monthGap)} above usual pace`;
-    }
-    if (netVsLast > 0) {
-      return `${formatGap(netVsLast)} vs last cycle at this point`;
-    }
-    if (netVsLast < 0) {
-      return `${formatGap(netVsLast)} vs last cycle at this point`;
-    }
-  }
-
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
@@ -443,24 +379,14 @@ const verdictDelta = computed(() => {
 });
 
 const verdictToneClass = computed(() => {
-  const ctx = budgetContext.value;
-  const netVsLast = ctx?.moneyLeftVsLastCycle;
-  const paceGap = budgetProjectedDelta.value;
-  const injection = ctx?.topupExtra ?? 0;
-
-  if (netVsLast != null && netVsLast > 50 && paceGap < -50 && injection > 0) {
-    return "pace-verdict--ok";
-  }
-
   const monthGap = projectedVsUsualDelta.value;
-  const projectedLeft = ctx?.projectedMoneyLeft;
+  const projectedLeft = budgetContext.value?.projectedMoneyLeft;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
     if (nowGap > 50) return "pace-verdict--warn";
     return "pace-verdict--ok";
   }
   if (monthGap > 0) {
-    if (netVsLast != null && netVsLast > 50) return "pace-verdict--warn";
     if (projectedLeft != null && projectedLeft >= 500) return "pace-verdict--warn";
     return "pace-verdict--bad";
   }
