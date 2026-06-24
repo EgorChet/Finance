@@ -4003,21 +4003,23 @@ table.rules select {
   color: #fbbf24;
 }
 
-.pace-verdict-injection-spent,
-.pace-verdict-injection-left {
+.pace-verdict-injection-line {
   margin: 0;
   font-size: 1rem;
   font-weight: 400;
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
-.pace-verdict-injection-spent {
+.pace-verdict-injection-spent-amt {
   color: var(--danger);
+  font-weight: 600;
 }
 
-.pace-verdict-injection-left {
+.pace-verdict-injection-left-amt {
   color: #34d399;
+  font-weight: 600;
 }
 
 .pace-verdict-injection-reason {
