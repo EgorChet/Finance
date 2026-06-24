@@ -54,7 +54,12 @@
             <template v-if="displaySpend > 0 && paceCompareAvg > 0">
               <div class="pace-verdict" :class="verdictToneClass">
                 <p class="pace-verdict-status">{{ verdictStatus }}</p>
-                <p class="pace-verdict-delta">{{ verdictDelta }}</p>
+                <template v-if="injectionCushionVerdict">
+                  <p class="pace-verdict-delta">{{ injectionCushionVerdict.spentLine }}</p>
+                  <p class="pace-verdict-delta">{{ injectionCushionVerdict.moneyLeftLine }}</p>
+                  <p class="pace-verdict-reason">{{ injectionCushionVerdict.reason }}</p>
+                </template>
+                <p v-else class="pace-verdict-delta">{{ verdictDelta }}</p>
                 <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
@@ -376,7 +381,7 @@ const verdictStatus = computed(() => {
 });
 
 const verdictDelta = computed(() => {
-  if (injectionCushionVerdict.value) return injectionCushionVerdict.value.delta;
+  if (injectionCushionVerdict.value) return "";
 
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) {

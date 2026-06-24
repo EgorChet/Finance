@@ -204,13 +204,16 @@ export function paceBudgetNote(ctx: PaceBudgetContext, projectedVsUsualDelta: nu
   return `Above usual pace — only ~${formatAboutIls(Math.max(0, projectedMoneyLeft))} left in budget at month-end.`;
 }
 
-/** Overspending but monthly injection + last-cycle cushion — short yellow verdict copy. */
+/** Overspending but monthly injection + last-cycle cushion — multi-line yellow verdict. */
 export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
   status: string;
-  delta: string;
+  spentLine: string;
+  moneyLeftLine: string;
+  reason: string;
 } | null {
   const paceGap = roundMoney(ctx.projectedMoneyLeft - ctx.usualProjectedMoneyLeft);
   const netVsLast = ctx.moneyLeftVsLastCycle;
+  const spentVsLast = ctx.spentVsLastCycleAtDay;
 
   if (ctx.topupExtra <= 0 || netVsLast == null || paceGap >= -50 || netVsLast <= 50) {
     return null;
@@ -219,9 +222,20 @@ export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
   const reserve = roundMoney(netVsLast + paceGap);
   if (reserve <= 0) return null;
 
+  const spentLine =
+    spentVsLast != null && spentVsLast > 50
+      ? `Spent ~${formatAboutIls(spentVsLast)} more than last month at this date`
+      : `Spending ~${formatAboutIls(Math.abs(paceGap))} faster than usual at month-end`;
+
+  const moneyLeftLine = `Money left is ~${formatAboutIls(netVsLast)} higher than last month`;
+
+  const reason = "Reason: budget injection";
+
   return {
     status: "Overspending",
-    delta: `~${formatAboutIls(Math.abs(paceGap))} over pace — extra budget covers it. ~${formatAboutIls(netVsLast)} vs last cycle, ~${formatAboutIls(reserve)} headroom.`,
+    spentLine,
+    moneyLeftLine,
+    reason,
   };
 }
 

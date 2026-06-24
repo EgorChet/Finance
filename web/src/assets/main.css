@@ -3987,6 +3987,18 @@ table.rules select {
   font-variant-numeric: tabular-nums;
 }
 
+.pace-verdict-reason {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.pace-verdict--warn .pace-verdict-reason {
+  color: #fbbf24;
+}
+
 .pace-verdict--ok .pace-verdict-status,
 .pace-verdict--ok .pace-verdict-delta {
   color: #34d399;
