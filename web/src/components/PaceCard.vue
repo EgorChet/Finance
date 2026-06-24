@@ -52,14 +52,17 @@
         <section class="pace-panel pace-panel-metrics">
           <div class="pace-simple">
             <template v-if="displaySpend > 0 && paceCompareAvg > 0">
-              <div class="pace-verdict" :class="verdictToneClass">
-                <p class="pace-verdict-status">{{ verdictStatus }}</p>
+              <div class="pace-verdict" :class="injectionCushionVerdict ? 'pace-verdict--injection' : verdictToneClass">
                 <template v-if="injectionCushionVerdict">
-                  <p class="pace-verdict-delta">{{ injectionCushionVerdict.spentLine }}</p>
-                  <p class="pace-verdict-delta">{{ injectionCushionVerdict.moneyLeftLine }}</p>
-                  <p class="pace-verdict-reason">{{ injectionCushionVerdict.reason }}</p>
+                  <p class="pace-verdict-injection-title">{{ injectionCushionVerdict.status }}</p>
+                  <p class="pace-verdict-injection-spent">{{ injectionCushionVerdict.spentLine }}</p>
+                  <p class="pace-verdict-injection-left">{{ injectionCushionVerdict.moneyLeftLine }}</p>
+                  <p class="pace-verdict-injection-reason">{{ injectionCushionVerdict.reason }}</p>
                 </template>
-                <p v-else class="pace-verdict-delta">{{ verdictDelta }}</p>
+                <template v-else>
+                  <p class="pace-verdict-status">{{ verdictStatus }}</p>
+                  <p class="pace-verdict-delta">{{ verdictDelta }}</p>
+                </template>
                 <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 

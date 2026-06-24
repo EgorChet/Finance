@@ -3995,6 +3995,39 @@ table.rules select {
   color: var(--text-muted);
 }
 
+.pace-verdict--injection .pace-verdict-injection-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fbbf24;
+}
+
+.pace-verdict-injection-spent,
+.pace-verdict-injection-left {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.pace-verdict-injection-spent {
+  color: var(--danger);
+}
+
+.pace-verdict-injection-left {
+  color: #34d399;
+}
+
+.pace-verdict-injection-reason {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .pace-verdict--warn .pace-verdict-reason {
   color: #fbbf24;
 }
