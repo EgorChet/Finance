@@ -43,6 +43,8 @@ export interface MonthItem {
   pendingStatement?: boolean;
   /** Mid-cycle snapshot upload for this billing period. */
   partial?: boolean;
+  /** When this statement was last saved on the server (ISO). */
+  saved_at?: string;
   /** Partial tab for the live open cycle (single-tab UX). */
   isCurrentCycle?: boolean;
 }

@@ -250,6 +250,7 @@ export function demoMonthCatalog(): MonthCatalogItem[] {
     label: `${billingCycleLabel(PARTIAL_BILLING)} · partial`,
     billing_date: PARTIAL_BILLING,
     partial: true,
+    saved_at: new Date().toISOString(),
   });
   return finals;
 }

@@ -738,20 +738,92 @@ export function manualSpendKey(cycleStart: string): string {
   return `finance-pace-manual-${cycleStart}`;
 }
 
-export function loadManualCycleSpend(cycleStart: string): number | null {
+/** Legacy plain-number entries are treated as older than any uploaded statement. */
+const LEGACY_MANUAL_SAVED_AT = "1970-01-01T00:00:00.000Z";
+
+export interface ManualCycleSpendEntry {
+  amount: number;
+  savedAt: string;
+}
+
+function parseManualCycleSpendEntry(raw: string): ManualCycleSpendEntry | null {
+  if (!raw) return null;
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as { amount?: unknown; savedAt?: unknown };
+      const amount = typeof parsed.amount === "number" ? parsed.amount : parseFloat(String(parsed.amount));
+      const savedAt = typeof parsed.savedAt === "string" ? parsed.savedAt : "";
+      if (Number.isNaN(amount) || amount < 0 || !savedAt) return null;
+      return { amount: roundMoney(amount), savedAt };
+    } catch {
+      return null;
+    }
+  }
+  const amount = parseFloat(raw);
+  if (Number.isNaN(amount) || amount < 0) return null;
+  return { amount: roundMoney(amount), savedAt: LEGACY_MANUAL_SAVED_AT };
+}
+
+export function loadManualCycleSpendEntry(cycleStart: string): ManualCycleSpendEntry | null {
   const raw = localStorage.getItem(manualSpendKey(cycleStart));
   if (raw === null || raw === "") return null;
-  const n = parseFloat(raw);
-  if (Number.isNaN(n) || n < 0) return null;
-  return roundMoney(n);
+  return parseManualCycleSpendEntry(raw);
+}
+
+export function loadManualCycleSpend(cycleStart: string): number | null {
+  return loadManualCycleSpendEntry(cycleStart)?.amount ?? null;
 }
 
 export function saveManualCycleSpend(cycleStart: string, amount: number | null): void {
   if (amount === null || amount <= 0) {
     localStorage.removeItem(manualSpendKey(cycleStart));
-  } else {
-    localStorage.setItem(manualSpendKey(cycleStart), String(amount));
+    return;
   }
+  const entry: ManualCycleSpendEntry = {
+    amount: roundMoney(amount),
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(manualSpendKey(cycleStart), JSON.stringify(entry));
+}
+
+/** Manual bank-app entry only applies when no newer statement snapshot exists for this cycle. */
+export function effectiveManualCycleSpend(
+  cycleStart: string,
+  options: {
+    statementSavedAt?: string | null;
+    hasStatementSpend?: boolean;
+  } = {},
+): number | null {
+  const entry = loadManualCycleSpendEntry(cycleStart);
+  if (!entry) return null;
+  if (!options.hasStatementSpend) return entry.amount;
+
+  const statementAt = options.statementSavedAt?.trim();
+  if (!statementAt) return null;
+
+  return entry.savedAt > statementAt ? entry.amount : null;
+}
+
+/** Drop manual entries superseded by a newer partial or final upload. */
+export function pruneStaleManualCycleSpend(
+  cycleStart: string,
+  options: {
+    statementSavedAt?: string | null;
+    hasStatementSpend?: boolean;
+  } = {},
+): void {
+  const entry = loadManualCycleSpendEntry(cycleStart);
+  if (!entry) return;
+  if (effectiveManualCycleSpend(cycleStart, options) !== null) return;
+  localStorage.removeItem(manualSpendKey(cycleStart));
+}
+
+export function partialStatementSavedAtForCycle(
+  months: MonthItem[],
+  cycleStart: string,
+  cycleDay = 10,
+): string | null {
+  return findPartialMonth(months, cycleStart, cycleDay)?.saved_at ?? null;
 }
 
 export function loadCycleDay(): number {

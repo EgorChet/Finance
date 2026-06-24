@@ -1,13 +1,30 @@
-import { copyFileSync } from "fs";
+import { copyFileSync, writeFileSync } from "fs";
 import path from "path";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 const pagesBase = process.env.GITHUB_PAGES_BASE?.replace(/\/?$/, "/") || "/Finance/";
+const buildId =
+  process.env.GITHUB_SHA?.slice(0, 12) ||
+  process.env.RENDER_GIT_COMMIT?.slice(0, 12) ||
+  String(Date.now());
 
 export default defineConfig({
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(buildId),
+  },
   plugins: [
     vue(),
+    {
+      name: "app-build-version",
+      closeBundle() {
+        const dist = path.resolve(__dirname, "dist");
+        writeFileSync(
+          path.join(dist, "version.json"),
+          `${JSON.stringify({ build: buildId }, null, 0)}\n`,
+        );
+      },
+    },
     {
       name: "gh-pages-spa-fallback",
       closeBundle() {

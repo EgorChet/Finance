@@ -81,6 +81,7 @@ export function monthCatalog(data: StatementsData): MonthCatalogItem[] {
         label: entry.month_label || monthLabel(billing || key),
         billing_date: billing || key,
         partial: entry.provisional === true,
+        saved_at: entry.saved_at,
       };
     });
 }

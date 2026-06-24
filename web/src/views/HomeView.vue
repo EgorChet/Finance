@@ -87,13 +87,15 @@ import {
   cycleStartForStatementBilling,
   cycleStartFromMonthKey,
   defaultOverviewMonthKey,
+  effectiveManualCycleSpend,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
   loadCycleDay,
-  loadManualCycleSpend,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
+  partialStatementSavedAtForCycle,
+  pruneStaleManualCycleSpend,
 } from "../utils/pace";
 
 const auth = useAuthStore();
@@ -211,18 +213,28 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   const start = cycleStartFromMonthKey(monthKey);
   const { end } = getCycleRangeForStart(start, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
+  const statementAt = partial?.saved_at ?? null;
   let txs = paceReport.value?.transactions ?? [];
+  let hasPartialData = false;
   if (partial) {
     try {
       const partialReport = await fetchReport(auth.isDemo, partial.key, auth.token || undefined);
       txs = partialReport.transactions;
+      hasPartialData = true;
     } catch {
       /* use pace txs */
     }
   }
+  pruneStaleManualCycleSpend(start, {
+    statementSavedAt: statementAt,
+    hasStatementSpend: hasPartialData,
+  });
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
-    manualSpend: partial ? null : loadManualCycleSpend(start),
+    manualSpend: effectiveManualCycleSpend(start, {
+      statementSavedAt: statementAt,
+      hasStatementSpend: hasPartialData,
+    }),
     configuredCharges: configuredCharges.value,
   });
 }
@@ -254,6 +266,11 @@ async function loadSpending() {
 
     const monthKey = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
     currentMonthKey.value = monthKey;
+    const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
+    pruneStaleManualCycleSpend(todayStart, {
+      statementSavedAt: partialStatementSavedAtForCycle(m.months, todayStart, cycleDay.value),
+      hasStatementSpend: !!findPartialMonth(m.months, todayStart, cycleDay.value),
+    });
 
     if (monthKey && isCycleMonthKey(monthKey)) {
       spendingReport.value = await buildCycleReportForKey(monthKey);

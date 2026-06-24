@@ -39,9 +39,13 @@
       :configured-charges="configuredCharges"
       :partial-statement-active="partialStatementActive"
       :cycle-everyday-spend="cycleEverydaySpend"
+      :statement-saved-at="statementSavedAt"
       :partial-total-spend="partialTotalSpend"
       :reference-date="refDate"
       :cycle-day="cycleDay"
+      :living-budget="resolvedLivingBudget"
+      :living-budget-base="livingBudgetBaseAmount"
+      :living-budget-topup="livingBudgetTopupExtra"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -135,14 +139,16 @@ import {
   cycleStartFromMonthKey,
   cycleNeedsOpenTab,
   defaultOverviewMonthKey,
+  effectiveManualCycleSpend,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
   latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
-  loadManualCycleSpend,
   loadPaceIncludeFixed,
   mergeMonthsWithOpenCycles,
+  partialStatementSavedAtForCycle,
+  pruneStaleManualCycleSpend,
 } from "../utils/pace";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, formatIls, openCycleTabLabel } from "../utils/format";
@@ -156,6 +162,9 @@ import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
+  cycleMonthYmForOverview,
+  livingBudgetBaseForMonth,
+  monthTopupExtraForMonth,
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
@@ -312,6 +321,18 @@ const resolvedLivingBudget = computed(() =>
   ),
 );
 
+const livingBudgetCycleYm = computed(() =>
+  cycleMonthYmForOverview(selectedMonth.value, report.value, cycleDay.value),
+);
+
+const livingBudgetTopupExtra = computed(() =>
+  monthTopupExtraForMonth(livingBudgetCycleYm.value, livingBudgetMonthTopups.value),
+);
+
+const livingBudgetBaseAmount = computed(() =>
+  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
+);
+
 const showSummaryMetrics = computed(() => {
   if (!report.value) return false;
   if (isPartialForOpenCycle.value) return report.value.total_spent > 0;
@@ -344,6 +365,12 @@ const cycleEverydaySpend = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
   const total = everydaySpendingTotal(report.value.transactions);
   return total > 0 ? total : null;
+});
+
+const statementSavedAt = computed((): string | null => {
+  const start =
+    activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
+  return partialStatementSavedAtForCycle(months.value, start, cycleDay.value);
 });
 
 const partialTotalSpend = computed(() => {
@@ -404,14 +431,26 @@ async function buildLocalCycleReport(monthKey: string): Promise<SpendingReport> 
   const start = cycleStartFromMonthKey(monthKey);
   const { end } = getCycleRangeForStart(start, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
+  const statementAt = partial?.saved_at ?? null;
   let txs = paceReport.value?.transactions ?? [];
+  let hasPartialData = false;
   if (partial) {
     const partialReport = await loadPartialReport(partial.key);
-    if (partialReport) txs = partialReport.transactions;
+    if (partialReport) {
+      txs = partialReport.transactions;
+      hasPartialData = true;
+    }
   }
+  pruneStaleManualCycleSpend(start, {
+    statementSavedAt: statementAt,
+    hasStatementSpend: hasPartialData,
+  });
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
-    manualSpend: partial ? null : loadManualCycleSpend(start),
+    manualSpend: effectiveManualCycleSpend(start, {
+      statementSavedAt: statementAt,
+      hasStatementSpend: hasPartialData,
+    }),
     configuredCharges: configuredCharges.value,
   });
 }
@@ -525,6 +564,11 @@ async function loadMonths() {
         month: billingCycleLabel(row.billing_date),
       }));
     await Promise.all([refreshPaceReport(), refreshConfiguredCharges(), refreshLivingBudget()]);
+    const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
+    pruneStaleManualCycleSpend(todayStart, {
+      statementSavedAt: partialStatementSavedAtForCycle(m.months, todayStart, cycleDay.value),
+      hasStatementSpend: !!findPartialMonth(m.months, todayStart, cycleDay.value),
+    });
     const queryMonth = typeof route.query.month === "string" ? route.query.month : null;
     const initial =
       queryMonth && m.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))

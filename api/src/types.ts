@@ -73,6 +73,8 @@ export interface MonthCatalogItem {
   billing_date: string;
   /** True for mid-cycle snapshot uploads. */
   partial?: boolean;
+  /** When this statement was last saved on the server (ISO). */
+  saved_at?: string;
 }
 
 export interface ReviewProgressData {

@@ -55,6 +55,7 @@
               <div class="pace-verdict" :class="verdictToneClass">
                 <p class="pace-verdict-status">{{ verdictStatus }}</p>
                 <p class="pace-verdict-delta">{{ verdictDelta }}</p>
+                <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
               </div>
 
               <details class="pace-simple-details">
@@ -103,6 +104,42 @@
                         <td>Difference</td>
                         <td>{{ formatGap(projectedVsUsualDelta) }}</td>
                       </tr>
+                      <template v-if="budgetContext">
+                        <tr class="pace-simple-table-group">
+                          <td colspan="2">Living budget</td>
+                        </tr>
+                        <tr>
+                          <td>Budget this cycle</td>
+                          <td>{{ formatIls(budgetContext.livingBudget) }}</td>
+                        </tr>
+                        <tr v-if="budgetContext.topupExtra > 0" class="pace-simple-table-sub">
+                          <td>Extra this month</td>
+                          <td>+{{ formatIls(budgetContext.topupExtra) }}</td>
+                        </tr>
+                        <tr>
+                          <td>Spent on cap</td>
+                          <td>{{ formatIls(budgetContext.spentOnCap) }}</td>
+                        </tr>
+                        <tr :class="moneyLeftNowClass">
+                          <td>Money left</td>
+                          <td>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</td>
+                        </tr>
+                        <tr class="pace-simple-table-group">
+                          <td colspan="2">Month-end (budget)</td>
+                        </tr>
+                        <tr>
+                          <td>Your projected left</td>
+                          <td>~{{ formatMoneyLeft(budgetContext.projectedMoneyLeft) }}</td>
+                        </tr>
+                        <tr>
+                          <td>At usual pace left</td>
+                          <td>~{{ formatMoneyLeft(budgetContext.usualProjectedMoneyLeft) }}</td>
+                        </tr>
+                        <tr class="pace-simple-table-gap" :class="budgetProjectedDeltaClass">
+                          <td>Difference</td>
+                          <td>{{ formatGap(budgetProjectedDelta) }}</td>
+                        </tr>
+                      </template>
                     </tbody>
                   </table>
                 </div>
@@ -124,7 +161,7 @@
         </section>
       </template>
 
-      <p v-if="pace?.dataStale && !manualSpend" class="pace-warning pace-panel-wide">
+      <p v-if="pace?.dataStale && !resolvedManualSpend" class="pace-warning pace-panel-wide">
         Upload your latest bill or enter current spending above — this cycle isn't on your statements yet.
       </p>
     </div>
@@ -136,15 +173,17 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "../types";
 import { formatIls, formatAboutIls } from "../utils/format";
 import { everydaySpendingComposition } from "../utils/householdBudget";
+import { computePaceBudgetContext, paceBudgetNote } from "../utils/paceBudget";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import {
   computePace,
   cycleStartForDate,
+  effectiveManualCycleSpend,
   getBillingCycle,
   getCycleRangeForStart,
   loadCycleDay,
-  loadManualCycleSpend,
   loadPaceAvgCycles,
+  pruneStaleManualCycleSpend,
   saveManualCycleSpend,
 } from "../utils/pace";
 
@@ -157,11 +196,19 @@ const props = defineProps<{
   partialStatementActive?: boolean;
   /** Everyday spending for the current cycle view — matches SummaryMetrics when set. */
   cycleEverydaySpend?: number | null;
+  /** Server timestamp for the partial snapshot covering this cycle, if any. */
+  statementSavedAt?: string | null;
   partialTotalSpend?: number | null;
   /** Pin demo pace to sample “today” (Jun 13 2026). */
   referenceDate?: Date;
   /** Billing cycle start day (default from settings). */
   cycleDay?: number;
+  /** Resolved living budget for this cycle (incl. Cibus + monthly injection). */
+  livingBudget?: number | null;
+  /** Base budget before monthly injection. */
+  livingBudgetBase?: number | null;
+  /** One-off extra cap added this calendar month. */
+  livingBudgetTopup?: number;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -192,8 +239,26 @@ const progressPct = computed(() => {
 const cycleStart = computed(() => cycleInfo.value.cycleStart);
 const manualInput = ref("");
 
+const hasStatementSpend = computed(
+  () => props.cycleEverydaySpend != null && props.cycleEverydaySpend > 0,
+);
+
+const effectiveManual = computed(() =>
+  effectiveManualCycleSpend(cycleStart.value, {
+    statementSavedAt: props.statementSavedAt,
+    hasStatementSpend: hasStatementSpend.value,
+  }),
+);
+
 function loadManualForCycle() {
-  const saved = loadManualCycleSpend(cycleStart.value);
+  pruneStaleManualCycleSpend(cycleStart.value, {
+    statementSavedAt: props.statementSavedAt,
+    hasStatementSpend: hasStatementSpend.value,
+  });
+  const saved = effectiveManualCycleSpend(cycleStart.value, {
+    statementSavedAt: props.statementSavedAt,
+    hasStatementSpend: hasStatementSpend.value,
+  });
   manualInput.value = saved !== null ? String(saved) : "";
 }
 
@@ -207,8 +272,14 @@ const manualSpend = computed((): number | null => {
   return n;
 });
 
+const resolvedManualSpend = computed((): number | null => {
+  if (props.partialStatementActive) return null;
+  if (hasStatementSpend.value && effectiveManual.value === null) return null;
+  return manualSpend.value;
+});
+
 const everydaySpendOverride = computed(() => {
-  if (manualSpend.value !== null) return undefined;
+  if (resolvedManualSpend.value !== null) return undefined;
   if (props.cycleEverydaySpend != null && props.cycleEverydaySpend > 0) {
     return props.cycleEverydaySpend;
   }
@@ -220,7 +291,7 @@ const pace = computed(() =>
     cycleDay: cycleDay.value,
     includeFixed: false,
     latestBillingDate: props.latestBillingDate ?? null,
-    manualSpend: props.partialStatementActive ? null : manualSpend.value,
+    manualSpend: resolvedManualSpend.value,
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
     statementSpendOverride: everydaySpendOverride.value,
@@ -236,7 +307,7 @@ const displaySpend = computed(() => {
 
 const showEntryPanel = computed(() => {
   if (props.partialStatementActive) return false;
-  if (displaySpend.value > 0 && manualSpend.value === null) return false;
+  if (displaySpend.value > 0 && resolvedManualSpend.value === null) return false;
   return true;
 });
 
@@ -251,6 +322,45 @@ const paceCompareAvg = computed(() => pace.value?.historicalAvgAtDay ?? 0);
 const projectedAtUsualPaceForecast = computed(() => pace.value?.projectedAtUsualPaceForecast ?? 0);
 
 const projectedVsUsualDelta = computed(() => pace.value?.projectedVsUsualDelta ?? 0);
+
+const budgetContext = computed(() => {
+  if (props.livingBudget == null || props.livingBudget <= 0) return null;
+  return computePaceBudgetContext(
+    props.cycleTransactions ?? [],
+    props.livingBudget,
+    projectedTotal.value,
+    projectedAtUsualPaceForecast.value,
+    {
+      baseBudget: props.livingBudgetBase,
+      topupExtra: props.livingBudgetTopup ?? 0,
+    },
+  );
+});
+
+const budgetNote = computed(() => {
+  if (!budgetContext.value) return "";
+  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
+});
+
+const budgetProjectedDelta = computed(() =>
+  budgetContext.value
+    ? budgetContext.value.projectedMoneyLeft - budgetContext.value.usualProjectedMoneyLeft
+    : 0,
+);
+
+const budgetProjectedDeltaClass = computed(() => {
+  const d = budgetProjectedDelta.value;
+  if (d > 0) return "pace-delta-good";
+  if (d < 0) return "pace-delta-bad";
+  return "";
+});
+
+const moneyLeftNowClass = computed(() => {
+  const left = budgetContext.value?.moneyLeft ?? 0;
+  if (left < 0) return "pace-simple-table-gap pace-delta-bad";
+  if (left <= (props.livingBudget ?? 0) * 0.2) return "pace-simple-table-gap pace-delta-bad";
+  return "";
+});
 
 const projectedDeltaClass = computed(() => {
   const d = projectedVsUsualDelta.value;
@@ -280,14 +390,23 @@ const verdictDelta = computed(() => {
 
 const verdictToneClass = computed(() => {
   const monthGap = projectedVsUsualDelta.value;
+  const projectedLeft = budgetContext.value?.projectedMoneyLeft;
   if (Math.abs(monthGap) < 50) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
     if (nowGap > 50) return "pace-verdict--warn";
     return "pace-verdict--ok";
   }
-  if (monthGap > 0) return "pace-verdict--bad";
+  if (monthGap > 0) {
+    if (projectedLeft != null && projectedLeft >= 500) return "pace-verdict--warn";
+    return "pace-verdict--bad";
+  }
   return "pace-verdict--good";
 });
+
+function formatMoneyLeft(amount: number): string {
+  if (amount < 0) return `${formatIls(Math.abs(amount))} over`;
+  return formatIls(amount);
+}
 
 function formatGap(delta: number): string {
   if (Math.abs(delta) < 1) return "Same";
@@ -320,4 +439,13 @@ watch(cycleStart, () => {
     loadManualForCycle();
   }
 });
+
+watch(
+  () => [props.statementSavedAt, props.cycleEverydaySpend] as const,
+  () => {
+    if (document.activeElement?.id !== "pace-manual-input") {
+      loadManualForCycle();
+    }
+  },
+);
 </script>

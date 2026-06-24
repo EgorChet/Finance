@@ -1188,6 +1188,35 @@ button {
   opacity: 0.85;
 }
 
+.app-update-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  background: #1e293b;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
+}
+
+.app-update-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
 .login-error {
   color: var(--danger);
   margin-top: 0.5rem;
@@ -3979,6 +4008,27 @@ table.rules select {
 .pace-verdict--bad .pace-verdict-status,
 .pace-verdict--bad .pace-verdict-delta {
   color: var(--danger);
+}
+
+.pace-budget-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.pace-verdict--warn .pace-budget-note {
+  color: #fbbf24;
+}
+
+.pace-verdict--bad .pace-budget-note {
+  color: #f87171;
+}
+
+.pace-verdict--ok .pace-budget-note,
+.pace-verdict--good .pace-budget-note {
+  color: var(--text-muted);
 }
 
 .pace-simple {
