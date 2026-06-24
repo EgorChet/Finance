@@ -225,14 +225,14 @@ export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
 
   const spentVsLastMonth = spentVsLast != null && spentVsLast > 50;
   const spentAmount = spentVsLastMonth
-    ? formatAboutIls(spentVsLast)
-    : formatAboutIls(Math.abs(paceGap));
+    ? formatIls(spentVsLast, 0)
+    : formatIls(Math.abs(paceGap), 0);
 
   return {
     status: "Overspending",
     spentAmount,
     spentVsLastMonth,
-    moneyLeftAmount: formatAboutIls(netVsLast),
+    moneyLeftAmount: formatIls(netVsLast, 0),
     reason: "Reason: budget injection",
   };
 }

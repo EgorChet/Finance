@@ -56,13 +56,13 @@
                 <template v-if="injectionCushionVerdict">
                   <p class="pace-verdict-injection-title">{{ injectionCushionVerdict.status }}</p>
                   <p v-if="injectionCushionVerdict.spentVsLastMonth" class="pace-verdict-injection-line">
-                    Spent ~<span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than last month at this date
+                    Spent <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than last month at this date
                   </p>
                   <p v-else class="pace-verdict-injection-line">
-                    Spending ~<span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> faster than usual at month-end
+                    Spending <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> faster than usual at month-end
                   </p>
                   <p class="pace-verdict-injection-line">
-                    Money left is ~<span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than last month
+                    Money left is <span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than last month
                   </p>
                   <p class="pace-verdict-injection-reason">{{ injectionCushionVerdict.reason }}</p>
                 </template>
