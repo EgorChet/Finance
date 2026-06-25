@@ -4,7 +4,7 @@
       <div>
         <h3 class="manual-section-title">Living budget</h3>
         <p class="manual-section-lead">
-          Monthly cap (excludes rent). +₪600/month Cibus is added automatically and matched as a groceries charge.
+          Monthly cap on your Visa (includes flat rent). +₪600/month Cibus is added automatically and matched as a groceries charge.
         </p>
       </div>
       <div v-if="!readonly" class="section-header-actions">

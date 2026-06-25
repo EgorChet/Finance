@@ -42,9 +42,9 @@ export function isMonthlyBillTransaction(tx: Transaction): boolean {
   return isRentTransaction(tx) || isCarLoanTransaction(tx) || isDevInstituteTransaction(tx);
 }
 
-/** Flat rent only — not counted against the ₪12k. */
-export function isBudgetExcludedTransaction(tx: Transaction): boolean {
-  return isRentTransaction(tx);
+/** Car loan or Dev Institute — fixed monthly bills excluded from everyday pace. */
+export function isEverydayPaceExcludedTransaction(tx: Transaction): boolean {
+  return isCarLoanTransaction(tx) || isDevInstituteTransaction(tx);
 }
 
 export function monthlyBillsTotal(transactions: Transaction[]): number {
@@ -54,10 +54,10 @@ export function monthlyBillsTotal(transactions: Transaction[]): number {
 }
 
 export function everydayTransactions(transactions: Transaction[]): Transaction[] {
-  return transactions.filter((tx) => !isMonthlyBillTransaction(tx));
+  return transactions.filter((tx) => !isEverydayPaceExcludedTransaction(tx));
 }
 
-/** Everything on the card except rent, car loan, and Dev Institute. */
+/** Everything on the card except car loan and Dev Institute (includes flat rent). */
 export function everydaySpendingTotal(transactions: Transaction[]): number {
   return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + tx.charge_amount, 0));
 }
@@ -240,27 +240,36 @@ export function everydaySpendingByCategory(transactions: Transaction[]): {
     .sort((a, b) => b.total - a.total);
 }
 
-/** What counts against the ₪12k (all card spend except rent). */
+/** What counts against the living budget cap (all card spend on the Visa, including rent). */
 export function budgetSpendBreakdown(transactions: Transaction[]): {
   spent: number;
   everyday: number;
+  rent: number;
   devInstitute: number;
   carLoan: number;
 } {
   let everyday = 0;
+  let rent = 0;
   let devInstitute = 0;
   let carLoan = 0;
   for (const tx of transactions) {
-    if (isBudgetExcludedTransaction(tx)) continue;
     const amt = tx.charge_amount;
-    if (isCarLoanTransaction(tx)) carLoan += amt;
+    if (isRentTransaction(tx)) rent += amt;
+    else if (isCarLoanTransaction(tx)) carLoan += amt;
     else if (isDevInstituteTransaction(tx)) devInstitute += amt;
     else everyday += amt;
   }
   everyday = roundMoney(everyday);
+  rent = roundMoney(rent);
   devInstitute = roundMoney(devInstitute);
   carLoan = roundMoney(carLoan);
-  return { everyday, devInstitute, carLoan, spent: roundMoney(everyday + devInstitute + carLoan) };
+  return {
+    everyday,
+    rent,
+    devInstitute,
+    carLoan,
+    spent: roundMoney(everyday + rent + devInstitute + carLoan),
+  };
 }
 
 export function discretionarySpent(transactions: Transaction[]): number {

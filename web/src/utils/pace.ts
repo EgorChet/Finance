@@ -1,6 +1,6 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
-import { isMonthlyBillTransaction, isConfiguredChargeTransaction, isConfiguredEverydayCharge } from "./householdBudget";
+import { isEverydayPaceExcludedTransaction, isConfiguredChargeTransaction, isConfiguredEverydayCharge } from "./householdBudget";
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
@@ -190,7 +190,7 @@ function cycleKey(start: Date): string {
 
 function includeTransaction(tx: Transaction, includeFixed: boolean): boolean {
   if (includeFixed) return true;
-  return !isMonthlyBillTransaction(tx);
+  return !isEverydayPaceExcludedTransaction(tx);
 }
 
 function isFixedChargeTx(tx: Transaction): boolean {
@@ -273,7 +273,7 @@ function statementEverydayAtDay(bucket: CycleBucket, dayIndex: number): number {
   if (dayIndex <= 0) return 0;
   let sum = 0;
   for (const tx of bucket.txs) {
-    if (isMonthlyBillTransaction(tx) || isConfiguredChargeTransaction(tx)) continue;
+    if (isEverydayPaceExcludedTransaction(tx) || isConfiguredChargeTransaction(tx)) continue;
     const d = parseIsoDate(tx.date);
     const day = daysBetween(bucket.start, d) + 1;
     if (day <= dayIndex) sum += tx.charge_amount;
@@ -286,7 +286,7 @@ function configuredEverydayFromBucketAtDay(bucket: CycleBucket, dayIndex: number
   let sum = 0;
   for (const tx of bucket.txs) {
     if (!isConfiguredChargeTransaction(tx)) continue;
-    if (isMonthlyBillTransaction(tx)) continue;
+    if (isEverydayPaceExcludedTransaction(tx)) continue;
     const d = parseIsoDate(tx.date);
     const day = daysBetween(bucket.start, d) + 1;
     if (day <= dayIndex) sum += tx.charge_amount;
@@ -307,7 +307,7 @@ function configuredEverydayBreakdownForBucket(
   const cycleEndIso = isoDate(bucket.end);
   const idsInBucket = new Set(
     bucket.txs
-      .filter((tx) => isConfiguredChargeTransaction(tx) && !isMonthlyBillTransaction(tx))
+      .filter((tx) => isConfiguredChargeTransaction(tx) && !isEverydayPaceExcludedTransaction(tx))
       .map((tx) => tx.notes!.slice("fixed_charge:".length)),
   );
 
