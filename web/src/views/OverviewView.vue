@@ -29,7 +29,6 @@
       :report="report"
       :living-budget="resolvedLivingBudget"
       :retrospective="budgetRetrospective"
-      :partial="isPartialMonthSelected"
       :pace-tone="summaryPaceTone"
       :pace-colored="showPaceCard"
     />
@@ -241,12 +240,6 @@ const isLiveCycleSelected = computed(() => {
     return selectedOpenCycle.value?.inProgress === true;
   }
   return start === cycleStartForDate(refDate.value, cycleDay.value);
-});
-
-const isPartialMonthSelected = computed(() => {
-  const month = months.value.find((m) => m.key === selectedMonth.value);
-  if (month?.partial) return true;
-  return report.value?.metadata?.provisional === true;
 });
 
 const isPartialForOpenCycle = computed(() => {

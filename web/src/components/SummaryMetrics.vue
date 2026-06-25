@@ -153,14 +153,13 @@ const props = withDefaults(
     report: SpendingReport;
     livingBudget: number | null;
     retrospective?: boolean;
-    partial?: boolean;
     compact?: boolean;
     /** Live-cycle pace tone — green / yellow / red money-left card. */
     paceTone?: PaceHealthTone | null;
     /** When true, use pace tone instead of raw budget-left coloring. */
     paceColored?: boolean;
   }>(),
-  { retrospective: false, partial: false, compact: false, paceTone: null, paceColored: false },
+  { retrospective: false, compact: false, paceTone: null, paceColored: false },
 );
 
 const everydayBreakdownOpen = ref(false);
@@ -220,7 +219,7 @@ const monthlyBillsPct = computed(() =>
   props.report.total_spent ? Math.round((monthlyBills.value / props.report.total_spent) * 100) : 0,
 );
 
-const everydayBreakdownEnabled = computed(() => props.partial && everydayTotal.value > 0);
+const everydayBreakdownEnabled = computed(() => everydayTotal.value > 0);
 const everydayCardTag = computed(() => (everydayBreakdownEnabled.value ? "button" : "div"));
 
 function openEverydayBreakdown() {

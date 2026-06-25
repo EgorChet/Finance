@@ -20,7 +20,6 @@
             compact
             :report="spendingReport"
             :living-budget="livingBudgetAmount"
-            :partial="isPartialCycle"
             :pace-tone="summaryPaceTone"
             :pace-colored="showPaceHealth"
           />
