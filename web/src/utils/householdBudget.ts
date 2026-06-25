@@ -6,6 +6,9 @@ import { roundMoney } from "./format";
 const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
 const CAR_LOAN_NAME_RE = /\b(car loan|הלוואת רכב)/i;
 const DEV_INST_NAME_RE = /developers?\s*institute|מכון המפתחים/i;
+const VAAD_BAYIT_RE =
+  /ועד\s*ה?בית|לועד\s*הבית|תשלום\s*לועד|vaad\s*bayit|vaad\s*habayit|building\s*committee|house\s*committee/i;
+const VAAD_BAYIT_CHARGE_ID_RE = /vaad|habayit|ועד/i;
 
 function chargeId(tx: Transaction): string | null {
   if (!tx.notes?.startsWith("fixed_charge:")) return null;
@@ -266,4 +269,31 @@ export function discretionarySpent(transactions: Transaction[]): number {
 
 export function moneyLeft(transactions: Transaction[], budget: number): number {
   return roundMoney(budget - discretionarySpent(transactions));
+}
+
+/** Vaad habayit — usually charged early in the billing cycle. */
+export function isVaadBayitTransaction(tx: Transaction): boolean {
+  const id = chargeId(tx);
+  if (id && VAAD_BAYIT_CHARGE_ID_RE.test(id)) return true;
+  return VAAD_BAYIT_RE.test(merchantLabel(tx));
+}
+
+export function hasVaadBayitCharge(transactions: Transaction[]): boolean {
+  return transactions.some(isVaadBayitTransaction);
+}
+
+export const VAAD_BAYIT_RESERVE = 500;
+
+/** Approx daily budget for the rest of the cycle; reserves Vaad bayit until it posts. */
+export function dailyBudgetLeft(
+  moneyLeftAmount: number,
+  transactions: Transaction[],
+  daysLeft: number,
+  vaadBayitReserve = VAAD_BAYIT_RESERVE,
+): number | null {
+  if (daysLeft <= 0) return null;
+  const pool = hasVaadBayitCharge(transactions)
+    ? moneyLeftAmount
+    : roundMoney(moneyLeftAmount - vaadBayitReserve);
+  return roundMoney(pool / daysLeft);
 }

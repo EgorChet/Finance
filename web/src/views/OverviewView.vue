@@ -31,6 +31,8 @@
       :retrospective="budgetRetrospective"
       :pace-tone="summaryPaceTone"
       :pace-colored="showPaceCard"
+      :cycle-day="cycleDay"
+      :reference-date="refDate"
     />
     <PaceCard
       v-if="showPaceCard"

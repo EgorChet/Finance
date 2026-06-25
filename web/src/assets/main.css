@@ -634,6 +634,31 @@ button {
   border-width: 2px;
 }
 
+.metric-budget-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.metric-budget-daily {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.metric-budget-daily-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-budget-daily-meta {
+  margin-top: 0.1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .metric-card-budget--ok {
   border-color: color-mix(in srgb, #34d399 45%, var(--border));
   background: color-mix(in srgb, #34d399 8%, var(--surface));

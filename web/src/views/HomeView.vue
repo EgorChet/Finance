@@ -22,6 +22,8 @@
             :living-budget="livingBudgetAmount"
             :pace-tone="summaryPaceTone"
             :pace-colored="showPaceHealth"
+            :cycle-day="cycleDay"
+            :reference-date="refDate"
           />
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>

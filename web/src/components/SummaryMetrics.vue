@@ -3,7 +3,13 @@
     <div class="metric-grid">
       <div class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
-          <div class="metric-label">{{ budgetLabel }}</div>
+          <div class="metric-budget-head">
+            <div class="metric-label">{{ budgetLabel }}</div>
+            <div v-if="dailyBudgetDisplay" class="metric-budget-daily">
+              <div class="metric-budget-daily-value">{{ dailyBudgetDisplay.perDay }}</div>
+              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.daysLeft }} days left</div>
+            </div>
+          </div>
           <div class="metric-value">{{ budgetDisplayValue }}</div>
           <p class="metric-budget-formula">{{ budgetFormula }}</p>
           <ul class="metric-budget-breakdown">
@@ -137,9 +143,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "../types";
-import { formatIls } from "../utils/format";
+import { formatAboutIls, formatIls } from "../utils/format";
 import {
   budgetSpendBreakdown,
+  dailyBudgetLeft,
   everydaySpendingComposition,
   everydaySpendingTotal,
   monthlyBillsTotal,
@@ -147,6 +154,7 @@ import {
 } from "../utils/householdBudget";
 import { paceHealthBudgetClass } from "../utils/paceBudget";
 import type { PaceHealthTone } from "../utils/paceHealth";
+import { getBillingCycle } from "../utils/pace";
 
 const props = withDefaults(
   defineProps<{
@@ -158,6 +166,8 @@ const props = withDefaults(
     paceTone?: PaceHealthTone | null;
     /** When true, use pace tone instead of raw budget-left coloring. */
     paceColored?: boolean;
+    cycleDay?: number;
+    referenceDate?: Date;
   }>(),
   { retrospective: false, compact: false, paceTone: null, paceColored: false },
 );
@@ -185,6 +195,28 @@ const budgetLabel = computed(() => {
 const budgetDisplayValue = computed(() => {
   if (budgetLeft.value === null) return "—";
   return isOverBudget.value ? formatIls(overAmount.value) : formatIls(budgetLeft.value);
+});
+
+const daysLeftInCycle = computed(() => {
+  if (props.retrospective || props.cycleDay == null || props.referenceDate == null) return null;
+  const { dayIndex, cycleLength } = getBillingCycle(props.referenceDate, props.cycleDay);
+  return cycleLength - dayIndex + 1;
+});
+
+const dailyBudgetDisplay = computed(() => {
+  if (budgetLeft.value === null || daysLeftInCycle.value === null || daysLeftInCycle.value <= 0) {
+    return null;
+  }
+  const perDay = dailyBudgetLeft(
+    budgetLeft.value,
+    props.report.transactions,
+    daysLeftInCycle.value,
+  );
+  if (perDay === null) return null;
+  return {
+    perDay: `~${formatAboutIls(perDay)}/day`,
+    daysLeft: daysLeftInCycle.value,
+  };
 });
 
 const budgetFormula = computed(() => {
