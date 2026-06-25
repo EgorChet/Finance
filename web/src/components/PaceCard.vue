@@ -76,7 +76,7 @@
               <details class="pace-simple-details">
                 <summary>See the numbers</summary>
                 <p class="pace-simple-details-note">
-                  Same as the Everyday spending tile — includes flat rent; excludes car loan and Dev Institute.
+                  Same as the Everyday spending tile — excludes rent, car loan, and Dev Institute.
                 </p>
                 <div class="pace-simple-table-wrap">
                   <table class="pace-simple-table">

@@ -37,7 +37,7 @@
             </li>
           </ul>
           <p class="metric-sub-note">
-            Includes flat rent on the card. Use a monthly extra if you need headroom for rent.
+            Includes flat rent in the cap (not in everyday pace). Use a monthly extra if you need headroom for rent.
             <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Edit budget</RouterLink>
           </p>
         </template>
@@ -95,7 +95,7 @@
               <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">Everyday spending</h3>
               <p class="everyday-breakdown-meta">{{ formatIls(everydayTotal) }}</p>
               <p class="everyday-breakdown-hint">
-                Everything on the card except car loan and Dev Institute (includes flat rent).
+                Everything on the card except rent, car loan, and Dev Institute.
               </p>
             </div>
             <button

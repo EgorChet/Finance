@@ -42,9 +42,9 @@ export function isMonthlyBillTransaction(tx: Transaction): boolean {
   return isRentTransaction(tx) || isCarLoanTransaction(tx) || isDevInstituteTransaction(tx);
 }
 
-/** Car loan or Dev Institute — fixed monthly bills excluded from everyday pace. */
+/** Rent, car loan, or Dev Institute — excluded from everyday pace. */
 export function isEverydayPaceExcludedTransaction(tx: Transaction): boolean {
-  return isCarLoanTransaction(tx) || isDevInstituteTransaction(tx);
+  return isMonthlyBillTransaction(tx);
 }
 
 export function monthlyBillsTotal(transactions: Transaction[]): number {
@@ -57,7 +57,7 @@ export function everydayTransactions(transactions: Transaction[]): Transaction[]
   return transactions.filter((tx) => !isEverydayPaceExcludedTransaction(tx));
 }
 
-/** Everything on the card except car loan and Dev Institute (includes flat rent). */
+/** Everything on the card except rent, car loan, and Dev Institute. */
 export function everydaySpendingTotal(transactions: Transaction[]): number {
   return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + tx.charge_amount, 0));
 }

@@ -106,12 +106,12 @@ export function computePaceBudgetContext(
       : roundMoney(livingBudget - topupExtra);
 
   const projectedSpentOnCap = roundMoney(
-    projectedEveryday + breakdown.devInstitute + breakdown.carLoan,
+    projectedEveryday + breakdown.rent + breakdown.devInstitute + breakdown.carLoan,
   );
   const projectedMoneyLeft = roundMoney(livingBudget - projectedSpentOnCap);
 
   const usualProjectedSpentOnCap = roundMoney(
-    usualEverydayMonth + breakdown.devInstitute + breakdown.carLoan,
+    usualEverydayMonth + breakdown.rent + breakdown.devInstitute + breakdown.carLoan,
   );
   const usualProjectedMoneyLeft = roundMoney(livingBudget - usualProjectedSpentOnCap);
 
