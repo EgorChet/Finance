@@ -1,10 +1,10 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
-import { isMonthlyBillTransaction } from "./householdBudget";
+import { isMonthlyBillTransaction, isConfiguredChargeTransaction } from "./householdBudget";
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
-  configuredEverydayAtDay,
+  configuredEverydayFromConfigAtDay,
   mergeConfiguredChargeTransactions,
   sumConfiguredCharges,
   sumConfiguredMonthlyBills,
@@ -224,6 +224,33 @@ function variableThroughDay(bucket: CycleBucket, dayIndex: number): number {
   return roundMoney(at.total - at.fixed);
 }
 
+/** Visa export everyday spend through dayIndex — excludes configured extras and monthly bills. */
+function statementEverydayAtDay(bucket: CycleBucket, dayIndex: number): number {
+  if (dayIndex <= 0) return 0;
+  let sum = 0;
+  for (const tx of bucket.txs) {
+    if (isMonthlyBillTransaction(tx) || isConfiguredChargeTransaction(tx)) continue;
+    const d = parseIsoDate(tx.date);
+    const day = daysBetween(bucket.start, d) + 1;
+    if (day <= dayIndex) sum += tx.charge_amount;
+  }
+  return roundMoney(sum);
+}
+
+function everydaySpendAtDay(
+  bucket: CycleBucket,
+  dayIndex: number,
+  charges: ConfiguredCharge[],
+  cycleDay: number,
+): number {
+  const cycleStartIso = isoDate(bucket.start);
+  const cycleEndIso = isoDate(bucket.end);
+  return roundMoney(
+    statementEverydayAtDay(bucket, dayIndex) +
+      configuredEverydayFromConfigAtDay(cycleStartIso, cycleEndIso, dayIndex, charges, cycleDay),
+  );
+}
+
 /** Fallback when no completed cycles to learn from — flat (linear) extrapolation. */
 export const DEFAULT_SECOND_HALF_MULTIPLIER = 1;
 
@@ -401,20 +428,10 @@ export function computePace(
     for (const [key, bucket] of buckets.entries()) {
       if (key === currentKey) continue;
       if (bucket.end >= todayNorm) continue;
+      const total = !includeFixed
+        ? everydaySpendAtDay(bucket, cycle.dayIndex, configuredList, cycleDay)
+        : spendAtDay(bucket, cycle.dayIndex).total;
       const atDay = spendAtDay(bucket, cycle.dayIndex);
-      const cycleStartIso = isoDate(bucket.start);
-      const cycleEndIso = isoDate(bucket.end);
-      const configuredEveryday = !includeFixed
-        ? configuredEverydayAtDay(
-            cycleStartIso,
-            cycleEndIso,
-            cycle.dayIndex,
-            bucket.txs,
-            configuredList,
-            cycleDay,
-          )
-        : 0;
-      const total = roundMoney(atDay.total + configuredEveryday);
       if (total > 0 || bucket.txs.length > 0) {
         rows.push({
           start: bucket.start,
@@ -454,18 +471,11 @@ export function computePace(
   const tomorrowCycle = getBillingCycle(tomorrowNorm, cycleDay);
   const tomorrowDayIndex = tomorrowCycle.dayIndex;
   const tomorrowVariables = usedSnapshots.map((s) => {
+    if (!includeFixed) {
+      return everydaySpendAtDay(s.bucket, tomorrowDayIndex, configuredList, cycleDay);
+    }
     const atDay = spendAtDay(s.bucket, tomorrowDayIndex);
-    const configuredEveryday = !includeFixed
-      ? configuredEverydayAtDay(
-          isoDate(s.bucket.start),
-          isoDate(s.bucket.end),
-          tomorrowDayIndex,
-          s.bucket.txs,
-          configuredList,
-          cycleDay,
-        )
-      : 0;
-    return roundMoney(atDay.total - atDay.fixed + configuredEveryday);
+    return roundMoney(atDay.total - atDay.fixed);
   });
   const avgCyclesTomorrowVariable =
     tomorrowVariables.length > 0
@@ -636,16 +646,7 @@ export function computePace(
       ? roundMoney(
           usedSnapshots.reduce((s, row) => {
             const cycleLength = daysBetween(row.bucket.start, row.bucket.end) + 1;
-            const atEnd = spendAtDay(row.bucket, cycleLength);
-            const configuredEveryday = configuredEverydayAtDay(
-              isoDate(row.bucket.start),
-              isoDate(row.bucket.end),
-              cycleLength,
-              row.bucket.txs,
-              configuredList,
-              cycleDay,
-            );
-            return s + atEnd.total + configuredEveryday;
+            return s + everydaySpendAtDay(row.bucket, cycleLength, configuredList, cycleDay);
           }, 0) / usedSnapshots.length,
         )
       : 0;

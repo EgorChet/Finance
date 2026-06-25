@@ -115,7 +115,26 @@ function dayIndexInCycle(cycleStart: string, chargeDate: string): number {
   return Math.floor((charge.getTime() - start.getTime()) / 86400000) + 1;
 }
 
-/** Configured everyday charges through dayIndex, skipping charges already present in txs. */
+/** Configured everyday charges through dayIndex (Cibus etc.) — from settings, not bank txs. */
+export function configuredEverydayFromConfigAtDay(
+  cycleStart: string,
+  cycleEnd: string,
+  dayIndex: number,
+  charges: ConfiguredCharge[],
+  cycleDay = DEFAULT_BILLING_CYCLE_DAY,
+): number {
+  if (dayIndex <= 0 || !charges.length) return 0;
+
+  let sum = 0;
+  for (const charge of configuredChargesForCycle(cycleStart, charges, cycleEnd)) {
+    if (costTypeForCategory(charge.category_en) === "fixed") continue;
+    const chargeDay = dayIndexInCycle(cycleStart, transactionDateForCharge(charge, cycleStart, cycleDay));
+    if (chargeDay <= dayIndex) sum += charge.amount;
+  }
+  return roundMoney(sum);
+}
+
+/** @deprecated Use configuredEverydayFromConfigAtDay — kept for callers that subtract existing txs. */
 export function configuredEverydayAtDay(
   cycleStart: string,
   cycleEnd: string,
@@ -124,22 +143,8 @@ export function configuredEverydayAtDay(
   charges: ConfiguredCharge[],
   cycleDay = DEFAULT_BILLING_CYCLE_DAY,
 ): number {
-  if (dayIndex <= 0 || !charges.length) return 0;
-
-  const existingIds = new Set(
-    bucketTxs
-      .filter((tx) => tx.notes?.startsWith("fixed_charge:"))
-      .map((tx) => tx.notes!.slice("fixed_charge:".length)),
-  );
-
-  let sum = 0;
-  for (const charge of configuredChargesForCycle(cycleStart, charges, cycleEnd)) {
-    if (costTypeForCategory(charge.category_en) === "fixed") continue;
-    if (existingIds.has(charge.id)) continue;
-    const chargeDay = dayIndexInCycle(cycleStart, transactionDateForCharge(charge, cycleStart, cycleDay));
-    if (chargeDay <= dayIndex) sum += charge.amount;
-  }
-  return roundMoney(sum);
+  void bucketTxs;
+  return configuredEverydayFromConfigAtDay(cycleStart, cycleEnd, dayIndex, charges, cycleDay);
 }
 
 export const ONGOING_THROUGH_MONTH = "2035-12";
