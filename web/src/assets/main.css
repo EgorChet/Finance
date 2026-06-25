@@ -634,11 +634,15 @@ button {
   border-width: 2px;
 }
 
-.metric-budget-head {
+.metric-budget-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.75rem;
+}
+
+.metric-budget-main {
+  min-width: 0;
 }
 
 .metric-budget-daily {
@@ -647,15 +651,16 @@ button {
 }
 
 .metric-budget-daily-value {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .metric-budget-daily-meta {
-  margin-top: 0.1rem;
-  font-size: 0.78rem;
+  margin-top: 0.15rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 

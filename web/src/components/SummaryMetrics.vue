@@ -3,14 +3,20 @@
     <div class="metric-grid">
       <div class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
-          <div class="metric-budget-head">
-            <div class="metric-label">{{ budgetLabel }}</div>
-            <div v-if="dailyBudgetDisplay" class="metric-budget-daily">
+          <div v-if="dailyBudgetDisplay" class="metric-budget-top">
+            <div class="metric-budget-main">
+              <div class="metric-label">{{ budgetLabel }}</div>
+              <div class="metric-value">{{ budgetDisplayValue }}</div>
+            </div>
+            <div class="metric-budget-daily">
               <div class="metric-budget-daily-value">{{ dailyBudgetDisplay.perDay }}</div>
               <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.daysLeft }} days left</div>
             </div>
           </div>
-          <div class="metric-value">{{ budgetDisplayValue }}</div>
+          <template v-else>
+            <div class="metric-label">{{ budgetLabel }}</div>
+            <div class="metric-value">{{ budgetDisplayValue }}</div>
+          </template>
           <p class="metric-budget-formula">{{ budgetFormula }}</p>
           <ul class="metric-budget-breakdown">
             <li>
