@@ -4,6 +4,7 @@ import { isMonthlyBillTransaction } from "./householdBudget";
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
+  configuredEverydayAtDay,
   mergeConfiguredChargeTransactions,
   sumConfiguredCharges,
   sumConfiguredMonthlyBills,
@@ -369,6 +370,7 @@ export function computePace(
 
   const cycle = getBillingCycle(todayNorm, cycleDay);
   const currentKey = cycleKey(cycle.start);
+  const configuredList = options.configuredCharges ?? [];
 
   const byCycle = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
   const byCycleAll = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
@@ -400,11 +402,24 @@ export function computePace(
       if (key === currentKey) continue;
       if (bucket.end >= todayNorm) continue;
       const atDay = spendAtDay(bucket, cycle.dayIndex);
-      if (atDay.total > 0 || bucket.txs.length > 0) {
+      const cycleStartIso = isoDate(bucket.start);
+      const cycleEndIso = isoDate(bucket.end);
+      const configuredEveryday = !includeFixed
+        ? configuredEverydayAtDay(
+            cycleStartIso,
+            cycleEndIso,
+            cycle.dayIndex,
+            bucket.txs,
+            configuredList,
+            cycleDay,
+          )
+        : 0;
+      const total = roundMoney(atDay.total + configuredEveryday);
+      if (total > 0 || bucket.txs.length > 0) {
         rows.push({
           start: bucket.start,
           bucket,
-          total: atDay.total,
+          total,
           fixed: atDay.fixed,
         });
       }
@@ -440,7 +455,17 @@ export function computePace(
   const tomorrowDayIndex = tomorrowCycle.dayIndex;
   const tomorrowVariables = usedSnapshots.map((s) => {
     const atDay = spendAtDay(s.bucket, tomorrowDayIndex);
-    return roundMoney(atDay.total - atDay.fixed);
+    const configuredEveryday = !includeFixed
+      ? configuredEverydayAtDay(
+          isoDate(s.bucket.start),
+          isoDate(s.bucket.end),
+          tomorrowDayIndex,
+          s.bucket.txs,
+          configuredList,
+          cycleDay,
+        )
+      : 0;
+    return roundMoney(atDay.total - atDay.fixed + configuredEveryday);
   });
   const avgCyclesTomorrowVariable =
     tomorrowVariables.length > 0
@@ -476,7 +501,6 @@ export function computePace(
 
   const cycleStartIso = isoDate(cycle.start);
   const cycleEndIso = isoDate(cycle.end);
-  const configuredList = options.configuredCharges ?? [];
   const configuredCharges = configuredChargesForCycle(cycleStartIso, configuredList, cycleEndIso).map((c) => ({
     name_en: c.name_en,
     amount: c.amount,
@@ -610,7 +634,19 @@ export function computePace(
   const historicalFullCycleEverydayAvg =
     !includeFixed && usedSnapshots.length > 0
       ? roundMoney(
-          usedSnapshots.reduce((s, row) => s + fullCycleTotal(row.bucket), 0) / usedSnapshots.length,
+          usedSnapshots.reduce((s, row) => {
+            const cycleLength = daysBetween(row.bucket.start, row.bucket.end) + 1;
+            const atEnd = spendAtDay(row.bucket, cycleLength);
+            const configuredEveryday = configuredEverydayAtDay(
+              isoDate(row.bucket.start),
+              isoDate(row.bucket.end),
+              cycleLength,
+              row.bucket.txs,
+              configuredList,
+              cycleDay,
+            );
+            return s + atEnd.total + configuredEveryday;
+          }, 0) / usedSnapshots.length,
         )
       : 0;
 

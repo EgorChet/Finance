@@ -96,6 +96,52 @@ export function sumConfiguredMonthlyBills(
   );
 }
 
+/** Groceries-style configured charges — excludes rent, loans, Dev Institute categories. */
+export function sumConfiguredEverydayCharges(
+  cycleStart: string,
+  charges: ConfiguredCharge[],
+  cycleEnd?: string,
+): number {
+  return roundMoney(
+    sumConfiguredCharges(cycleStart, charges, cycleEnd) - sumConfiguredMonthlyBills(cycleStart, charges, cycleEnd),
+  );
+}
+
+function dayIndexInCycle(cycleStart: string, chargeDate: string): number {
+  const [sy, sm, sd] = cycleStart.slice(0, 10).split("-").map(Number);
+  const [cy, cm, cd] = chargeDate.slice(0, 10).split("-").map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const charge = new Date(cy, cm - 1, cd);
+  return Math.floor((charge.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+/** Configured everyday charges through dayIndex, skipping charges already present in txs. */
+export function configuredEverydayAtDay(
+  cycleStart: string,
+  cycleEnd: string,
+  dayIndex: number,
+  bucketTxs: Transaction[],
+  charges: ConfiguredCharge[],
+  cycleDay = DEFAULT_BILLING_CYCLE_DAY,
+): number {
+  if (dayIndex <= 0 || !charges.length) return 0;
+
+  const existingIds = new Set(
+    bucketTxs
+      .filter((tx) => tx.notes?.startsWith("fixed_charge:"))
+      .map((tx) => tx.notes!.slice("fixed_charge:".length)),
+  );
+
+  let sum = 0;
+  for (const charge of configuredChargesForCycle(cycleStart, charges, cycleEnd)) {
+    if (costTypeForCategory(charge.category_en) === "fixed") continue;
+    if (existingIds.has(charge.id)) continue;
+    const chargeDay = dayIndexInCycle(cycleStart, transactionDateForCharge(charge, cycleStart, cycleDay));
+    if (chargeDay <= dayIndex) sum += charge.amount;
+  }
+  return roundMoney(sum);
+}
+
 export const ONGOING_THROUGH_MONTH = "2035-12";
 
 export function isOngoingThrough(throughMonth: string): boolean {
