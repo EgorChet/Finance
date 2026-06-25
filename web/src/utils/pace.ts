@@ -4,6 +4,7 @@ import { isMonthlyBillTransaction, isConfiguredChargeTransaction, isConfiguredEv
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
+  configuredEverydayFromConfigAtDay,
   mergeConfiguredChargeTransactions,
   ONGOING_THROUGH_MONTH,
   sumConfiguredCharges,
@@ -127,6 +128,10 @@ export interface PaceDebugInfo {
     secondHalfMultiplier: number;
     projectedTotal: number;
     projectedAtUsualPaceForecast: number;
+    structuralConfiguredAtDay: number;
+    structuralConfiguredFullCycle: number;
+    adjustedUsualFullMonth: number;
+    visaRatio: number | null;
     formula: string;
   };
 }
@@ -404,6 +409,97 @@ function everydaySpendAtDay(
     statementEverydayAtDay(bucket, dayIndex) +
       configuredEverydayAtDayForBucket(bucket, dayIndex, charges, cycleDay),
   );
+}
+
+function averageConfiguredEverydayAtDay(
+  snapshots: { bucket: CycleBucket }[],
+  dayIndex: number,
+  charges: ConfiguredCharge[],
+  cycleDay: number,
+): number {
+  if (!snapshots.length) return 0;
+  return roundMoney(
+    snapshots.reduce(
+      (sum, row) =>
+        sum + configuredEverydayAtDayForBucket(row.bucket, dayIndex, charges, cycleDay),
+      0,
+    ) / snapshots.length,
+  );
+}
+
+function currentConfiguredEverydayAtDay(
+  currentBucket: CycleBucket | undefined,
+  dayIndex: number,
+  cycleStart: string,
+  cycleEnd: string,
+  charges: ConfiguredCharge[],
+  cycleDay: number,
+): number {
+  if (currentBucket) {
+    return configuredEverydayAtDayForBucket(currentBucket, dayIndex, charges, cycleDay);
+  }
+  return configuredEverydayFromConfigAtDay(cycleStart, cycleEnd, dayIndex, charges, cycleDay);
+}
+
+/** Project full-cycle everyday spend without treating new recurring extras as overspending. */
+function projectEverydayWithStructuralAdjustment(options: {
+  currentSpend: number;
+  compareAvg: number;
+  currentConfiguredAtDay: number;
+  usualConfiguredAtDay: number;
+  currentConfiguredFullCycle: number;
+  usualConfiguredFullCycle: number;
+  historicalFullCycleEverydayAvg: number;
+}): {
+  projectedTotal: number;
+  adjustedUsualFullMonth: number;
+  structuralAtDay: number;
+  structuralFullCycle: number;
+  visaRatio: number | null;
+} {
+  const {
+    currentSpend,
+    compareAvg,
+    currentConfiguredAtDay,
+    usualConfiguredAtDay,
+    currentConfiguredFullCycle,
+    usualConfiguredFullCycle,
+    historicalFullCycleEverydayAvg,
+  } = options;
+
+  const structuralAtDay = roundMoney(Math.max(0, currentConfiguredAtDay - usualConfiguredAtDay));
+  const structuralFullCycle = roundMoney(
+    Math.max(0, currentConfiguredFullCycle - usualConfiguredFullCycle),
+  );
+  const adjustedUsualFullMonth = roundMoney(historicalFullCycleEverydayAvg + structuralFullCycle);
+
+  const currentVisaAtDay = roundMoney(Math.max(0, currentSpend - currentConfiguredAtDay));
+  const usualVisaAtDay = roundMoney(Math.max(0, compareAvg - usualConfiguredAtDay));
+
+  if (usualVisaAtDay > 0 && compareAvg > 0) {
+    const visaRatio = currentVisaAtDay / usualVisaAtDay;
+    const historicalVisaFullCycleAvg = roundMoney(
+      Math.max(0, historicalFullCycleEverydayAvg - usualConfiguredFullCycle),
+    );
+    const projectedVisa = roundMoney(historicalVisaFullCycleAvg * visaRatio);
+    return {
+      projectedTotal: roundMoney(projectedVisa + currentConfiguredFullCycle),
+      adjustedUsualFullMonth,
+      structuralAtDay,
+      structuralFullCycle,
+      visaRatio: roundMoney(visaRatio * 1000) / 1000,
+    };
+  }
+
+  const behavioralCurrent = roundMoney(currentSpend - structuralAtDay);
+  const fallbackRatio = compareAvg > 0 ? behavioralCurrent / compareAvg : 1;
+  return {
+    projectedTotal: roundMoney(adjustedUsualFullMonth * fallbackRatio),
+    adjustedUsualFullMonth,
+    structuralAtDay,
+    structuralFullCycle,
+    visaRatio: null,
+  };
 }
 
 /** Fallback when no completed cycles to learn from — flat (linear) extrapolation. */
@@ -815,27 +911,92 @@ export function computePace(
         )
       : 0;
 
+  const usualConfiguredAtDay =
+    !includeFixed && usedSnapshots.length > 0
+      ? averageConfiguredEverydayAtDay(
+          usedSnapshots,
+          cycle.dayIndex,
+          historicalConfiguredCharges,
+          cycleDay,
+        )
+      : 0;
+  const usualConfiguredFullCycle =
+    !includeFixed && usedSnapshots.length > 0
+      ? roundMoney(
+          usedSnapshots.reduce((s, row) => {
+            const len = daysBetween(row.bucket.start, row.bucket.end) + 1;
+            return (
+              s +
+              configuredEverydayAtDayForBucket(row.bucket, len, historicalConfiguredCharges, cycleDay)
+            );
+          }, 0) / usedSnapshots.length,
+        )
+      : 0;
+
+  const currentConfiguredAtDay = !includeFixed
+    ? currentConfiguredEverydayAtDay(
+        currentBucket,
+        cycle.dayIndex,
+        cycleStartIso,
+        cycleEndIso,
+        configuredList,
+        cycleDay,
+      )
+    : 0;
+  const currentConfiguredFullCycle = !includeFixed
+    ? configuredEverydayFromConfigAtDay(
+        cycleStartIso,
+        cycleEndIso,
+        cycle.cycleLength,
+        configuredList,
+        cycleDay,
+      )
+    : 0;
+
   const projectedEveryday = projectedVariable;
   const usualAtDayBaseline = includeFixed ? historicalAvgVariableAtDay : historicalAvgAtDay;
   const projectedEverydayAtUsualPace = extrapolateHistoricalVariable(usualAtDayBaseline);
 
   let projectedTotal: number;
+  let adjustedUsualFullMonth = historicalFullCycleEverydayAvg;
+  let structuralConfiguredAtDay = 0;
+  let structuralConfiguredFullCycle = 0;
+  let visaRatio: number | null = null;
+  let projectionFormula = "";
+
   if (!includeFixed && historicalFullCycleEverydayAvg > 0 && compareAvg > 0 && currentSpend > 0) {
-    // Scale typical full-cycle everyday by how far ahead/behind you are now — avoids
-    // extrapolating front-loaded subscriptions as if they repeat all month.
-    projectedTotal = roundMoney(historicalFullCycleEverydayAvg * (currentSpend / compareAvg));
+    const adjusted = projectEverydayWithStructuralAdjustment({
+      currentSpend,
+      compareAvg,
+      currentConfiguredAtDay,
+      usualConfiguredAtDay,
+      currentConfiguredFullCycle,
+      usualConfiguredFullCycle,
+      historicalFullCycleEverydayAvg,
+    });
+    projectedTotal = adjusted.projectedTotal;
+    adjustedUsualFullMonth = adjusted.adjustedUsualFullMonth;
+    structuralConfiguredAtDay = adjusted.structuralAtDay;
+    structuralConfiguredFullCycle = adjusted.structuralFullCycle;
+    visaRatio = adjusted.visaRatio;
+    projectionFormula =
+      visaRatio != null
+        ? `Visa pace ×${visaRatio} on historical Visa avg + ₪${currentConfiguredFullCycle} extras this cycle`
+        : `Adjusted usual ₪${adjustedUsualFullMonth} × behavioral pace`;
   } else if (includeFixed) {
     projectedTotal = roundMoney(projectionFixed + projectedEveryday);
+    projectionFormula = `Fixed ₪${projectionFixed} + extrapolated everyday`;
   } else {
     projectedTotal = projectedEveryday;
+    projectionFormula = "Extrapolated everyday from current variable spend";
   }
 
   const projectedOtherFixed = roundMoney(Math.max(0, projectionFixed - configuredMonthlyBills));
 
   const projectedAtUsualPaceForecast = includeFixed
     ? roundMoney(historicalAvgFixedAtDay + projectedEverydayAtUsualPace)
-    : historicalFullCycleEverydayAvg > 0
-      ? historicalFullCycleEverydayAvg
+    : adjustedUsualFullMonth > 0
+      ? adjustedUsualFullMonth
       : projectedEverydayAtUsualPace;
   const projectedVsUsualDelta = roundMoney(projectedTotal - projectedAtUsualPaceForecast);
   const historicalActualMonthAvg = historicalFullCycleAvg;
@@ -846,8 +1007,8 @@ export function computePace(
 
   /** @deprecated Use projectedAtUsualPaceForecast for forecast comparisons. */
   const projectedAtUsualPace =
-    !includeFixed && historicalFullCycleEverydayAvg > 0
-      ? historicalFullCycleEverydayAvg
+    !includeFixed && adjustedUsualFullMonth > 0
+      ? adjustedUsualFullMonth
       : historicalFullCycleAvg > 0
         ? historicalFullCycleAvg
         : projectedAtUsualPaceForecast;
@@ -945,9 +1106,13 @@ export function computePace(
       secondHalfMultiplier,
       projectedTotal,
       projectedAtUsualPaceForecast,
+      structuralConfiguredAtDay,
+      structuralConfiguredFullCycle,
+      adjustedUsualFullMonth,
+      visaRatio,
       formula: !includeFixed
-        ? `Extrapolate usual ₪${usualAtDayBaseline} at day ${cycle.dayIndex} → ~₪${projectedAtUsualPaceForecast} full cycle`
-        : `Fixed ₪${projectionFixed} + extrapolated everyday`,
+        ? projectionFormula || `Extrapolate usual ₪${usualAtDayBaseline} at day ${cycle.dayIndex}`
+        : projectionFormula || `Fixed ₪${projectionFixed} + extrapolated everyday`,
     },
   };
 

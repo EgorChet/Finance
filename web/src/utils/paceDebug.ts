@@ -48,6 +48,14 @@ export function logPaceDebug(debug: PaceDebugInfo, label = "Pace calculation"): 
     formula: debug.usualAtDayFormula,
     result: debug.usualAtDay,
   });
-  console.log("Month-end projection", debug.projection);
+  console.log("Month-end projection", {
+    formula: debug.projection.formula,
+    yourMonth: debug.projection.projectedTotal,
+    usualMonth: debug.projection.projectedAtUsualPaceForecast,
+    structuralExtrasAtDay: debug.projection.structuralConfiguredAtDay,
+    structuralExtrasFullCycle: debug.projection.structuralConfiguredFullCycle,
+    adjustedUsualMonth: debug.projection.adjustedUsualFullMonth,
+    visaPaceRatio: debug.projection.visaRatio,
+  });
   console.groupEnd();
 }
