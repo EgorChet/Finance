@@ -122,6 +122,26 @@ export function isConfiguredChargeTransaction(tx: Transaction): boolean {
   return tx.notes?.startsWith("fixed_charge:") === true;
 }
 
+/** Configured charge counts as everyday (not rent / car loan / Dev Institute). */
+export function isConfiguredEverydayCharge(charge: {
+  id: string;
+  name_en: string;
+  name_he?: string;
+}): boolean {
+  return !isMonthlyBillTransaction({
+    date: "",
+    merchant_he: charge.name_he || "",
+    merchant_en: charge.name_en,
+    amount: 0,
+    charge_amount: 0,
+    transaction_type_he: "",
+    category_he: null,
+    category_en: "",
+    notes: `fixed_charge:${charge.id}`,
+    merchant_known: true,
+  });
+}
+
 /** Configured Extra charges and installment payment rows — hidden in Browse by default. */
 export function isSystemRecurringTransaction(tx: Transaction): boolean {
   if (isConfiguredChargeTransaction(tx)) return true;

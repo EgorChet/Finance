@@ -1,5 +1,6 @@
 import type { Transaction } from "../types";
 import { costTypeForCategory } from "../categories";
+import { isConfiguredEverydayCharge } from "./householdBudget";
 import { roundMoney } from "./format";
 import { isoDateLocal } from "./transactionPeriod";
 
@@ -127,7 +128,7 @@ export function configuredEverydayFromConfigAtDay(
 
   let sum = 0;
   for (const charge of configuredChargesForCycle(cycleStart, charges, cycleEnd)) {
-    if (costTypeForCategory(charge.category_en) === "fixed") continue;
+    if (!isConfiguredEverydayCharge(charge)) continue;
     const chargeDay = dayIndexInCycle(cycleStart, transactionDateForCharge(charge, cycleStart, cycleDay));
     if (chargeDay <= dayIndex) sum += charge.amount;
   }

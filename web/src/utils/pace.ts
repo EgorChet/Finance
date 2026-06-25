@@ -1,13 +1,14 @@
 import type { SpendingReport, Transaction, MonthItem } from "../types";
 import { costTypeForCategory } from "../categories";
-import { isMonthlyBillTransaction, isConfiguredChargeTransaction } from "./householdBudget";
+import { isMonthlyBillTransaction, isConfiguredChargeTransaction, isConfiguredEverydayCharge } from "./householdBudget";
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
-  configuredEverydayFromConfigAtDay,
   mergeConfiguredChargeTransactions,
+  ONGOING_THROUGH_MONTH,
   sumConfiguredCharges,
   sumConfiguredMonthlyBills,
+  transactionDateForCharge,
 } from "./fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
 import { dedupeTransactionSnapshots, filterSpendTransactions } from "./transaction";
@@ -237,17 +238,92 @@ function statementEverydayAtDay(bucket: CycleBucket, dayIndex: number): number {
   return roundMoney(sum);
 }
 
+function configuredEverydayFromBucketAtDay(bucket: CycleBucket, dayIndex: number): number {
+  if (dayIndex <= 0) return 0;
+  let sum = 0;
+  for (const tx of bucket.txs) {
+    if (!isConfiguredChargeTransaction(tx)) continue;
+    if (isMonthlyBillTransaction(tx)) continue;
+    const d = parseIsoDate(tx.date);
+    const day = daysBetween(bucket.start, d) + 1;
+    if (day <= dayIndex) sum += tx.charge_amount;
+  }
+  return roundMoney(sum);
+}
+
+function configuredEverydayAtDayForBucket(
+  bucket: CycleBucket,
+  dayIndex: number,
+  charges: ConfiguredCharge[],
+  cycleDay: number,
+): number {
+  const fromTxs = configuredEverydayFromBucketAtDay(bucket, dayIndex);
+  if (!charges.length) return fromTxs;
+
+  const cycleStartIso = isoDate(bucket.start);
+  const cycleEndIso = isoDate(bucket.end);
+  const idsInBucket = new Set(
+    bucket.txs
+      .filter((tx) => isConfiguredChargeTransaction(tx) && !isMonthlyBillTransaction(tx))
+      .map((tx) => tx.notes!.slice("fixed_charge:".length)),
+  );
+
+  let fromConfig = 0;
+  for (const charge of configuredChargesForCycle(cycleStartIso, charges, cycleEndIso)) {
+    if (!isConfiguredEverydayCharge(charge)) continue;
+    if (idsInBucket.has(charge.id)) continue;
+    const chargeDate = transactionDateForCharge(charge, cycleStartIso, cycleDay);
+    const chargeDay = daysBetween(bucket.start, parseIsoDate(chargeDate)) + 1;
+    if (chargeDay <= dayIndex) fromConfig += charge.amount;
+  }
+
+  return roundMoney(fromTxs + fromConfig);
+}
+
+function inferConfiguredChargesFromTransactions(transactions: Transaction[]): ConfiguredCharge[] {
+  const byId = new Map<string, ConfiguredCharge>();
+  for (const tx of transactions) {
+    if (!isConfiguredChargeTransaction(tx)) continue;
+    if (!isConfiguredEverydayCharge({
+      id: tx.notes!.slice("fixed_charge:".length),
+      name_en: tx.merchant_en,
+      name_he: tx.merchant_he,
+    })) {
+      continue;
+    }
+    const id = tx.notes!.slice("fixed_charge:".length);
+    if (byId.has(id)) continue;
+    byId.set(id, {
+      id,
+      name_en: tx.merchant_en,
+      name_he: tx.merchant_he,
+      amount: tx.charge_amount,
+      category_en: tx.category_en || "Uncategorized",
+      from_month: "2020-01",
+      through_month: ONGOING_THROUGH_MONTH,
+    });
+  }
+  return [...byId.values()];
+}
+
+function mergeConfiguredChargeLists(
+  primary: ConfiguredCharge[],
+  inferred: ConfiguredCharge[],
+): ConfiguredCharge[] {
+  const byId = new Map(inferred.map((c) => [c.id, c]));
+  for (const charge of primary) byId.set(charge.id, charge);
+  return [...byId.values()];
+}
+
 function everydaySpendAtDay(
   bucket: CycleBucket,
   dayIndex: number,
   charges: ConfiguredCharge[],
   cycleDay: number,
 ): number {
-  const cycleStartIso = isoDate(bucket.start);
-  const cycleEndIso = isoDate(bucket.end);
   return roundMoney(
     statementEverydayAtDay(bucket, dayIndex) +
-      configuredEverydayFromConfigAtDay(cycleStartIso, cycleEndIso, dayIndex, charges, cycleDay),
+      configuredEverydayAtDayForBucket(bucket, dayIndex, charges, cycleDay),
   );
 }
 
@@ -384,6 +460,8 @@ export function computePace(
     /** Most recent completed cycles to average; 0 = all available. */
     avgCycles?: number;
     configuredCharges?: ConfiguredCharge[];
+    /** Current-cycle txs (incl. merged extras) — used to infer charges missing from history. */
+    cycleTransactions?: Transaction[];
     /** When set (e.g. partial export totals), replaces cycle-bucket statement spend. */
     statementSpendOverride?: number | null;
     /** Everyday portion for projection when override total includes fixed categories. */
@@ -397,7 +475,13 @@ export function computePace(
 
   const cycle = getBillingCycle(todayNorm, cycleDay);
   const currentKey = cycleKey(cycle.start);
-  const configuredList = options.configuredCharges ?? [];
+  const configuredList = mergeConfiguredChargeLists(
+    options.configuredCharges ?? [],
+    inferConfiguredChargesFromTransactions([
+      ...transactions,
+      ...(options.cycleTransactions ?? []),
+    ]),
+  );
 
   const byCycle = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
   const byCycleAll = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();

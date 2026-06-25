@@ -300,6 +300,7 @@ const pace = computed(() =>
     manualSpend: resolvedManualSpend.value,
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
+    cycleTransactions: props.cycleTransactions ?? [],
     statementSpendOverride: everydaySpendOverride.value,
     statementVariableOverride: everydaySpendOverride.value,
     today: props.referenceDate,

@@ -54,6 +54,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
     manualSpend: options.manualSpend ?? null,
     avgCycles: options.avgCycles ?? 3,
     configuredCharges: options.configuredCharges ?? [],
+    cycleTransactions,
     statementSpendOverride: statementOverride,
     statementVariableOverride: statementOverride,
     today: referenceDate,
