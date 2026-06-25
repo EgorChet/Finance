@@ -2,7 +2,7 @@ import type { PaceDebugInfo } from "./pace";
 
 const PACE_DEBUG_STORAGE_KEY = "finance_pace_debug";
 
-/** Console + UI breakdown when true, or always in dev builds. */
+/** Enable in the browser console: localStorage.finance_pace_debug = '1' (also on in dev builds). */
 export function isPaceDebugEnabled(): boolean {
   if (import.meta.env.DEV) return true;
   try {

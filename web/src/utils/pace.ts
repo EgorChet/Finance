@@ -13,6 +13,7 @@ import {
 } from "./fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "./format";
 import { dedupeTransactionSnapshots, filterSpendTransactions } from "./transaction";
+import { logPaceDebug } from "./paceDebug";
 
 export interface BillingCycle {
   start: Date;
@@ -92,8 +93,6 @@ export interface PaceResult {
   cycleEnd: string;
   dataStale: boolean;
   latestBillingDate: string | null;
-  /** Per-cycle breakdown for analysis (pace card + optional console log). */
-  debug?: PaceDebugInfo;
 }
 
 export interface PaceDebugCycleRow {
@@ -970,6 +969,8 @@ export function computePace(
     },
   };
 
+  logPaceDebug(debug);
+
   return {
     currentSpend,
     statementSpend,
@@ -1013,7 +1014,6 @@ export function computePace(
     cycleEnd: isoDate(cycle.end),
     dataStale,
     latestBillingDate: latestBilling,
-    debug,
   };
 }
 export const CYCLE_DAY_KEY = "finance-cycle-day";
