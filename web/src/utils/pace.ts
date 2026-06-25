@@ -4,7 +4,6 @@ import { isMonthlyBillTransaction, isConfiguredChargeTransaction, isConfiguredEv
 import type { ConfiguredCharge } from "./fixedCharges";
 import {
   configuredChargesForCycle,
-  configuredEverydayFromConfigAtDay,
   mergeConfiguredChargeTransactions,
   ONGOING_THROUGH_MONTH,
   sumConfiguredCharges,
@@ -114,8 +113,6 @@ export interface PaceDebugInfo {
   cycleEnd: string;
   configuredChargeSource: { fromApi: number; fromInferred: number; merged: number };
   configuredChargesUsed: { id: string; name: string; amount: number }[];
-  /** Flat extra-charges amount added to each historical cycle for comparison. */
-  compareConfiguredEveryday: number;
   historicalCycles: PaceDebugCycleRow[];
   usualAtDayFormula: string;
   usualAtDay: number;
@@ -544,8 +541,6 @@ export function computePace(
     configuredCharges?: ConfiguredCharge[];
     /** Current-cycle txs (incl. merged extras) — used to infer charges missing from history. */
     cycleTransactions?: Transaction[];
-    /** Extra charges total from the Everyday spending tile — applied to historical comparison. */
-    configuredEverydayCompare?: number | null;
     /** When set (e.g. partial export totals), replaces cycle-bucket statement spend. */
     statementSpendOverride?: number | null;
     /** Everyday portion for projection when override total includes fixed categories. */
@@ -567,26 +562,8 @@ export function computePace(
   const configuredList = mergeConfiguredChargeLists(apiConfiguredCharges, inferredConfiguredCharges);
   const cycleStartIso = isoDate(cycle.start);
   const cycleEndIso = isoDate(cycle.end);
-  const compareConfiguredEveryday =
-    options.configuredEverydayCompare != null && options.configuredEverydayCompare > 0
-      ? roundMoney(options.configuredEverydayCompare)
-      : configuredEverydayFromConfigAtDay(
-          cycleStartIso,
-          cycleEndIso,
-          cycle.dayIndex,
-          configuredList,
-          cycleDay,
-        );
-  const compareConfiguredFullCycle =
-    options.configuredEverydayCompare != null && options.configuredEverydayCompare > 0
-      ? roundMoney(options.configuredEverydayCompare)
-      : configuredEverydayFromConfigAtDay(
-          cycleStartIso,
-          cycleEndIso,
-          cycle.cycleLength,
-          configuredList,
-          cycleDay,
-        );
+  /** Per-cycle extras from settings (real from_month) — not inferred charges with fake dates. */
+  const historicalConfiguredCharges = apiConfiguredCharges;
 
   const byCycle = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
   const byCycleAll = new Map<string, { start: Date; end: Date; txs: Transaction[] }>();
@@ -618,9 +595,7 @@ export function computePace(
       if (key === currentKey) continue;
       if (bucket.end >= todayNorm) continue;
       const total = !includeFixed
-        ? roundMoney(
-            statementEverydayAtDay(bucket, cycle.dayIndex) + compareConfiguredEveryday,
-          )
+        ? everydaySpendAtDay(bucket, cycle.dayIndex, historicalConfiguredCharges, cycleDay)
         : spendAtDay(bucket, cycle.dayIndex).total;
       const atDay = spendAtDay(bucket, cycle.dayIndex);
       if (total > 0 || bucket.txs.length > 0) {
@@ -663,9 +638,7 @@ export function computePace(
   const tomorrowDayIndex = tomorrowCycle.dayIndex;
   const tomorrowVariables = usedSnapshots.map((s) => {
     if (!includeFixed) {
-      return roundMoney(
-        statementEverydayAtDay(s.bucket, tomorrowDayIndex) + compareConfiguredEveryday,
-      );
+      return everydaySpendAtDay(s.bucket, tomorrowDayIndex, historicalConfiguredCharges, cycleDay);
     }
     const atDay = spendAtDay(s.bucket, tomorrowDayIndex);
     return roundMoney(atDay.total - atDay.fixed);
@@ -836,11 +809,8 @@ export function computePace(
     !includeFixed && usedSnapshots.length > 0
       ? roundMoney(
           usedSnapshots.reduce((s, row) => {
-            return (
-              s +
-              statementEverydayAtDay(row.bucket, cycle.cycleLength) +
-              compareConfiguredFullCycle
-            );
+            const len = daysBetween(row.bucket.start, row.bucket.end) + 1;
+            return s + everydaySpendAtDay(row.bucket, len, historicalConfiguredCharges, cycleDay);
           }, 0) / usedSnapshots.length,
         )
       : 0;
@@ -902,18 +872,31 @@ export function computePace(
 
   const historicalDebugCycles: PaceDebugCycleRow[] = usedSnapshots.map((s) => {
     const cycleStart = isoDate(s.start);
-    const visaExport = !includeFixed
-      ? statementEverydayAtDay(s.bucket, cycle.dayIndex)
-      : roundMoney(s.total);
-    const configuredForCompare = !includeFixed ? compareConfiguredEveryday : 0;
+    if (!includeFixed) {
+      const breakdown = everydaySpendBreakdownAtDay(
+        s.bucket,
+        cycle.dayIndex,
+        historicalConfiguredCharges,
+        cycleDay,
+      );
+      return {
+        cycleStart,
+        label: billingCycleLabel(cycleStart),
+        dayIndex: cycle.dayIndex,
+        visaExport: breakdown.visaExport,
+        configuredFromTxs: breakdown.configuredFromTxs,
+        configuredFromSettings: breakdown.configuredFromSettings,
+        totalAtDay: breakdown.total,
+      };
+    }
     return {
       cycleStart,
       label: billingCycleLabel(cycleStart),
       dayIndex: cycle.dayIndex,
-      visaExport,
+      visaExport: roundMoney(s.total),
       configuredFromTxs: 0,
-      configuredFromSettings: configuredForCompare,
-      totalAtDay: roundMoney(visaExport + configuredForCompare),
+      configuredFromSettings: 0,
+      totalAtDay: roundMoney(s.total),
     };
   });
 
@@ -948,7 +931,6 @@ export function computePace(
     configuredChargesUsed: configuredList
       .filter(isConfiguredEverydayCharge)
       .map((c) => ({ id: c.id, name: c.name_en, amount: c.amount })),
-    compareConfiguredEveryday,
     historicalCycles: historicalDebugCycles,
     usualAtDayFormula: usualFormula,
     usualAtDay: historicalAvgAtDay,

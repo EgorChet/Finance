@@ -305,7 +305,6 @@ const pace = computed(() =>
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
     cycleTransactions: props.cycleTransactions ?? [],
-    configuredEverydayCompare: everydayComposition.value.configuredTotal,
     statementSpendOverride: everydaySpendOverride.value,
     statementVariableOverride: everydaySpendOverride.value,
     today: props.referenceDate,

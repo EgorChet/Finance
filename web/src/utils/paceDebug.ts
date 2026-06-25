@@ -4,7 +4,11 @@ const PACE_DEBUG_STORAGE_KEY = "finance_pace_debug";
 
 /** Enable in the browser console: localStorage.finance_pace_debug = '1' (also on in dev builds). */
 export function isPaceDebugEnabled(): boolean {
-  if (import.meta.env.DEV) return true;
+  try {
+    if (import.meta.env?.DEV) return true;
+  } catch {
+    /* not a Vite bundle */
+  }
   try {
     return localStorage.getItem(PACE_DEBUG_STORAGE_KEY) === "1";
   } catch {
@@ -36,7 +40,6 @@ export function logPaceDebug(debug: PaceDebugInfo, label = "Pace calculation"): 
     fromApi: debug.configuredChargeSource.fromApi,
     inferredFromCurrentCycle: debug.configuredChargeSource.fromInferred,
     mergedTotal: debug.configuredChargeSource.merged,
-    compareEverydayAdded: debug.compareConfiguredEveryday,
     charges: debug.configuredChargesUsed,
   });
   console.log("Current spend", debug.current);

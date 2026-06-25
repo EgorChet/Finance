@@ -1,6 +1,5 @@
 import type { Transaction } from "../types";
 import type { ConfiguredCharge } from "./fixedCharges";
-import { everydaySpendingComposition } from "./householdBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "./livingBudget";
 import {
   computePace,
@@ -56,7 +55,6 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
     avgCycles: options.avgCycles ?? 3,
     configuredCharges: options.configuredCharges ?? [],
     cycleTransactions,
-    configuredEverydayCompare: everydaySpendingComposition(cycleTransactions).configuredTotal,
     statementSpendOverride: statementOverride,
     statementVariableOverride: statementOverride,
     today: referenceDate,
