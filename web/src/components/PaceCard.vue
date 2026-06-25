@@ -143,6 +143,81 @@
                     </tbody>
                   </table>
                 </div>
+                <details v-if="pace?.debug" class="pace-debug-details">
+                  <summary>Calculation details</summary>
+                  <p class="pace-debug-lead">
+                    Day {{ pace.debug.dayIndex }} of {{ pace.debug.cycleLength }} · cycle
+                    {{ formatCycleRange(pace.debug.cycleStart, pace.debug.cycleEnd) }}
+                  </p>
+                  <p class="pace-debug-note">{{ pace.debug.current.note }}</p>
+                  <table class="pace-simple-table pace-debug-table">
+                    <tbody>
+                      <tr class="pace-simple-table-group">
+                        <td colspan="2">Extra charges used in comparison</td>
+                      </tr>
+                      <tr>
+                        <td>From Extra charges settings</td>
+                        <td>{{ pace.debug.configuredChargeSource.fromApi }}</td>
+                      </tr>
+                      <tr>
+                        <td>Inferred from current cycle</td>
+                        <td>{{ pace.debug.configuredChargeSource.fromInferred }}</td>
+                      </tr>
+                      <tr
+                        v-for="charge in pace.debug.configuredChargesUsed"
+                        :key="charge.id"
+                        class="pace-simple-table-sub"
+                      >
+                        <td>{{ charge.name }}</td>
+                        <td>{{ formatIls(charge.amount) }}/mo</td>
+                      </tr>
+                      <tr>
+                        <td>Added to each past cycle</td>
+                        <td>{{ formatIls(pace.debug.compareConfiguredEveryday) }}</td>
+                      </tr>
+                      <tr class="pace-simple-table-group">
+                        <td colspan="2">
+                          Usual at day {{ pace.debug.dayIndex }} ({{ pace.debug.historicalCycles.length }}
+                          {{ pace.debug.historicalCycles.length === 1 ? "cycle" : "cycles" }})
+                        </td>
+                      </tr>
+                      <tr
+                        v-for="row in pace.debug.historicalCycles"
+                        :key="row.cycleStart"
+                        class="pace-debug-cycle-row"
+                      >
+                        <td>
+                          {{ row.label }}
+                          <span class="pace-debug-cycle-sub">
+                            Visa {{ formatIls(row.visaExport) }}
+                            <template v-if="row.configuredFromTxs + row.configuredFromSettings > 0">
+                              · extras
+                              {{ formatIls(row.configuredFromTxs + row.configuredFromSettings) }}
+                            </template>
+                          </span>
+                        </td>
+                        <td>{{ formatIls(row.totalAtDay) }}</td>
+                      </tr>
+                      <tr class="pace-simple-table-gap">
+                        <td>Average (usual)</td>
+                        <td>{{ formatIls(pace.debug.usualAtDay) }}</td>
+                      </tr>
+                      <tr class="pace-debug-formula-row">
+                        <td colspan="2">{{ pace.debug.usualAtDayFormula }}</td>
+                      </tr>
+                      <tr class="pace-simple-table-group">
+                        <td colspan="2">Month-end projection</td>
+                      </tr>
+                      <tr class="pace-debug-formula-row">
+                        <td colspan="2">{{ pace.debug.projection.formula }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p v-if="isPaceDebugEnabled()" class="pace-debug-console-hint">
+                    Open the browser console for a full log (dev mode, or
+                    <code>localStorage.finance_pace_debug = '1'</code>).
+                  </p>
+                </details>
               </details>
             </template>
 
@@ -188,6 +263,7 @@ import {
   pruneStaleManualCycleSpend,
   saveManualCycleSpend,
 } from "../utils/pace";
+import { isPaceDebugEnabled, logPaceDebug } from "../utils/paceDebug";
 
 const props = defineProps<{
   transactions: Transaction[];
@@ -292,6 +368,10 @@ const everydaySpendOverride = computed(() => {
   return undefined;
 });
 
+const everydayComposition = computed(() =>
+  everydaySpendingComposition(props.cycleTransactions ?? []),
+);
+
 const pace = computed(() =>
   computePace(props.transactions, {
     cycleDay: cycleDay.value,
@@ -301,6 +381,7 @@ const pace = computed(() =>
     avgCycles: avgCycles.value,
     configuredCharges: props.configuredCharges ?? [],
     cycleTransactions: props.cycleTransactions ?? [],
+    configuredEverydayCompare: everydayComposition.value.configuredTotal,
     statementSpendOverride: everydaySpendOverride.value,
     statementVariableOverride: everydaySpendOverride.value,
     today: props.referenceDate,
@@ -317,10 +398,6 @@ const showEntryPanel = computed(() => {
   if (displaySpend.value > 0 && resolvedManualSpend.value === null) return false;
   return true;
 });
-
-const everydayComposition = computed(() =>
-  everydaySpendingComposition(props.cycleTransactions ?? []),
-);
 
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
@@ -456,5 +533,13 @@ watch(
       loadManualForCycle();
     }
   },
+);
+
+watch(
+  () => pace.value?.debug,
+  (debug) => {
+    if (debug) logPaceDebug(debug);
+  },
+  { immediate: true },
 );
 </script>
