@@ -2270,6 +2270,100 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.category-accordion-trigger-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.category-accordion-trigger-row .category-accordion-trigger {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-accordion-nested-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.category-accordion-nested-row .category-accordion-nested-trigger {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-accordion-nested-row .category-compare-indicator,
+.category-accordion-trigger-row .category-compare-indicator {
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.category-accordion-nested-row .category-compare-indicator {
+  margin-right: 0.35rem;
+}
+
+.category-accordion-trigger-row .category-compare-indicator {
+  margin-right: 0.15rem;
+}
+
+.category-compare-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.category-compare-indicator-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.category-compare-indicator--high {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+
+.category-compare-indicator--low {
+  color: #34d399;
+  border-color: color-mix(in srgb, #34d399 42%, var(--border));
+  background: color-mix(in srgb, #34d399 10%, var(--surface));
+}
+
+.category-compare-indicator--neutral,
+.category-compare-indicator--unknown {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--text-muted) 6%, var(--surface));
+}
+
+.category-compare-indicator:hover {
+  filter: brightness(1.05);
+}
+
+.category-compare-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.category-compare-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.category-compare-dialog .pace-simple-table-wrap {
+  margin: 0;
+}
+
 .category-accordion-txs {
   border-top: 1px solid var(--border);
 }

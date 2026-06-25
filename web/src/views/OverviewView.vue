@@ -90,6 +90,11 @@
       :statement-billing="selectedMonth ? statementBilling : null"
       :excludeable="!auth.isDemo"
       :excluding-key="excludingKey"
+      :show-compare="partialStatementActive"
+      :all-transactions="paceTransactions"
+      :cycle-day="cycleDay"
+      :cycle-start="activeCycleStart ?? undefined"
+      :reference-date="refDate"
       @exclude="excludeTransaction"
     />
     </template>
