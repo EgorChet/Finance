@@ -55,14 +55,14 @@
               <div class="pace-verdict" :class="injectionCushionVerdict ? 'pace-verdict--injection' : verdictToneClass">
                 <template v-if="injectionCushionVerdict">
                   <p class="pace-verdict-injection-title">{{ injectionCushionVerdict.status }}</p>
-                  <p v-if="injectionCushionVerdict.spentVsLastMonth" class="pace-verdict-injection-line">
-                    Spent <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than last month at this date
+                  <p v-if="injectionCushionVerdict.spentVsUsual" class="pace-verdict-injection-line">
+                    Spent <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than usual at this point
                   </p>
                   <p v-else class="pace-verdict-injection-line">
                     Spending <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> faster than usual at month-end
                   </p>
                   <p class="pace-verdict-injection-line">
-                    Money left is <span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than last month
+                    Money left is <span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than usual
                   </p>
                   <p class="pace-verdict-injection-reason">{{ injectionCushionVerdict.reason }}</p>
                 </template>
@@ -127,16 +127,16 @@
                           <td>Money left</td>
                           <td>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</td>
                         </tr>
-                        <tr v-if="showLastCycleCompare">
-                          <td>Money left then{{ lastCycleDayLabel }}</td>
+                        <tr v-if="showHistoricalBudgetCompare">
+                          <td>Usual money left at this point</td>
                           <td>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</td>
                         </tr>
                         <tr
-                          v-if="showLastCycleCompare"
+                          v-if="showHistoricalBudgetCompare"
                           class="pace-simple-table-gap"
-                          :class="moneyLeftVsLastCycleTableClass"
+                          :class="moneyLeftVsUsualTableClass"
                         >
-                          <td>Net vs last cycle</td>
+                          <td>Net vs usual</td>
                           <td>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</td>
                         </tr>
                       </template>
@@ -346,18 +346,12 @@ const budgetContext = computed(() => {
       dayIndex: cycleInfo.value.dayIndex,
       budgetSegments: props.livingBudgetSegments ?? [],
       budgetMonthTopups: props.livingBudgetMonthTopups ?? [],
+      avgCycles: avgCycles.value,
     },
   );
 });
 
-const showLastCycleCompare = computed(() => budgetContext.value?.lastCycleMoneyLeftAtDay != null);
-
-const lastCycleDayLabel = computed(() => {
-  const day = budgetContext.value?.lastCycleComparisonDay;
-  if (!day) return "";
-  const d = new Date(day + "T12:00:00");
-  return ` (${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})`;
-});
+const showHistoricalBudgetCompare = computed(() => budgetContext.value?.lastCycleMoneyLeftAtDay != null);
 
 const injectionCushionVerdict = computed(() =>
   budgetContext.value ? paceInjectionCushionVerdict(budgetContext.value) : null,
@@ -372,7 +366,7 @@ const budgetNote = computed(() => {
   return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
 });
 
-const moneyLeftVsLastCycleTableClass = computed(() => {
+const moneyLeftVsUsualTableClass = computed(() => {
   const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
   if (d > 0) return "pace-delta-good";
   if (d < 0) return "pace-delta-bad";

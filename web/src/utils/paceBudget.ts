@@ -3,7 +3,7 @@ import { budgetSpendBreakdown, moneyLeft } from "./householdBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "./livingBudget";
 import { livingBudgetForMonth } from "./livingBudget";
 import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "./format";
-import { getCycleRangeForStart } from "./pace";
+import { getCycleRangeForStart, type PaceAvgCycles } from "./pace";
 
 function parseIsoDate(dateStr: string): Date {
   const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
@@ -59,19 +59,20 @@ export interface PaceBudgetContext {
   usualEverydayMonth: number;
   usualProjectedSpentOnCap: number;
   usualProjectedMoneyLeft: number;
-  /** Last billing cycle cap (from budget settings that month). */
+  /** Average cap over recent completed cycles (from budget settings each month). */
   lastCycleBudget: number | null;
   lastCycleSpentAtDay: number | null;
+  /** Average money left at this day index over recent completed cycles. */
   lastCycleMoneyLeftAtDay: number | null;
   spentVsLastCycleAtDay: number | null;
   budgetVsLastCycle: number | null;
-  /** Money left now minus money left at the same day last cycle. */
+  /** Money left now minus usual money left at this point in the cycle. */
   moneyLeftVsLastCycle: number | null;
-  /** Calendar date in the previous cycle matching today's day index. */
-  lastCycleComparisonDay: string | null;
+  /** Completed cycles included in the living-budget average. */
+  historicalBudgetCyclesUsed: number;
   projectedMoneyLeftAtLastCycleBudget: number | null;
   headroomFromHigherBudget: number | null;
-  /** Month-end: projected left vs projected left at last cycle's cap. */
+  /** Month-end: projected left vs projected left at the usual historical cap. */
   projectedMoneyLeftVsLastCycleCap: number | null;
 }
 
@@ -89,6 +90,8 @@ export function computePaceBudgetContext(
     dayIndex?: number;
     budgetSegments?: LivingBudgetSegment[];
     budgetMonthTopups?: LivingBudgetMonthTopup[];
+    /** Recent completed cycles to average; 0 = all available (max 24). Matches pace usual baseline. */
+    avgCycles?: PaceAvgCycles;
   } = {},
 ): PaceBudgetContext | null {
   if (livingBudget === null || livingBudget <= 0) return null;
@@ -118,7 +121,7 @@ export function computePaceBudgetContext(
   let spentVsLastCycleAtDay: number | null = null;
   let budgetVsLastCycle: number | null = null;
   let moneyLeftVsLastCycle: number | null = null;
-  let lastCycleComparisonDay: string | null = null;
+  let historicalBudgetCyclesUsed = 0;
   let projectedMoneyLeftAtLastCycleBudget: number | null = null;
   let headroomFromHigherBudget: number | null = null;
   let projectedMoneyLeftVsLastCycleCap: number | null = null;
@@ -130,20 +133,35 @@ export function computePaceBudgetContext(
     dayIndex = 0,
     budgetSegments = [],
     budgetMonthTopups = [],
+    avgCycles = 3,
   } = options;
 
   if (allTransactions?.length && cycleStart && dayIndex > 0) {
-    const prevStart = previousBillingCycleStart(cycleStart);
-    const { end: prevEnd } = getCycleRangeForStart(prevStart, cycleDay);
-    const prevYm = prevStart.slice(0, 7);
-    lastCycleBudget = livingBudgetForMonth(prevYm, budgetSegments, budgetMonthTopups);
-    lastCycleSpentAtDay = spentOnCapThroughDay(allTransactions, prevStart, prevEnd, dayIndex);
+    const targetCycles = avgCycles > 0 ? avgCycles : 24;
+    const budgets: number[] = [];
+    const spents: number[] = [];
+    const moneyLefts: number[] = [];
+    let cursor = cycleStart;
+    let scanned = 0;
 
-    if (lastCycleBudget != null && lastCycleBudget > 0) {
-      const sameDay = parseIsoDate(prevStart);
-      sameDay.setDate(sameDay.getDate() + dayIndex - 1);
-      lastCycleComparisonDay = isoDate(sameDay);
-      lastCycleMoneyLeftAtDay = roundMoney(lastCycleBudget - lastCycleSpentAtDay);
+    while (moneyLefts.length < targetCycles && scanned < 24) {
+      cursor = previousBillingCycleStart(cursor);
+      scanned += 1;
+      const { end: prevEnd } = getCycleRangeForStart(cursor, cycleDay);
+      const budget = livingBudgetForMonth(cursor.slice(0, 7), budgetSegments, budgetMonthTopups);
+      if (budget == null || budget <= 0) continue;
+      const spent = spentOnCapThroughDay(allTransactions, cursor, prevEnd, dayIndex);
+      budgets.push(budget);
+      spents.push(spent);
+      moneyLefts.push(roundMoney(budget - spent));
+    }
+
+    if (moneyLefts.length > 0) {
+      const n = moneyLefts.length;
+      historicalBudgetCyclesUsed = n;
+      lastCycleBudget = roundMoney(budgets.reduce((sum, v) => sum + v, 0) / n);
+      lastCycleSpentAtDay = roundMoney(spents.reduce((sum, v) => sum + v, 0) / n);
+      lastCycleMoneyLeftAtDay = roundMoney(moneyLefts.reduce((sum, v) => sum + v, 0) / n);
       spentVsLastCycleAtDay = roundMoney(spentOnCap - lastCycleSpentAtDay);
       budgetVsLastCycle = roundMoney(livingBudget - lastCycleBudget);
       moneyLeftVsLastCycle = roundMoney(left - lastCycleMoneyLeftAtDay);
@@ -171,7 +189,7 @@ export function computePaceBudgetContext(
     spentVsLastCycleAtDay,
     budgetVsLastCycle,
     moneyLeftVsLastCycle,
-    lastCycleComparisonDay,
+    historicalBudgetCyclesUsed,
     projectedMoneyLeftAtLastCycleBudget,
     headroomFromHigherBudget,
     projectedMoneyLeftVsLastCycleCap,
@@ -204,11 +222,11 @@ export function paceBudgetNote(ctx: PaceBudgetContext, projectedVsUsualDelta: nu
   return `Above usual pace — only ~${formatAboutIls(Math.max(0, projectedMoneyLeft))} left in budget at month-end.`;
 }
 
-/** Overspending but monthly injection + last-cycle cushion — multi-line verdict copy. */
+/** Overspending but monthly injection + usual-cushion — multi-line verdict copy. */
 export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
   status: string;
   spentAmount: string;
-  spentVsLastMonth: boolean;
+  spentVsUsual: boolean;
   moneyLeftAmount: string;
   reason: string;
 } | null {
@@ -223,15 +241,15 @@ export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
   const reserve = roundMoney(netVsLast + paceGap);
   if (reserve <= 0) return null;
 
-  const spentVsLastMonth = spentVsLast != null && spentVsLast > 50;
-  const spentAmount = spentVsLastMonth
+  const spentVsUsual = spentVsLast != null && spentVsLast > 50;
+  const spentAmount = spentVsUsual
     ? formatIlsWhole(spentVsLast)
     : formatIlsWhole(Math.abs(paceGap));
 
   return {
     status: "Overspending",
     spentAmount,
-    spentVsLastMonth,
+    spentVsUsual,
     moneyLeftAmount: formatIlsWhole(netVsLast),
     reason: "Reason: budget injection",
   };
