@@ -77,6 +77,9 @@
       :pace-colored="showPaceCard"
       :cycle-day="cycleDay"
       :reference-date="refDate"
+      :living-budget-period-label="activeLivingBudgetPeriodLabel"
+      :can-delete-living-budget-period="canDeleteLivingBudgetPeriod"
+      @delete-living-budget-period="deleteActiveLivingBudgetPeriod"
     />
     <PaceCard
       v-if="showPaceCard"
@@ -169,7 +172,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { addExclusion, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport } from "../api/client";
+import { addExclusion, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport, saveLivingBudget } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
@@ -221,6 +224,9 @@ import {
   type LivingBudgetSegment,
   cycleMonthYmForOverview,
   livingBudgetBaseForMonth,
+  livingBudgetSegmentForMonth,
+  livingBudgetSegmentStableKey,
+  monthRangeLabel,
   monthTopupExtraForMonth,
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
@@ -398,6 +404,20 @@ const livingBudgetTopupExtra = computed(() =>
 
 const livingBudgetBaseAmount = computed(() =>
   livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value, configuredCharges.value),
+);
+
+const activeLivingBudgetSegment = computed(() =>
+  livingBudgetSegmentForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
+);
+
+const activeLivingBudgetPeriodLabel = computed(() => {
+  const seg = activeLivingBudgetSegment.value;
+  if (!seg) return null;
+  return monthRangeLabel(seg.from_month, seg.through_month);
+});
+
+const canDeleteLivingBudgetPeriod = computed(
+  () => !auth.isDemo && selectedMonth.value !== null && activeLivingBudgetSegment.value !== null,
 );
 
 const showSummaryMetrics = computed(() => {
@@ -588,6 +608,42 @@ async function refreshLivingBudget() {
   } catch {
     livingBudgetSegments.value = [];
     livingBudgetMonthTopups.value = [];
+  }
+}
+
+async function deleteActiveLivingBudgetPeriod() {
+  const seg = activeLivingBudgetSegment.value;
+  if (!seg || auth.isDemo) return;
+
+  const periodLabel = monthRangeLabel(seg.from_month, seg.through_month);
+  const ok = await confirm({
+    title: livingBudgetSegments.value.length <= 1 ? "Remove budget period?" : "Delete budget period?",
+    message: `Remove the ${formatIls(seg.amount)} period (${periodLabel}) for this month?`,
+    confirmLabel: livingBudgetSegments.value.length <= 1 ? "Remove" : "Delete period",
+    tone: "danger",
+  });
+  if (!ok) return;
+
+  const key = livingBudgetSegmentStableKey(seg);
+  const nextSegments = livingBudgetSegments.value
+    .filter((s) => livingBudgetSegmentStableKey(s) !== key)
+    .map((s) => normalizeLivingBudgetSegment(s));
+  const nextTopups = livingBudgetMonthTopups.value
+    .filter((t) => !(seg.from_month <= t.month && t.month <= seg.through_month))
+    .map((t) => normalizeLivingBudgetMonthTopup(t));
+
+  try {
+    const data = await saveLivingBudget(
+      {
+        segments: nextSegments,
+        month_topups: nextTopups,
+      },
+      auth.token || undefined,
+    );
+    livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
+    livingBudgetMonthTopups.value = (data.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
+  } catch (e) {
+    error.value = String(e);
   }
 }
 

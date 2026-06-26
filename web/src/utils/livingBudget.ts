@@ -88,9 +88,17 @@ export function livingBudgetBaseForMonth(
   segments: LivingBudgetSegment[],
   configuredCharges: ConfiguredCharge[] = [],
 ): number | null {
-  const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
+  const match = livingBudgetSegmentForMonth(ym, segments);
   if (!match) return null;
   return roundMoney(match.amount + capAdditionsForMonth(ym, configuredCharges));
+}
+
+/** Active living-budget period for a calendar month (YYYY-MM). */
+export function livingBudgetSegmentForMonth(
+  ym: string,
+  segments: LivingBudgetSegment[],
+): LivingBudgetSegment | null {
+  return segments.find((s) => s.from_month <= ym && ym <= s.through_month) ?? null;
 }
 
 /** Previous calendar month as YYYY-MM. */

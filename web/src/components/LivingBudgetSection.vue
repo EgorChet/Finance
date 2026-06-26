@@ -43,6 +43,15 @@
             >
               Edit
             </button>
+            <button
+              v-if="!readonly"
+              type="button"
+              class="btn btn-danger btn-sm living-budget-card__delete"
+              :disabled="disabled"
+              @click="removeSegment(seg)"
+            >
+              Delete
+            </button>
           </header>
 
           <ul class="living-budget-breakdown">

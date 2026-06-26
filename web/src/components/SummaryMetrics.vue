@@ -37,8 +37,20 @@
             </li>
           </ul>
           <p class="metric-sub-note">
-            Includes flat rent in the cap (not in everyday pace). Use a monthly extra if you need headroom for rent.
-            <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
+            <span v-if="livingBudgetPeriodLabel" class="metric-budget-period">
+              Budget period: {{ livingBudgetPeriodLabel }}
+            </span>
+            <span class="metric-budget-period-actions">
+              <button
+                v-if="canDeleteLivingBudgetPeriod"
+                type="button"
+                class="btn btn-danger btn-sm"
+                @click="$emit('deleteLivingBudgetPeriod')"
+              >
+                Delete period
+              </button>
+              <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
+            </span>
           </p>
         </template>
         <template v-else>
@@ -179,9 +191,21 @@ const props = withDefaults(
     paceColored?: boolean;
     cycleDay?: number;
     referenceDate?: Date;
+    livingBudgetPeriodLabel?: string | null;
+    canDeleteLivingBudgetPeriod?: boolean;
   }>(),
-  { retrospective: false, compact: false, paceTone: null, paceColored: false, hideLivingBudget: false },
+  {
+    retrospective: false,
+    compact: false,
+    paceTone: null,
+    paceColored: false,
+    hideLivingBudget: false,
+    livingBudgetPeriodLabel: null,
+    canDeleteLivingBudgetPeriod: false,
+  },
 );
+
+defineEmits<{ deleteLivingBudgetPeriod: [] }>();
 
 const everydayBreakdownOpen = ref(false);
 const closeBtn = ref<HTMLButtonElement | null>(null);

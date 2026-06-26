@@ -490,6 +490,18 @@ button {
   text-decoration: underline;
 }
 
+.metric-budget-period {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.metric-budget-period-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .living-budget-timeline {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
@@ -614,6 +626,15 @@ button {
 
 .living-budget-card__edit {
   flex-shrink: 0;
+}
+
+.living-budget-card__delete {
+  flex-shrink: 0;
+}
+
+.living-budget-card__header .btn-edit,
+.living-budget-card__header .living-budget-card__delete {
+  align-self: flex-start;
 }
 
 .living-budget-breakdown {
