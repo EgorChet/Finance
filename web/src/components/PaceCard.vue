@@ -346,6 +346,7 @@ const budgetContext = computed(() => {
       dayIndex: cycleInfo.value.dayIndex,
       budgetSegments: props.livingBudgetSegments ?? [],
       budgetMonthTopups: props.livingBudgetMonthTopups ?? [],
+      configuredCharges: props.configuredCharges ?? [],
       avgCycles: avgCycles.value,
     },
   );

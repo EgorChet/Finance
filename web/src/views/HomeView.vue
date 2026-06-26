@@ -174,6 +174,7 @@ const livingBudgetAmount = computed(() =>
     livingBudgetSegments.value,
     cycleDay.value,
     livingBudgetMonthTopups.value,
+    configuredCharges.value,
   ),
 );
 
@@ -186,7 +187,7 @@ const livingBudgetTopupExtra = computed(() =>
 );
 
 const livingBudgetBaseAmount = computed(() =>
-  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
+  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value, configuredCharges.value),
 );
 
 const showPaceHealth = computed(() => {

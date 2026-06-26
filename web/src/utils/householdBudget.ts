@@ -304,5 +304,6 @@ export function dailyBudgetLeft(
   const pool = hasVaadBayitCharge(transactions)
     ? moneyLeftAmount
     : roundMoney(moneyLeftAmount - vaadBayitReserve);
+  if (pool <= 0) return 0;
   return roundMoney(pool / daysLeft);
 }

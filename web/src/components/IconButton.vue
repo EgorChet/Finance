@@ -27,13 +27,49 @@
         stroke-linecap="round"
       />
     </svg>
+    <svg v-else-if="icon === 'upload'" class="icon-button-svg" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M8 10.25V3.5M5.25 6.25 8 3.5l2.75 2.75"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M3.25 10.25v1.5a1.25 1.25 0 0 0 1.25 1.25h7a1.25 1.25 0 0 0 1.25-1.25v-1.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+    <svg v-else-if="icon === 'logout'" class="icon-button-svg" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M6.25 2.75h4.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-4.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M9.25 8H2.75M6.75 5.5 9.25 8l-2.5 2.5"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
   </button>
 </template>
 
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    icon: "close" | "plus" | "trash";
+    icon: "close" | "plus" | "trash" | "upload" | "logout";
     label: string;
     variant?: "default" | "danger";
     disabled?: boolean;

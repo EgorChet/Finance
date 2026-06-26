@@ -2,7 +2,7 @@
   <div class="review-page" :class="{ 'review-page--has-bar': !!current && !loading }">
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample queue only. Sign in to label your real charges.</div>
 
-    <h2 class="page-title">Label merchants</h2>
+    <h2 v-if="!embedded" class="page-title">Label merchants</h2>
     <p v-if="!current || loading" class="page-lead">
       Hebrew names from your card statement get an English name and spending category. Once saved, the same store is
       labeled automatically on future uploads.
@@ -208,6 +208,13 @@ import { confirm as askConfirm } from "../composables/useConfirm";
 import type { ReviewQueueItem } from "../types";
 import { CATEGORY_PICKLIST } from "../categories";
 import { formatIls, formatTransactionDate } from "../utils/format";
+
+withDefaults(
+  defineProps<{
+    embedded?: boolean;
+  }>(),
+  { embedded: false },
+);
 
 const SWIPE_THRESHOLD = 90;
 const SWIPE_MAX_ROTATION = 14;

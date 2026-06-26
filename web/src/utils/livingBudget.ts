@@ -11,6 +11,8 @@ import {
   segmentStatus,
   ymToLabel,
 } from "./fixedCharges";
+import type { ConfiguredCharge } from "./fixedCharges";
+import { fatherInjectionForMonth, FATHER_INJECTION_LABEL } from "./fatherInjection";
 import { cycleStartForStatementBilling, cycleStartFromMonthKey, isCycleMonthKey } from "./pace";
 
 export interface LivingBudgetSegment {
@@ -71,16 +73,23 @@ export function livingBudgetForMonth(
   ym: string,
   segments: LivingBudgetSegment[],
   monthTopups: LivingBudgetMonthTopup[] = [],
+  configuredCharges: ConfiguredCharge[] = [],
+): number | null {
+  const base = livingBudgetBaseForMonth(ym, segments, configuredCharges);
+  if (base === null) return null;
+  return roundMoney(base + monthTopupExtraForMonth(ym, monthTopups));
+}
+
+export function livingBudgetBaseForMonth(
+  ym: string,
+  segments: LivingBudgetSegment[],
+  configuredCharges: ConfiguredCharge[] = [],
 ): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
   if (!match) return null;
-  return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE + monthTopupExtraForMonth(ym, monthTopups));
-}
-
-export function livingBudgetBaseForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
-  const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
-  if (!match) return null;
-  return roundMoney(match.amount + CIBUS_MONTHLY_ALLOWANCE);
+  return roundMoney(
+    match.amount + CIBUS_MONTHLY_ALLOWANCE + fatherInjectionForMonth(ym, configuredCharges),
+  );
 }
 
 /** Previous calendar month as YYYY-MM. */
@@ -99,8 +108,9 @@ export function livingBudgetForPreviousMonth(
   ym: string,
   segments: LivingBudgetSegment[],
   monthTopups: LivingBudgetMonthTopup[] = [],
+  configuredCharges: ConfiguredCharge[] = [],
 ): number | null {
-  return livingBudgetForMonth(previousCalendarMonth(ym), segments, monthTopups);
+  return livingBudgetForMonth(previousCalendarMonth(ym), segments, monthTopups, configuredCharges);
 }
 
 function segmentsOverlap(a: LivingBudgetSegment, b: LivingBudgetSegment): boolean {
@@ -199,17 +209,26 @@ export function resolvedLivingBudget(
   segments: LivingBudgetSegment[],
   cycleDay: number,
   monthTopups: LivingBudgetMonthTopup[] = [],
+  configuredCharges: ConfiguredCharge[] = [],
 ): number | null {
   const ym = cycleMonthYmForOverview(selectedMonth, report, cycleDay);
-  return livingBudgetForMonth(ym, segments, monthTopups);
+  return livingBudgetForMonth(ym, segments, monthTopups, configuredCharges);
 }
 
-export function livingBudgetTimelineSummary(segments: LivingBudgetSegment[]): string {
+export function livingBudgetTimelineSummary(
+  segments: LivingBudgetSegment[],
+  configuredCharges: ConfiguredCharge[] = [],
+): string {
   return [...segments]
     .sort((a, b) => a.from_month.localeCompare(b.from_month))
     .map((s) => {
-      const total = roundMoney(s.amount + CIBUS_MONTHLY_ALLOWANCE);
-      return `₪${total.toLocaleString()} incl. Cibus (${monthRangeLabel(s.from_month, s.through_month)})`;
+      const father = fatherInjectionForMonth(s.from_month, configuredCharges);
+      const extras =
+        father > 0
+          ? ` incl. Cibus + ${FATHER_INJECTION_LABEL.toLowerCase()}`
+          : " incl. Cibus";
+      const total = roundMoney(s.amount + CIBUS_MONTHLY_ALLOWANCE + father);
+      return `₪${total.toLocaleString()}${extras} (${monthRangeLabel(s.from_month, s.through_month)})`;
     })
     .join(" → ");
 }

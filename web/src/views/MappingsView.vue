@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
-    <h2 class="page-title">Merchant mappings</h2>
+    <h2 v-if="!embedded" class="page-title">Merchant mappings</h2>
     <AppLoader
       v-if="loading"
       title="Loading merchant mappings"
@@ -86,6 +86,13 @@ import EditPanel from "../components/EditPanel.vue";
 import { useAuthStore } from "../stores/auth";
 import { CATEGORY_PICKLIST } from "../categories";
 import type { MerchantRow } from "../types";
+
+withDefaults(
+  defineProps<{
+    embedded?: boolean;
+  }>(),
+  { embedded: false },
+);
 
 const categories = CATEGORY_PICKLIST;
 

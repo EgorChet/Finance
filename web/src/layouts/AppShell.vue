@@ -147,6 +147,24 @@
               <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
               Light mode
             </label>
+            <div v-if="showNavIconActions" class="mobile-nav-icon-row">
+              <template v-if="!auth.isDemo">
+                <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
+                <IconButton
+                  icon="upload"
+                  label="Upload statement"
+                  :disabled="processing"
+                  @click="uploadInput?.click()"
+                />
+              </template>
+              <IconButton
+                v-if="auth.authRequired && auth.isAuthenticated"
+                icon="logout"
+                label="Sign out"
+                variant="danger"
+                @click="logout"
+              />
+            </div>
             <template v-if="!auth.isDemo">
               <button
                 v-if="showLocalSync"
@@ -157,24 +175,7 @@
               >
                 Sync .xlsx files
               </button>
-              <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
-              <button
-                type="button"
-                class="mobile-nav-action btn"
-                :disabled="processing"
-                @click="uploadInput?.click()"
-              >
-                Upload statement
-              </button>
             </template>
-            <button
-              v-if="auth.authRequired && auth.isAuthenticated"
-              type="button"
-              class="mobile-nav-action btn"
-              @click="logout"
-            >
-              Sign out
-            </button>
             <button v-if="auth.isDemo" type="button" class="mobile-nav-action btn" @click="goLogin">
               Sign in for real data
             </button>
@@ -234,6 +235,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
+import IconButton from "../components/IconButton.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
@@ -277,10 +279,8 @@ const NAV_ITEMS = [
   { to: "/app/overview", label: "Spending" },
   { to: "/app/calendar", label: "Calendar" },
   { to: "/app/browse", label: "Browse" },
-  { to: "/app/mappings", label: "Mappings" },
-  { to: "/app/review", label: "Label" },
-  { to: "/app/excluded", label: "Excluded" },
-  { to: "/app/recurring", label: "Extra charges" },
+  { to: "/app/merchants", label: "Merchants" },
+  { to: "/app/household", label: "Household" },
 ] as const;
 
 const navItems = NAV_ITEMS;
@@ -326,6 +326,10 @@ const sideMenuPortfolioVisible = computed(
     portfolioCombinedUsd.value != null ||
     !!marketSnapshot.value?.btc_usd ||
     !!marketSnapshot.value?.sp500,
+);
+
+const showNavIconActions = computed(
+  () => !auth.isDemo || (auth.authRequired && auth.isAuthenticated),
 );
 
 const portfolioCombinedUsd = computed(() => {

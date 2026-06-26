@@ -11,18 +11,50 @@
     dismissible
     @dismiss="error = ''"
   />
-  <template v-else-if="report || reportLoading">
+  <template v-else-if="report || reportLoading || overviewPeriod">
     <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <h2 class="overview-page-title">Spending overview</h2>
-    <MonthPicker :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
+    <div class="pill-row overview-period-row">
+      <button
+        type="button"
+        class="pill pill-period"
+        :class="{ active: overviewPeriod === 'ytd' }"
+        @click="togglePeriod('ytd')"
+      >
+        This year
+      </button>
+      <button
+        type="button"
+        class="pill pill-period"
+        :class="{ active: overviewPeriod === 'rolling12' }"
+        @click="togglePeriod('rolling12')"
+      >
+        Last 12 months
+      </button>
+    </div>
+    <MonthPicker
+      :model-value="overviewPeriod ? null : selectedMonth"
+      :months="displayMonths"
+      @update:model-value="onMonthSelected"
+    />
     <AppLoader
-      v-if="reportLoading"
+      v-if="overviewPeriod && !paceReport"
+      compact
+      title="Loading period"
+      subtitle="Aggregating your spending history"
+    />
+    <SpendingPeriodPanel
+      v-else-if="overviewPeriod && periodAnalysis"
+      :analysis="periodAnalysis"
+    />
+    <AppLoader
+      v-else-if="reportLoading"
       title="Loading month"
       :subtitle="switchingMonthLabel"
     />
-    <template v-else-if="report">
+    <template v-else-if="report && !overviewPeriod">
     <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
     <SummaryMetrics
       v-if="showSummaryMetrics"
@@ -135,6 +167,7 @@ import MonthPicker from "../components/MonthPicker.vue";
 import MonthlyTrendChart from "../components/MonthlyTrendChart.vue";
 import PaceCard from "../components/PaceCard.vue";
 import PendingCycleCard from "../components/PendingCycleCard.vue";
+import SpendingPeriodPanel from "../components/SpendingPeriodPanel.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import { useAuthStore } from "../stores/auth";
 import { confirm } from "../composables/useConfirm";
@@ -181,6 +214,10 @@ import {
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
 } from "../utils/livingBudget";
+import {
+  analyzeSpendingPeriod,
+  type SpendingPeriodMode,
+} from "../utils/spendingPeriod";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -200,10 +237,16 @@ const expandedCategoryKeys = ref<string[]>([]);
 const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
 const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
+const overviewPeriod = ref<SpendingPeriodMode | null>(null);
 
 const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.value));
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
+
+const periodAnalysis = computed(() => {
+  if (!overviewPeriod.value || !paceReport.value) return null;
+  return analyzeSpendingPeriod(paceReport.value.transactions, overviewPeriod.value, refDate.value);
+});
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
@@ -324,6 +367,7 @@ const resolvedLivingBudget = computed(() =>
     livingBudgetSegments.value,
     cycleDay.value,
     livingBudgetMonthTopups.value,
+    configuredCharges.value,
   ),
 );
 
@@ -336,7 +380,7 @@ const livingBudgetTopupExtra = computed(() =>
 );
 
 const livingBudgetBaseAmount = computed(() =>
-  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
+  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value, configuredCharges.value),
 );
 
 const showSummaryMetrics = computed(() => {
@@ -551,7 +595,13 @@ function defaultTxPeriod(month: string | null): TransactionPeriod {
   return "month";
 }
 
+function togglePeriod(mode: SpendingPeriodMode) {
+  overviewPeriod.value = overviewPeriod.value === mode ? null : mode;
+  expandedCategoryKeys.value = [];
+}
+
 async function onMonthSelected(month: string | null) {
+  overviewPeriod.value = null;
   selectedMonth.value = month;
   expandedCategoryKeys.value = [];
   txPeriod.value = defaultTxPeriod(month);

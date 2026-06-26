@@ -107,7 +107,8 @@ export function formatAboutIls(amount: number): string {
   else if (abs >= 20) rounded = Math.round(abs / 10) * 10;
   else rounded = Math.round(abs);
   const n = sign * rounded;
-  return `₪${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  const body = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return n < 0 ? `-₪${body}` : `₪${body}`;
 }
 
 /** Parse YYYY-MM-DD as a local calendar date (avoids UTC off-by-one). */

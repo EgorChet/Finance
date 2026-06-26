@@ -1,5 +1,6 @@
 import type { Transaction } from "../types";
 import { budgetSpendBreakdown, moneyLeft } from "./householdBudget";
+import type { ConfiguredCharge } from "./fixedCharges";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "./livingBudget";
 import { livingBudgetForMonth } from "./livingBudget";
 import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "./format";
@@ -90,6 +91,7 @@ export function computePaceBudgetContext(
     dayIndex?: number;
     budgetSegments?: LivingBudgetSegment[];
     budgetMonthTopups?: LivingBudgetMonthTopup[];
+    configuredCharges?: ConfiguredCharge[];
     /** Recent completed cycles to average; 0 = all available (max 24). Matches pace usual baseline. */
     avgCycles?: PaceAvgCycles;
   } = {},
@@ -133,6 +135,7 @@ export function computePaceBudgetContext(
     dayIndex = 0,
     budgetSegments = [],
     budgetMonthTopups = [],
+    configuredCharges = [],
     avgCycles = 3,
   } = options;
 
@@ -148,7 +151,7 @@ export function computePaceBudgetContext(
       cursor = previousBillingCycleStart(cursor);
       scanned += 1;
       const { end: prevEnd } = getCycleRangeForStart(cursor, cycleDay);
-      const budget = livingBudgetForMonth(cursor.slice(0, 7), budgetSegments, budgetMonthTopups);
+      const budget = livingBudgetForMonth(cursor.slice(0, 7), budgetSegments, budgetMonthTopups, configuredCharges);
       if (budget == null || budget <= 0) continue;
       const spent = spentOnCapThroughDay(allTransactions, cursor, prevEnd, dayIndex);
       budgets.push(budget);

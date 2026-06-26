@@ -1,21 +1,23 @@
 <template>
-  <div>
-    <div v-if="auth.isDemo" class="demo-banner">
-      Demo mode — exclusions are read-only. Sign in to exclude charges from your totals.
-    </div>
-    <h2 class="page-title">Excluded charges</h2>
-    <p class="page-lead">
-      These transactions are hidden from totals, charts, and pace. Restoring a charge puts it back in your spending.
-    </p>
+  <section id="excluded" class="manual-section excluded-section">
+    <header class="manual-section-header">
+      <div>
+        <h3 class="manual-section-title">Excluded charges</h3>
+        <p class="manual-section-lead">
+          Hidden from totals, charts, and pace. Restore a charge to count it in your spending again.
+        </p>
+      </div>
+    </header>
 
     <AppLoader
       v-if="loading"
+      compact
       title="Loading exclusions"
-      subtitle="Fetching charges you've marked as not your spend"
+      subtitle="Fetching charges marked as not your spend"
     />
     <template v-else>
-      <p v-if="error" style="color: var(--danger)">{{ error }}</p>
-      <p v-else-if="!entries.length" style="color: var(--text-muted)">
+      <p v-if="error" class="recurring-form-error">{{ error }}</p>
+      <p v-else-if="!entries.length" class="manual-empty">
         No excluded charges yet. Use <strong>Exclude</strong> on Overview transactions.
       </p>
       <div v-else class="excluded-list">
@@ -42,15 +44,15 @@
           </div>
         </article>
       </div>
-      <p v-if="status" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.75rem">{{ status }}</p>
+      <p v-if="status" class="excluded-section-status">{{ status }}</p>
     </template>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { fetchExclusions, removeExclusion } from "../api/client";
-import AppLoader from "../components/AppLoader.vue";
+import AppLoader from "./AppLoader.vue";
 import { useAuthStore } from "../stores/auth";
 import type { ExcludedItem } from "../types";
 import { formatIls, formatTransactionDate } from "../utils/format";

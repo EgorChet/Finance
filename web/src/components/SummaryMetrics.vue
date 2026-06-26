@@ -38,7 +38,7 @@
           </ul>
           <p class="metric-sub-note">
             Includes flat rent in the cap (not in everyday pace). Use a monthly extra if you need headroom for rent.
-            <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Edit budget</RouterLink>
+            <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
           </p>
         </template>
         <template v-else>
@@ -46,7 +46,7 @@
           <div class="metric-value metric-value-sm">Not set for this month</div>
           <p class="metric-sub-note">
             Add budget periods for this billing cycle on
-            <RouterLink class="metric-budget-edit-link" to="/app/recurring#living-budget">Extra charges</RouterLink>.
+            <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Household</RouterLink>.
           </p>
         </template>
       </div>
@@ -120,8 +120,8 @@
                 <template v-if="everydayComposition.configuredTotal > 0">
                   <li class="everyday-breakdown-simple-row">
                     <span>
-                      Extra charges
-                      <RouterLink class="everyday-breakdown-link" to="/app/recurring">edit</RouterLink>
+                      Fixed bills
+                      <RouterLink class="everyday-breakdown-link" to="/app/household">edit</RouterLink>
                     </span>
                     <strong>{{ formatIls(everydayComposition.configuredTotal) }}</strong>
                   </li>
@@ -224,8 +224,9 @@ const dailyBudgetDisplay = computed(() => {
     daysLeftInCycle.value,
   );
   if (perDay === null) return null;
+  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `~${formatAboutIls(perDay)}/day`;
   return {
-    perDay: `~${formatAboutIls(perDay)}/day`,
+    perDay: perDayLabel,
     daysLeft: daysLeftInCycle.value,
   };
 });

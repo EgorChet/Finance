@@ -76,6 +76,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
       dayIndex: cycle.dayIndex,
       budgetSegments: options.budgetSegments ?? [],
       budgetMonthTopups: options.budgetMonthTopups ?? [],
+      configuredCharges: options.configuredCharges ?? [],
       avgCycles: options.avgCycles ?? 3,
     },
   );
