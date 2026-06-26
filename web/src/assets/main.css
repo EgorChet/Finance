@@ -2828,10 +2828,7 @@ button {
   font-size: 0.95rem;
 }
 
-.category-accordion-split-zone--compare:hover {
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-}
-
+.category-accordion-split-zone--compare:hover,
 .category-accordion-split-zone--expand:hover {
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
@@ -2880,6 +2877,10 @@ button {
 .category-accordion-split .legend-btn-amount {
   font-size: 1rem;
   font-weight: 700;
+}
+
+.category-accordion-split-zone--compare .category-compare-indicator {
+  flex-shrink: 0;
 }
 
 .category-compare-indicator--decorative {

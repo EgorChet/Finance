@@ -24,16 +24,17 @@
           <button
             type="button"
             class="category-accordion-split-zone category-accordion-split-zone--compare"
-            :aria-label="compareAria(scopeForItem(item), item.name)"
-            :title="compareTitle(scopeForItem(item))"
-            @click="openCompareForItem(item)"
+            :aria-expanded="isOpen(item.key)"
+            :aria-label="`${item.name}: expand charges`"
+            @click="toggle(item.key)"
           >
             <span class="swatch" :style="{ background: colors[idx % colors.length] }" />
             <span class="category-accordion-split-label">{{ item.name }}</span>
             <CategoryCompareIndicator
-              decorative
               :tone="compareTone(scopeForItem(item))"
               :delta="compareResultForScope(scopeForItem(item))?.delta"
+              :label="item.name"
+              @click.stop="openCompareForItem(item)"
             />
           </button>
           <button
@@ -79,15 +80,16 @@
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-label="compareAria(scopeForHomeSub(row.category_en), homeSubsectionLabel(row.category_en))"
-                  :title="compareTitle(scopeForHomeSub(row.category_en))"
-                  @click="openCompareForHomeSub(row.category_en)"
+                  :aria-expanded="isOpen(subKey(item.key, row.category_en))"
+                  :aria-label="`${homeSubsectionLabel(row.category_en)}: expand charges`"
+                  @click="toggle(subKey(item.key, row.category_en))"
                 >
                   <span class="category-accordion-split-label">{{ homeSubsectionLabel(row.category_en) }}</span>
                   <CategoryCompareIndicator
-                    decorative
                     :tone="compareTone(scopeForHomeSub(row.category_en))"
                     :delta="compareResultForScope(scopeForHomeSub(row.category_en))?.delta"
+                    :label="homeSubsectionLabel(row.category_en)"
+                    @click.stop="openCompareForHomeSub(row.category_en)"
                   />
                 </button>
                 <button
@@ -151,15 +153,16 @@
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-label="compareAria(scopeForSubscriptionSub(row.name), row.name)"
-                  :title="compareTitle(scopeForSubscriptionSub(row.name))"
-                  @click="openCompareForSubscriptionSub(row.name)"
+                  :aria-expanded="isOpen(subKey(item.key, row.name))"
+                  :aria-label="`${row.name}: expand charges`"
+                  @click="toggle(subKey(item.key, row.name))"
                 >
                   <span class="category-accordion-split-label">{{ row.name }}</span>
                   <CategoryCompareIndicator
-                    decorative
                     :tone="compareTone(scopeForSubscriptionSub(row.name))"
                     :delta="compareResultForScope(scopeForSubscriptionSub(row.name))?.delta"
+                    :label="row.name"
+                    @click.stop="openCompareForSubscriptionSub(row.name)"
                   />
                 </button>
                 <button
@@ -223,15 +226,16 @@
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-label="compareAria(scopeForOtherSub(row.category_en), row.category_en)"
-                  :title="compareTitle(scopeForOtherSub(row.category_en))"
-                  @click="openCompareForOtherSub(row.category_en)"
+                  :aria-expanded="isOpen(subKey(item.key, row.category_en))"
+                  :aria-label="`${row.category_en}: expand charges`"
+                  @click="toggle(subKey(item.key, row.category_en))"
                 >
                   <span class="category-accordion-split-label">{{ row.category_en }}</span>
                   <CategoryCompareIndicator
-                    decorative
                     :tone="compareTone(scopeForOtherSub(row.category_en))"
                     :delta="compareResultForScope(scopeForOtherSub(row.category_en))?.delta"
+                    :label="row.category_en"
+                    @click.stop="openCompareForOtherSub(row.category_en)"
                   />
                 </button>
                 <button
@@ -323,8 +327,6 @@ import {
 } from "../categories";
 import {
   buildCategoryCompareContext,
-  categoryCompareAriaLabel,
-  categoryCompareTitle,
   categoryCompareTone,
   computeCategoryCompareFromContext,
   scopeKey,
@@ -369,17 +371,9 @@ const compareReady = computed(
 
 const accordionHint = computed(() =>
   compareReady.value
-    ? "Left side compares to usual spending; right side expands charges."
+    ? "Tap to expand charges. Trend icon compares to usual spending."
     : "Tap to expand charges — you can open several at once.",
 );
-
-function compareAria(scope: CategoryCompareScope, label: string): string {
-  return categoryCompareAriaLabel(compareTone(scope), label);
-}
-
-function compareTitle(scope: CategoryCompareScope): string {
-  return categoryCompareTitle(compareResultForScope(scope)?.delta);
-}
 
 function closeCompare() {
   compareOpen.value = false;
