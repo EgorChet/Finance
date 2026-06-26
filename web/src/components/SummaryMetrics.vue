@@ -1,7 +1,7 @@
 <template>
   <div class="summary-metrics">
     <div class="metric-grid">
-      <div class="metric-card metric-card-budget" :class="budgetClass">
+      <div v-if="!hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
           <div v-if="dailyBudgetDisplay" class="metric-budget-top">
             <div class="metric-budget-main">
@@ -170,6 +170,7 @@ const props = withDefaults(
   defineProps<{
     report: SpendingReport;
     livingBudget: number | null;
+    hideLivingBudget?: boolean;
     retrospective?: boolean;
     compact?: boolean;
     /** Live-cycle pace tone — green / yellow / red money-left card. */
@@ -179,7 +180,7 @@ const props = withDefaults(
     cycleDay?: number;
     referenceDate?: Date;
   }>(),
-  { retrospective: false, compact: false, paceTone: null, paceColored: false },
+  { retrospective: false, compact: false, paceTone: null, paceColored: false, hideLivingBudget: false },
 );
 
 const everydayBreakdownOpen = ref(false);

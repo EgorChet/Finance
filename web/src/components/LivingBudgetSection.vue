@@ -22,9 +22,10 @@
               <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
               <span class="list-row__amount list-row__amount--cibus">+{{ formatIls(CIBUS_MONTHLY_ALLOWANCE) }}</span>
               <span
-                v-if="fatherInjectionForSegment(seg) > 0"
+                v-for="label in fatherInjectionLabels(seg)"
+                :key="`father-${label}`"
                 class="list-row__amount list-row__amount--father"
-              >+{{ formatIls(fatherInjectionForSegment(seg)) }}</span>
+              >+{{ label }}</span>
             </div>
             <span class="list-row__meta">{{ segmentExtrasLabel(seg) }} · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
           </div>
@@ -163,7 +164,11 @@ import ToggleSwitch from "./ToggleSwitch.vue";
 import { confirm } from "../composables/useConfirm";
 import { formatIls } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
-import { fatherInjectionForMonth, FATHER_INJECTION_LABEL } from "../utils/fatherInjection";
+import {
+  fatherInjectionAmountsForSegment,
+  formatFatherInjectionBadge,
+  FATHER_INJECTION_LABEL,
+} from "../utils/fatherInjection";
 import {
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
@@ -205,13 +210,15 @@ const segmentDeleteLabel = computed(() =>
   segments.value.length <= 1 ? "Remove budget period" : "Delete period",
 );
 
-function fatherInjectionForSegment(seg: LivingBudgetSegment): number {
-  return fatherInjectionForMonth(seg.from_month, props.configuredCharges);
+function fatherInjectionLabels(seg: LivingBudgetSegment): string[] {
+  const amounts = fatherInjectionAmountsForSegment(seg.from_month, seg.through_month, props.configuredCharges);
+  if (!amounts.length) return [];
+  return [formatFatherInjectionBadge(amounts)];
 }
 
 function segmentExtrasLabel(seg: LivingBudgetSegment): string {
   const parts = ["Cibus"];
-  if (fatherInjectionForSegment(seg) > 0) parts.push(FATHER_INJECTION_LABEL);
+  if (fatherInjectionLabels(seg).length > 0) parts.push(FATHER_INJECTION_LABEL);
   return parts.join(" · ");
 }
 

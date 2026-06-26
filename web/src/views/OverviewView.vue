@@ -59,7 +59,8 @@
     <SummaryMetrics
       v-if="showSummaryMetrics"
       :report="report"
-      :living-budget="resolvedLivingBudget"
+      :living-budget="monthLivingBudget"
+      :hide-living-budget="selectedMonth === null"
       :retrospective="budgetRetrospective"
       :pace-tone="summaryPaceTone"
       :pace-colored="showPaceCard"
@@ -369,6 +370,11 @@ const resolvedLivingBudget = computed(() =>
     livingBudgetMonthTopups.value,
     configuredCharges.value,
   ),
+);
+
+/** Living budget applies to one billing cycle — not the all-months aggregate. */
+const monthLivingBudget = computed(() =>
+  selectedMonth.value === null ? null : resolvedLivingBudget.value,
 );
 
 const livingBudgetCycleYm = computed(() =>
