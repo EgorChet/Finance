@@ -11,6 +11,7 @@
       {{ m.label }}<span v-if="m.inProgress" class="pill-now"> · now</span><span v-else-if="m.pendingStatement" class="pill-pending-tag"> · pending</span>
     </button>
     <button
+      v-if="!omitAllMonths"
       type="button"
       class="pill"
       :class="{ active: modelValue === null }"
@@ -24,7 +25,7 @@
 <script setup lang="ts">
 import type { MonthItem } from "../types";
 
-defineProps<{ months: MonthItem[]; modelValue: string | null }>();
+defineProps<{ months: MonthItem[]; modelValue: string | null; omitAllMonths?: boolean }>();
 defineEmits<{ "update:modelValue": [string | null] }>();
 </script>
 

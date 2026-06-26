@@ -15,28 +15,39 @@
     <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
-    <h2 class="overview-page-title">Spending overview</h2>
-    <div class="pill-row overview-period-row">
-      <button
-        type="button"
-        class="pill pill-period"
-        :class="{ active: overviewPeriod === 'ytd' }"
-        @click="togglePeriod('ytd')"
-      >
-        This year
-      </button>
-      <button
-        type="button"
-        class="pill pill-period"
-        :class="{ active: overviewPeriod === 'rolling12' }"
-        @click="togglePeriod('rolling12')"
-      >
-        Last 12 months
-      </button>
-    </div>
+    <header class="overview-page-header">
+      <h2 class="overview-page-title">Spending overview</h2>
+      <div class="pill-row overview-page-periods">
+        <button
+          type="button"
+          class="pill pill-period"
+          :class="{ active: overviewPeriod === 'ytd' }"
+          @click="togglePeriod('ytd')"
+        >
+          This year
+        </button>
+        <button
+          type="button"
+          class="pill pill-period"
+          :class="{ active: overviewPeriod === 'rolling12' }"
+          @click="togglePeriod('rolling12')"
+        >
+          Last 12 months
+        </button>
+        <button
+          type="button"
+          class="pill pill-period"
+          :class="{ active: selectedMonth === null && !overviewPeriod }"
+          @click="onMonthSelected(null)"
+        >
+          All months
+        </button>
+      </div>
+    </header>
     <MonthPicker
       :model-value="overviewPeriod ? null : selectedMonth"
       :months="displayMonths"
+      omit-all-months
       @update:model-value="onMonthSelected"
     />
     <AppLoader
