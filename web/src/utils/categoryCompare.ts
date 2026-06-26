@@ -4,7 +4,7 @@ import {
   homeSubsectionKey,
   rollupCategory,
 } from "../categories";
-import { roundMoney } from "./format";
+import { roundMoney, formatIls } from "./format";
 import { getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "./pace";
 import { subscriptionSubsectionLabel } from "./subscriptionSections";
 
@@ -53,6 +53,21 @@ export function categoryCompareTone(
   if (delta == null || usual == null) return "unknown";
   if (Math.abs(delta) < CATEGORY_COMPARE_NEUTRAL_THRESHOLD) return "neutral";
   return delta > 0 ? "high" : "low";
+}
+
+export function categoryCompareAriaLabel(tone: CategoryCompareTone, label?: string): string {
+  const name = label ? `${label}: ` : "";
+  if (tone === "high") return `${name}Spending above usual — open comparison`;
+  if (tone === "low") return `${name}Spending below usual — open comparison`;
+  if (tone === "neutral") return `${name}About usual — open comparison`;
+  return `${name}Compare with usual spending`;
+}
+
+export function categoryCompareTitle(delta?: number | null): string {
+  if (delta == null) return "Compare with usual spending";
+  if (Math.abs(delta) < 1) return "About usual at this point in the cycle";
+  const abs = formatIls(Math.abs(delta));
+  return delta > 0 ? `${abs} above usual` : `${abs} below usual`;
 }
 
 export function scopeKey(scope: CategoryCompareScope): string {
