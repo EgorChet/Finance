@@ -265,6 +265,13 @@ export function isCachedFile(data: StatementsData, hash: string): boolean {
   return Object.values(data.statements).some((e) => e.file_hash === hash);
 }
 
+/** Remove one stored statement export (billing key YYYY-MM-DD). */
+export function deleteStatementByKey(data: StatementsData, key: string): boolean {
+  if (!data.statements[key]) return false;
+  delete data.statements[key];
+  return true;
+}
+
 /** Apply saved merchant rules to all statements and rebuild summaries (no Python call). */
 export function applyMerchantRules(data: StatementsData, rules: MerchantRules): number {
   let changed = 0;

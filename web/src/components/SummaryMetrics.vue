@@ -36,22 +36,6 @@
               <span>{{ formatIls(budgetCarLoan) }}</span>
             </li>
           </ul>
-          <p class="metric-sub-note">
-            <span v-if="livingBudgetPeriodLabel" class="metric-budget-period">
-              Budget period: {{ livingBudgetPeriodLabel }}
-            </span>
-            <span class="metric-budget-period-actions">
-              <button
-                v-if="canDeleteLivingBudgetPeriod"
-                type="button"
-                class="btn btn-danger btn-sm"
-                @click="$emit('deleteLivingBudgetPeriod')"
-              >
-                Delete period
-              </button>
-              <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
-            </span>
-          </p>
         </template>
         <template v-else>
           <div class="metric-label">Living budget</div>
@@ -61,6 +45,10 @@
             <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Household</RouterLink>.
           </p>
         </template>
+        <div v-if="livingBudgetPeriodLabel" class="metric-budget-footer">
+          <div class="metric-budget-footer__period">Budget period: {{ livingBudgetPeriodLabel }}</div>
+          <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
+        </div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Total spent</div>
@@ -192,7 +180,6 @@ const props = withDefaults(
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
-    canDeleteLivingBudgetPeriod?: boolean;
   }>(),
   {
     retrospective: false,
@@ -201,11 +188,8 @@ const props = withDefaults(
     paceColored: false,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
-    canDeleteLivingBudgetPeriod: false,
   },
 );
-
-defineEmits<{ deleteLivingBudgetPeriod: [] }>();
 
 const everydayBreakdownOpen = ref(false);
 const closeBtn = ref<HTMLButtonElement | null>(null);

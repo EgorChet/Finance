@@ -502,6 +502,27 @@ button {
   gap: 0.45rem;
 }
 
+.metric-budget-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem 0.75rem;
+}
+
+.metric-budget-footer__period {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.metric-card-budget .metric-budget-footer .metric-budget-edit-link {
+  margin-left: 0;
+}
+
 .living-budget-timeline {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
@@ -589,7 +610,9 @@ button {
 .living-budget-card__header {
   display: flex;
   align-items: flex-start;
-  gap: 0.65rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   padding: 0.75rem 0.85rem;
   border-bottom: 1px solid var(--border);
 }
@@ -624,17 +647,19 @@ button {
   margin-top: 0.1rem;
 }
 
-.living-budget-card__edit {
-  flex-shrink: 0;
+.living-budget-card__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
-.living-budget-card__delete {
-  flex-shrink: 0;
-}
-
-.living-budget-card__header .btn-edit,
-.living-budget-card__header .living-budget-card__delete {
-  align-self: flex-start;
+.living-budget-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .living-budget-breakdown {

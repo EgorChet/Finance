@@ -28,30 +28,32 @@
                 Total varies when Cibus or rent amounts change
               </p>
             </div>
-            <span
-              class="living-budget-card__status recurring-status"
-              :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
-            >
-              {{ livingBudgetStatusLabel(seg) }}
-            </span>
-            <button
-              v-if="!readonly"
-              type="button"
-              class="btn btn-edit living-budget-card__edit"
-              :disabled="disabled"
-              @click="startEditSegment(index)"
-            >
-              Edit
-            </button>
-            <button
-              v-if="!readonly"
-              type="button"
-              class="btn btn-danger btn-sm living-budget-card__delete"
-              :disabled="disabled"
-              @click="removeSegment(seg)"
-            >
-              Delete
-            </button>
+            <div class="living-budget-card__aside">
+              <span
+                class="living-budget-card__status recurring-status"
+                :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
+              >
+                {{ livingBudgetStatusLabel(seg) }}
+              </span>
+              <div v-if="!readonly" class="living-budget-card__actions">
+                <button
+                  type="button"
+                  class="btn btn-edit"
+                  :disabled="disabled"
+                  @click="startEditSegment(index)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-danger btn-sm"
+                  :disabled="disabled"
+                  @click="removeSegment(seg)"
+                >
+                  Delete period
+                </button>
+              </div>
+            </div>
           </header>
 
           <ul class="living-budget-breakdown">

@@ -58,6 +58,12 @@ async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function del<T>(url: string, token?: string): Promise<T> {
+  const res = await fetch(url, { method: "DELETE", headers: headers(token) });
+  if (!res.ok) throw new Error(await readApiError(res));
+  return res.json() as Promise<T>;
+}
+
 export async function authStatus() {
   return get<{ auth_required: boolean }>(`${BASE}/api/auth/status`);
 }
@@ -90,6 +96,14 @@ export async function fetchMonths(demo: boolean, token?: string) {
     summary: { month: string; billing_date: string; total: number; transactions: number }[];
     demo_as_of?: string;
   }>(`${prefix(demo)}/months`, token);
+}
+
+/** Remove one uploaded statement (billing key YYYY-MM-DD) from storage. */
+export async function deleteStatementMonth(monthKey: string, token?: string) {
+  return del<{ ok: boolean; key: string; total_months: number }>(
+    `${prefix(false)}/statements/${encodeURIComponent(monthKey)}`,
+    token,
+  );
 }
 
 export async function fetchReport(demo: boolean, month: string | null, token?: string) {

@@ -47,8 +47,10 @@
     <MonthPicker
       :model-value="overviewPeriod ? null : selectedMonth"
       :months="displayMonths"
+      :allow-delete="!auth.isDemo"
       omit-all-months
       @update:model-value="onMonthSelected"
+      @delete-month="onDeleteStatementMonth"
     />
     <AppLoader
       v-if="overviewPeriod && !paceReport"
@@ -78,8 +80,6 @@
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
-      :can-delete-living-budget-period="canDeleteLivingBudgetPeriod"
-      @delete-living-budget-period="deleteActiveLivingBudgetPeriod"
     />
     <PaceCard
       v-if="showPaceCard"
@@ -172,7 +172,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { addExclusion, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport, saveLivingBudget } from "../api/client";
+import { addExclusion, deleteStatementMonth, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
@@ -225,7 +225,6 @@ import {
   cycleMonthYmForOverview,
   livingBudgetBaseForMonth,
   livingBudgetSegmentForMonth,
-  livingBudgetSegmentStableKey,
   monthRangeLabel,
   monthTopupExtraForMonth,
   normalizeLivingBudgetMonthTopup,
@@ -415,10 +414,6 @@ const activeLivingBudgetPeriodLabel = computed(() => {
   if (!seg) return null;
   return monthRangeLabel(seg.from_month, seg.through_month);
 });
-
-const canDeleteLivingBudgetPeriod = computed(
-  () => !auth.isDemo && selectedMonth.value !== null && activeLivingBudgetSegment.value !== null,
-);
 
 const showSummaryMetrics = computed(() => {
   if (!report.value) return false;
@@ -611,37 +606,37 @@ async function refreshLivingBudget() {
   }
 }
 
-async function deleteActiveLivingBudgetPeriod() {
-  const seg = activeLivingBudgetSegment.value;
-  if (!seg || auth.isDemo) return;
+async function onDeleteStatementMonth(key: string) {
+  if (auth.isDemo || isCycleMonthKey(key)) return;
 
-  const periodLabel = monthRangeLabel(seg.from_month, seg.through_month);
+  const month = displayMonths.value.find((m) => m.key === key);
   const ok = await confirm({
-    title: livingBudgetSegments.value.length <= 1 ? "Remove budget period?" : "Delete budget period?",
-    message: `Remove the ${formatIls(seg.amount)} period (${periodLabel}) for this month?`,
-    confirmLabel: livingBudgetSegments.value.length <= 1 ? "Remove" : "Delete period",
+    title: "Delete statement?",
+    message: `Remove all spending data for ${month?.label ?? key}? This cannot be undone.`,
+    confirmLabel: "Delete",
     tone: "danger",
   });
   if (!ok) return;
 
-  const key = livingBudgetSegmentStableKey(seg);
-  const nextSegments = livingBudgetSegments.value
-    .filter((s) => livingBudgetSegmentStableKey(s) !== key)
-    .map((s) => normalizeLivingBudgetSegment(s));
-  const nextTopups = livingBudgetMonthTopups.value
-    .filter((t) => !(seg.from_month <= t.month && t.month <= seg.through_month))
-    .map((t) => normalizeLivingBudgetMonthTopup(t));
-
   try {
-    const data = await saveLivingBudget(
-      {
-        segments: nextSegments,
-        month_topups: nextTopups,
-      },
-      auth.token || undefined,
-    );
-    livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
-    livingBudgetMonthTopups.value = (data.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
+    await deleteStatementMonth(key, auth.token || undefined);
+    const demo = auth.isDemo;
+    const token = auth.token || undefined;
+    const m = await fetchMonths(demo, token);
+    months.value = m.months;
+    partialReportCache.value.delete(key);
+    summary.value = m.summary
+      .filter((row) => !m.months.some((month) => month.billing_date === row.billing_date && month.partial))
+      .map((row) => ({
+        ...row,
+        month: billingCycleLabel(row.billing_date),
+      }));
+    await refreshPaceReport();
+    if (selectedMonth.value === key || !months.value.some((row) => row.key === selectedMonth.value)) {
+      selectedMonth.value = defaultOverviewMonthKey(months.value, cycleDay.value, refDate.value);
+      txPeriod.value = defaultTxPeriod(selectedMonth.value);
+    }
+    await refreshReport(selectedMonth.value);
   } catch (e) {
     error.value = String(e);
   }

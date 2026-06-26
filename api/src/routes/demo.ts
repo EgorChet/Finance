@@ -106,6 +106,10 @@ router.post("/upload", (_req, res) => {
   res.status(403).json({ error: "Upload disabled in demo mode — sign in to use your statements" });
 });
 
+router.delete("/statements/:key", (_req, res) => {
+  res.status(403).json({ error: "Deleting statements disabled in demo mode — sign in to manage your data" });
+});
+
 router.put("/rules", (_req, res) => {
   res.status(403).json({ error: "Saving rules disabled in demo mode" });
 });
