@@ -22,25 +22,28 @@
           type="button"
           class="pill pill-period"
           :class="{ active: overviewPeriod === 'ytd' }"
+          aria-label="This year"
           @click="togglePeriod('ytd')"
         >
-          This year
+          YTD
         </button>
         <button
           type="button"
           class="pill pill-period"
           :class="{ active: overviewPeriod === 'rolling12' }"
+          aria-label="Last 12 months"
           @click="togglePeriod('rolling12')"
         >
-          Last 12 months
+          12M
         </button>
         <button
           type="button"
           class="pill pill-period"
           :class="{ active: selectedMonth === null && !overviewPeriod }"
+          aria-label="All months"
           @click="onMonthSelected(null)"
         >
-          All months
+          ALL
         </button>
       </div>
     </header>
