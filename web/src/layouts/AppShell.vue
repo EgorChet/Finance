@@ -143,46 +143,124 @@
               </div>
             </div>
             <div class="mobile-nav-footer">
-              <label class="mobile-nav-footer-row mobile-nav-theme">
+              <label class="mobile-nav-setting-row">
+                <span class="mobile-nav-setting-icon" aria-hidden="true">
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16">
+                    <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+                    <path
+                      d="M8 1.5v1.25M8 13.25V14.5M14.5 8h-1.25M2.75 8H1.5M12.55 3.45l-.88.88M4.33 11.67l-.88.88M12.55 12.55l-.88-.88M4.33 4.33l-.88-.88"
+                      stroke="currentColor"
+                      stroke-width="1.35"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+                <span class="mobile-nav-setting-copy">
+                  <span class="mobile-nav-setting-label">Light mode</span>
+                  <span class="mobile-nav-setting-hint">{{ app.lightMode ? "On" : "Off" }}</span>
+                </span>
                 <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
-                <span class="mobile-nav-theme-label">Light mode</span>
               </label>
 
-              <div v-if="auth.isDemo" class="mobile-nav-footer-row">
-                <button type="button" class="mobile-nav-footer-btn btn" @click="goLogin">
-                  Sign in for real data
+              <div v-if="auth.isDemo" class="mobile-nav-account-card">
+                <p class="mobile-nav-demo-note">You're viewing demo data. Sign in to use your own statements.</p>
+                <button type="button" class="mobile-nav-action btn mobile-nav-action--accent" @click="goLogin">
+                  Sign in
                 </button>
               </div>
 
-              <div v-else class="mobile-nav-footer-row mobile-nav-footer-row--account">
+              <div v-else class="mobile-nav-account-card">
+                <div v-if="auth.userLabel" class="mobile-nav-account-header">
+                  <span class="mobile-nav-account-avatar" aria-hidden="true">{{ accountInitial }}</span>
+                  <div class="mobile-nav-account-meta">
+                    <span class="mobile-nav-account-eyebrow">Signed in as</span>
+                    <span class="mobile-nav-account-name">{{ auth.userLabel }}</span>
+                  </div>
+                </div>
+
                 <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
-                <IconButton
-                  icon="upload"
-                  label="Upload statement"
+                <button
+                  type="button"
+                  class="mobile-nav-action btn"
                   :disabled="processing"
                   @click="uploadInput?.click()"
-                />
-                <p v-if="auth.userLabel" class="mobile-nav-user">
-                  Signed in as <strong>{{ auth.userLabel }}</strong>
-                </p>
-                <IconButton
-                  v-if="auth.authRequired && auth.isAuthenticated"
-                  icon="logout"
-                  label="Sign out"
-                  variant="danger"
-                  @click="logout"
-                />
-              </div>
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M8 10.25V3.5M5.25 6.25 8 3.5l2.75 2.75"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M3.25 10.25v1.5a1.25 1.25 0 0 0 1.25 1.25h7a1.25 1.25 0 0 0 1.25-1.25v-1.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Import statement
+                </button>
 
-              <button
-                v-if="!auth.isDemo && showLocalSync"
-                type="button"
-                class="mobile-nav-footer-btn btn"
-                :disabled="processing"
-                @click="sync"
-              >
-                Sync .xlsx files
-              </button>
+                <button
+                  v-if="showLocalSync"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  :disabled="processing"
+                  @click="sync"
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Sync .xlsx files
+                </button>
+
+                <button
+                  v-if="auth.authRequired && auth.isAuthenticated"
+                  type="button"
+                  class="mobile-nav-action btn mobile-nav-action--danger"
+                  @click="logout"
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M6.25 2.75h4.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-4.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M9.25 8H2.75M6.75 5.5 9.25 8l-2.5 2.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Sign out
+                </button>
+              </div>
             </div>
           </div>
         </nav>
@@ -236,7 +314,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
-import IconButton from "../components/IconButton.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
@@ -319,6 +396,11 @@ let marketTimer: ReturnType<typeof setInterval> | null = null;
 const KAS_REFRESH_MS = 600_000;
 const FXCN_REFRESH_MS = 6 * 60 * 60 * 1000;
 const MARKET_REFRESH_MS = 600_000;
+
+const accountInitial = computed(() => {
+  const label = auth.userLabel?.trim();
+  return label ? label.charAt(0).toUpperCase() : "?";
+});
 
 const sideMenuPortfolioVisible = computed(
   () =>
