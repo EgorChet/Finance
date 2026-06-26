@@ -1,8 +1,6 @@
 import type { SpendingReport } from "../types";
 import { roundMoney } from "./format";
 
-/** Employer Cibus card — loaded monthly, spent as groceries; not on the Visa export. */
-export const CIBUS_MONTHLY_ALLOWANCE = 600;
 import {
   currentYearMonth,
   isOngoingThrough,
@@ -12,7 +10,12 @@ import {
   ymToLabel,
 } from "./fixedCharges";
 import type { ConfiguredCharge } from "./fixedCharges";
-import { fatherInjectionForMonth, FATHER_INJECTION_LABEL } from "./fatherInjection";
+import {
+  cibusAllowanceForMonth,
+  capAdditionsForMonth,
+  CIBUS_LABEL,
+  FATHER_INJECTION_LABEL,
+} from "./budgetCapAdditions";
 import { cycleStartForStatementBilling, cycleStartFromMonthKey, isCycleMonthKey } from "./pace";
 
 export interface LivingBudgetSegment {
@@ -87,9 +90,7 @@ export function livingBudgetBaseForMonth(
 ): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
   if (!match) return null;
-  return roundMoney(
-    match.amount + CIBUS_MONTHLY_ALLOWANCE + fatherInjectionForMonth(ym, configuredCharges),
-  );
+  return roundMoney(match.amount + capAdditionsForMonth(ym, configuredCharges));
 }
 
 /** Previous calendar month as YYYY-MM. */
@@ -222,13 +223,15 @@ export function livingBudgetTimelineSummary(
   return [...segments]
     .sort((a, b) => a.from_month.localeCompare(b.from_month))
     .map((s) => {
-      const father = fatherInjectionForMonth(s.from_month, configuredCharges);
-      const extras =
-        father > 0
-          ? ` incl. Cibus + ${FATHER_INJECTION_LABEL.toLowerCase()}`
-          : " incl. Cibus";
-      const total = roundMoney(s.amount + CIBUS_MONTHLY_ALLOWANCE + father);
-      return `₪${total.toLocaleString()}${extras} (${monthRangeLabel(s.from_month, s.through_month)})`;
+      const ym = s.from_month;
+      const cibus = cibusAllowanceForMonth(ym, configuredCharges);
+      const additions = capAdditionsForMonth(ym, configuredCharges);
+      const extras: string[] = [];
+      if (cibus > 0) extras.push(CIBUS_LABEL);
+      if (additions > cibus) extras.push(FATHER_INJECTION_LABEL.toLowerCase());
+      const extraLabel = extras.length ? ` incl. ${extras.join(" + ")}` : "";
+      const total = roundMoney(s.amount + additions);
+      return `₪${total.toLocaleString()}${extraLabel} (${monthRangeLabel(s.from_month, s.through_month)})`;
     })
     .join(" → ");
 }

@@ -38,7 +38,7 @@
         @save="persistCharges"
       />
 
-      <section class="manual-section">
+      <section id="recurring" class="manual-section">
         <header class="manual-section-header">
           <div>
             <h3 class="manual-section-title">Recurring monthly</h3>

@@ -143,12 +143,18 @@
               </div>
             </div>
             <div class="mobile-nav-footer">
-            <label class="mobile-nav-action">
-              <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
-              Light mode
-            </label>
-            <div v-if="showNavIconActions" class="mobile-nav-icon-row">
-              <template v-if="!auth.isDemo">
+              <label class="mobile-nav-footer-row mobile-nav-theme">
+                <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
+                <span class="mobile-nav-theme-label">Light mode</span>
+              </label>
+
+              <div v-if="auth.isDemo" class="mobile-nav-footer-row">
+                <button type="button" class="mobile-nav-footer-btn btn" @click="goLogin">
+                  Sign in for real data
+                </button>
+              </div>
+
+              <div v-else class="mobile-nav-footer-row mobile-nav-footer-row--account">
                 <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
                 <IconButton
                   icon="upload"
@@ -156,32 +162,27 @@
                   :disabled="processing"
                   @click="uploadInput?.click()"
                 />
-              </template>
-              <IconButton
-                v-if="auth.authRequired && auth.isAuthenticated"
-                icon="logout"
-                label="Sign out"
-                variant="danger"
-                @click="logout"
-              />
-            </div>
-            <template v-if="!auth.isDemo">
+                <p v-if="auth.userLabel" class="mobile-nav-user">
+                  Signed in as <strong>{{ auth.userLabel }}</strong>
+                </p>
+                <IconButton
+                  v-if="auth.authRequired && auth.isAuthenticated"
+                  icon="logout"
+                  label="Sign out"
+                  variant="danger"
+                  @click="logout"
+                />
+              </div>
+
               <button
-                v-if="showLocalSync"
+                v-if="!auth.isDemo && showLocalSync"
                 type="button"
-                class="mobile-nav-action btn"
+                class="mobile-nav-footer-btn btn"
                 :disabled="processing"
                 @click="sync"
               >
                 Sync .xlsx files
               </button>
-            </template>
-            <button v-if="auth.isDemo" type="button" class="mobile-nav-action btn" @click="goLogin">
-              Sign in for real data
-            </button>
-            <p v-else-if="auth.userLabel" class="mobile-nav-user">
-              Signed in as <strong>{{ auth.userLabel }}</strong>
-            </p>
             </div>
           </div>
         </nav>
@@ -326,10 +327,6 @@ const sideMenuPortfolioVisible = computed(
     portfolioCombinedUsd.value != null ||
     !!marketSnapshot.value?.btc_usd ||
     !!marketSnapshot.value?.sp500,
-);
-
-const showNavIconActions = computed(
-  () => !auth.isDemo || (auth.authRequired && auth.isAuthenticated),
 );
 
 const portfolioCombinedUsd = computed(() => {

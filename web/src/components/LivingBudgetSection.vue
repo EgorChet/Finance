@@ -4,7 +4,10 @@
       <div>
         <h3 class="manual-section-title">Living budget</h3>
         <p class="manual-section-lead">
-          Monthly cap on your Visa (flat rent counts against it). +₪600/month Cibus and Father injection (flat rent amount) are added automatically.
+          Monthly Visa cap = everyday amount below, plus Cibus and rent headroom from
+          <RouterLink v-if="!readonly" to="/app/household#recurring" class="living-budget-cap-link">Recurring monthly</RouterLink>
+          <template v-else>Recurring monthly</template>
+          — each with its own dates and amounts.
         </p>
       </div>
       <div v-if="!readonly" class="section-header-actions">
@@ -14,34 +17,85 @@
 
     <div v-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
 
-    <ul v-else class="charge-compact-list">
+    <ul v-else class="charge-compact-list living-budget-period-list">
       <li v-for="(seg, index) in segments" :key="`budget-seg-${index}`" class="charge-compact-row-wrap">
-        <div v-if="readonly || !isEditingSegment(index)" class="list-row">
-          <div class="list-row__main">
-            <div class="list-row__amounts">
-              <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
-              <span class="list-row__amount list-row__amount--cibus">+{{ formatIls(CIBUS_MONTHLY_ALLOWANCE) }}</span>
-              <span
-                v-for="label in fatherInjectionLabels(seg)"
-                :key="`father-${label}`"
-                class="list-row__amount list-row__amount--father"
-              >+{{ label }}</span>
+        <article v-if="readonly || !isEditingSegment(index)" class="living-budget-card">
+          <header class="living-budget-card__header">
+            <div class="living-budget-card__summary">
+              <div class="living-budget-card__total">{{ formatIls(segmentTotalCap(seg)) }}</div>
+              <div class="living-budget-card__period">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</div>
+              <p v-if="segmentCapVaries(seg)" class="living-budget-card__vary">
+                Total varies when Cibus or rent amounts change
+              </p>
             </div>
-            <span class="list-row__meta">{{ segmentExtrasLabel(seg) }} · {{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
-          </div>
-          <span class="list-row__status recurring-status" :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)">
-            {{ livingBudgetStatusLabel(seg) }}
-          </span>
-          <button
-            v-if="!readonly"
-            type="button"
-            class="btn btn-edit"
-            :disabled="disabled"
-            @click="startEditSegment(index)"
-          >
-            Edit
-          </button>
-        </div>
+            <span
+              class="living-budget-card__status recurring-status"
+              :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
+            >
+              {{ livingBudgetStatusLabel(seg) }}
+            </span>
+            <button
+              v-if="!readonly"
+              type="button"
+              class="btn btn-edit living-budget-card__edit"
+              :disabled="disabled"
+              @click="startEditSegment(index)"
+            >
+              Edit
+            </button>
+          </header>
+
+          <ul class="living-budget-breakdown">
+            <li class="living-budget-breakdown__row">
+              <span class="living-budget-breakdown__label">
+                Everyday cap
+                <span class="living-budget-breakdown__hint">edited here</span>
+              </span>
+              <span class="living-budget-breakdown__value">{{ formatIls(seg.amount) }}</span>
+            </li>
+            <li
+              v-for="addition in capAdditions(seg)"
+              :key="`${addition.kind}-${addition.chargeId}-${addition.from_month}`"
+              class="living-budget-breakdown__row living-budget-breakdown__row--linked"
+            >
+              <span class="living-budget-breakdown__label">
+                {{ addition.label }}
+                <span class="living-budget-breakdown__hint">
+                  {{ monthRangeLabel(addition.from_month, addition.through_month) }}
+                </span>
+              </span>
+              <span class="living-budget-breakdown__value">
+                +{{ formatIls(addition.amount) }}
+                <RouterLink
+                  v-if="!readonly"
+                  to="/app/household#recurring"
+                  class="living-budget-cap-link"
+                >
+                  Edit
+                </RouterLink>
+              </span>
+            </li>
+            <li
+              v-if="!capAdditions(seg).length"
+              class="living-budget-breakdown__row living-budget-breakdown__row--muted"
+            >
+              <span class="living-budget-breakdown__label">
+                Cibus and rent headroom
+                <span class="living-budget-breakdown__hint">not configured</span>
+              </span>
+              <span class="living-budget-breakdown__value">
+                <RouterLink
+                  v-if="!readonly"
+                  to="/app/household#recurring"
+                  class="living-budget-cap-link"
+                >
+                  Add in Recurring
+                </RouterLink>
+                <span v-else>—</span>
+              </span>
+            </li>
+          </ul>
+        </article>
 
         <EditPanel
           v-else
@@ -56,7 +110,7 @@
         >
           <div class="recurring-segment-row">
             <div class="field-group">
-              <label class="field-label">Amount (₪)</label>
+              <label class="field-label">Everyday cap (₪)</label>
               <input
                 v-model.number="seg.amount"
                 class="input"
@@ -157,6 +211,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { RouterLink } from "vue-router";
 import EditPanel from "./EditPanel.vue";
 import IconButton from "./IconButton.vue";
 import MonthSelect from "./MonthSelect.vue";
@@ -164,17 +219,14 @@ import ToggleSwitch from "./ToggleSwitch.vue";
 import { confirm } from "../composables/useConfirm";
 import { formatIls } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
-import {
-  fatherInjectionAmountsForSegment,
-  formatFatherInjectionBadge,
-  FATHER_INJECTION_LABEL,
-} from "../utils/fatherInjection";
+import { capAdditionPeriodsForSegment } from "../utils/budgetCapAdditions";
+import { calendarMonthsInSegment } from "../utils/fatherInjection";
 import {
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
-  CIBUS_MONTHLY_ALLOWANCE,
   currentYearMonth,
   isOngoingThrough,
+  livingBudgetBaseForMonth,
   livingBudgetStatusLabel,
   monthRangeLabel,
   ONGOING_THROUGH_MONTH,
@@ -210,16 +262,27 @@ const segmentDeleteLabel = computed(() =>
   segments.value.length <= 1 ? "Remove budget period" : "Delete period",
 );
 
-function fatherInjectionLabels(seg: LivingBudgetSegment): string[] {
-  const amounts = fatherInjectionAmountsForSegment(seg.from_month, seg.through_month, props.configuredCharges);
-  if (!amounts.length) return [];
-  return [formatFatherInjectionBadge(amounts)];
+function representativeMonth(seg: LivingBudgetSegment): string {
+  const now = currentYearMonth();
+  if (seg.from_month <= now && now <= seg.through_month) return now;
+  return seg.from_month;
 }
 
-function segmentExtrasLabel(seg: LivingBudgetSegment): string {
-  const parts = ["Cibus"];
-  if (fatherInjectionLabels(seg).length > 0) parts.push(FATHER_INJECTION_LABEL);
-  return parts.join(" · ");
+function segmentTotalCap(seg: LivingBudgetSegment): number {
+  const ym = representativeMonth(seg);
+  return livingBudgetBaseForMonth(ym, segments.value, props.configuredCharges) ?? seg.amount;
+}
+
+function segmentCapVaries(seg: LivingBudgetSegment): boolean {
+  const months = calendarMonthsInSegment(seg.from_month, seg.through_month);
+  const totals = new Set(
+    months.map((ym) => livingBudgetBaseForMonth(ym, segments.value, props.configuredCharges)),
+  );
+  return totals.size > 1;
+}
+
+function capAdditions(seg: LivingBudgetSegment) {
+  return capAdditionPeriodsForSegment(seg, props.configuredCharges);
 }
 
 function topupRowKey(topup: LivingBudgetMonthTopup, index: number): string {

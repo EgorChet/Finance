@@ -1,4 +1,4 @@
-import { roundMoney, formatIls } from "./format";
+import { roundMoney } from "./format";
 import { chargesForMonth, isMonthlyCharge, type ConfiguredCharge } from "./fixedCharges";
 
 export const FATHER_INJECTION_LABEL = "Father injection";
@@ -47,22 +47,3 @@ export function calendarMonthsInSegment(fromMonth: string, throughMonth: string)
   return months;
 }
 
-/** Distinct Father injection amounts across a living-budget segment. */
-export function fatherInjectionAmountsForSegment(
-  fromMonth: string,
-  throughMonth: string,
-  charges: ConfiguredCharge[],
-): number[] {
-  const amounts = new Set<number>();
-  for (const ym of calendarMonthsInSegment(fromMonth, throughMonth)) {
-    const amount = fatherInjectionForMonth(ym, charges);
-    if (amount > 0) amounts.add(amount);
-  }
-  return [...amounts].sort((a, b) => a - b);
-}
-
-export function formatFatherInjectionBadge(amounts: number[]): string {
-  if (!amounts.length) return "";
-  if (amounts.length === 1) return formatIls(amounts[0]);
-  return `${formatIls(amounts[0])}–${formatIls(amounts[amounts.length - 1])}`;
-}
