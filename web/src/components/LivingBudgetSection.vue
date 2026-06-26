@@ -4,7 +4,7 @@
       <div>
         <h3 class="manual-section-title">Living budget</h3>
         <p class="manual-section-lead">
-          Monthly Visa cap = everyday amount below, plus Cibus and rent headroom from
+          Monthly Visa cap = salary after tax below, plus Cibus and rent headroom from
           <RouterLink v-if="!readonly" to="/app/household#recurring" class="living-budget-cap-link">Recurring monthly</RouterLink>
           <template v-else>Recurring monthly</template>
           — each with its own dates and amounts.
@@ -48,7 +48,7 @@
           <ul class="living-budget-breakdown">
             <li class="living-budget-breakdown__row">
               <span class="living-budget-breakdown__label">
-                Everyday cap
+                Salary after tax
                 <span class="living-budget-breakdown__hint">edited here</span>
               </span>
               <span class="living-budget-breakdown__value">{{ formatIls(seg.amount) }}</span>
@@ -110,7 +110,7 @@
         >
           <div class="recurring-segment-row">
             <div class="field-group">
-              <label class="field-label">Everyday cap (₪)</label>
+              <label class="field-label">Salary after tax (₪)</label>
               <input
                 v-model.number="seg.amount"
                 class="input"
