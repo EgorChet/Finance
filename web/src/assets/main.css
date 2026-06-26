@@ -2657,7 +2657,8 @@ button {
 }
 
 .category-accordion-item--open .category-accordion-trigger,
-.category-accordion-item--open .category-accordion-split:not(.category-accordion-split--nested) {
+.category-accordion-item--open .category-accordion-split:not(.category-accordion-split--nested),
+.category-accordion-item--compare-open .category-accordion-split:not(.category-accordion-split--nested) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
   border-radius: 10px 10px 0 0;
@@ -2833,6 +2834,14 @@ button {
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
+.category-accordion-split--compare-open .category-accordion-split-zone--compare {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.category-accordion-split--open .category-accordion-split-zone--expand {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 .category-accordion-split--high .category-accordion-split-zone--compare {
   background: color-mix(in srgb, var(--danger) 7%, var(--surface));
 }
@@ -2881,6 +2890,34 @@ button {
 
 .category-accordion-split-zone--compare .category-compare-indicator {
   flex-shrink: 0;
+}
+
+.category-accordion-compare-panel {
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  border-top: none;
+  background: color-mix(in srgb, var(--surface-alt) 85%, var(--surface));
+}
+
+.category-accordion-item--compare-open:not(.category-accordion-item--open) .category-accordion-compare-panel {
+  border-radius: 0 0 10px 10px;
+}
+
+.category-accordion-item--compare-open.category-accordion-item--open .category-accordion-compare-panel {
+  border-bottom: none;
+}
+
+.category-accordion-compare-panel--nested {
+  border-top: 1px solid var(--border);
+  padding: 0.55rem 0.65rem 0.65rem;
+  background: color-mix(in srgb, var(--surface-alt) 70%, var(--surface));
+}
+
+.category-compare-panel-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .category-compare-indicator--decorative {

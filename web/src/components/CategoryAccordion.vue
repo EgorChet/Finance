@@ -11,31 +11,35 @@
         v-for="(item, idx) in items"
         :key="item.key"
         class="category-accordion-item"
-        :class="{ 'category-accordion-item--open': isOpen(item.key) }"
+        :class="{
+          'category-accordion-item--open': isOpen(item.key),
+          'category-accordion-item--compare-open': isCompareOpen(item.key),
+        }"
       >
         <div
           v-if="compareReady"
           class="category-accordion-split"
           :class="{
             'category-accordion-split--open': isOpen(item.key),
+            'category-accordion-split--compare-open': isCompareOpen(item.key),
             [`category-accordion-split--${compareTone(scopeForItem(item))}`]: true,
           }"
         >
           <button
             type="button"
             class="category-accordion-split-zone category-accordion-split-zone--compare"
-            :aria-expanded="isOpen(item.key)"
-            :aria-label="`${item.name}: expand charges`"
-            @click="toggle(item.key)"
+            :aria-expanded="isCompareOpen(item.key)"
+            :aria-label="`${item.name}: compare to usual spending`"
+            @click="toggleCompare(item.key)"
           >
             <span class="swatch" :style="{ background: colors[idx % colors.length] }" />
             <span class="category-accordion-split-label">{{ item.name }}</span>
             <CategoryCompareIndicator
+              decorative
               :tone="compareTone(scopeForItem(item))"
               :delta="compareResultForScope(scopeForItem(item))?.delta"
-              :label="item.name"
-              @click.stop="openCompareForItem(item)"
             />
+            <span class="category-accordion-chevron" aria-hidden="true">{{ isCompareOpen(item.key) ? "▾" : "▸" }}</span>
           </button>
           <button
             type="button"
@@ -61,36 +65,46 @@
           </span>
         </button>
 
+        <div
+          v-if="compareReady && isCompareOpen(item.key) && compareResultForScope(scopeForItem(item))"
+          class="category-accordion-compare-panel"
+        >
+          <CategoryComparePanel :result="compareResultForScope(scopeForItem(item))!" />
+        </div>
+
         <div v-if="isOpen(item.key)" class="category-accordion-panel">
           <template v-if="item.kind === 'home'">
             <div
               v-for="row in homeSubsections"
               :key="row.category_en"
               class="category-accordion-nested"
-              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.category_en)) }"
+              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.category_en)) || isCompareOpen(subKey(item.key, row.category_en)) }"
             >
               <div
                 v-if="compareReady"
                 class="category-accordion-split category-accordion-split--nested"
                 :class="{
                   'category-accordion-split--open': isOpen(subKey(item.key, row.category_en)),
+                  'category-accordion-split--compare-open': isCompareOpen(subKey(item.key, row.category_en)),
                   [`category-accordion-split--${compareTone(scopeForHomeSub(row.category_en))}`]: true,
                 }"
               >
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-expanded="isOpen(subKey(item.key, row.category_en))"
-                  :aria-label="`${homeSubsectionLabel(row.category_en)}: expand charges`"
-                  @click="toggle(subKey(item.key, row.category_en))"
+                  :aria-expanded="isCompareOpen(subKey(item.key, row.category_en))"
+                  :aria-label="`${homeSubsectionLabel(row.category_en)}: compare to usual spending`"
+                  @click="toggleCompare(subKey(item.key, row.category_en))"
                 >
                   <span class="category-accordion-split-label">{{ homeSubsectionLabel(row.category_en) }}</span>
                   <CategoryCompareIndicator
+                    decorative
                     :tone="compareTone(scopeForHomeSub(row.category_en))"
                     :delta="compareResultForScope(scopeForHomeSub(row.category_en))?.delta"
-                    :label="homeSubsectionLabel(row.category_en)"
-                    @click.stop="openCompareForHomeSub(row.category_en)"
                   />
+                  <span class="category-accordion-chevron" aria-hidden="true">
+                    {{ isCompareOpen(subKey(item.key, row.category_en)) ? "▾" : "▸" }}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -121,6 +135,12 @@
                   </span>
                 </span>
               </button>
+              <div
+                v-if="compareReady && isCompareOpen(subKey(item.key, row.category_en)) && compareResultForScope(scopeForHomeSub(row.category_en))"
+                class="category-accordion-compare-panel category-accordion-compare-panel--nested"
+              >
+                <CategoryComparePanel :result="compareResultForScope(scopeForHomeSub(row.category_en))!" />
+              </div>
               <TransactionList
                 v-if="isOpen(subKey(item.key, row.category_en))"
                 class="category-accordion-txs"
@@ -140,30 +160,33 @@
               v-for="row in subscriptionRows"
               :key="row.name"
               class="category-accordion-nested"
-              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.name)) }"
+              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.name)) || isCompareOpen(subKey(item.key, row.name)) }"
             >
               <div
                 v-if="compareReady"
                 class="category-accordion-split category-accordion-split--nested"
                 :class="{
                   'category-accordion-split--open': isOpen(subKey(item.key, row.name)),
+                  'category-accordion-split--compare-open': isCompareOpen(subKey(item.key, row.name)),
                   [`category-accordion-split--${compareTone(scopeForSubscriptionSub(row.name))}`]: true,
                 }"
               >
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-expanded="isOpen(subKey(item.key, row.name))"
-                  :aria-label="`${row.name}: expand charges`"
-                  @click="toggle(subKey(item.key, row.name))"
+                  :aria-expanded="isCompareOpen(subKey(item.key, row.name))"
+                  :aria-label="`${row.name}: compare to usual spending`"
+                  @click="toggleCompare(subKey(item.key, row.name))"
                 >
                   <span class="category-accordion-split-label">{{ row.name }}</span>
                   <CategoryCompareIndicator
+                    decorative
                     :tone="compareTone(scopeForSubscriptionSub(row.name))"
                     :delta="compareResultForScope(scopeForSubscriptionSub(row.name))?.delta"
-                    :label="row.name"
-                    @click.stop="openCompareForSubscriptionSub(row.name)"
                   />
+                  <span class="category-accordion-chevron" aria-hidden="true">
+                    {{ isCompareOpen(subKey(item.key, row.name)) ? "▾" : "▸" }}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -194,6 +217,12 @@
                   </span>
                 </span>
               </button>
+              <div
+                v-if="compareReady && isCompareOpen(subKey(item.key, row.name)) && compareResultForScope(scopeForSubscriptionSub(row.name))"
+                class="category-accordion-compare-panel category-accordion-compare-panel--nested"
+              >
+                <CategoryComparePanel :result="compareResultForScope(scopeForSubscriptionSub(row.name))!" />
+              </div>
               <TransactionList
                 v-if="isOpen(subKey(item.key, row.name))"
                 class="category-accordion-txs"
@@ -213,30 +242,33 @@
               v-for="row in otherCategories"
               :key="row.category_en"
               class="category-accordion-nested"
-              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.category_en)) }"
+              :class="{ 'category-accordion-nested--open': isOpen(subKey(item.key, row.category_en)) || isCompareOpen(subKey(item.key, row.category_en)) }"
             >
               <div
                 v-if="compareReady"
                 class="category-accordion-split category-accordion-split--nested"
                 :class="{
                   'category-accordion-split--open': isOpen(subKey(item.key, row.category_en)),
+                  'category-accordion-split--compare-open': isCompareOpen(subKey(item.key, row.category_en)),
                   [`category-accordion-split--${compareTone(scopeForOtherSub(row.category_en))}`]: true,
                 }"
               >
                 <button
                   type="button"
                   class="category-accordion-split-zone category-accordion-split-zone--compare"
-                  :aria-expanded="isOpen(subKey(item.key, row.category_en))"
-                  :aria-label="`${row.category_en}: expand charges`"
-                  @click="toggle(subKey(item.key, row.category_en))"
+                  :aria-expanded="isCompareOpen(subKey(item.key, row.category_en))"
+                  :aria-label="`${row.category_en}: compare to usual spending`"
+                  @click="toggleCompare(subKey(item.key, row.category_en))"
                 >
                   <span class="category-accordion-split-label">{{ row.category_en }}</span>
                   <CategoryCompareIndicator
+                    decorative
                     :tone="compareTone(scopeForOtherSub(row.category_en))"
                     :delta="compareResultForScope(scopeForOtherSub(row.category_en))?.delta"
-                    :label="row.category_en"
-                    @click.stop="openCompareForOtherSub(row.category_en)"
                   />
+                  <span class="category-accordion-chevron" aria-hidden="true">
+                    {{ isCompareOpen(subKey(item.key, row.category_en)) ? "▾" : "▸" }}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -267,6 +299,12 @@
                   </span>
                 </span>
               </button>
+              <div
+                v-if="compareReady && isCompareOpen(subKey(item.key, row.category_en)) && compareResultForScope(scopeForOtherSub(row.category_en))"
+                class="category-accordion-compare-panel category-accordion-compare-panel--nested"
+              >
+                <CategoryComparePanel :result="compareResultForScope(scopeForOtherSub(row.category_en))!" />
+              </div>
               <TransactionList
                 v-if="isOpen(subKey(item.key, row.category_en))"
                 class="category-accordion-txs"
@@ -299,19 +337,12 @@
         </div>
       </div>
     </div>
-
-    <CategoryCompareDialog
-      v-if="compareResult"
-      :open="compareOpen"
-      :result="compareResult"
-      @close="closeCompare"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import CategoryCompareDialog from "./CategoryCompareDialog.vue";
+import CategoryComparePanel from "./CategoryComparePanel.vue";
 import CategoryCompareIndicator from "./CategoryCompareIndicator.vue";
 import TransactionList from "./TransactionList.vue";
 import type { CategorySummary, Transaction } from "../types";
@@ -357,8 +388,7 @@ const emit = defineEmits<{
   exclude: [Transaction];
 }>();
 
-const compareOpen = ref(false);
-const compareResult = ref<CategoryCompareResult | null>(null);
+const compareExpandedKeys = ref<string[]>([]);
 
 const compareReady = computed(
   () =>
@@ -371,13 +401,9 @@ const compareReady = computed(
 
 const accordionHint = computed(() =>
   compareReady.value
-    ? "Tap to expand charges. Trend icon compares to usual spending."
+    ? "Left side compares to usual spending; right side expands charges."
     : "Tap to expand charges — you can open several at once.",
 );
-
-function closeCompare() {
-  compareOpen.value = false;
-}
 
 const compareContext = computed(() => {
   if (
@@ -433,13 +459,6 @@ function compareTone(scope: CategoryCompareScope): CategoryCompareTone {
   return categoryCompareTone(result.delta, result.usual);
 }
 
-function openCompare(scope: CategoryCompareScope) {
-  const result = compareResultForScope(scope);
-  if (!result) return;
-  compareResult.value = result;
-  compareOpen.value = true;
-}
-
 function scopeForItem(item: AccordionItem): CategoryCompareScope {
   if (item.kind === "other") {
     return { kind: "otherBucket", categories: otherCategories.value.map((c) => c.category_en) };
@@ -457,22 +476,6 @@ function scopeForSubscriptionSub(name: string): CategoryCompareScope {
 
 function scopeForOtherSub(categoryEn: string): CategoryCompareScope {
   return { kind: "raw", category: categoryEn };
-}
-
-function openCompareForItem(item: AccordionItem) {
-  openCompare(scopeForItem(item));
-}
-
-function openCompareForHomeSub(categoryEn: string) {
-  openCompare(scopeForHomeSub(categoryEn));
-}
-
-function openCompareForSubscriptionSub(name: string) {
-  openCompare(scopeForSubscriptionSub(name));
-}
-
-function openCompareForOtherSub(categoryEn: string) {
-  openCompare(scopeForOtherSub(categoryEn));
 }
 
 const colors = CHART_COLORS;
@@ -560,11 +563,22 @@ function isOpen(key: string): boolean {
   return props.expandedKeys.includes(key);
 }
 
+function isCompareOpen(key: string): boolean {
+  return compareExpandedKeys.value.includes(key);
+}
+
 function toggle(key: string) {
   const next = new Set(props.expandedKeys);
   if (next.has(key)) next.delete(key);
   else next.add(key);
   emit("update:expandedKeys", [...next]);
+}
+
+function toggleCompare(key: string) {
+  const next = new Set(compareExpandedKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  compareExpandedKeys.value = [...next];
 }
 
 function txsForLeaf(category: string): Transaction[] {
