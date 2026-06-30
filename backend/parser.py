@@ -22,6 +22,7 @@ _PENDING_AMOUNT_CURRENCY = re.compile(
     r"(\d[\d,]*(?:\.\d+)?)\s*(PLN|USD|EUR|GBP|BGN|AMD)\b",
     re.IGNORECASE,
 )
+_PENDING_AMOUNT_ILS = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*₪")
 
 
 def _to_date(value) -> date:
@@ -43,10 +44,14 @@ def _amount_key(amount: float) -> float:
 
 
 def parse_pending_currencies(rows: list[tuple], header_idx: int) -> dict[float, str]:
-    """Leumi header lines list pending foreign totals, e.g. '469.40 PLN'."""
+    """Leumi header lines list pending totals, e.g. '469.40 PLN' or '160.00 ₪'."""
     by_amount: dict[float, str] = {}
     for row in rows[:header_idx]:
         text = " ".join(str(c) for c in row if c)
+        if "בתהליך קליטה" in text:
+            for match in _PENDING_AMOUNT_ILS.finditer(text):
+                amt = _amount_key(float(match.group(1).replace(",", "")))
+                by_amount[amt] = "ILS"
         for match in _PENDING_AMOUNT_CURRENCY.finditer(text):
             amt = _amount_key(float(match.group(1).replace(",", "")))
             by_amount[amt] = match.group(2).upper()

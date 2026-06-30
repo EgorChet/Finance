@@ -418,7 +418,7 @@ def resolve_charge_ils(
     if pending:
         currency = (
             explicit_currency
-            if explicit_currency and explicit_currency != "ILS"
+            if explicit_currency
             else detect_currency(merchant, amount, None, None)
         )
         if currency == "ILS":

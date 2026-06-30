@@ -66,7 +66,36 @@ def test_parse_pending_currencies_from_header():
         ("עסקאות בתהליך קליטה 313.82 ₪ ובנוסף 469.40 PLN",),
         ("תאריך", "שם בית עסק", "סכום"),
     ]
-    assert parse_pending_currencies(rows, 1) == {469.4: "PLN"}
+    assert parse_pending_currencies(rows, 1) == {313.82: "ILS", 469.4: "PLN"}
+
+
+def test_pending_yalla_balagan_uses_ils_from_header():
+    charge, currency, estimated = resolve_charge_ils(
+        160,
+        None,
+        "nagalaB allaY",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 29),
+        explicit_currency="ILS",
+    )
+    assert charge == 160
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_parser_yalla_balagan_from_jun30_statement():
+    from pathlib import Path
+    from parser import parse_leumi_visa_xlsx
+
+    path = Path(__file__).resolve().parents[2] / "statements" / "Partial"
+    files = list(path.glob("*30.06.26*.xlsx"))
+    assert files, "Jun 30 partial statement fixture missing"
+    txs, meta = parse_leumi_visa_xlsx(files[0])
+    assert meta["pending_currencies"]["160.0"] == "ILS"
+    yalla = next(tx for tx in txs if "allaY" in tx.merchant_he)
+    assert yalla.charge_amount == 160
+    assert yalla.original_currency == "ILS"
+    assert yalla.charge_estimated is True
 
 
 def test_parser_metadata_includes_pending_currencies():

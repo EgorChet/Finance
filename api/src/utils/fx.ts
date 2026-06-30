@@ -341,10 +341,7 @@ export function resolveChargeIls(
 
   // Pending — column 3 not final; use FX even if charge_amount was already estimated.
   if (pending) {
-    const currency =
-      explicitCurrency && explicitCurrency !== "ILS"
-        ? explicitCurrency
-        : detectCurrency(merchant, amount, null, null);
+    const currency = explicitCurrency ?? detectCurrency(merchant, amount, null, null);
     if (currency === "ILS") {
       return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: true };
     }
