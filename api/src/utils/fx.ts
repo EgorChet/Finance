@@ -10,6 +10,7 @@ const EUR_MERCHANT =
   /\b(SRL|SPA|OOD|EOOD|GMBH|TERMINI|ROMA|MILANO|AUTOGRILL|UBR\*|AVIS|ZARA|COS|UNIQLO|POLENE|VIvat|PAUL AIRPORT|DEDEM SPA|PIERLUIGI|SUMUP|MANGO ROMA)\b/i;
 const BGN_MERCHANT = /\b(EOOD|OOD|BALGARIYA|BURGAS|BULGARIA|AMREST KOFI)\b/i;
 const ILS_MERCHANT = /\bBIT\b/i;
+const APPLE_MERCHANT = /APPLE\.COM|ITUNES/i;
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
@@ -17,6 +18,12 @@ function roundMoney(value: number): number {
 
 function hasHebrew(text: string): boolean {
   return HEBREW.test(text);
+}
+
+/** Israeli App Store / local tiers often end in .00 or .90 (not USD .99). */
+function looksLikeIlsPrice(amount: number): boolean {
+  const frac = Math.round((amount % 1) * 100);
+  return frac === 0 || frac === 90;
 }
 
 export function inferCurrencyFromRatio(amount: number, charge: number): string | null {
@@ -38,7 +45,7 @@ export function detectCurrency(
   charge: number | null,
   explicitCurrency?: string | null,
 ): string {
-  if (explicitCurrency && explicitCurrency !== "ILS") return explicitCurrency;
+  if (explicitCurrency) return explicitCurrency;
 
   if (hasHebrew(merchant)) return "ILS";
 
@@ -51,6 +58,8 @@ export function detectCurrency(
     const inferred = inferCurrencyFromRatio(amount, charge);
     if (inferred) return inferred;
   }
+
+  if (APPLE_MERCHANT.test(merchant) && looksLikeIlsPrice(amount)) return "ILS";
 
   if (USD_MERCHANT.test(merchant)) return "USD";
 

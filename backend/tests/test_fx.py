@@ -136,6 +136,40 @@ def test_detect_currency_il_country_suffix():
     assert detect_currency("Some Shop IL", 50, None) == "ILS"
 
 
+def test_pending_apple_ils_subscription_not_usd():
+    """Israeli App Store bills in ₪ — pending 39.90 must not be treated as $39.90."""
+    charge, currency, estimated = resolve_charge_ils(
+        39.9,
+        None,
+        "APPLE.COM/BILL ITUNES.COM IE",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 30),
+    )
+    assert charge == 39.9
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_detect_currency_apple_usd_subscription():
+    assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.99, None) == "USD"
+
+
+def test_detect_currency_apple_ils_price_tier():
+    assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.9, None) == "ILS"
+
+
+def test_detect_currency_honors_explicit_ils():
+    assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.99, None, "ILS") == "ILS"
+
+
+def test_parse_pending_currencies_comma_decimal_ils():
+    rows = [
+        ("עסקאות בתהליך קליטה 39,90 ₪",),
+        ("תאריך", "שם בית עסק", "סכום"),
+    ]
+    assert parse_pending_currencies(rows, 1) == {39.9: "ILS"}
+
+
 def test_installment_uses_ils_slice():
     charge, _, estimated = resolve_charge_ils(
         1500,
