@@ -27,6 +27,7 @@ _EUR_MERCHANT = re.compile(
 )
 _BGN_MERCHANT = re.compile(r"\b(EOOD|OOD|BALGARIYA|BURGAS|BULGARIA|AMREST KOFI)\b", re.IGNORECASE)
 _ILS_MERCHANT = re.compile(r"\bBIT\b", re.IGNORECASE)
+_APPLE_MERCHANT = re.compile(r"APPLE\.COM|ITUNES", re.IGNORECASE)
 
 
 def _round_money(value: float) -> float:
@@ -35,6 +36,12 @@ def _round_money(value: float) -> float:
 
 def _has_hebrew(text: str) -> bool:
     return bool(_HEBREW.search(text))
+
+
+def _looks_like_ils_price(amount: float) -> bool:
+    """Israeli App Store / local tiers often end in .00 or .90 (not USD .99)."""
+    frac = round((amount % 1) * 100)
+    return frac in (0, 90)
 
 
 def infer_currency_from_ratio(amount: float, charge: float) -> Optional[str]:
@@ -64,7 +71,7 @@ def detect_currency(
     charge: Optional[float],
     explicit_currency: Optional[str] = None,
 ) -> str:
-    if explicit_currency and explicit_currency != "ILS":
+    if explicit_currency:
         return explicit_currency
 
     if _has_hebrew(merchant):
@@ -81,6 +88,9 @@ def detect_currency(
         inferred = infer_currency_from_ratio(amount, charge)
         if inferred:
             return inferred
+
+    if _APPLE_MERCHANT.search(merchant) and _looks_like_ils_price(amount):
+        return "ILS"
 
     if _USD_MERCHANT.search(merchant):
         return "USD"
