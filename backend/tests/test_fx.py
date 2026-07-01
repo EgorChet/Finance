@@ -150,6 +150,36 @@ def test_pending_apple_ils_subscription_not_usd():
     assert estimated is True
 
 
+def test_pending_apple_corrects_stale_explicit_usd():
+    """Re-normalize must fix rows saved with original_currency=USD before the Apple ILS fix."""
+    charge, currency, estimated = resolve_charge_ils(
+        39.9,
+        None,
+        "APPLE.COM/BILL ITUNES.COM IE",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 30),
+        explicit_currency="USD",
+    )
+    assert charge == 39.9
+    assert currency == "ILS"
+    assert estimated is True
+
+
+@patch("fx.get_rate_to_ils", return_value=3.7)
+def test_pending_apple_corrects_stale_usd_with_estimated_charge(_mock):
+    charge, currency, estimated = resolve_charge_ils(
+        39.9,
+        147.63,
+        "APPLE.COM/BILL ITUNES.COM IE",
+        "עסקה בקליטה",
+        tx_date=date(2026, 6, 30),
+        explicit_currency="USD",
+    )
+    assert charge == 39.9
+    assert currency == "ILS"
+    assert estimated is True
+
+
 def test_detect_currency_apple_usd_subscription():
     assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.99, None) == "USD"
 

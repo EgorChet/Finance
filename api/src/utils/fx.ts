@@ -100,12 +100,9 @@ function explicitCurrencyForTx(
   pendingCurrencies?: Record<string, string> | null,
 ): string | null | undefined {
   if (isPendingCharge(tx.charge_amount, tx.notes, tx.transaction_type_he, tx.amount)) {
-    // Header map and parser output beat merchant heuristics (OPENAI → USD).
-    return (
-      pendingCurrencyForAmount(tx.amount, pendingCurrencies) ??
-      tx.original_currency ??
-      null
-    );
+    // Only the statement header is authoritative for pending rows — do not reuse a
+    // stale original_currency from an earlier export (e.g. Apple ₪39.90 saved as USD).
+    return pendingCurrencyForAmount(tx.amount, pendingCurrencies) ?? null;
   }
   return tx.original_currency;
 }
@@ -350,7 +347,11 @@ export function resolveChargeIls(
 
   // Pending — column 3 not final; use FX even if charge_amount was already estimated.
   if (pending) {
-    const currency = explicitCurrency ?? detectCurrency(merchant, amount, null, null);
+    const detected = detectCurrency(merchant, amount, null, null);
+    const currency =
+      explicitCurrency && !(explicitCurrency === "USD" && detected === "ILS")
+        ? explicitCurrency
+        : detected;
     if (currency === "ILS") {
       return { chargeAmount: roundMoney(amount), originalCurrency: "ILS", estimated: true };
     }
