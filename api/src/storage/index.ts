@@ -1,5 +1,6 @@
 import * as local from "./local.js";
 import * as supabase from "./supabase.js";
+import { invalidateStatementsCache, readStatementsWithCache } from "./statementsCache.js";
 
 /** Use Supabase whenever credentials are set; set STORAGE=local to force file storage for offline dev. */
 const useSupabase =
@@ -7,11 +8,22 @@ const useSupabase =
 
 const store = useSupabase ? supabase : local;
 
+async function readStatementsRaw(): Promise<import("../types.js").StatementsData> {
+  return store.readStatements();
+}
+
+export async function readStatements(): Promise<import("../types.js").StatementsData> {
+  return readStatementsWithCache(readStatementsRaw);
+}
+
+export async function writeStatements(data: import("../types.js").StatementsData): Promise<void> {
+  invalidateStatementsCache();
+  await store.writeStatements(data);
+}
+
 export const discoverXlsxFiles = store.discoverXlsxFiles;
 export const fileHash = store.fileHash;
 export const saveUploadedXlsx = store.saveUploadedXlsx;
-export const readStatements = store.readStatements;
-export const writeStatements = store.writeStatements;
 export const readRules = store.readRules;
 export const writeRules = store.writeRules;
 export const readReviewProgress = store.readReviewProgress;

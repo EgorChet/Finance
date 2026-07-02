@@ -32,6 +32,7 @@ const statusError = ref("");
 const submitting = ref(false);
 const progressMessage = ref("");
 const progressLogs = ref<{ at: string; message: string }[]>([]);
+const otpInputRef = ref<HTMLInputElement | null>(null);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -62,6 +63,7 @@ function applyJobStatus(status: {
   if (status.status === "otp_required") {
     step.value = "otp";
     submitting.value = false;
+    progressMessage.value = status.message || "Enter the SMS code from Cal";
     stopPolling();
     return;
   }
@@ -155,12 +157,15 @@ async function beginSync() {
   statusError.value = "";
   otpCode.value = "";
   jobId.value = null;
-  progressMessage.value = "Starting Cal sync…";
+  progressMessage.value = "Connecting to Cal…";
   progressLogs.value = [];
   step.value = "loading";
   try {
     const result = await startCalSync(auth.token || undefined);
     jobId.value = result.jobId;
+    // Show OTP field immediately so iOS can bind incoming SMS (before otp_required).
+    step.value = "otp";
+    progressMessage.value = "Waiting for SMS from Cal…";
     startPolling(result.jobId);
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
     applyJobStatus(initial);
@@ -246,41 +251,53 @@ onBeforeUnmount(stopPolling);
       <template v-else-if="step === 'otp'">
         <p class="upload-type-hint">
           <template v-if="maskedId">Account {{ maskedId }} — </template>
-          Enter the SMS code from Cal.
+          {{ progressMessage || "Enter the SMS code from Cal." }}
         </p>
+        <ul v-if="recentLogs.length && !submitting" class="cal-sync-log" aria-live="polite">
+          <li v-for="(entry, i) in recentLogs" :key="`${entry.at}-${i}`">
+            {{ entry.message }}
+          </li>
+        </ul>
         <p v-if="progressMessage && submitting" class="cal-sync-progress">{{ progressMessage }}</p>
-        <label class="cal-field">
-          <span>SMS code</span>
-          <input
-            v-model="otpCode"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            maxlength="8"
-            placeholder="123456"
-          />
-        </label>
-        <div class="process-error-actions upload-type-actions">
-          <button type="button" class="btn" :disabled="submitting" @click="close">Cancel</button>
-          <button
-            v-if="!jobId"
-            type="button"
-            class="btn"
-            :disabled="submitting"
-            @click="beginSync"
-          >
-            Retry connect
-          </button>
-          <button
-            v-else
-            type="button"
-            class="btn btn-primary"
-            :disabled="!canSubmitOtp || submitting"
-            @click="submitOtp"
-          >
-            Submit code
-          </button>
-        </div>
+        <form class="cal-otp-form" @submit.prevent="submitOtp">
+          <label class="cal-field">
+            <span>SMS code</span>
+            <input
+              ref="otpInputRef"
+              v-model="otpCode"
+              name="one-time-code"
+              type="tel"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              maxlength="8"
+              enterkeyhint="done"
+              placeholder="Tap here — iPhone may suggest code"
+            />
+          </label>
+          <div class="process-error-actions upload-type-actions">
+            <button type="button" class="btn" :disabled="submitting" @click="close">Cancel</button>
+            <button
+              v-if="!jobId"
+              type="button"
+              class="btn"
+              :disabled="submitting"
+              @click="beginSync"
+            >
+              Retry connect
+            </button>
+            <button
+              v-else
+              type="submit"
+              class="btn btn-primary"
+              :disabled="!canSubmitOtp || submitting"
+            >
+              Submit code
+            </button>
+          </div>
+        </form>
       </template>
 
       <p v-if="statusError" class="cal-sync-error" role="alert">{{ statusError }}</p>
@@ -331,5 +348,9 @@ onBeforeUnmount(stopPolling);
 
 .cal-sync-log li {
   margin: 0.15rem 0;
+}
+
+.cal-otp-form {
+  margin: 0;
 }
 </style>

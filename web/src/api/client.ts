@@ -98,6 +98,19 @@ export async function fetchMonths(demo: boolean, token?: string) {
   }>(`${prefix(demo)}/months`, token);
 }
 
+export async function fetchHomeData(demo: boolean, token?: string) {
+  return get<{
+    months: MonthItem[];
+    report: SpendingReport | null;
+    fixed_charges: ConfiguredCharge[];
+    living_budget: {
+      segments: import("../utils/livingBudget").LivingBudgetSegment[];
+      month_topups: import("../utils/livingBudget").LivingBudgetMonthTopup[];
+    };
+    demo_as_of?: string;
+  }>(`${prefix(demo)}/home-data`, token);
+}
+
 /** Remove one uploaded statement (billing key YYYY-MM-DD) from storage. */
 export async function deleteStatementMonth(monthKey: string, token?: string) {
   return del<{ ok: boolean; key: string; total_months: number }>(

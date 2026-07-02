@@ -57,12 +57,10 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import {
   fetchCalendar,
-  fetchFixedCharges,
   fetchFxcnQuote,
+  fetchHomeData,
   fetchKaspaQuote,
-  fetchLivingBudget,
   fetchMarketSnapshot,
-  fetchMonths,
   fetchReport,
   type FxcnQuote,
   type KaspaQuote,
@@ -305,31 +303,22 @@ async function loadSpending() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    const [m, charges, allReport] = await Promise.all([
-      fetchMonths(demo, token),
-      fetchFixedCharges(demo, token),
-      fetchReport(demo, null, token),
-    ]);
-    months.value = m.months;
-    if (demo && m.demo_as_of) auth.demoAsOf = m.demo_as_of;
-    configuredCharges.value = charges.charges;
-    paceReport.value = allReport;
+    const bundle = await fetchHomeData(demo, token);
+    months.value = bundle.months;
+    if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
+    configuredCharges.value = bundle.fixed_charges;
+    paceReport.value = bundle.report;
+    livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
+    livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
+      normalizeLivingBudgetMonthTopup,
+    );
 
-    try {
-      const budget = await fetchLivingBudget(demo, token);
-      livingBudgetSegments.value = budget.segments.map(normalizeLivingBudgetSegment);
-      livingBudgetMonthTopups.value = (budget.month_topups || []).map(normalizeLivingBudgetMonthTopup);
-    } catch {
-      livingBudgetSegments.value = [];
-      livingBudgetMonthTopups.value = [];
-    }
-
-    const monthKey = defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
+    const monthKey = defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
     currentMonthKey.value = monthKey;
     const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
     pruneStaleManualCycleSpend(todayStart, {
-      statementSavedAt: partialStatementSavedAtForCycle(m.months, todayStart, cycleDay.value),
-      hasStatementSpend: !!findPartialMonth(m.months, todayStart, cycleDay.value),
+      statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
+      hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
     });
 
     if (monthKey && isCycleMonthKey(monthKey)) {
@@ -348,9 +337,8 @@ async function loadSpending() {
 }
 
 onMounted(() => {
-  void refreshPortfolio();
+  void loadSpending().finally(() => void refreshPortfolio());
   void loadCalendar();
-  void loadSpending();
 });
 
 function goSignIn() {

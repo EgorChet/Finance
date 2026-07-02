@@ -38,24 +38,21 @@ import {
 import {
   addExclusion,
   listExclusions,
-  refreshExclusionsCache,
   removeExclusion,
   transactionKey,
 } from "../services/exclusions.js";
 import {
   loadFixedCharges,
-  refreshFixedChargesCache,
   saveFixedCharges,
   validateFixedCharges,
 } from "../services/fixedCharges.js";
 import {
   loadLivingBudgetData,
   loadLivingBudgetSegments,
-  refreshLivingBudgetCache,
   saveLivingBudget,
   validateLivingBudget,
 } from "../services/livingBudget.js";
-import { ensureDailyFallback } from "../utils/fxRates.js";
+import { ensureAuxCachesFresh } from "../middleware/auxCache.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
@@ -78,7 +75,7 @@ router.use("/cal", calRoutes);
 
 router.use(async (_req, _res, next) => {
   try {
-    await Promise.all([refreshExclusionsCache(), refreshFixedChargesCache(), refreshLivingBudgetCache(), ensureDailyFallback()]);
+    await ensureAuxCachesFresh();
     next();
   } catch (e) {
     next(e);
@@ -153,6 +150,20 @@ router.get("/months", async (_req, res) => {
   const data = await readStatements();
   const catalog = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
   res.json({ months: catalog, summary: summaryRows(data) });
+});
+
+/** Single round-trip for Home: months + all-month report + fixed charges + living budget. */
+router.get("/home-data", async (_req, res) => {
+  const data = await readStatements();
+  const months = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
+  const report = await getCombinedReportAsync(data, null);
+  const budget = loadLivingBudgetData();
+  res.json({
+    months,
+    report: report ?? null,
+    fixed_charges: loadFixedCharges(),
+    living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+  });
 });
 
 const STATEMENT_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
