@@ -310,9 +310,18 @@
     <CalSyncDialog
       :open="calSyncOpen"
       @close="calSyncOpen = false"
-      @done="onCalSyncDone"
+      @background="onCalSyncBackground"
       @error="onCalSyncError"
     />
+
+    <Teleport to="body">
+      <CalSyncFloating
+        v-if="calSyncFloat"
+        :state="calSyncFloat.state"
+        :message="calSyncFloat.message"
+        @dismiss="dismissCalSyncFloat"
+      />
+    </Teleport>
 
     <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
       <div class="process-error-card upload-type-card">
@@ -338,8 +347,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
 import CalSyncDialog from "../components/CalSyncDialog.vue";
+import CalSyncFloating from "../components/CalSyncFloating.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
-import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
+import { fetchAppConfig, fetchCalJobStatus, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, finishCalSync, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
 import { useAppStore } from "../stores/app";
@@ -408,6 +418,11 @@ const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const calSyncOpen = ref(false);
 const calSyncEnabled = ref(false);
+const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
+
+let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
+let calSyncDoneTimer: ReturnType<typeof setTimeout> | null = null;
+let calSyncBgJobId: string | null = null;
 const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
 const fxcnQuote = ref<FxcnQuote | null>(null);
@@ -591,18 +606,80 @@ async function loadCalSyncConfig() {
   }
 }
 
+function stopCalSyncBackground() {
+  if (calSyncPollTimer) {
+    clearInterval(calSyncPollTimer);
+    calSyncPollTimer = null;
+  }
+  calSyncBgJobId = null;
+}
+
+function dismissCalSyncFloat() {
+  if (calSyncDoneTimer) {
+    clearTimeout(calSyncDoneTimer);
+    calSyncDoneTimer = null;
+  }
+  calSyncFloat.value = null;
+  stopCalSyncBackground();
+}
+
+function refreshAfterCalSync() {
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 2200);
+}
+
+async function pollCalSyncBackground(jobId: string) {
+  try {
+    const status = await fetchCalJobStatus(jobId, auth.token || undefined);
+    if (!calSyncFloat.value || calSyncBgJobId !== jobId) return;
+
+    if (status.status === "done") {
+      stopCalSyncBackground();
+      calSyncFloat.value = { message: "Saving statement…", state: "syncing" };
+      await finishCalSync(jobId, auth.token || undefined);
+      calSyncFloat.value = { message: "Cal sync complete", state: "done" };
+      calSyncDoneTimer = window.setTimeout(dismissCalSyncFloat, 3500);
+      refreshAfterCalSync();
+      return;
+    }
+
+    if (status.status === "error") {
+      stopCalSyncBackground();
+      calSyncFloat.value = {
+        message: status.error || "Cal sync failed",
+        state: "error",
+      };
+      return;
+    }
+
+    calSyncFloat.value = {
+      message: status.message || "Syncing with Cal…",
+      state: "syncing",
+    };
+  } catch (e) {
+    stopCalSyncBackground();
+    calSyncFloat.value = {
+      message: e instanceof Error ? e.message : String(e),
+      state: "error",
+    };
+  }
+}
+
+function onCalSyncBackground(jobId: string) {
+  calSyncOpen.value = false;
+  stopCalSyncBackground();
+  calSyncBgJobId = jobId;
+  calSyncFloat.value = { message: "Syncing with Cal…", state: "syncing" };
+  void pollCalSyncBackground(jobId);
+  calSyncPollTimer = setInterval(() => {
+    void pollCalSyncBackground(jobId);
+  }, 1000);
+}
+
 function openCalSync() {
   closeNav();
   calSyncOpen.value = true;
-}
-
-function onCalSyncDone() {
-  calSyncOpen.value = false;
-  beginProcess("Cal sync complete", "Refreshing your overview…", ["Saving partial statement", "Refreshing"]);
-  processStep.value = 1;
-  window.setTimeout(() => {
-    window.location.reload();
-  }, 500);
 }
 
 function onCalSyncError(message: string) {
@@ -623,6 +700,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearStepTimer();
+  stopCalSyncBackground();
+  dismissCalSyncFloat();
   if (kaspaTimer) {
     clearInterval(kaspaTimer);
     kaspaTimer = null;

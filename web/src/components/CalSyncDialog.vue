@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   fetchCalJobStatus,
   fetchCalStatus,
-  finishCalSync,
   saveCalCredentials,
   startCalSync,
   submitCalOtp,
@@ -18,7 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  done: [];
+  background: [jobId: string];
   error: [message: string];
 }>();
 
@@ -32,7 +31,6 @@ const statusError = ref("");
 const submitting = ref(false);
 const progressMessage = ref("");
 const progressLogs = ref<{ at: string; message: string }[]>([]);
-const otpInputRef = ref<HTMLInputElement | null>(null);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -49,6 +47,12 @@ function stopPolling() {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+}
+
+function handOffToBackground(id: string) {
+  stopPolling();
+  emit("background", id);
+  emit("close");
 }
 
 function applyJobStatus(status: {
@@ -68,8 +72,7 @@ function applyJobStatus(status: {
     return;
   }
   if (status.status === "done") {
-    stopPolling();
-    void finalizeSync();
+    if (jobId.value) handOffToBackground(jobId.value);
     return;
   }
   if (status.status === "error") {
@@ -78,20 +81,6 @@ function applyJobStatus(status: {
     statusError.value = status.error || "Cal sync failed";
     step.value = "otp";
     emit("error", statusError.value);
-  }
-}
-
-async function finalizeSync() {
-  if (!jobId.value) return;
-  try {
-    await finishCalSync(jobId.value, auth.token || undefined);
-    emit("done");
-  } catch (e) {
-    statusError.value = e instanceof Error ? e.message : String(e);
-    step.value = "otp";
-    emit("error", statusError.value);
-  } finally {
-    submitting.value = false;
   }
 }
 
@@ -163,7 +152,6 @@ async function beginSync() {
   try {
     const result = await startCalSync(auth.token || undefined);
     jobId.value = result.jobId;
-    // Show OTP field immediately so iOS can bind incoming SMS (before otp_required).
     step.value = "otp";
     progressMessage.value = "Waiting for SMS from Cal…";
     startPolling(result.jobId);
@@ -181,13 +169,11 @@ async function submitOtp() {
   if (!jobId.value) return;
   submitting.value = true;
   statusError.value = "";
-  progressMessage.value = "Verifying SMS code…";
   try {
     await submitCalOtp(jobId.value, otpCode.value.replace(/\D/g, ""), auth.token || undefined);
-    emit("done");
+    handOffToBackground(jobId.value);
   } catch (e) {
     statusError.value = e instanceof Error ? e.message : String(e);
-  } finally {
     submitting.value = false;
   }
 }
@@ -258,12 +244,10 @@ onBeforeUnmount(stopPolling);
             {{ entry.message }}
           </li>
         </ul>
-        <p v-if="progressMessage && submitting" class="cal-sync-progress">{{ progressMessage }}</p>
         <form class="cal-otp-form" @submit.prevent="submitOtp">
           <label class="cal-field">
             <span>SMS code</span>
             <input
-              ref="otpInputRef"
               v-model="otpCode"
               name="one-time-code"
               type="tel"
@@ -320,7 +304,6 @@ onBeforeUnmount(stopPolling);
   border: 1px solid var(--border, #ccc);
   background: var(--surface, #fff);
   color: inherit;
-  /* iOS Safari zooms focused inputs below 16px — keep modal stable on iPhone/PWA */
   font-size: 16px;
   min-height: 44px;
 }
@@ -329,12 +312,6 @@ onBeforeUnmount(stopPolling);
   margin-top: 0.75rem;
   color: var(--danger, #c0392b);
   font-size: 0.9rem;
-}
-
-.cal-sync-progress {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
-  opacity: 0.85;
 }
 
 .cal-sync-log {

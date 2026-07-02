@@ -8,7 +8,6 @@ import {
 } from "../services/reportService.js";
 import { analyzeFileBuffer } from "../services/analyzerClient.js";
 import {
-  awaitJobCompletion,
   cancelCalJob,
   consumeCalJob,
   createCalSyncJob,
@@ -159,10 +158,7 @@ router.post("/sync/otp", async (req, res) => {
     }
 
     submitCalOtpCode(jobId, code);
-    await awaitJobCompletion(jobId);
-    const { buffer, filename } = consumeCalJob(jobId);
-    const saved = await savePartialCalReportFromXlsx(buffer, filename);
-    res.json({ ok: true, status: "done", ...saved });
+    res.json({ ok: true, jobId });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: message });

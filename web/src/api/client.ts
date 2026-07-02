@@ -296,7 +296,7 @@ export async function finishCalSync(jobId: string, token?: string) {
 }
 
 export async function submitCalOtp(jobId: string, code: string, token?: string) {
-  return post<{ ok: boolean; status: string; key?: string }>(
+  return post<{ ok: boolean; jobId: string }>(
     `${prefix(false)}/cal/sync/otp`,
     { jobId, code },
     token,
