@@ -33,9 +33,9 @@ export function inferCurrencyFromRatio(amount: number, charge: number): string |
   if (ratio >= 3.85 && ratio <= 4.55) return "EUR";
   if (ratio >= 1.85 && ratio <= 2.25) return "BGN";
   if (ratio >= 4.5 && ratio <= 5.0) return "GBP";
+  if (ratio >= 0.98 && ratio <= 1.02) return "ILS";
   if (ratio >= 0.85 && ratio <= 1.05) return "PLN";
   if (ratio >= 0.005 && ratio <= 0.02) return "AMD";
-  if (ratio >= 0.98 && ratio <= 1.02) return "ILS";
   return null;
 }
 
@@ -76,7 +76,6 @@ export function detectCurrency(
 
   if (BGN_MERCHANT.test(merchant)) return "BGN";
   if (EUR_MERCHANT.test(merchant)) return "EUR";
-  if (/[A-Za-z]{3,}/.test(merchant) && !hasHebrew(merchant)) return "USD";
 
   return "ILS";
 }
@@ -308,6 +307,7 @@ export function isPendingCharge(
     if (isRefundTransaction(transactionTypeHe, amount, chargeRaw)) return false;
   }
   if (notes?.includes("בקליטה")) return true;
+  if (transactionTypeHe?.includes("בתהליך קליטה")) return true;
   if (chargeRaw == null) return true;
   return chargeRaw <= 0;
 }

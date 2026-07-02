@@ -56,12 +56,12 @@ def infer_currency_from_ratio(amount: float, charge: float) -> Optional[str]:
         return "BGN"
     if 4.5 <= ratio <= 5.0:
         return "GBP"
+    if 0.98 <= ratio <= 1.02:
+        return "ILS"
     if 0.85 <= ratio <= 1.05:
         return "PLN"
     if 0.005 <= ratio <= 0.02:
         return "AMD"
-    if 0.98 <= ratio <= 1.02:
-        return "ILS"
     return None
 
 
@@ -116,9 +116,6 @@ def detect_currency(
         return "BGN"
     if _EUR_MERCHANT.search(merchant):
         return "EUR"
-
-    if re.search(r"[A-Za-z]{3,}", merchant) and not _has_hebrew(merchant):
-        return "USD"
 
     return "ILS"
 
@@ -366,6 +363,8 @@ def is_pending_charge(
         if is_refund_transaction(transaction_type_he, amount, charge_raw):
             return False
     if notes and "בקליטה" in notes:
+        return True
+    if transaction_type_he and "בתהליך קליטה" in transaction_type_he:
         return True
     if charge_raw is None:
         return True
