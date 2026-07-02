@@ -255,8 +255,31 @@ export async function saveCalCredentials(nationalId: string, cardLast4: string, 
   );
 }
 
+export type CalJobStatusResponse = {
+  jobId: string;
+  status: string;
+  message: string | null;
+  error: string | null;
+  logs: { at: string; message: string }[];
+};
+
 export async function startCalSync(token?: string) {
-  return post<{ jobId: string; status: string; key?: string }>(`${prefix(false)}/cal/sync/start`, {}, token);
+  return post<{ jobId: string; status: string }>(`${prefix(false)}/cal/sync/start`, {}, token);
+}
+
+export async function fetchCalJobStatus(jobId: string, token?: string) {
+  return get<CalJobStatusResponse>(
+    `${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}/status`,
+    token,
+  );
+}
+
+export async function finishCalSync(jobId: string, token?: string) {
+  return post<{ ok: boolean; status: string; key?: string }>(
+    `${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}/finish`,
+    {},
+    token,
+  );
 }
 
 export async function submitCalOtp(jobId: string, code: string, token?: string) {

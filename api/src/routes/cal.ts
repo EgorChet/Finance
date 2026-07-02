@@ -6,15 +6,14 @@ import {
   normalizeProvisionalChargesAsync,
   rememberReport,
 } from "../services/reportService.js";
-import { analyzeCalTransactions } from "../services/analyzerClient.js";
-import { mapCalTransactions } from "../services/calTransactionMapper.js";
+import { analyzeFileBuffer } from "../services/analyzerClient.js";
 import {
   awaitJobCompletion,
   cancelCalJob,
   consumeCalJob,
   createCalSyncJob,
+  getCalJobStatus,
   submitCalOtpCode,
-  waitForJobPhase,
 } from "../services/calSyncService.js";
 import {
   calSyncEnabled,
@@ -70,21 +69,11 @@ router.put("/credentials", async (req, res) => {
   }
 });
 
-async function savePartialCalReport(transactions: ReturnType<typeof mapCalTransactions>) {
+async function savePartialCalReportFromXlsx(buffer: Buffer, filename: string) {
   const billingDate = openCycleBillingDate();
-  const sourceFile = `cal-partial-${billingDate}.xlsx`;
-  const metadata = {
-    billing_date: billingDate,
-    source_file: sourceFile,
-    source: "cal-sync",
-  };
-  const report = await analyzeCalTransactions(
-    transactions as unknown as Array<Record<string, unknown>>,
-    metadata,
-    true,
-  );
+  const report = await analyzeFileBuffer(buffer, filename, true);
   const storedReport = await normalizeProvisionalChargesAsync(report);
-  const hash = createHash("sha256").update(JSON.stringify(transactions)).digest("hex");
+  const hash = createHash("sha256").update(buffer).digest("hex");
 
   const data = await readStatements();
   const rules = await readRules();
@@ -92,7 +81,7 @@ async function savePartialCalReport(transactions: ReturnType<typeof mapCalTransa
     data,
     storedReport,
     `cal-sync:${billingDate}`,
-    sourceFile,
+    filename,
     hash,
     true,
   );
@@ -111,23 +100,48 @@ router.post("/sync/start", async (_req, res) => {
     }
 
     const job = await createCalSyncJob(creds);
-    const phase = await waitForJobPhase(job.id, ["otp_required", "done", "error"], 90_000);
+    res.json({ jobId: job.id, status: job.status });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: message });
+  }
+});
 
-    if (phase.status === "otp_required") {
-      res.json({ jobId: job.id, status: "otp_required" });
+router.get("/sync/:jobId/status", (req, res) => {
+  try {
+    assertCalEnabled();
+    const status = getCalJobStatus(req.params.jobId);
+    if (!status) {
+      res.status(404).json({ error: "Sync session not found" });
+      return;
+    }
+    res.json(status);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: message });
+  }
+});
+
+router.post("/sync/:jobId/finish", async (req, res) => {
+  try {
+    assertCalEnabled();
+    const status = getCalJobStatus(req.params.jobId);
+    if (!status) {
+      res.status(404).json({ error: "Sync session not found" });
+      return;
+    }
+    if (status.status === "error") {
+      res.status(400).json({ error: status.error || "Cal sync failed" });
+      return;
+    }
+    if (status.status !== "done") {
+      res.status(409).json({ error: "Sync not finished yet", status: status.status });
       return;
     }
 
-    if (phase.status === "done") {
-      await job.pipelineDone;
-      const raw = consumeCalJob(job.id);
-      const mapped = mapCalTransactions(raw);
-      const saved = await savePartialCalReport(mapped);
-      res.json({ jobId: job.id, status: "done", ...saved });
-      return;
-    }
-
-    throw new Error(phase.error || "Cal sync failed");
+    const { buffer, filename } = consumeCalJob(req.params.jobId);
+    const saved = await savePartialCalReportFromXlsx(buffer, filename);
+    res.json({ ok: true, status: "done", ...saved });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: message });
@@ -146,9 +160,8 @@ router.post("/sync/otp", async (req, res) => {
 
     submitCalOtpCode(jobId, code);
     await awaitJobCompletion(jobId);
-    const raw = consumeCalJob(jobId);
-    const mapped = mapCalTransactions(raw);
-    const saved = await savePartialCalReport(mapped);
+    const { buffer, filename } = consumeCalJob(jobId);
+    const saved = await savePartialCalReportFromXlsx(buffer, filename);
     res.json({ ok: true, status: "done", ...saved });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

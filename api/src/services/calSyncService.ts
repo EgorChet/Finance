@@ -1,38 +1,37 @@
-import { existsSync, readdirSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import puppeteer, { type Browser, type Frame, type Page } from "puppeteer";
 import type { CalCredentialsData } from "../storage/calCredentials.js";
-import { openCycleStartDate } from "../utils/billingCycle.js";
-import { type CalScraperTransaction } from "./calTransactionMapper.js";
 
 const LOGIN_URL = "https://www.cal-online.co.il/";
-const TRANSACTIONS_ENDPOINT =
-  "https://api.cal-online.co.il/Transactions/api/transactionsDetails/getCardTransactionsDetails";
-const PENDING_ENDPOINT =
-  "https://api.cal-online.co.il/Transactions/api/approvals/getClearanceRequests";
-const FRAMES_ENDPOINT = "https://api.cal-online.co.il/Frames/api/Frames/GetFrameStatus";
+const DIGITAL_URL = "https://digital-web.cal-online.co.il/";
 
 const JOB_TTL_MS = 5 * 60 * 1000;
 const OTP_WAIT_MS = 3 * 60 * 1000;
-const PHASE_TIMEOUT_MS = 90 * 1000;
+const PHASE_TIMEOUT_MS = 120_000;
+const MAX_LOG_LINES = 80;
 
-const API_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-  Origin: "https://digital-web.cal-online.co.il",
-  Referer: "https://digital-web.cal-online.co.il",
-  "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
-  "Content-Type": "application/json",
-};
+const USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 
 export type CalJobStatus = "starting" | "otp_required" | "scraping" | "done" | "error" | "cancelled";
+
+export interface CalSyncLogEntry {
+  at: string;
+  message: string;
+}
 
 export interface CalSyncJob {
   id: string;
   status: CalJobStatus;
+  message?: string;
+  logs: CalSyncLogEntry[];
   error?: string;
-  transactions?: CalScraperTransaction[];
+  xlsxBuffer?: Buffer;
+  xlsxFilename?: string;
   createdAt: number;
+  updatedAt: number;
   browser?: Browser;
   page?: Page;
   otpPromise?: Promise<string>;
@@ -55,13 +54,128 @@ function resolveChromiumPath(): string | undefined {
       if (existsSync(candidate)) return candidate;
     }
   } catch {
-    /* local dev */
+    /* local dev — bundled Chromium */
   }
   return undefined;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function isDetachedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /detached Frame|Execution context was destroyed|Cannot find context/i.test(msg);
+}
+
+function jobLog(job: CalSyncJob | undefined, message: string): void {
+  const line = `[cal-sync${job ? ` ${job.id.slice(0, 8)}` : ""}] ${message}`;
+  console.log(line);
+  if (!job) return;
+  job.message = message;
+  job.updatedAt = Date.now();
+  job.logs.push({ at: new Date().toISOString(), message });
+  if (job.logs.length > MAX_LOG_LINES) job.logs.shift();
+}
+
+async function retry<T>(
+  job: CalSyncJob,
+  label: string,
+  fn: () => Promise<T>,
+  attempts = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isDetachedError(err) || i === attempts - 1) throw err;
+      jobLog(job, `${label}: page reloaded, retry ${i + 2}/${attempts}…`);
+      await sleep(800 + i * 400);
+    }
+  }
+  throw lastErr;
+}
+
+async function frameAlive(frame: Frame): Promise<boolean> {
+  try {
+    await frame.evaluate(() => true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+type PageOrFrame = Page | Frame;
+
+async function findSelectorContext(page: Page, selector: string): Promise<PageOrFrame | null> {
+  try {
+    if (await page.$(selector)) return page;
+  } catch {
+    /* ignore */
+  }
+  for (const frame of page.frames()) {
+    try {
+      if ((await frameAlive(frame)) && (await frame.$(selector))) return frame;
+    } catch {
+      /* detached */
+    }
+  }
+  return null;
+}
+
+async function requireContext(page: Page, job: CalSyncJob, selector: string, timeoutMs = 30_000): Promise<PageOrFrame> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ctx = await findSelectorContext(page, selector);
+    if (ctx) return ctx;
+    await sleep(500);
+  }
+  throw new Error(`Cal control not found: ${selector}`);
+}
+
+async function safeClick(target: PageOrFrame, selector: string, timeoutMs = 15_000): Promise<void> {
+  await target.waitForSelector(selector, { visible: true, timeout: timeoutMs });
+  const clicked = await target.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!(el instanceof HTMLElement)) return false;
+    el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    el.click();
+    return true;
+  }, selector);
+  if (!clicked) throw new Error(`Could not click: ${selector}`);
+}
+
+async function safeType(target: PageOrFrame, selector: string, value: string): Promise<void> {
+  await target.waitForSelector(selector, { visible: true, timeout: 15_000 });
+  await target.evaluate(
+    (sel, text) => {
+      const el = document.querySelector(sel);
+      if (!(el instanceof HTMLInputElement)) throw new Error(`Input not found: ${sel}`);
+      el.focus();
+      el.value = text;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+    selector,
+    value,
+  );
+}
+
+async function clickByText(target: PageOrFrame, text: string): Promise<void> {
+  const clicked = await target.evaluate((needle) => {
+    const candidates = document.querySelectorAll("button, a, span, strong, div[role='button']");
+    for (const el of candidates) {
+      if (!el.textContent?.includes(needle)) continue;
+      const clickTarget = (el.closest("button, a") ?? el) as HTMLElement;
+      clickTarget.click();
+      return true;
+    }
+    return false;
+  }, text);
+  if (!clicked) throw new Error(`Could not click text: ${text}`);
 }
 
 function purgeExpiredJobs(): void {
@@ -85,91 +199,113 @@ async function cleanupJob(jobId: string): Promise<void> {
   }
 }
 
-async function getLoginFrame(page: Page): Promise<Frame> {
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
-    const frame = page.frames().find((f) => f.url().includes("connect"));
-    if (frame) return frame;
-    await sleep(400);
+async function hasOtpField(page: Page): Promise<boolean> {
+  const ctx = await findSelectorContext(page, '[formcontrolname="otp"]');
+  if (!ctx) return false;
+  try {
+    const idField = await findSelectorContext(page, '[formcontrolname="id"]');
+    return !idField;
+  } catch {
+    return true;
   }
-  throw new Error("Cal login frame not found");
 }
 
-async function frameHasOtpInput(frame: Frame): Promise<boolean> {
-  const selectors = [
-    'input[formcontrolname="otp"]',
-    'input[formcontrolname="otpCode"]',
-    'input[formcontrolname="code"]',
-    'input[name="otp"]',
-    'input[type="tel"]',
-    'input[inputmode="numeric"]',
-  ];
-  for (const sel of selectors) {
-    if (await frame.$(sel)) return true;
-  }
-  const text = await frame.evaluate(() => document.body?.innerText || "");
-  return /קוד|sms|אימות/i.test(text);
-}
-
-async function fillOtp(frame: Frame, code: string): Promise<void> {
-  const selectors = [
-    'input[formcontrolname="otp"]',
-    'input[formcontrolname="otpCode"]',
-    'input[formcontrolname="code"]',
-    'input[name="otp"]',
-    'input[type="tel"]',
-    'input[inputmode="numeric"]',
-  ];
-  for (const sel of selectors) {
-    const el = await frame.$(sel);
-    if (el) {
-      await el.click({ clickCount: 3 });
-      await el.type(code, { delay: 40 });
-      const submit = await frame.$('button[type="submit"]');
-      if (submit) await submit.click();
-      return;
-    }
-  }
-  throw new Error("OTP input field not found");
-}
-
-async function isLoggedIn(page: Page): Promise<boolean> {
-  if (/dashboard|digital-web/i.test(page.url())) return true;
-  return page.evaluate(() => {
-    const raw = window.sessionStorage.getItem("auth-module");
-    if (!raw) return false;
-    try {
-      const parsed = JSON.parse(raw) as { auth?: { calConnectToken?: string | null } };
-      return Boolean(parsed.auth?.calConnectToken);
-    } catch {
-      return false;
-    }
+async function fillOtp(page: Page, job: CalSyncJob, code: string): Promise<void> {
+  await retry(job, "Fill OTP", async () => {
+    const ctx = await requireContext(page, job, '[formcontrolname="otp"]');
+    jobLog(job, "Entering SMS code…");
+    await safeType(ctx, '[formcontrolname="otp"]', code);
+    const submitted = await ctx.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], button.btn-primary');
+      if (btn instanceof HTMLElement) {
+        btn.click();
+        return true;
+      }
+      const otp = document.querySelector('[formcontrolname="otp"]') as HTMLInputElement | null;
+      otp?.form?.requestSubmit();
+      return Boolean(otp);
+    });
+    if (!submitted) throw new Error("Could not submit OTP form");
   });
 }
 
-async function openCalLogin(page: Page): Promise<Frame> {
-  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await page.waitForSelector("#ccLoginDesktopBtn", { timeout: 30_000 });
-  await page.click("#ccLoginDesktopBtn");
-  const frame = await getLoginFrame(page);
-  await frame.waitForSelector("#regular-login", { timeout: 15_000 });
-  await frame.click("#regular-login");
-  await frame.waitForSelector("regular-login", { timeout: 15_000 });
-  return frame;
+async function isLoggedIn(page: Page): Promise<boolean> {
+  if (/digital-web|dashboard/i.test(page.url())) {
+    if (await page.$(".cardDebitsTransactions-main, .last4digits")) return true;
+  }
+  try {
+    return await page.evaluate(() => {
+      const raw = window.sessionStorage.getItem("auth-module");
+      if (!raw) return false;
+      const parsed = JSON.parse(raw) as { auth?: { calConnectToken?: string | null } };
+      return Boolean(parsed.auth?.calConnectToken);
+    });
+  } catch {
+    return false;
+  }
 }
 
-async function submitCalLogin(frame: Frame, creds: CalCredentialsData): Promise<void> {
-  await frame.waitForSelector('[formcontrolname="userName"]', { timeout: 15_000 });
-  await frame.evaluate(
-    (sel) => {
-      const el = document.querySelector(sel) as HTMLInputElement | null;
-      if (el) el.value = "";
-    },
-    '[formcontrolname="userName"]',
-  );
-  await frame.type('[formcontrolname="userName"]', creds.national_id, { delay: 25 });
-  await frame.type('[formcontrolname="password"]', creds.card_last4, { delay: 25 });
-  await frame.click('button[type="submit"]');
+async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
+  jobLog(job, "Opening cal-online.co.il…");
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  jobLog(job, `Loaded ${page.url()}`);
+  await sleep(1500);
+
+  jobLog(job, "Clicking כניסה לחשבון…");
+  const clicked = await page.evaluate(() => {
+    for (const strong of document.querySelectorAll("strong")) {
+      if (strong.textContent?.includes("כניסה לחשבון")) {
+        const target = strong.closest("a, button, [role=button]") ?? strong.parentElement ?? strong;
+        (target as HTMLElement).click();
+        return true;
+      }
+    }
+    const img = document.querySelector("img.imglogin");
+    if (img) {
+      const target = img.closest("a, button, strong") ?? img;
+      (target as HTMLElement).click();
+      return true;
+    }
+    const legacy = document.querySelector("#ccLoginDesktopBtn");
+    if (legacy instanceof HTMLElement) {
+      legacy.click();
+      return true;
+    }
+    return false;
+  });
+  if (!clicked) throw new Error("Cal login button (כניסה לחשבון) not found");
+
+  await sleep(2500);
+  await requireContext(page, job, '[formcontrolname="id"]');
+  jobLog(job, "Login form ready");
+}
+
+async function clickSendSms(ctx: PageOrFrame): Promise<void> {
+  try {
+    await clickByText(ctx, "שלחו לי סיסמה");
+    return;
+  } catch {
+    /* fall through */
+  }
+  await safeClick(ctx, 'button[type="submit"]');
+}
+
+async function fillCredentialsAndRequestSms(
+  page: Page,
+  job: CalSyncJob,
+  creds: CalCredentialsData,
+): Promise<void> {
+  await retry(job, "Fill login form", async () => {
+    const ctx = await requireContext(page, job, '[formcontrolname="id"]');
+    jobLog(job, "Entering teudat zehut…");
+    await safeType(ctx, '[formcontrolname="id"]', creds.national_id);
+    jobLog(job, "Entering last 4 card digits…");
+    await safeType(ctx, '[formcontrolname="secondOtpParam"]', creds.card_last4);
+    jobLog(job, "Clicking שלחו לי סיסמה ב-SMS…");
+    await clickSendSms(ctx);
+  });
+  await sleep(2000);
 }
 
 function createOtpPromise(job: CalSyncJob): Promise<string> {
@@ -186,191 +322,151 @@ function createOtpPromise(job: CalSyncJob): Promise<string> {
   });
 }
 
-async function getAuthHeader(page: Page): Promise<string> {
-  const deadline = Date.now() + 20_000;
+async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
+  jobLog(job, "Waiting for Cal dashboard…");
+  const deadline = Date.now() + PHASE_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const token = await page.evaluate(() => {
-      const raw = window.sessionStorage.getItem("auth-module");
-      if (!raw) return null;
-      try {
-        const parsed = JSON.parse(raw) as { auth?: { calConnectToken?: string | null } };
-        return parsed.auth?.calConnectToken || null;
-      } catch {
-        return null;
+    if (await page.$(".cardDebitsTransactions-main")) {
+      jobLog(job, "Dashboard ready");
+      return;
+    }
+    if (await isLoggedIn(page)) {
+      if (!/digital-web/i.test(page.url())) {
+        jobLog(job, "Navigating to digital-web…");
+        await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await sleep(3000);
       }
-    });
-    if (token) return `CALAuthScheme ${token}`;
+      if (await page.$(".cardDebitsTransactions-main, .last4digits")) {
+        jobLog(job, "Dashboard ready");
+        return;
+      }
+    }
+    await sleep(800);
+  }
+  throw new Error("Cal dashboard did not load after login");
+}
+
+async function waitForXlsxDownload(dir: string, timeoutMs = 90_000): Promise<Buffer> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith(".xlsx") || name.endsWith(".crdownload")) continue;
+      const filePath = join(dir, name);
+      if (!existsSync(filePath)) continue;
+      await sleep(800);
+      return readFileSync(filePath);
+    }
     await sleep(500);
   }
-  throw new Error("Could not read Cal session token");
+  throw new Error("Excel download timed out");
 }
 
-async function calPost<T>(page: Page, url: string, body: unknown, auth: string): Promise<T> {
-  return page.evaluate(
-    async (args) => {
-      const res = await fetch(args.url, {
-        method: "POST",
-        headers: {
-          ...args.headers,
-          Authorization: args.auth,
-          "X-Site-Id": "09031987-273E-2311-906C-8AF85B17C8D9",
-        },
-        body: JSON.stringify(args.body),
-      });
-      if (!res.ok) throw new Error(`Cal API ${res.status}`);
-      return res.json() as Promise<T>;
-    },
-    { url, body, auth, headers: API_HEADERS },
-  );
-}
-
-async function fetchTransactionsFromCal(page: Page, startDate: Date): Promise<CalScraperTransaction[]> {
-  const auth = await getAuthHeader(page);
-
-  const init = await page.evaluate(() => {
-    const raw = window.sessionStorage.getItem("init");
-    return raw ? JSON.parse(raw) : null;
-  }) as { result?: { cards?: { cardUniqueId: string; last4Digits: string }[] } } | null;
-
-  const cards = init?.result?.cards || [];
-  if (!cards.length) throw new Error("No Cal cards found in session");
-
-  const all: CalScraperTransaction[] = [];
-  const start = new Date(startDate);
-  const now = new Date();
-  const months =
-    (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1;
-
-  for (const card of cards) {
-    let pendingData: {
-      result?: { cardsList?: { authDetalisList?: Record<string, unknown>[] }[] };
-      statusCode?: number;
-    } | null = null;
-    try {
-      pendingData = await calPost(page, PENDING_ENDPOINT, { cardUniqueIDArray: [card.cardUniqueId] }, auth);
-    } catch {
-      pendingData = null;
-    }
-
-    for (let i = 0; i <= Math.max(months, 1); i++) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthData = await calPost<{
-        statusCode?: number;
-        title?: string;
-        result?: {
-          bankAccounts?: {
-            debitDates?: { transactions?: Record<string, unknown>[] }[];
-            immidiateDebits?: { debitDays?: { transactions?: Record<string, unknown>[] }[] };
-          }[];
-        };
-      }>(
-        page,
-        TRANSACTIONS_ENDPOINT,
-        {
-          cardUniqueId: card.cardUniqueId,
-          month: String(monthDate.getMonth() + 1),
-          year: String(monthDate.getFullYear()),
-        },
-        auth,
-      );
-
-      if (monthData.statusCode !== 1) {
-        throw new Error(monthData.title || "Failed to fetch Cal transactions");
-      }
-
-      const bankAccounts = monthData.result?.bankAccounts || [];
-      for (const account of bankAccounts) {
-        for (const debit of account.debitDates || []) {
-          for (const tx of debit.transactions || []) {
-            all.push(mapCalApiTransaction(tx, false));
-          }
-        }
-        for (const day of account.immidiateDebits?.debitDays || []) {
-          for (const tx of day.transactions || []) {
-            all.push(mapCalApiTransaction(tx, false));
-          }
-        }
-      }
-    }
-
-    const pendingList = pendingData?.result?.cardsList?.flatMap((c) => c.authDetalisList || []) || [];
-    for (const tx of pendingList) {
-      all.push(mapCalApiTransaction(tx, true));
-    }
-  }
-
-  const startIso = startDate.toISOString().slice(0, 10);
-  const seen = new Set<string>();
-  return all.filter((tx) => {
-    if (tx.date.slice(0, 10) < startIso) return false;
-    const key = `${tx.date}|${tx.description}|${tx.chargedAmount}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+async function setupDownloadDir(page: Page): Promise<string> {
+  const downloadDir = mkdtempSync(join(tmpdir(), "cal-sync-"));
+  const cdp = await page.createCDPSession();
+  await cdp.send("Browser.setDownloadBehavior", {
+    behavior: "allow",
+    downloadPath: downloadDir,
+    eventsEnabled: true,
   });
+  return downloadDir;
 }
 
-function mapCalApiTransaction(raw: Record<string, unknown>, pending: boolean): CalScraperTransaction {
-  const merchantName = String(raw.merchantName || "");
-  const trnPurchaseDate = String(raw.trnPurchaseDate || "");
-  const debCrdDate = raw.debCrdDate ? String(raw.debCrdDate) : trnPurchaseDate;
-  const trnAmt = Number(raw.trnAmt || 0);
-  const amtBeforeConv = Number(raw.amtBeforeConvAndIndex ?? trnAmt);
-  const charged = pending ? trnAmt : amtBeforeConv;
-  const currency = String(raw.trnCurrencySymbol || "₪");
-  const trnTypeCode = String(raw.trnTypeCode || "5");
+async function exportTransactionsExcel(
+  page: Page,
+  job: CalSyncJob,
+  cardLast4: string,
+): Promise<{ buffer: Buffer; filename: string }> {
+  const downloadDir = await setupDownloadDir(page);
 
-  return {
-    date: trnPurchaseDate,
-    processedDate: debCrdDate,
-    description: merchantName,
-    chargedAmount: charged * -1,
-    originalAmount: trnAmt * (trnTypeCode === "6" ? 1 : -1),
-    originalCurrency: currency,
-    status: pending ? "pending" : "completed",
-    category: String(raw.branchCodeDesc || ""),
-    memo: "",
-    type: trnTypeCode === "8" ? "installments" : "normal",
-  };
+  jobLog(job, `Opening card ••••${cardLast4}…`);
+  await page.waitForSelector(".cardDebitsTransactions-main", { visible: true, timeout: 60_000 });
+  const cardClicked = await page.evaluate((last4) => {
+    for (const card of document.querySelectorAll(".cardDebitsTransactions-main")) {
+      if (card.textContent?.includes(last4)) {
+        (card as HTMLElement).click();
+        return true;
+      }
+    }
+    const fallback = document.querySelector(".cardDebitsTransactions-main");
+    if (fallback instanceof HTMLElement) {
+      fallback.click();
+      return true;
+    }
+    return false;
+  }, cardLast4);
+  if (!cardClicked) throw new Error("Could not open card transactions view");
+  await sleep(3500);
+
+  jobLog(job, "Clicking יצוא (Excel export)…");
+  const exportClicked = await page.evaluate(() => {
+    const byLabel = document.querySelector('button[aria-label="ייצוא לאקסל"]');
+    if (byLabel instanceof HTMLElement) {
+      byLabel.click();
+      return true;
+    }
+    for (const btn of document.querySelectorAll(".export button, button")) {
+      if (btn.textContent?.trim() === "יצוא") {
+        (btn as HTMLElement).click();
+        return true;
+      }
+    }
+    return false;
+  });
+  if (!exportClicked) throw new Error('Export button (יצוא) not found');
+
+  jobLog(job, "Waiting for Excel file…");
+  const buffer = await waitForXlsxDownload(downloadDir);
+  const filename = readdirSync(downloadDir).find((n) => n.endsWith(".xlsx")) || "cal-export.xlsx";
+  try {
+    rmSync(downloadDir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
+  jobLog(job, `Downloaded ${filename} (${buffer.length} bytes)`);
+  return { buffer, filename };
 }
 
 async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<void> {
   try {
     const page = job.page!;
-    const frame = await openCalLogin(page);
-    await submitCalLogin(frame, creds);
+    const chromium = resolveChromiumPath();
+    jobLog(job, chromium ? `Chromium: ${chromium}` : "Chromium: bundled (puppeteer)");
 
-    const deadline = Date.now() + PHASE_TIMEOUT_MS;
-    while (Date.now() < deadline) {
+    await openCalLogin(page, job);
+    await fillCredentialsAndRequestSms(page, job, creds);
+
+    jobLog(job, "Waiting for SMS OTP screen…");
+    const otpScreenDeadline = Date.now() + 60_000;
+    while (Date.now() < otpScreenDeadline) {
+      if (await hasOtpField(page)) break;
       if (await isLoggedIn(page)) break;
-      if (await frameHasOtpInput(frame)) {
-        job.status = "otp_required";
-        const code = await (job.otpPromise ?? createOtpPromise(job));
-        await fillOtp(frame, code);
-        await sleep(3000);
-        continue;
-      }
-      await sleep(800);
+      await sleep(500);
     }
 
     if (!(await isLoggedIn(page))) {
-      throw new Error("Cal login timed out");
+      if (!(await hasOtpField(page))) {
+        throw new Error("SMS OTP screen did not appear");
+      }
+      job.status = "otp_required";
+      jobLog(job, "SMS sent — enter code in the app");
+      const code = await (job.otpPromise ?? createOtpPromise(job));
+      await fillOtp(page, job, code);
+      await sleep(4000);
     }
 
-    // Navigate to digital app so session storage is populated
-    await page.goto("https://digital-web.cal-online.co.il/", {
-      waitUntil: "domcontentloaded",
-      timeout: 60_000,
-    });
-    await sleep(2000);
+    await waitForDashboard(page, job);
 
     job.status = "scraping";
-    const cycleStart = openCycleStartDate();
-    job.transactions = await fetchTransactionsFromCal(page, new Date(cycleStart + "T00:00:00"));
+    const exported = await exportTransactionsExcel(page, job, creds.card_last4);
+    job.xlsxBuffer = exported.buffer;
+    job.xlsxFilename = exported.filename;
     job.status = "done";
+    jobLog(job, "Sync complete");
   } catch (e) {
     job.status = "error";
     job.error = e instanceof Error ? e.message : String(e);
+    jobLog(job, `Failed: ${job.error}`);
   } finally {
     if (job.browser) {
       try {
@@ -394,46 +490,60 @@ export async function cancelCalJob(jobId: string): Promise<void> {
   await cleanupJob(jobId);
 }
 
+export function getCalJobStatus(jobId: string): {
+  jobId: string;
+  status: CalJobStatus;
+  message: string | null;
+  error: string | null;
+  logs: CalSyncLogEntry[];
+} | null {
+  const job = getCalJob(jobId);
+  if (!job) return null;
+  return {
+    jobId: job.id,
+    status: job.status,
+    message: job.message ?? null,
+    error: job.error ?? null,
+    logs: job.logs,
+  };
+}
+
 export async function createCalSyncJob(creds: CalCredentialsData): Promise<CalSyncJob> {
   purgeExpiredJobs();
   const id = crypto.randomUUID();
   const executablePath = resolveChromiumPath();
+  jobLog(undefined, "Launching browser (headless)…");
   const browser = await puppeteer.launch({
     headless: true,
     executablePath,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-blink-features=AutomationControlled",
+      "--lang=he-IL",
+    ],
+    defaultViewport: { width: 1280, height: 900 },
   });
   const page = await browser.newPage();
-  await page.setUserAgent(API_HEADERS["User-Agent"]);
+  await page.setUserAgent(USER_AGENT);
 
   const job: CalSyncJob = {
     id,
     status: "starting",
+    message: "Starting…",
+    logs: [],
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     browser,
     page,
   };
   job.otpPromise = createOtpPromise(job);
   jobs.set(id, job);
+  jobLog(job, "Browser ready");
 
   job.pipelineDone = runPipeline(job, creds);
   return job;
-}
-
-export async function waitForJobPhase(
-  jobId: string,
-  targets: CalJobStatus[],
-  timeoutMs: number,
-): Promise<CalSyncJob> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const job = getCalJob(jobId);
-    if (!job) throw new Error("Sync session expired — start again");
-    if (targets.includes(job.status)) return job;
-    if (job.status === "error") throw new Error(job.error || "Cal sync failed");
-    await sleep(400);
-  }
-  throw new Error("Cal sync timed out");
 }
 
 export function submitCalOtpCode(jobId: string, code: string): void {
@@ -443,10 +553,11 @@ export function submitCalOtpCode(jobId: string, code: string): void {
   const trimmed = code.replace(/\D/g, "");
   if (trimmed.length < 4) throw new Error("Invalid SMS code");
   if (!job.otpResolve) throw new Error("OTP handler not ready");
+  jobLog(job, "OTP submitted from app");
   job.otpResolve(trimmed);
 }
 
-export async function awaitJobCompletion(jobId: string, timeoutMs = 120_000): Promise<CalSyncJob> {
+export async function awaitJobCompletion(jobId: string, timeoutMs = 180_000): Promise<CalSyncJob> {
   const job = getCalJob(jobId);
   if (!job?.pipelineDone) throw new Error("Sync session expired — start again");
   const timer = sleep(timeoutMs).then(() => {
@@ -460,10 +571,10 @@ export async function awaitJobCompletion(jobId: string, timeoutMs = 120_000): Pr
   return finalJob;
 }
 
-export function consumeCalJob(jobId: string): CalScraperTransaction[] {
+export function consumeCalJob(jobId: string): { buffer: Buffer; filename: string } {
   const job = getCalJob(jobId);
-  if (!job?.transactions?.length) throw new Error("No transactions from Cal sync");
-  const txns = job.transactions;
+  if (!job?.xlsxBuffer?.length) throw new Error("No Excel export from Cal sync");
+  const result = { buffer: job.xlsxBuffer, filename: job.xlsxFilename || "cal-export.xlsx" };
   jobs.delete(jobId);
-  return txns;
+  return result;
 }
