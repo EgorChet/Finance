@@ -9,7 +9,8 @@ const DIGITAL_URL = "https://digital-web.cal-online.co.il/";
 
 const JOB_TTL_MS = 5 * 60 * 1000;
 const OTP_WAIT_MS = 3 * 60 * 1000;
-const PHASE_TIMEOUT_MS = 120_000;
+const PHASE_TIMEOUT_MS = 180_000;
+const DASHBOARD_TIMEOUT_MS = 150_000;
 const MAX_LOG_LINES = 80;
 
 const USER_AGENT =
@@ -215,10 +216,22 @@ async function fillOtp(page: Page, job: CalSyncJob, code: string): Promise<void>
     const ctx = await requireContext(page, job, '[formcontrolname="otp"]');
     jobLog(job, "Entering SMS code…");
     await safeType(ctx, '[formcontrolname="otp"]', code);
+
+    const navPromise = page
+      .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 45_000 })
+      .catch(() => null);
+
     const submitted = await ctx.evaluate(() => {
-      const btn = document.querySelector('button[type="submit"], button.btn-primary');
-      if (btn instanceof HTMLElement) {
-        btn.click();
+      for (const btn of document.querySelectorAll("button")) {
+        const text = btn.textContent?.trim() || "";
+        if (/אישור|כניסה|המשך|אימות/i.test(text)) {
+          (btn as HTMLElement).click();
+          return true;
+        }
+      }
+      const submit = document.querySelector('button[type="submit"], button.btn-primary');
+      if (submit instanceof HTMLElement) {
+        submit.click();
         return true;
       }
       const otp = document.querySelector('[formcontrolname="otp"]') as HTMLInputElement | null;
@@ -226,13 +239,36 @@ async function fillOtp(page: Page, job: CalSyncJob, code: string): Promise<void>
       return Boolean(otp);
     });
     if (!submitted) throw new Error("Could not submit OTP form");
+
+    await navPromise;
+    jobLog(job, `After OTP: ${page.url()}`);
+    await sleep(3000);
   });
 }
 
 async function isLoggedIn(page: Page): Promise<boolean> {
-  if (/digital-web|dashboard/i.test(page.url())) {
-    if (await page.$(".cardDebitsTransactions-main, .last4digits")) return true;
+  if (await findOnPageOrFrames(page, ".cardDebitsTransactions-main, .last4digits")) return true;
+  if (/digital-web/i.test(page.url()) && (await hasAuthToken(page))) return true;
+  return false;
+}
+
+async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean> {
+  try {
+    if (await page.$(selector)) return true;
+  } catch {
+    /* ignore */
   }
+  for (const frame of page.frames()) {
+    try {
+      if (await frameAlive(frame) && (await frame.$(selector))) return true;
+    } catch {
+      /* detached */
+    }
+  }
+  return false;
+}
+
+async function hasAuthToken(page: Page): Promise<boolean> {
   try {
     return await page.evaluate(() => {
       const raw = window.sessionStorage.getItem("auth-module");
@@ -243,6 +279,13 @@ async function isLoggedIn(page: Page): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function loginFormVisible(page: Page): Promise<boolean> {
+  return (
+    (await findSelectorContext(page, '[formcontrolname="id"]')) !== null ||
+    (await findSelectorContext(page, '[formcontrolname="otp"]')) !== null
+  );
 }
 
 async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
@@ -323,27 +366,55 @@ function createOtpPromise(job: CalSyncJob): Promise<string> {
 }
 
 async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
-  jobLog(job, "Waiting for Cal dashboard…");
-  const deadline = Date.now() + PHASE_TIMEOUT_MS;
+  jobLog(job, "Waiting for login to finish…");
+  const loginDeadline = Date.now() + 60_000;
+  while (Date.now() < loginDeadline) {
+    if (await isLoggedIn(page)) break;
+    if (!(await loginFormVisible(page)) && !/login|connect/i.test(page.url())) {
+      jobLog(job, `Login form cleared (${page.url()})`);
+      break;
+    }
+    await sleep(1000);
+  }
+
+  if (!/digital-web/i.test(page.url())) {
+    jobLog(job, `Opening ${DIGITAL_URL}…`);
+    await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
+    await sleep(4000);
+  }
+
+  jobLog(job, `At ${page.url()} — waiting for dashboard UI…`);
+  const dashboardSelectors =
+    ".cardDebitsTransactions-main, .last4digits, app-card-in-debits-transactions, .cardInDeatailsTransactions";
+  const deadline = Date.now() + DASHBOARD_TIMEOUT_MS;
+
   while (Date.now() < deadline) {
-    if (await page.$(".cardDebitsTransactions-main")) {
+    if (await findOnPageOrFrames(page, dashboardSelectors)) {
       jobLog(job, "Dashboard ready");
       return;
     }
-    if (await isLoggedIn(page)) {
-      if (!/digital-web/i.test(page.url())) {
-        jobLog(job, "Navigating to digital-web…");
-        await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
-        await sleep(3000);
-      }
-      if (await page.$(".cardDebitsTransactions-main, .last4digits")) {
-        jobLog(job, "Dashboard ready");
-        return;
-      }
+    if (await hasAuthToken(page)) {
+      jobLog(job, "Session token found — waiting for UI…");
+    } else {
+      jobLog(job, "No session token yet…");
     }
-    await sleep(800);
+    await sleep(2000);
   }
-  throw new Error("Cal dashboard did not load after login");
+
+  if (await hasAuthToken(page)) {
+    jobLog(job, "Reloading dashboard (token present, UI slow)…");
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+    await sleep(5000);
+    try {
+      await page.waitForSelector(dashboardSelectors, { visible: true, timeout: 60_000 });
+      jobLog(job, "Dashboard ready after reload");
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  throw new Error(`Cal dashboard did not load after login (${page.url()})`);
 }
 
 async function waitForXlsxDownload(dir: string, timeoutMs = 90_000): Promise<Buffer> {
@@ -452,7 +523,7 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
       jobLog(job, "SMS sent — enter code in the app");
       const code = await (job.otpPromise ?? createOtpPromise(job));
       await fillOtp(page, job, code);
-      await sleep(4000);
+      await sleep(2000);
     }
 
     await waitForDashboard(page, job);
@@ -557,7 +628,7 @@ export function submitCalOtpCode(jobId: string, code: string): void {
   job.otpResolve(trimmed);
 }
 
-export async function awaitJobCompletion(jobId: string, timeoutMs = 180_000): Promise<CalSyncJob> {
+export async function awaitJobCompletion(jobId: string, timeoutMs = 360_000): Promise<CalSyncJob> {
   const job = getCalJob(jobId);
   if (!job?.pipelineDone) throw new Error("Sync session expired — start again");
   const timer = sleep(timeoutMs).then(() => {

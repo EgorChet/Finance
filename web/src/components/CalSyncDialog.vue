@@ -303,6 +303,9 @@ onBeforeUnmount(stopPolling);
   border: 1px solid var(--border, #ccc);
   background: var(--surface, #fff);
   color: inherit;
+  /* iOS Safari zooms focused inputs below 16px — keep modal stable on iPhone/PWA */
+  font-size: 16px;
+  min-height: 44px;
 }
 
 .cal-sync-error {
