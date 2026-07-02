@@ -68,9 +68,13 @@ import {
 } from "../services/calendarService.js";
 import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, MerchantRules } from "../types.js";
 import { userIdFromRequest } from "../auth.js";
+import { calSyncEnabled } from "../storage/calCredentials.js";
+import calRoutes from "./cal.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
+
+router.use("/cal", calRoutes);
 
 router.use(async (_req, _res, next) => {
   try {
@@ -106,6 +110,7 @@ router.get("/config", (_req, res) => {
   res.json({
     analyzer_wake_url: isPublicRenderAnalyzerUrl(url) ? url : null,
     analyzer_wake_from_browser: analyzerUsesPublicUrl(),
+    cal_sync_enabled: calSyncEnabled(),
   });
 });
 

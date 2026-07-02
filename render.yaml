@@ -27,6 +27,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: CAL_SYNC_ENABLED
+        value: "true"
 
   - type: web
     name: finance-analyzer

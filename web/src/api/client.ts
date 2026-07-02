@@ -177,7 +177,7 @@ export async function warmApi(token?: string) {
 }
 
 export async function fetchAppConfig(token?: string) {
-  return get<{ analyzer_wake_url: string | null; analyzer_wake_from_browser: boolean }>(
+  return get<{ analyzer_wake_url: string | null; analyzer_wake_from_browser: boolean; cal_sync_enabled?: boolean }>(
     `${prefix(false)}/config`,
     token,
   );
@@ -234,6 +234,41 @@ export async function warmAnalyzerService(token?: string) {
   });
   if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<{ ready: boolean }>;
+}
+
+export type CalSyncStatus = {
+  enabled: boolean;
+  configured: boolean;
+  national_id_masked: string | null;
+  card_last4_masked: string | null;
+};
+
+export async function fetchCalStatus(token?: string) {
+  return get<CalSyncStatus>(`${prefix(false)}/cal/status`, token);
+}
+
+export async function saveCalCredentials(nationalId: string, cardLast4: string, token?: string) {
+  return put<{ ok: boolean; configured: boolean }>(
+    `${prefix(false)}/cal/credentials`,
+    { national_id: nationalId, card_last4: cardLast4 },
+    token,
+  );
+}
+
+export async function startCalSync(token?: string) {
+  return post<{ jobId: string; status: string; key?: string }>(`${prefix(false)}/cal/sync/start`, {}, token);
+}
+
+export async function submitCalOtp(jobId: string, code: string, token?: string) {
+  return post<{ ok: boolean; status: string; key?: string }>(
+    `${prefix(false)}/cal/sync/otp`,
+    { jobId, code },
+    token,
+  );
+}
+
+export async function cancelCalSync(jobId: string, token?: string) {
+  return del<{ ok: boolean }>(`${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}`, token);
 }
 
 export async function uploadStatement(

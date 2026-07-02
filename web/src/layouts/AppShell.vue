@@ -207,6 +207,22 @@
                 </button>
 
                 <button
+                  v-if="showCalSync"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  :disabled="processing"
+                  @click="openCalSync"
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm0 1.5a.75.75 0 0 1 .75.75v2.25H11a.75.75 0 0 1 0 1.5H8.75V11a.75.75 0 0 1-1.5 0V8.5H5a.75.75 0 0 1 0-1.5h2.25V4.75A.75.75 0 0 1 8 4Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  Sync with Cal
+                </button>
+
+                <button
                   v-if="showLocalSync"
                   type="button"
                   class="mobile-nav-action btn"
@@ -291,6 +307,13 @@
       </div>
     </div>
 
+    <CalSyncDialog
+      :open="calSyncOpen"
+      @close="calSyncOpen = false"
+      @done="onCalSyncDone"
+      @error="onCalSyncError"
+    />
+
     <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
       <div class="process-error-card upload-type-card">
         <h3>Statement type</h3>
@@ -314,6 +337,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
+import CalSyncDialog from "../components/CalSyncDialog.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { fetchAppConfig, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
@@ -382,6 +406,8 @@ const canRetry = ref(false);
 const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
+const calSyncOpen = ref(false);
+const calSyncEnabled = ref(false);
 const navOpen = ref(false);
 const kaspaQuote = ref<KaspaQuote | null>(null);
 const fxcnQuote = ref<FxcnQuote | null>(null);
@@ -551,8 +577,42 @@ watch(navOpen, (open) => {
 });
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
+const showCalSync = computed(
+  () => Boolean(import.meta.env.VITE_API_URL) && !auth.isDemo && calSyncEnabled.value,
+);
+
+async function loadCalSyncConfig() {
+  if (!import.meta.env.VITE_API_URL || auth.isDemo) return;
+  try {
+    const config = await fetchAppConfig(auth.token || undefined);
+    calSyncEnabled.value = config.cal_sync_enabled === true;
+  } catch {
+    calSyncEnabled.value = false;
+  }
+}
+
+function openCalSync() {
+  closeNav();
+  calSyncOpen.value = true;
+}
+
+function onCalSyncDone() {
+  calSyncOpen.value = false;
+  beginProcess("Cal sync complete", "Refreshing your overview…", ["Saving partial statement", "Refreshing"]);
+  processStep.value = 1;
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 500);
+}
+
+function onCalSyncError(message: string) {
+  failProcess("Cal sync failed", message, () => {
+    calSyncOpen.value = true;
+  });
+}
 
 onMounted(() => {
+  void loadCalSyncConfig();
   void refreshKaspaQuote();
   void refreshFxcnQuote();
   void refreshMarketSnapshot();

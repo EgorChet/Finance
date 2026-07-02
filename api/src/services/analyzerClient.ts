@@ -164,6 +164,31 @@ export async function translateMerchant(hebrew: string): Promise<string> {
   return data.english || "";
 }
 
+export async function analyzeCalTransactions(
+  transactions: Array<Record<string, unknown>>,
+  metadata: Record<string, unknown>,
+  autoTranslate = true,
+): Promise<SpendingReport> {
+  const ready = await ensureAnalyzerReady();
+  if (!ready) {
+    throw new Error(analyzerNotReadyMessage());
+  }
+  const res = await fetchAnalyzer("/analyze-cal-transactions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transactions,
+      metadata,
+      auto_translate: autoTranslate,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Analyzer error ${res.status}: ${text}`);
+  }
+  return (await res.json()) as SpendingReport;
+}
+
 export async function reanalyzeAll(
   statements: StatementsData,
   rules: MerchantRules,

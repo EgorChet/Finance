@@ -16,7 +16,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from analyzer import analyze_spending  # noqa: E402
-from history import report_from_dict, report_to_dict  # noqa: E402
+from history import report_from_dict, report_to_dict, _tx_from_dict  # noqa: E402
 from maps import MapperStore  # noqa: E402
 from maps import looks_hebrew, suggest_merchant_english  # noqa: E402
 from pipeline import analyze_file  # noqa: E402
@@ -35,6 +35,12 @@ app.add_middleware(
 class ReanalyzeRequest(BaseModel):
     statements: dict
     rules: dict
+    auto_translate: bool = True
+
+
+class CalAnalyzeRequest(BaseModel):
+    transactions: list[dict]
+    metadata: dict
     auto_translate: bool = True
 
 
@@ -104,6 +110,22 @@ def translate_merchant(q: str = "") -> dict:
         return {"english": ""}
     english = _translate_one(raw)
     return {"english": english or ""}
+
+
+@app.post("/analyze-cal-transactions")
+def analyze_cal_transactions(body: CalAnalyzeRequest) -> dict:
+    from datetime import date as date_cls
+
+    meta = dict(body.metadata)
+    billing = meta.get("billing_date")
+    if isinstance(billing, str):
+        meta["billing_date"] = date_cls.fromisoformat(billing)
+
+    mapper = MapperStore()
+    transactions = [_tx_from_dict(tx) for tx in body.transactions]
+    translate_transactions(transactions, mapper, auto_translate_unknown=body.auto_translate)
+    report = analyze_spending(transactions, meta)
+    return report_to_dict(report)
 
 
 @app.post("/reanalyze-all")

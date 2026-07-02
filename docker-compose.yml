@@ -18,10 +18,16 @@ services:
       PORT: "3000"
       ANALYZER_URL: http://analyzer:8001
       DATA_DIR: /app/data
+      CAL_SYNC_ENABLED: ${CAL_SYNC_ENABLED:-true}
+      STORAGE: ${STORAGE:-local}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     volumes:
       - ./statements:/app/statements
+      - ./data:/app/data
     depends_on:
       - analyzer
 
@@ -30,7 +36,7 @@ services:
       context: ./web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ""
+        VITE_API_URL: http://localhost:3000
     ports:
       - "5173:80"
     depends_on:
