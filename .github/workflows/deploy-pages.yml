@@ -10,19 +10,15 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time; let in-flight deploys finish (cancel-in-progress causes
-# "Deployment cancelled" when pushes land during the Pages upload step).
+# Only the latest deploy should run — queued Pages deploys often fail together on GitHub outages.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +39,56 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
-      - name: Deploy to GitHub Pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages (attempt 1)
         id: deployment
-        uses: actions/deploy-pages@v5
-        timeout-minutes: 20
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        timeout-minutes: 15
+
+      - name: Wait before retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 90
+
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deploy2
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        timeout-minutes: 15
+
+      - name: Wait before final retry
+        if: steps.deployment.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 90
+
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: deploy3
+        if: steps.deployment.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        timeout-minutes: 15
+
+      - name: Report deploy result
+        if: always()
+        run: |
+          if [ "${{ steps.deployment.outcome }}" = "success" ]; then
+            echo "Pages deploy succeeded on attempt 1"
+            exit 0
+          fi
+          if [ "${{ steps.deploy2.outcome }}" = "success" ]; then
+            echo "Pages deploy succeeded on attempt 2"
+            exit 0
+          fi
+          if [ "${{ steps.deploy3.outcome }}" = "success" ]; then
+            echo "Pages deploy succeeded on attempt 3"
+            exit 0
+          fi
+          echo "Pages deploy failed after retries (GitHub Pages outage or queue issue)"
+          exit 1
