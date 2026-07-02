@@ -188,6 +188,54 @@ def test_detect_currency_apple_ils_price_tier():
     assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.9, None) == "ILS"
 
 
+def test_detect_currency_equal_amount_charge_is_ils_not_pln():
+    """When amount equals bank charge, ratio ~1 must be ILS (not PLN band)."""
+    assert detect_currency("ROY SWEETS", 11, 11) == "ILS"
+
+
+def test_pending_english_israeli_merchant_is_ils():
+    """Israeli shops with English names must not be treated as USD while pending."""
+    charge, currency, estimated = resolve_charge_ils(
+        11,
+        None,
+        "ROY SWEETS",
+        "עסקה בקליטה",
+        tx_date=date(2026, 7, 1),
+    )
+    assert charge == 11
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_pending_english_merchant_corrects_stale_usd_estimate():
+    """Re-normalize must undo a prior USD misread on pending rows."""
+    charge, currency, estimated = resolve_charge_ils(
+        11,
+        32.78,
+        "ROY SWEETS",
+        "עסקה בקליטה",
+        tx_date=date(2026, 7, 1),
+        explicit_currency="USD",
+    )
+    assert charge == 11
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_pending_cal_transaction_type_marks_pending():
+    charge, currency, estimated = resolve_charge_ils(
+        11,
+        32.78,
+        "ROY SWEETS",
+        "pending",
+        tx_date=date(2026, 7, 1),
+        transaction_type_he="בתהליך קליטה",
+    )
+    assert charge == 11
+    assert currency == "ILS"
+    assert estimated is True
+
+
 def test_detect_currency_honors_explicit_ils():
     assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.99, None, "ILS") == "ILS"
 
