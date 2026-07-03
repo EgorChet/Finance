@@ -104,11 +104,6 @@
       :pace-tone="summaryPaceTone"
       @settings-change="onPaceSettingsChange"
     />
-    <div v-if="showPaceHistoryExpand" class="overview-pace-expand">
-      <button type="button" class="btn btn-ghost btn-sm" @click="expandPaceHistory">
-        Show more history ({{ paceExpandLabel }})
-      </button>
-    </div>
     <PendingCycleCard
       v-if="isPendingCycleSelected && selectedCycleStart"
       :cycle-start="selectedCycleStart"
@@ -244,11 +239,7 @@ import {
   type SpendingPeriodMode,
 } from "../utils/spendingPeriod";
 import { onSpendingRefresh } from "../composables/useSpendingRefresh";
-import {
-  DEFAULT_PACE_MONTHS,
-  nextPaceMonths,
-  paceMonthsLabel,
-} from "../utils/paceMonths";
+import { DEFAULT_PACE_MONTHS } from "../utils/paceMonths";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -269,7 +260,6 @@ const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
 const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 const overviewPeriod = ref<SpendingPeriodMode | null>(null);
-const paceMonthsWindow = ref(DEFAULT_PACE_MONTHS);
 const paceReportIsFull = ref(false);
 const periodLoading = ref(false);
 
@@ -501,15 +491,6 @@ const partialTotalSpend = computed(() => {
   return report.value.total_spent;
 });
 
-const showPaceHistoryExpand = computed(
-  () => showPaceCard.value && !paceReportIsFull.value && paceMonthsWindow.value > 0,
-);
-
-const paceExpandLabel = computed(() => {
-  const next = nextPaceMonths(paceMonthsWindow.value);
-  return paceMonthsLabel(next);
-});
-
 function mapSummaryRows(
   rows: { month: string; billing_date: string; total: number }[],
   monthItems: MonthItem[],
@@ -631,7 +612,7 @@ async function refreshReport(month: string | null = selectedMonth.value) {
 async function refreshConfiguredCharges() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+  const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
   configuredCharges.value = bundle.fixed_charges;
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
@@ -679,21 +660,11 @@ async function refreshPaceReport(forceFull = false) {
       paceReport.value = await fetchReport(demo, null, token);
       paceReportIsFull.value = true;
     } else {
-      paceReport.value = await fetchReport(demo, null, token, { months: paceMonthsWindow.value });
+      paceReport.value = await fetchReport(demo, null, token, { months: DEFAULT_PACE_MONTHS });
     }
   } catch {
     paceReport.value = null;
   }
-}
-
-async function expandPaceHistory() {
-  const next = nextPaceMonths(paceMonthsWindow.value);
-  if (next === 0) {
-    await refreshPaceReport(true);
-    return;
-  }
-  paceMonthsWindow.value = next;
-  await refreshPaceReport();
 }
 
 async function loadFullPaceReport() {
@@ -764,7 +735,7 @@ async function loadMonths() {
   try {
     const demo = auth.isDemo;
     const token = auth.token || undefined;
-    const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+    const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
     months.value = bundle.months;
     if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
     partialReportCache.value.clear();
@@ -801,7 +772,6 @@ let stopSpendingRefresh: (() => void) | undefined;
 onMounted(() => {
   void loadMonths();
   stopSpendingRefresh = onSpendingRefresh(() => {
-    paceMonthsWindow.value = DEFAULT_PACE_MONTHS;
     paceReportIsFull.value = false;
     partialReportCache.value.clear();
     void loadMonths();
