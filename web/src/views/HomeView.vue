@@ -55,13 +55,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { fetchCalendar, fetchHomeData, fetchReport } from "../api/client";
+import { fetchCalendar, fetchReport } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import PortfolioSummaryCard from "../components/home/PortfolioSummaryCard.vue";
 import UpcomingEventsCard from "../components/home/UpcomingEventsCard.vue";
 import { onSpendingRefresh } from "../composables/useSpendingRefresh";
 import { useAuthStore } from "../stores/auth";
+import { type HomeDataBundle, useHomeDataStore } from "../stores/homeData";
 import { usePortfolioStore } from "../stores/portfolio";
 import { goToSignIn } from "../utils/signIn";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
@@ -99,6 +100,7 @@ import {
 } from "../utils/pace";
 
 const auth = useAuthStore();
+const homeData = useHomeDataStore();
 const portfolio = usePortfolioStore();
 const router = useRouter();
 
@@ -263,42 +265,86 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   });
 }
 
-async function loadSpending() {
-  spendingLoading.value = true;
-  spendingError.value = "";
+async function refreshMonthReport(monthKey: string) {
+  try {
+    const r = await fetchReport(auth.isDemo, monthKey, auth.token || undefined);
+    if (currentMonthKey.value === monthKey) spendingReport.value = r;
+  } catch {
+    /* keep cached scoped report */
+  }
+}
+
+async function resolveSpendingReport(monthKey: string | null, bundle: HomeDataBundle) {
+  if (monthKey && isCycleMonthKey(monthKey)) {
+    spendingReport.value = await buildCycleReportForKey(monthKey);
+    return;
+  }
+  if (monthKey) {
+    const scoped = bundle.scoped_reports?.[monthKey];
+    if (scoped) {
+      spendingReport.value = scoped;
+      void refreshMonthReport(monthKey);
+      return;
+    }
+    spendingReport.value = await fetchReport(auth.isDemo, monthKey, auth.token || undefined);
+    return;
+  }
+  spendingReport.value = null;
+}
+
+async function applySpendingBundle(bundle: HomeDataBundle, opts: { preserveMonth?: boolean } = {}) {
+  months.value = bundle.months;
+  if (auth.isDemo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
+  configuredCharges.value = bundle.fixed_charges;
+  paceReport.value = bundle.report;
+  livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
+  livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
+    normalizeLivingBudgetMonthTopup,
+  );
+
+  const monthKey =
+    opts.preserveMonth && currentMonthKey.value
+      ? currentMonthKey.value
+      : defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
+  currentMonthKey.value = monthKey;
+  const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
+  pruneStaleManualCycleSpend(todayStart, {
+    statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
+    hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
+  });
+  await resolveSpendingReport(monthKey, bundle);
+}
+
+async function loadSpending(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
+  const cached = !options.force && !options.background && homeData.peek(demo, token, DEFAULT_PACE_MONTHS);
+
+  if (cached) {
+    try {
+      await applySpendingBundle(cached);
+      spendingLoading.value = false;
+      void loadSpending({ background: true });
+    } catch (e) {
+      spendingError.value = String(e);
+    }
+    return;
+  }
+
+  if (!options.background) {
+    spendingLoading.value = true;
+    spendingError.value = "";
+  }
   try {
-    const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
-    months.value = bundle.months;
-    if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
-    configuredCharges.value = bundle.fixed_charges;
-    paceReport.value = bundle.report;
-    livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
-    livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
-      normalizeLivingBudgetMonthTopup,
-    );
-
-    const monthKey = defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
-    currentMonthKey.value = monthKey;
-    const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
-    pruneStaleManualCycleSpend(todayStart, {
-      statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
-      hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
-    });
-
-    if (monthKey && isCycleMonthKey(monthKey)) {
-      spendingReport.value = await buildCycleReportForKey(monthKey);
-    } else if (monthKey) {
-      spendingReport.value = await fetchReport(demo, monthKey, token);
-    } else {
+    const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, options);
+    await applySpendingBundle(bundle, { preserveMonth: options.background });
+  } catch (e) {
+    if (!options.background) {
+      spendingError.value = String(e);
       spendingReport.value = null;
     }
-  } catch (e) {
-    spendingError.value = String(e);
-    spendingReport.value = null;
   } finally {
-    spendingLoading.value = false;
+    if (!options.background) spendingLoading.value = false;
   }
 }
 
@@ -308,7 +354,8 @@ onMounted(() => {
   void loadSpending();
   void loadCalendar();
   stopSpendingRefresh = onSpendingRefresh(() => {
-    void loadSpending();
+    homeData.invalidate();
+    void loadSpending({ force: true });
   });
 });
 

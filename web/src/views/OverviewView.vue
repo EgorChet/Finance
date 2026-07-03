@@ -175,7 +175,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { addExclusion, deleteStatementMonth, fetchHomeData, fetchMonths, fetchReport } from "../api/client";
+import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
@@ -239,9 +239,11 @@ import {
   type SpendingPeriodMode,
 } from "../utils/spendingPeriod";
 import { onSpendingRefresh } from "../composables/useSpendingRefresh";
+import { type HomeDataBundle, useHomeDataStore } from "../stores/homeData";
 import { DEFAULT_PACE_MONTHS } from "../utils/paceMonths";
 
 const auth = useAuthStore();
+const homeData = useHomeDataStore();
 const route = useRoute();
 const loading = ref(true);
 const reportLoading = ref(false);
@@ -523,6 +525,7 @@ async function afterExclusionChange() {
   summary.value = mapSummaryRows(m.summary, m.months);
   paceReportIsFull.value = false;
   monthReportCache.value.clear();
+  homeData.invalidate();
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
@@ -638,7 +641,7 @@ async function refreshReport(
 async function refreshConfiguredCharges() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
+  const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, { force: true });
   configuredCharges.value = bundle.fixed_charges;
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
@@ -665,6 +668,7 @@ async function onDeleteStatementMonth(key: string) {
     const m = await fetchMonths(demo, token);
     months.value = m.months;
     monthReportCache.value.delete(key);
+    homeData.invalidate();
     summary.value = mapSummaryRows(m.summary, m.months);
     paceReportIsFull.value = false;
     await refreshPaceReport();
@@ -766,41 +770,65 @@ function onPaceSettingsChange() {
   }
 }
 
-async function loadMonths() {
-  loading.value = true;
-  error.value = "";
+async function applyFromBundle(bundle: HomeDataBundle, opts: { preserveSelection?: boolean } = {}) {
+  months.value = bundle.months;
+  if (auth.isDemo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
+  seedMonthReportCache(bundle.scoped_reports);
+  summary.value = mapSummaryRows(bundle.summary, bundle.months);
+  configuredCharges.value = bundle.fixed_charges;
+  paceReport.value = bundle.report;
+  paceReportIsFull.value = false;
+  livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
+  livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
+    normalizeLivingBudgetMonthTopup(t),
+  );
+  const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
+  pruneStaleManualCycleSpend(todayStart, {
+    statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
+    hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
+  });
+  if (opts.preserveSelection) {
+    await refreshReport(selectedMonth.value);
+    return;
+  }
+  const queryMonth = typeof route.query.month === "string" ? route.query.month : null;
+  const initial =
+    queryMonth && bundle.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))
+      ? queryMonth
+      : defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
+  selectedMonth.value = initial;
+  txPeriod.value = defaultTxPeriod(initial);
+  await refreshReport(initial);
+}
+
+async function loadMonths(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && homeData.peek(demo, token, DEFAULT_PACE_MONTHS);
+
+  if (cached) {
+    try {
+      await applyFromBundle(cached);
+      loading.value = false;
+      void loadMonths({ background: true });
+    } catch (e) {
+      error.value = String(e);
+    }
+    return;
+  }
+
+  if (!options.background) {
+    loading.value = true;
+    error.value = "";
+  }
   try {
-    const demo = auth.isDemo;
-    const token = auth.token || undefined;
-    const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
-    months.value = bundle.months;
-    if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
-    seedMonthReportCache(bundle.scoped_reports);
-    summary.value = mapSummaryRows(bundle.summary, bundle.months);
-    configuredCharges.value = bundle.fixed_charges;
-    paceReport.value = bundle.report;
-    paceReportIsFull.value = false;
-    livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
-    livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
-      normalizeLivingBudgetMonthTopup(t),
-    );
-    const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
-    pruneStaleManualCycleSpend(todayStart, {
-      statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
-      hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
-    });
-    const queryMonth = typeof route.query.month === "string" ? route.query.month : null;
-    const initial =
-      queryMonth && bundle.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))
-        ? queryMonth
-        : defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
-    selectedMonth.value = initial;
-    txPeriod.value = defaultTxPeriod(initial);
-    await refreshReport(initial);
+    const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, options);
+    await applyFromBundle(bundle, { preserveSelection: options.background });
+    if (!options.background) error.value = "";
   } catch (e) {
-    error.value = String(e);
+    if (!options.background) error.value = String(e);
   } finally {
-    loading.value = false;
+    if (!options.background) loading.value = false;
   }
 }
 
@@ -811,7 +839,8 @@ onMounted(() => {
   stopSpendingRefresh = onSpendingRefresh(() => {
     paceReportIsFull.value = false;
     monthReportCache.value.clear();
-    void loadMonths();
+    homeData.invalidate();
+    void loadMonths({ force: true });
   });
 });
 
