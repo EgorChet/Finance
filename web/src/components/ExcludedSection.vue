@@ -26,7 +26,8 @@
             <span class="excluded-card-amount">{{ row.amount != null ? formatIls(row.amount) : "—" }}</span>
             <span class="excluded-card-date">{{ row.date ? formatTransactionDate(row.date) : "—" }}</span>
           </div>
-          <p class="excluded-card-merchant">{{ row.merchant_he || row.key }}</p>
+          <p class="excluded-card-merchant">{{ excludedMerchantLabel(row) }}</p>
+          <p v-if="excludedMerchantSubtitle(row)" class="excluded-card-merchant-sub">{{ excludedMerchantSubtitle(row) }}</p>
           <div class="excluded-card-footer">
             <p class="excluded-card-note">
               <span v-if="row.note">{{ row.note }}</span>
@@ -66,6 +67,17 @@ const error = ref("");
 const status = ref("");
 const entries = ref<ExcludedItem[]>([]);
 const restoringKey = ref<string | null>(null);
+
+function excludedMerchantLabel(row: ExcludedItem): string {
+  return row.merchant_en?.trim() || row.merchant_he?.trim() || row.key;
+}
+
+function excludedMerchantSubtitle(row: ExcludedItem): string | null {
+  const en = row.merchant_en?.trim();
+  const he = row.merchant_he?.trim();
+  if (!en || !he || en === he) return null;
+  return he;
+}
 
 async function load(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;

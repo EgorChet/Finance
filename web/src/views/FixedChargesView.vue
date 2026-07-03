@@ -106,83 +106,161 @@
 
         <div v-if="visibleRecurringGroups.length" class="recurring-groups">
           <section v-for="group in visibleRecurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
-            <header class="recurring-card-header">
-              <div>
-                <h3 class="recurring-card-title">{{ groupDisplayName(group) }}</h3>
-                <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
-              </div>
-              <div v-if="!auth.isDemo && isEditingGroup(group)" class="section-header-actions">
-                <IconButton icon="plus" label="Add period" :disabled="saving" @click="addSegment(group)" />
-              </div>
-            </header>
-
-            <ul class="charge-compact-list">
-              <li v-for="(seg, segIndex) in visibleGroupSegments(group)" :key="`${group.id}-${segIndex}`" class="charge-compact-row-wrap">
-                <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
-                  <div class="list-row__main">
-                    <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
-                    <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
-                  </div>
-                  <span
-                    class="list-row__status recurring-status"
-                    :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
-                  >
-                    {{ statusLabel(seg) }}
-                  </span>
-                  <button
-                    v-if="!auth.isDemo"
-                    type="button"
-                    class="btn btn-edit"
-                    :disabled="saving"
-                    @click="startEditCharge(seg)"
-                  >
-                    Edit
-                  </button>
+            <template v-if="singleVisibleSegment(group)">
+              <div
+                v-if="auth.isDemo || !isEditingCharge(singleVisibleSegment(group)!)"
+                class="list-row recurring-card-single"
+              >
+                <div class="list-row__main">
+                  <strong class="list-row__label">{{ groupDisplayName(group) }}</strong>
+                  <span class="list-row__meta">{{ recurringSegmentMeta(group, singleVisibleSegment(group)!) }}</span>
                 </div>
-
-                <EditPanel
-                  v-else
-                  title="Edit period"
-                  done-label="Save"
-                  :disabled="saving"
-                  deletable
-                  :delete-label="segmentDeleteLabel(group)"
-                  @done="finishEditCharge(seg)"
-                  @cancel="cancelEditCharge(seg)"
-                  @delete="deleteSegmentOrBill(group, seg)"
+                <span
+                  class="list-row__status recurring-status"
+                  :class="'recurring-status-' + segmentStatus(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month, referenceYm)"
                 >
-                  <div class="recurring-segment-row">
-                    <div class="field-group">
-                      <label class="field-label">Amount (₪)</label>
-                      <input
-                        v-model.number="seg.amount"
-                        class="input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        inputmode="decimal"
-                      />
-                    </div>
-                    <div class="field-group">
-                      <label class="field-label">From</label>
-                      <MonthSelect v-model="seg.from_month" />
-                    </div>
+                  {{ statusLabel(singleVisibleSegment(group)!) }}
+                </span>
+                <button
+                  v-if="!auth.isDemo"
+                  type="button"
+                  class="btn btn-edit"
+                  :disabled="saving"
+                  @click="startEditCharge(singleVisibleSegment(group)!)"
+                >
+                  Edit
+                </button>
+              </div>
+
+              <EditPanel
+                v-else
+                title="Edit recurring bill"
+                done-label="Save"
+                :disabled="saving"
+                deletable
+                :delete-label="segmentDeleteLabel(group)"
+                @done="finishEditCharge(singleVisibleSegment(group)!)"
+                @cancel="cancelEditCharge(singleVisibleSegment(group)!)"
+                @delete="deleteSegmentOrBill(group, singleVisibleSegment(group)!)"
+              >
+                <div class="recurring-segment-row">
+                  <div class="field-group">
+                    <label class="field-label">Amount (₪)</label>
+                    <input
+                      v-model.number="singleVisibleSegment(group)!.amount"
+                      class="input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputmode="decimal"
+                    />
                   </div>
-                  <div class="field-group recurring-segment-through">
-                    <label class="field-label">Through</label>
-                    <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
-                    <label class="recurring-ongoing recurring-ongoing--compact">
-                      <ToggleSwitch
-                        :model-value="isOngoingThrough(seg.through_month)"
-                        :disabled="saving"
-                        @update:model-value="toggleOngoing(seg, $event)"
-                      />
-                      <span class="recurring-ongoing-text">No end date</span>
-                    </label>
+                  <div class="field-group">
+                    <label class="field-label">From</label>
+                    <MonthSelect v-model="singleVisibleSegment(group)!.from_month" />
                   </div>
-                </EditPanel>
-              </li>
-            </ul>
+                </div>
+                <div class="field-group recurring-segment-through">
+                  <label class="field-label">Through</label>
+                  <MonthSelect
+                    v-if="!isOngoingThrough(singleVisibleSegment(group)!.through_month)"
+                    v-model="singleVisibleSegment(group)!.through_month"
+                  />
+                  <label class="recurring-ongoing recurring-ongoing--compact">
+                    <ToggleSwitch
+                      :model-value="isOngoingThrough(singleVisibleSegment(group)!.through_month)"
+                      :disabled="saving"
+                      @update:model-value="toggleOngoing(singleVisibleSegment(group)!, $event)"
+                    />
+                    <span class="recurring-ongoing-text">No end date</span>
+                  </label>
+                </div>
+              </EditPanel>
+            </template>
+
+            <template v-else>
+              <header class="recurring-card-header">
+                <div>
+                  <h3 class="recurring-card-title">{{ groupDisplayName(group) }}</h3>
+                  <p class="recurring-card-sub">{{ group.category_en }}</p>
+                </div>
+                <div v-if="!auth.isDemo && isEditingGroup(group)" class="section-header-actions">
+                  <IconButton icon="plus" label="Add period" :disabled="saving" @click="addSegment(group)" />
+                </div>
+              </header>
+
+              <ul class="charge-compact-list">
+                <li
+                  v-for="(seg, segIndex) in visibleGroupSegments(group)"
+                  :key="`${group.id}-${segIndex}`"
+                  class="charge-compact-row-wrap"
+                >
+                  <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
+                    <div class="list-row__main">
+                      <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
+                      <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                    </div>
+                    <span
+                      class="list-row__status recurring-status"
+                      :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
+                    >
+                      {{ statusLabel(seg) }}
+                    </span>
+                    <button
+                      v-if="!auth.isDemo"
+                      type="button"
+                      class="btn btn-edit"
+                      :disabled="saving"
+                      @click="startEditCharge(seg)"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  <EditPanel
+                    v-else
+                    title="Edit period"
+                    done-label="Save"
+                    :disabled="saving"
+                    deletable
+                    :delete-label="segmentDeleteLabel(group)"
+                    @done="finishEditCharge(seg)"
+                    @cancel="cancelEditCharge(seg)"
+                    @delete="deleteSegmentOrBill(group, seg)"
+                  >
+                    <div class="recurring-segment-row">
+                      <div class="field-group">
+                        <label class="field-label">Amount (₪)</label>
+                        <input
+                          v-model.number="seg.amount"
+                          class="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputmode="decimal"
+                        />
+                      </div>
+                      <div class="field-group">
+                        <label class="field-label">From</label>
+                        <MonthSelect v-model="seg.from_month" />
+                      </div>
+                    </div>
+                    <div class="field-group recurring-segment-through">
+                      <label class="field-label">Through</label>
+                      <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
+                      <label class="recurring-ongoing recurring-ongoing--compact">
+                        <ToggleSwitch
+                          :model-value="isOngoingThrough(seg.through_month)"
+                          :disabled="saving"
+                          @update:model-value="toggleOngoing(seg, $event)"
+                        />
+                        <span class="recurring-ongoing-text">No end date</span>
+                      </label>
+                    </div>
+                  </EditPanel>
+                </li>
+              </ul>
+            </template>
 
             <ul v-if="showEndedRecurring && endedGroupSegments(group).length" class="charge-compact-list household-ended-list">
               <li v-for="(seg, segIndex) in endedGroupSegments(group)" :key="`${group.id}-ended-${segIndex}`" class="charge-compact-row-wrap">
@@ -193,7 +271,7 @@
                   </div>
                   <span
                     class="list-row__status recurring-status"
-                    :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
+                    :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
                   >
                     {{ statusLabel(seg) }}
                   </span>
@@ -819,12 +897,21 @@ function throughLabel(throughMonth: string): string {
   return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
 }
 
+function singleVisibleSegment(group: ChargeGroup): ConfiguredCharge | null {
+  const visible = visibleGroupSegments(group);
+  return visible.length === 1 ? visible[0]! : null;
+}
+
+function recurringSegmentMeta(group: ChargeGroup, seg: ConfiguredCharge): string {
+  return `${group.category_en} · ${formatIls(seg.amount)} · ${monthRangeLabel(seg.from_month, seg.through_month)}`;
+}
+
 function statusLabel(seg: ConfiguredCharge): string {
   const s = segmentStatus(seg.from_month, seg.through_month, referenceYm.value);
   if (s === "ended") return "Ended";
-  if (s === "upcoming") return "Starts " + ymToLabel(seg.from_month);
-  if (isOngoingThrough(seg.through_month)) return "Active · ongoing";
-  return "Active · ends " + ymToLabel(seg.through_month);
+  if (s === "upcoming") return `Starts ${ymToLabel(seg.from_month)}`;
+  if (isOngoingThrough(seg.through_month)) return "Active";
+  return `Ends ${ymToLabel(seg.through_month)}`;
 }
 
 function oneTimeStatusLabel(chargeDate: string): string {
@@ -839,10 +926,6 @@ function oneTimeStatusClass(chargeDate: string): string {
   if (s === "upcoming") return "upcoming";
   if (s === "active") return "active";
   return "ended";
-}
-
-function timelineSummary(group: ChargeGroup): string {
-  return group.segments.map((s) => `${formatIls(s.amount)} (${monthRangeLabel(s.from_month, s.through_month)})`).join(" → ");
 }
 
 function toggleOngoing(seg: ConfiguredCharge, ongoing: boolean) {

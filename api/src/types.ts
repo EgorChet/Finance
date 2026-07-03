@@ -115,6 +115,7 @@ export interface ExclusionsData {
 export interface ExcludedItemView extends ExcludedEntry {
   date?: string;
   merchant_he?: string;
+  merchant_en?: string;
   amount?: number;
   can_restore: boolean;
 }

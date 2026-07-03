@@ -1,7 +1,14 @@
-import type { ExcludedEntry, ExcludedItemView, ExclusionsData, SpendingReport, Transaction } from "../types.js";
-import { readExclusions, writeExclusions } from "../storage/index.js";
+import type {
+  ExcludedEntry,
+  ExcludedItemView,
+  ExclusionsData,
+  MerchantRules,
+  SpendingReport,
+  Transaction,
+} from "../types.js";
+import { readExclusions, readFixedCharges, readRules, writeExclusions } from "../storage/index.js";
 import { rebuildReportSummaries } from "./fixedCharges.js";
-import { normalizeReviewKey } from "./reviewService.js";
+import { normalizeReviewKey, suggestEnglish } from "./reviewService.js";
 
 let cachedKeys: Set<string> | null = null;
 let cachedEntries: ExcludedEntry[] | null = null;
@@ -71,18 +78,46 @@ export function parseExclusionKey(key: string): { date?: string; merchant_he?: s
   };
 }
 
-export function enrichExclusion(entry: ExcludedEntry): ExcludedItemView {
+export function enrichExclusion(
+  entry: ExcludedEntry,
+  rules: MerchantRules = {},
+  fixedChargeNames = new Map<string, string>(),
+): ExcludedItemView {
   const parsed = parseExclusionKey(entry.key);
+  const merchantHe = parsed.merchant_he?.trim();
+  let merchantEn: string | undefined;
+  if (merchantHe) {
+    const fromRules = suggestEnglish(merchantHe, rules);
+    if (fromRules) merchantEn = fromRules;
+    else merchantEn = fixedChargeNames.get(merchantHe);
+  }
   return {
     ...entry,
     ...parsed,
+    merchant_en: merchantEn || undefined,
     can_restore: true,
   };
 }
 
+async function exclusionEnrichmentContext(): Promise<{
+  rules: MerchantRules;
+  fixedChargeNames: Map<string, string>;
+}> {
+  const [rules, fixed] = await Promise.all([readRules(), readFixedCharges()]);
+  const fixedChargeNames = new Map<string, string>();
+  for (const charge of fixed.charges || []) {
+    const en = charge.name_en?.trim();
+    if (!en) continue;
+    if (charge.name_he?.trim()) fixedChargeNames.set(charge.name_he.trim(), en);
+    fixedChargeNames.set(en, en);
+  }
+  return { rules, fixedChargeNames };
+}
+
 export async function listExclusions(): Promise<ExcludedItemView[]> {
   await refreshExclusionsCache();
-  return (cachedEntries || []).map(enrichExclusion);
+  const ctx = await exclusionEnrichmentContext();
+  return (cachedEntries || []).map((entry) => enrichExclusion(entry, ctx.rules, ctx.fixedChargeNames));
 }
 
 export async function addExclusion(key: string, note?: string): Promise<ExcludedItemView> {
@@ -109,8 +144,11 @@ export async function addExclusion(key: string, note?: string): Promise<Excluded
   await refreshExclusionsCache();
 
   const entry = cachedEntries?.find((e) => e.key === normalized);
+  const ctx = await exclusionEnrichmentContext();
   return enrichExclusion(
     entry || { key: normalized, note: note?.trim(), added_at: new Date().toISOString(), source: "user" },
+    ctx.rules,
+    ctx.fixedChargeNames,
   );
 }
 

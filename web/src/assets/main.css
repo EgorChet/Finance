@@ -3953,8 +3953,16 @@ table.rules select {
 }
 
 .excluded-card-merchant {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.25rem;
   font-size: 1rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.excluded-card-merchant-sub {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
   line-height: 1.35;
   word-break: break-word;
 }
@@ -4143,6 +4151,15 @@ table.rules select {
   margin: 0.2rem 0 0;
   color: var(--text-muted);
   font-size: 0.88rem;
+}
+
+.recurring-card-single {
+  padding: 0.85rem 1rem;
+}
+
+.recurring-card-single .list-row__label {
+  display: block;
+  margin-bottom: 0.2rem;
 }
 
 .recurring-card-actions {
