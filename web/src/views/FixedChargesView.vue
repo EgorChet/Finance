@@ -33,6 +33,7 @@
         v-model:segments="livingBudgetSegments"
         v-model:month-topups="livingBudgetMonthTopups"
         :configured-charges="charges"
+        :reference-ym="referenceYm"
         :readonly="auth.isDemo"
         :disabled="saving"
         @save="persistCharges"
@@ -502,7 +503,9 @@ import { invalidateHouseholdDataCaches } from "../stores/invalidateCaches";
 import { useHomeDataStore } from "../stores/homeData";
 import { type HouseholdBundle, useHouseholdDataStore } from "../stores/viewData";
 import { confirm } from "../composables/useConfirm";
+import { referenceDate, yearMonthForDate } from "../utils/appDate";
 import { formatIls } from "../utils/format";
+import { isoDateLocal } from "../utils/transactionPeriod";
 import {
   type ChargeGroup,
   type ConfiguredCharge,
@@ -537,6 +540,9 @@ const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
 const homeData = useHomeDataStore();
 const householdData = useHouseholdDataStore();
+const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
+const referenceYm = computed(() => yearMonthForDate(refDate.value));
+const referenceToday = computed(() => isoDateLocal(refDate.value));
 const loading = ref(true);
 const hydrated = ref(false);
 const saving = ref(false);
@@ -589,10 +595,10 @@ const oneTimeCharges = computed(() =>
     .sort((a, b) => (b.charge_date ?? "").localeCompare(a.charge_date ?? "")),
 );
 const visibleOneTimeCharges = computed(() =>
-  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!) !== "past"),
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) !== "past"),
 );
 const pastOneTimeCharges = computed(() =>
-  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!) === "past"),
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) === "past"),
 );
 const endedRecurringCount = computed(() =>
   recurringGroups.value.reduce((sum, group) => sum + endedGroupSegments(group).length, 0),
@@ -600,11 +606,15 @@ const endedRecurringCount = computed(() =>
 const hasUnsavedChanges = computed(() => hydrated.value && isDirty());
 
 function visibleGroupSegments(group: ChargeGroup) {
-  return group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month) !== "ended");
+  return group.segments.filter(
+    (seg) => segmentStatus(seg.from_month, seg.through_month, referenceYm.value) !== "ended",
+  );
 }
 
 function endedGroupSegments(group: ChargeGroup) {
-  return group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month) === "ended");
+  return group.segments.filter(
+    (seg) => segmentStatus(seg.from_month, seg.through_month, referenceYm.value) === "ended",
+  );
 }
 
 function editRecurringCharge(chargeId: string, fromMonth: string) {
@@ -810,7 +820,7 @@ function throughLabel(throughMonth: string): string {
 }
 
 function statusLabel(seg: ConfiguredCharge): string {
-  const s = segmentStatus(seg.from_month, seg.through_month);
+  const s = segmentStatus(seg.from_month, seg.through_month, referenceYm.value);
   if (s === "ended") return "Ended";
   if (s === "upcoming") return "Starts " + ymToLabel(seg.from_month);
   if (isOngoingThrough(seg.through_month)) return "Active · ongoing";
@@ -818,14 +828,14 @@ function statusLabel(seg: ConfiguredCharge): string {
 }
 
 function oneTimeStatusLabel(chargeDate: string): string {
-  const s = oneTimeStatus(chargeDate);
+  const s = oneTimeStatus(chargeDate, referenceToday.value);
   if (s === "upcoming") return "Scheduled · " + dateToLabel(chargeDate);
   if (s === "active") return "Today";
   return dateToLabel(chargeDate);
 }
 
 function oneTimeStatusClass(chargeDate: string): string {
-  const s = oneTimeStatus(chargeDate);
+  const s = oneTimeStatus(chargeDate, referenceToday.value);
   if (s === "upcoming") return "upcoming";
   if (s === "active") return "active";
   return "ended";

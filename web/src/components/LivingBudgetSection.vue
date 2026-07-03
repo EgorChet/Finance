@@ -399,7 +399,7 @@ import { formatIls } from "../utils/format";
 import type { ConfiguredCharge } from "../utils/fixedCharges";
 import { capAdditionPeriodsForSegment } from "../utils/budgetCapAdditions";
 import { calendarMonthsInSegment } from "../utils/fatherInjection";
-import { compareMonthTopups, compareTemporalRanges, isPastMonth } from "../utils/householdUi";
+import { compareMonthTopups, compareTemporalRanges, isArchivedTopupMonth } from "../utils/householdUi";
 import {
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
@@ -418,8 +418,9 @@ const props = withDefaults(
     readonly?: boolean;
     disabled?: boolean;
     configuredCharges?: ConfiguredCharge[];
+    referenceYm?: string;
   }>(),
-  { readonly: false, disabled: false, configuredCharges: () => [] },
+  { readonly: false, disabled: false, configuredCharges: () => [], referenceYm: undefined },
 );
 
 const emit = defineEmits<{
@@ -438,6 +439,8 @@ const topupIsNew = ref(false);
 const showEndedBudget = ref(false);
 const showPastTopups = ref(false);
 
+const nowYm = computed(() => props.referenceYm ?? currentYearMonth());
+
 const indexedSegments = computed(() => segments.value.map((seg, index) => ({ seg, index })));
 
 const sortedSegments = computed(() =>
@@ -447,18 +450,19 @@ const sortedSegments = computed(() =>
       a.seg.through_month,
       b.seg.from_month,
       b.seg.through_month,
+      nowYm.value,
     ),
   ),
 );
 
 const headlineSegment = computed(() => {
   const active = sortedSegments.value.find(
-    ({ seg }) => segmentStatus(seg.from_month, seg.through_month) === "active",
+    ({ seg }) => segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "active",
   );
   if (active) return active;
   return (
     sortedSegments.value.find(
-      ({ seg }) => segmentStatus(seg.from_month, seg.through_month) === "upcoming",
+      ({ seg }) => segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "upcoming",
     ) ?? null
   );
 });
@@ -466,13 +470,14 @@ const headlineSegment = computed(() => {
 const headlineSegmentIsActive = computed(
   () =>
     !!headlineSegment.value &&
-    segmentStatus(headlineSegment.value.seg.from_month, headlineSegment.value.seg.through_month) === "active",
+    segmentStatus(headlineSegment.value.seg.from_month, headlineSegment.value.seg.through_month, nowYm.value) ===
+      "active",
 );
 
 const listedSegments = computed(() => {
   const headline = headlineSegment.value;
   return sortedSegments.value.filter(({ seg }) => {
-    if (segmentStatus(seg.from_month, seg.through_month) === "ended") return false;
+    if (segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "ended") return false;
     if (!headline) return true;
     return seg !== headline.seg;
   });
@@ -480,20 +485,20 @@ const listedSegments = computed(() => {
 
 const endedSegments = computed(() =>
   sortedSegments.value.filter(
-    ({ seg }) => segmentStatus(seg.from_month, seg.through_month) === "ended",
+    ({ seg }) => segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "ended",
   ),
 );
 
 const sortedMonthTopups = computed(() =>
-  [...monthTopups.value].sort((a, b) => compareMonthTopups(a.month, b.month)),
+  [...monthTopups.value].sort((a, b) => compareMonthTopups(a.month, b.month, nowYm.value)),
 );
 
 const visibleMonthTopups = computed(() =>
-  sortedMonthTopups.value.filter((topup) => !isPastMonth(topup.month)),
+  sortedMonthTopups.value.filter((topup) => !isArchivedTopupMonth(topup.month, nowYm.value)),
 );
 
 const pastMonthTopups = computed(() =>
-  sortedMonthTopups.value.filter((topup) => isPastMonth(topup.month)),
+  sortedMonthTopups.value.filter((topup) => isArchivedTopupMonth(topup.month, nowYm.value)),
 );
 
 const segmentDeleteLabel = computed(() =>
@@ -501,7 +506,7 @@ const segmentDeleteLabel = computed(() =>
 );
 
 function representativeMonth(seg: LivingBudgetSegment): string {
-  const now = currentYearMonth();
+  const now = nowYm.value;
   if (seg.from_month <= now && now <= seg.through_month) return now;
   return seg.from_month;
 }
@@ -614,7 +619,7 @@ function toggleOngoing(seg: LivingBudgetSegment, ongoing: boolean) {
   if (ongoing) {
     seg.through_month = ONGOING_THROUGH_MONTH;
   } else if (isOngoingThrough(seg.through_month)) {
-    seg.through_month = currentYearMonth();
+    seg.through_month = nowYm.value;
   }
 }
 
@@ -633,7 +638,7 @@ function prevMonthBefore(ym: string): string {
 function addSegment() {
   const sorted = [...segments.value].sort((a, b) => a.from_month.localeCompare(b.from_month));
   const last = sorted[sorted.length - 1];
-  let fromMonth = currentYearMonth();
+  let fromMonth = nowYm.value;
   if (last) {
     if (isOngoingThrough(last.through_month)) {
       const prevYm = prevMonthBefore(fromMonth);
@@ -680,7 +685,7 @@ async function removeSegment(seg: LivingBudgetSegment) {
 
 function addMonthTopup() {
   const used = new Set(monthTopups.value.map((t) => t.month));
-  let month = currentYearMonth();
+  let month = nowYm.value;
   while (used.has(month)) {
     month = nextMonthAfter(month);
   }

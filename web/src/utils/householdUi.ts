@@ -1,4 +1,5 @@
 import { currentYearMonth, segmentStatus } from "./fixedCharges";
+import { previousCalendarMonth } from "./livingBudget";
 
 export type TemporalBucket = "active" | "upcoming" | "ended";
 
@@ -29,9 +30,14 @@ export function isPastMonth(month: string, nowYm = currentYearMonth()): boolean 
   return month < nowYm;
 }
 
+/** Hide month extras older than the previous calendar month (keep current + last month visible). */
+export function isArchivedTopupMonth(month: string, nowYm = currentYearMonth()): boolean {
+  return month < previousCalendarMonth(nowYm);
+}
+
 export function compareMonthTopups(aMonth: string, bMonth: string, nowYm = currentYearMonth()): number {
-  const aPast = isPastMonth(aMonth, nowYm);
-  const bPast = isPastMonth(bMonth, nowYm);
-  if (aPast !== bPast) return aPast ? 1 : -1;
+  const aArchived = isArchivedTopupMonth(aMonth, nowYm);
+  const bArchived = isArchivedTopupMonth(bMonth, nowYm);
+  if (aArchived !== bArchived) return aArchived ? 1 : -1;
   return bMonth.localeCompare(aMonth);
 }
