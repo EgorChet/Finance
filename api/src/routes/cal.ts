@@ -1,27 +1,20 @@
 import { Router } from "express";
-import { createHash } from "crypto";
-import {
-  finalizeStatementByKey,
-  normalizeProvisionalChargesAsync,
-  rememberReport,
-} from "../services/reportService.js";
-import { getFinalizeVersion } from "../services/finalizeVersion.js";
-import { analyzeFileBuffer } from "../services/analyzerClient.js";
 import {
   cancelCalJob,
   consumeCalJob,
   createCalSyncJob,
+  getCalJob,
   getCalJobStatus,
+  releaseCalJob,
   submitCalOtpCode,
 } from "../services/calSyncService.js";
+import { persistCalSyncExport } from "../services/calSyncPersist.js";
 import {
   calSyncEnabled,
   maskNationalId,
   readCalCredentials,
   writeCalCredentials,
 } from "../storage/calCredentials.js";
-import { readRules, readStatements, writeStatements } from "../storage/index.js";
-import { openCycleBillingDate } from "../utils/billingCycle.js";
 
 const router = Router();
 
@@ -68,28 +61,6 @@ router.put("/credentials", async (req, res) => {
   }
 });
 
-async function savePartialCalReportFromXlsx(buffer: Buffer, filename: string) {
-  const billingDate = openCycleBillingDate();
-  const report = await analyzeFileBuffer(buffer, filename, true);
-  const storedReport = await normalizeProvisionalChargesAsync(report);
-  const hash = createHash("sha256").update(buffer).digest("hex");
-
-  const data = await readStatements();
-  const rules = await readRules();
-  const key = rememberReport(
-    data,
-    storedReport,
-    `cal-sync:${billingDate}`,
-    filename,
-    hash,
-    true,
-  );
-  const version = await getFinalizeVersion();
-  await finalizeStatementByKey(data, key, rules, version);
-  await writeStatements(data);
-  return { key, report: data.statements[key]!.report };
-}
-
 router.post("/sync/start", async (_req, res) => {
   try {
     assertCalEnabled();
@@ -125,7 +96,8 @@ router.get("/sync/:jobId/status", (req, res) => {
 router.post("/sync/:jobId/finish", async (req, res) => {
   try {
     assertCalEnabled();
-    const status = getCalJobStatus(req.params.jobId);
+    const jobId = req.params.jobId;
+    const status = getCalJobStatus(jobId);
     if (!status) {
       res.status(404).json({ error: "Sync session not found" });
       return;
@@ -134,13 +106,25 @@ router.post("/sync/:jobId/finish", async (req, res) => {
       res.status(400).json({ error: status.error || "Cal sync failed" });
       return;
     }
+    if (status.saved && status.statementKey) {
+      releaseCalJob(jobId);
+      res.json({ ok: true, status: "done", key: status.statementKey });
+      return;
+    }
     if (status.status !== "done") {
       res.status(409).json({ error: "Sync not finished yet", status: status.status });
       return;
     }
 
-    const { buffer, filename } = consumeCalJob(req.params.jobId);
-    const saved = await savePartialCalReportFromXlsx(buffer, filename);
+    const job = getCalJob(jobId);
+    if (!job?.xlsxBuffer?.length) {
+      res.status(409).json({ error: "Sync export not available anymore" });
+      return;
+    }
+
+    const { buffer, filename } = consumeCalJob(jobId);
+    const saved = await persistCalSyncExport(buffer, filename);
+    releaseCalJob(jobId);
     res.json({ ok: true, status: "done", ...saved });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

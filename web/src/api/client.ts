@@ -300,6 +300,8 @@ export type CalJobStatusResponse = {
   message: string | null;
   error: string | null;
   logs: { at: string; message: string }[];
+  saved?: boolean;
+  statementKey?: string | null;
 };
 
 export async function startCalSync(token?: string) {

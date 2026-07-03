@@ -3,11 +3,13 @@ import { tmpdir } from "os";
 import { join } from "path";
 import puppeteer, { type Browser, type Frame, type Page } from "puppeteer";
 import type { CalCredentialsData } from "../storage/calCredentials.js";
+import { persistCalSyncExport } from "./calSyncPersist.js";
 
 const LOGIN_URL = "https://www.cal-online.co.il/";
 const DIGITAL_URL = "https://digital-web.cal-online.co.il/";
 
-const JOB_TTL_MS = 5 * 60 * 1000;
+const JOB_IDLE_TTL_MS = 10 * 60 * 1000;
+const JOB_MAX_AGE_MS = 20 * 60 * 1000;
 const OTP_WAIT_MS = 3 * 60 * 1000;
 const PHASE_TIMEOUT_MS = 180_000;
 const DASHBOARD_TIMEOUT_MS = 150_000;
@@ -16,7 +18,14 @@ const MAX_LOG_LINES = 80;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 
-export type CalJobStatus = "starting" | "otp_required" | "scraping" | "done" | "error" | "cancelled";
+export type CalJobStatus =
+  | "starting"
+  | "otp_required"
+  | "scraping"
+  | "saving"
+  | "done"
+  | "error"
+  | "cancelled";
 
 export interface CalSyncLogEntry {
   at: string;
@@ -31,6 +40,7 @@ export interface CalSyncJob {
   error?: string;
   xlsxBuffer?: Buffer;
   xlsxFilename?: string;
+  savedStatementKey?: string;
   createdAt: number;
   updatedAt: number;
   browser?: Browser;
@@ -182,7 +192,12 @@ async function clickByText(target: PageOrFrame, text: string): Promise<void> {
 function purgeExpiredJobs(): void {
   const now = Date.now();
   for (const [id, job] of jobs) {
-    if (now - job.createdAt > JOB_TTL_MS) void cleanupJob(id);
+    const age = now - job.createdAt;
+    const idle = now - job.updatedAt;
+    const terminal =
+      job.status === "done" || job.status === "error" || job.status === "cancelled";
+    if (age > JOB_MAX_AGE_MS) void cleanupJob(id);
+    else if (terminal && idle > JOB_IDLE_TTL_MS) void cleanupJob(id);
   }
 }
 
@@ -532,8 +547,14 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     const exported = await exportTransactionsExcel(page, job, creds.card_last4);
     job.xlsxBuffer = exported.buffer;
     job.xlsxFilename = exported.filename;
+
+    job.status = "saving";
+    jobLog(job, "Saving statement…");
+    const saved = await persistCalSyncExport(exported.buffer, exported.filename);
+    job.savedStatementKey = saved.key;
+    job.xlsxBuffer = undefined;
     job.status = "done";
-    jobLog(job, "Sync complete");
+    jobLog(job, "Sync complete — statement saved");
   } catch (e) {
     job.status = "error";
     job.error = e instanceof Error ? e.message : String(e);
@@ -567,6 +588,8 @@ export function getCalJobStatus(jobId: string): {
   message: string | null;
   error: string | null;
   logs: CalSyncLogEntry[];
+  saved: boolean;
+  statementKey: string | null;
 } | null {
   const job = getCalJob(jobId);
   if (!job) return null;
@@ -576,6 +599,8 @@ export function getCalJobStatus(jobId: string): {
     message: job.message ?? null,
     error: job.error ?? null,
     logs: job.logs,
+    saved: Boolean(job.savedStatementKey),
+    statementKey: job.savedStatementKey ?? null,
   };
 }
 
@@ -646,6 +671,10 @@ export function consumeCalJob(jobId: string): { buffer: Buffer; filename: string
   const job = getCalJob(jobId);
   if (!job?.xlsxBuffer?.length) throw new Error("No Excel export from Cal sync");
   const result = { buffer: job.xlsxBuffer, filename: job.xlsxFilename || "cal-export.xlsx" };
-  jobs.delete(jobId);
+  job.xlsxBuffer = undefined;
   return result;
+}
+
+export function releaseCalJob(jobId: string): void {
+  jobs.delete(jobId);
 }

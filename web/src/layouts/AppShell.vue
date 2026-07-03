@@ -356,6 +356,7 @@ import { emitSpendingRefresh } from "../composables/useSpendingRefresh";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
 import { usePortfolioStore } from "../stores/portfolio";
+import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "../utils/calSyncSession";
 import { goToSignIn } from "../utils/signIn";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
@@ -572,6 +573,7 @@ function stopCalSyncBackground() {
     calSyncPollTimer = null;
   }
   calSyncBgJobId = null;
+  clearCalSyncJobId();
 }
 
 function dismissCalSyncFloat() {
@@ -596,8 +598,10 @@ async function pollCalSyncBackground(jobId: string) {
 
     if (status.status === "done") {
       stopCalSyncBackground();
-      calSyncFloat.value = { message: "Saving statement…", state: "syncing" };
-      await finishCalSync(jobId, auth.token || undefined);
+      if (!status.saved) {
+        calSyncFloat.value = { message: "Saving statement…", state: "syncing" };
+        await finishCalSync(jobId, auth.token || undefined);
+      }
       calSyncFloat.value = { message: "Cal sync complete", state: "done" };
       calSyncDoneTimer = window.setTimeout(dismissCalSyncFloat, 3500);
       refreshAfterCalSync();
@@ -630,11 +634,33 @@ function onCalSyncBackground(jobId: string) {
   calSyncOpen.value = false;
   stopCalSyncBackground();
   calSyncBgJobId = jobId;
+  saveCalSyncJobId(jobId);
   calSyncFloat.value = { message: "Syncing with Cal…", state: "syncing" };
   void pollCalSyncBackground(jobId);
   calSyncPollTimer = setInterval(() => {
     void pollCalSyncBackground(jobId);
   }, 1000);
+}
+
+async function resumeCalSyncIfNeeded() {
+  if (!calSyncEnabled.value || auth.isDemo) return;
+  const jobId = readCalSyncJobId();
+  if (!jobId || calSyncBgJobId) return;
+  try {
+    const status = await fetchCalJobStatus(jobId, auth.token || undefined);
+    if (status.status === "done") {
+      clearCalSyncJobId();
+      refreshAfterCalSync();
+      return;
+    }
+    if (status.status === "error") {
+      clearCalSyncJobId();
+      return;
+    }
+    onCalSyncBackground(jobId);
+  } catch {
+    clearCalSyncJobId();
+  }
 }
 
 function openCalSync() {
@@ -649,7 +675,7 @@ function onCalSyncError(message: string) {
 }
 
 onMounted(() => {
-  void loadCalSyncConfig();
+  void loadCalSyncConfig().then(() => resumeCalSyncIfNeeded());
   portfolio.startPolling(auth.isDemo, auth.token || undefined);
 });
 
