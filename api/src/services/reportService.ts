@@ -13,12 +13,22 @@ import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
 import { dedupeTransactionSnapshots, normalizeForeignCharges, shouldSkipNonSpendRow } from "../utils/fx.js";
 import { prefetchRatesForPending } from "../utils/fxRates.js";
+import { getFinalizeVersion } from "./finalizeVersion.js";
+
+/** Default billing keys for pace baseline: current + 3 past months. */
+export const DEFAULT_PACE_MONTHS = 4;
 
 /** Retired categories merged into another for display and totals. */
 const CATEGORY_ALIASES: Record<string, string> = {
   "Sibus Flexi": "Groceries",
   "Home & Electronics": "Home & Furniture",
 };
+
+const finalizedMemo = new Map<string, SpendingReport>();
+
+function memoKey(billingKey: string, version: string): string {
+  return `${billingKey}:${version}`;
+}
 
 function remapLegacyCategories(report: SpendingReport): SpendingReport {
   let changed = false;
@@ -61,6 +71,32 @@ export async function finalizeReportAsync(report: SpendingReport): Promise<Spend
   return finalizeReport(report);
 }
 
+export function getFinalizedReport(entry: StatementEntry, version: string): SpendingReport {
+  if (entry.finalize_version === version) {
+    const mk = memoKey(entry.billing_key, version);
+    const cached = finalizedMemo.get(mk);
+    if (cached) return cached;
+    finalizedMemo.set(mk, entry.report);
+    return entry.report;
+  }
+  const finalized = finalizeReport(entry.report);
+  finalizedMemo.set(memoKey(entry.billing_key, version), finalized);
+  return finalized;
+}
+
+export async function persistFinalizedStatementAsync(
+  entry: StatementEntry,
+  version: string,
+): Promise<void> {
+  entry.report = await finalizeReportAsync(entry.report);
+  entry.finalize_version = version;
+  entry.summary = {
+    total: entry.report.total_spent,
+    transaction_count: entry.report.transaction_count,
+  };
+  finalizedMemo.set(memoKey(entry.billing_key, version), entry.report);
+}
+
 function billingKey(dateStr: string | undefined): string {
   if (!dateStr) return "unknown";
   return dateStr.slice(0, 10);
@@ -86,10 +122,27 @@ export function monthCatalog(data: StatementsData): MonthCatalogItem[] {
     });
 }
 
-export function summaryRows(data: StatementsData) {
+export function recentBillingKeys(data: StatementsData, count: number): string[] {
+  return monthCatalog(data)
+    .sort((a, b) => b.key.localeCompare(a.key))
+    .slice(0, Math.max(1, count))
+    .map((m) => m.key);
+}
+
+export function summaryRows(data: StatementsData, version: string) {
   return monthCatalog(data).map((m) => {
     const entry = data.statements[m.key];
-    const report = finalizeReport(entry.report);
+    if (entry.finalize_version === version && entry.summary) {
+      return {
+        month: m.label,
+        billing_date: m.billing_date,
+        total: entry.summary.total,
+        transactions: entry.summary.transaction_count,
+        source_file: entry.source_file,
+        partial: entry.provisional === true,
+      };
+    }
+    const report = getFinalizedReport(entry, version);
     return {
       month: m.label,
       billing_date: m.billing_date,
@@ -160,7 +213,9 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
 export async function getCombinedReportAsync(
   data: StatementsData,
   keys: string[] | null,
+  version?: string,
 ): Promise<SpendingReport | null> {
+  const finalizeVersion = version ?? await getFinalizeVersion();
   const entries = Object.values(data.statements).sort((a, b) =>
     a.billing_key.localeCompare(b.billing_key),
   );
@@ -178,13 +233,13 @@ export async function getCombinedReportAsync(
   await prefetchRatesForPending(selected.flatMap((e) => e.report.transactions));
 
   if (selected.length === 1) {
-    return finalizeReport(selected[0].report);
+    return getFinalizedReport(selected[0], finalizeVersion);
   }
 
   const labels = selected.map((e) => e.month_label);
   const label = `${labels[0]} – ${labels[labels.length - 1]} (${selected.length} months)`;
   return combineReports(
-    selected.map((e) => finalizeReport(e.report)),
+    selected.map((e) => getFinalizedReport(e, finalizeVersion)),
     label,
   );
 }
@@ -192,6 +247,7 @@ export async function getCombinedReportAsync(
 export function getCombinedReport(
   data: StatementsData,
   keys: string[] | null,
+  version: string,
 ): SpendingReport | null {
   const entries = Object.values(data.statements).sort((a, b) =>
     a.billing_key.localeCompare(b.billing_key),
@@ -207,13 +263,13 @@ export function getCombinedReport(
   }
   if (!selected.length) return null;
   if (selected.length === 1) {
-    return finalizeReport(selected[0].report);
+    return getFinalizedReport(selected[0], version);
   }
 
   const labels = selected.map((e) => e.month_label);
   const label = `${labels[0]} – ${labels[labels.length - 1]} (${selected.length} months)`;
   return combineReports(
-    selected.map((e) => finalizeReport(e.report)),
+    selected.map((e) => getFinalizedReport(e, version)),
     label,
   );
 }
@@ -272,41 +328,67 @@ export function deleteStatementByKey(data: StatementsData, key: string): boolean
   return true;
 }
 
-/** Apply saved merchant rules to all statements and rebuild summaries (no Python call). */
-export function applyMerchantRules(data: StatementsData, rules: MerchantRules): number {
+/** Patch merchant/category fields on one report (no finalize). */
+export function patchMerchantRulesOnReport(report: SpendingReport, rules: MerchantRules): number {
   let changed = 0;
-  for (const entry of Object.values(data.statements)) {
-    for (const tx of entry.report.transactions) {
-      const rule = rules[tx.merchant_he];
-      if (rule?.english) {
-        const fromRule = rule.english.trim();
-        if (tx.merchant_en !== fromRule) {
-          tx.merchant_en = fromRule;
-          changed += 1;
-        }
-      } else if (tx.merchant_en) {
-        const canon = canonicalMerchantEnglish(tx.merchant_en, tx.merchant_he);
-        if (tx.merchant_en !== canon) {
-          tx.merchant_en = canon;
-          changed += 1;
-        }
+  for (const tx of report.transactions) {
+    const rule = rules[tx.merchant_he];
+    if (rule?.english) {
+      const fromRule = rule.english.trim();
+      if (tx.merchant_en !== fromRule) {
+        tx.merchant_en = fromRule;
+        changed += 1;
       }
-      if (rule?.category && tx.category_en !== rule.category) {
-        tx.category_en = rule.category;
+    } else if (tx.merchant_en) {
+      const canon = canonicalMerchantEnglish(tx.merchant_en, tx.merchant_he);
+      if (tx.merchant_en !== canon) {
+        tx.merchant_en = canon;
         changed += 1;
       }
     }
-    entry.report = rebuildReportSummaries(finalizeReport(entry.report));
+    if (rule?.category && tx.category_en !== rule.category) {
+      tx.category_en = rule.category;
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
+/** Finalize one statement after upload — does not touch other months. */
+export async function finalizeStatementByKey(
+  data: StatementsData,
+  key: string,
+  rules: MerchantRules,
+  version: string,
+): Promise<number> {
+  const entry = data.statements[key];
+  if (!entry) return 0;
+  const changed = patchMerchantRulesOnReport(entry.report, rules);
+  await persistFinalizedStatementAsync(entry, version);
+  return changed;
+}
+
+/** Apply saved merchant rules to all statements and rebuild summaries (no Python call). */
+export async function applyMerchantRules(
+  data: StatementsData,
+  rules: MerchantRules,
+  version: string,
+): Promise<number> {
+  let changed = 0;
+  for (const entry of Object.values(data.statements)) {
+    changed += patchMerchantRulesOnReport(entry.report, rules);
+    await persistFinalizedStatementAsync(entry, version);
   }
   return changed;
 }
 
 /** Re-run FX/refund normalization and rebuild summaries for all stored statements. */
 export async function reprocessAllStatements(data: StatementsData): Promise<{ updated: number }> {
+  const version = await getFinalizeVersion();
   let updated = 0;
   for (const entry of Object.values(data.statements)) {
     const before = JSON.stringify(entry.report.transactions);
-    entry.report = await finalizeReportAsync(entry.report);
+    await persistFinalizedStatementAsync(entry, version);
     if (JSON.stringify(entry.report.transactions) !== before) {
       updated += 1;
     }

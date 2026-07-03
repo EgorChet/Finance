@@ -25,6 +25,11 @@
             :cycle-day="cycleDay"
             :reference-date="refDate"
           />
+          <div v-if="showPaceHistoryExpand" class="home-card-actions home-pace-expand">
+            <button type="button" class="btn btn-ghost btn-sm" @click="expandPaceHistory">
+              Show more history ({{ paceExpandLabel }})
+            </button>
+          </div>
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
           </div>
@@ -41,42 +46,39 @@
     />
 
     <PortfolioSummaryCard
-      :loading="portfolioLoading"
-      :refreshing="portfolioRefreshing"
+      :loading="portfolio.loading"
+      :refreshing="portfolio.refreshing"
       :demo="auth.isDemo"
-      :kaspa="kaspaQuote"
-      :fxcn="fxcnQuote"
-      :market="marketSnapshot"
-      @refresh="refreshPortfolio(true)"
+      :kaspa="portfolio.kaspaQuote"
+      :fxcn="portfolio.fxcnQuote"
+      :market="portfolio.marketSnapshot"
+      @refresh="portfolio.refresh(auth.isDemo, auth.token || undefined, true)"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import {
-  fetchCalendar,
-  fetchFxcnQuote,
-  fetchHomeData,
-  fetchKaspaQuote,
-  fetchMarketSnapshot,
-  fetchReport,
-  type FxcnQuote,
-  type KaspaQuote,
-  type MarketSnapshot,
-} from "../api/client";
+import { fetchCalendar, fetchHomeData, fetchReport } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import PortfolioSummaryCard from "../components/home/PortfolioSummaryCard.vue";
 import UpcomingEventsCard from "../components/home/UpcomingEventsCard.vue";
+import { onSpendingRefresh } from "../composables/useSpendingRefresh";
 import { useAuthStore } from "../stores/auth";
+import { usePortfolioStore } from "../stores/portfolio";
 import { goToSignIn } from "../utils/signIn";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
 import { everydaySpendingTotal } from "../utils/householdBudget";
 import { computeLivePaceHealth } from "../utils/paceHealth";
+import {
+  DEFAULT_PACE_MONTHS,
+  nextPaceMonths,
+  paceMonthsLabel,
+} from "../utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
@@ -106,13 +108,8 @@ import {
 } from "../utils/pace";
 
 const auth = useAuthStore();
+const portfolio = usePortfolioStore();
 const router = useRouter();
-
-const portfolioLoading = ref(true);
-const portfolioRefreshing = ref(false);
-const kaspaQuote = ref<KaspaQuote | null>(null);
-const fxcnQuote = ref<FxcnQuote | null>(null);
-const marketSnapshot = ref<MarketSnapshot | null>(null);
 
 const calendarLoading = ref(true);
 const calendarError = ref("");
@@ -128,9 +125,20 @@ const configuredCharges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<ReturnType<typeof normalizeLivingBudgetSegment>[]>([]);
 const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonthTopup>[]>([]);
 const cycleDay = ref(loadCycleDay());
+const paceMonthsWindow = ref(DEFAULT_PACE_MONTHS);
+const paceReportIsFull = ref(false);
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
 const todayIso = computed(() => refDate.value.toISOString().slice(0, 10));
+
+const showPaceHistoryExpand = computed(
+  () => showPaceHealth.value && !paceReportIsFull.value && paceMonthsWindow.value > 0,
+);
+
+const paceExpandLabel = computed(() => {
+  const next = nextPaceMonths(paceMonthsWindow.value);
+  return paceMonthsLabel(next);
+});
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
@@ -231,28 +239,6 @@ const overviewLink = computed(() => {
   return { name: "overview" as const, query: { month: currentMonthKey.value } };
 });
 
-async function refreshPortfolio(force = false) {
-  if (force) portfolioRefreshing.value = true;
-  else portfolioLoading.value = true;
-  const demo = auth.isDemo;
-  const token = auth.token || undefined;
-  try {
-    const [kas, fxcn, market] = await Promise.all([
-      fetchKaspaQuote(demo, token, force),
-      fetchFxcnQuote(demo, token, force),
-      fetchMarketSnapshot(demo, token, force),
-    ]);
-    kaspaQuote.value = kas;
-    fxcnQuote.value = fxcn;
-    marketSnapshot.value = market;
-  } catch {
-    /* keep stale values */
-  } finally {
-    portfolioLoading.value = false;
-    portfolioRefreshing.value = false;
-  }
-}
-
 async function loadCalendar() {
   calendarLoading.value = true;
   calendarError.value = "";
@@ -297,17 +283,30 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   });
 }
 
+async function loadPaceReport(forceFull = false) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  if (forceFull || paceReportIsFull.value) {
+    paceReport.value = await fetchReport(demo, null, token);
+    paceReportIsFull.value = true;
+    return;
+  }
+  const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+  paceReport.value = bundle.report;
+}
+
 async function loadSpending() {
   spendingLoading.value = true;
   spendingError.value = "";
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    const bundle = await fetchHomeData(demo, token);
+    const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
     months.value = bundle.months;
     if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
     configuredCharges.value = bundle.fixed_charges;
     paceReport.value = bundle.report;
+    paceReportIsFull.value = false;
     livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
     livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
       normalizeLivingBudgetMonthTopup,
@@ -336,9 +335,40 @@ async function loadSpending() {
   }
 }
 
+async function expandPaceHistory() {
+  const next = nextPaceMonths(paceMonthsWindow.value);
+  if (next === 0) {
+    spendingLoading.value = true;
+    try {
+      await loadPaceReport(true);
+    } finally {
+      spendingLoading.value = false;
+    }
+    return;
+  }
+  paceMonthsWindow.value = next;
+  spendingLoading.value = true;
+  try {
+    await loadPaceReport();
+  } finally {
+    spendingLoading.value = false;
+  }
+}
+
+let stopSpendingRefresh: (() => void) | undefined;
+
 onMounted(() => {
-  void loadSpending().finally(() => void refreshPortfolio());
+  void loadSpending();
   void loadCalendar();
+  stopSpendingRefresh = onSpendingRefresh(() => {
+    paceMonthsWindow.value = DEFAULT_PACE_MONTHS;
+    paceReportIsFull.value = false;
+    void loadSpending();
+  });
+});
+
+onUnmounted(() => {
+  stopSpendingRefresh?.();
 });
 
 function goSignIn() {

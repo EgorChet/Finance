@@ -344,16 +344,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "../components/AppLoader.vue";
 import CalSyncDialog from "../components/CalSyncDialog.vue";
 import CalSyncFloating from "../components/CalSyncFloating.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
-import { fetchAppConfig, fetchCalJobStatus, fetchFxcnQuote, fetchKaspaQuote, fetchMarketSnapshot, finishCalSync, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
-import type { FxcnQuote, KaspaQuote, MarketSnapshot } from "../api/client";
+import { fetchAppConfig, fetchCalJobStatus, finishCalSync, syncStatements, uploadStatement, warmAnalyzerService } from "../api/client";
 import { wakeAnalyzerInBrowser } from "../api/wakeAnalyzer";
+import { emitSpendingRefresh } from "../composables/useSpendingRefresh";
 import { useAppStore } from "../stores/app";
 import { useAuthStore } from "../stores/auth";
+import { usePortfolioStore } from "../stores/portfolio";
 import { goToSignIn } from "../utils/signIn";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "../utils/format";
 import kaspaLogo from "../assets/kaspa.png";
@@ -403,6 +405,8 @@ function onLightModeChange(value: boolean) {
   if (value !== app.lightMode) app.toggleTheme();
 }
 const auth = useAuthStore();
+const portfolio = usePortfolioStore();
+const { kaspaQuote, fxcnQuote, marketSnapshot, refreshing: portfolioRefreshing } = storeToRefs(portfolio);
 const route = useRoute();
 const router = useRouter();
 const processing = ref(false);
@@ -424,19 +428,8 @@ let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let calSyncDoneTimer: ReturnType<typeof setTimeout> | null = null;
 let calSyncBgJobId: string | null = null;
 const navOpen = ref(false);
-const kaspaQuote = ref<KaspaQuote | null>(null);
-const fxcnQuote = ref<FxcnQuote | null>(null);
-const marketSnapshot = ref<MarketSnapshot | null>(null);
 const portfolioAsset = ref<PortfolioAsset>(readPortfolioAsset());
-const portfolioRefreshing = ref(false);
 let stepTimer: ReturnType<typeof setInterval> | null = null;
-let kaspaTimer: ReturnType<typeof setInterval> | null = null;
-let fxcnTimer: ReturnType<typeof setInterval> | null = null;
-let marketTimer: ReturnType<typeof setInterval> | null = null;
-
-const KAS_REFRESH_MS = 600_000;
-const FXCN_REFRESH_MS = 6 * 60 * 60 * 1000;
-const MARKET_REFRESH_MS = 600_000;
 
 const accountInitial = computed(() => {
   const label = auth.userLabel?.trim();
@@ -538,42 +531,9 @@ function setPortfolioAsset(asset: PortfolioAsset) {
   void refreshPortfolioQuote();
 }
 
-async function refreshKaspaQuote(force = false) {
-  try {
-    kaspaQuote.value = await fetchKaspaQuote(auth.isDemo, auth.token || undefined, force);
-  } catch {
-    /* keep last quote */
-  }
-}
-
-async function refreshFxcnQuote(force = false) {
-  try {
-    fxcnQuote.value = await fetchFxcnQuote(auth.isDemo, auth.token || undefined, force);
-  } catch {
-    /* keep last quote */
-  }
-}
-
-async function refreshMarketSnapshot(force = false) {
-  try {
-    marketSnapshot.value = await fetchMarketSnapshot(auth.isDemo, auth.token || undefined, force);
-  } catch {
-    /* keep last snapshot */
-  }
-}
-
 async function refreshPortfolioQuote(force = false) {
   if (portfolioRefreshing.value) return;
-  portfolioRefreshing.value = true;
-  try {
-    if (portfolioAsset.value === "kas") {
-      await refreshKaspaQuote(force);
-    } else {
-      await refreshFxcnQuote(force);
-    }
-  } finally {
-    portfolioRefreshing.value = false;
-  }
+  await portfolio.refresh(auth.isDemo, auth.token || undefined, force);
 }
 
 function closeNav() {
@@ -625,7 +585,7 @@ function dismissCalSyncFloat() {
 
 function refreshAfterCalSync() {
   window.setTimeout(() => {
-    window.location.reload();
+    emitSpendingRefresh();
   }, 2200);
 }
 
@@ -690,30 +650,14 @@ function onCalSyncError(message: string) {
 
 onMounted(() => {
   void loadCalSyncConfig();
-  void refreshKaspaQuote();
-  void refreshFxcnQuote();
-  void refreshMarketSnapshot();
-  kaspaTimer = setInterval(() => void refreshKaspaQuote(), KAS_REFRESH_MS);
-  fxcnTimer = setInterval(() => void refreshFxcnQuote(), FXCN_REFRESH_MS);
-  marketTimer = setInterval(() => void refreshMarketSnapshot(), MARKET_REFRESH_MS);
+  portfolio.startPolling(auth.isDemo, auth.token || undefined);
 });
 
 onUnmounted(() => {
   clearStepTimer();
   stopCalSyncBackground();
   dismissCalSyncFloat();
-  if (kaspaTimer) {
-    clearInterval(kaspaTimer);
-    kaspaTimer = null;
-  }
-  if (fxcnTimer) {
-    clearInterval(fxcnTimer);
-    fxcnTimer = null;
-  }
-  if (marketTimer) {
-    clearInterval(marketTimer);
-    marketTimer = null;
-  }
+  portfolio.stopPolling();
   document.body.style.overflow = "";
 });
 
@@ -786,9 +730,10 @@ async function runUpload(file: File, statementType: "partial" | "final") {
     await uploadStatement(file, statementType, auth.token || undefined);
     clearStepTimer();
     processStep.value = UPLOAD_STEPS.length - 1;
-    processSubtitle.value = "Done — refreshing your overview…";
+    processSubtitle.value = "Done — refreshing your data…";
     await new Promise((r) => setTimeout(r, 500));
-    window.location.reload();
+    processing.value = false;
+    emitSpendingRefresh();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     failProcess("Upload failed", message, () => runUpload(file, statementType));
@@ -803,9 +748,10 @@ async function sync() {
     await syncStatements(auth.token || undefined);
     clearStepTimer();
     processStep.value = SYNC_STEPS.length - 1;
-    processSubtitle.value = "Done — refreshing your overview…";
+    processSubtitle.value = "Done — refreshing your data…";
     await new Promise((r) => setTimeout(r, 500));
-    window.location.reload();
+    processing.value = false;
+    emitSpendingRefresh();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     failProcess("Sync failed", message, sync);

@@ -5,8 +5,8 @@ import path from "path";
 import { analyzeFileBuffer, analyzerUsesPublicUrl, isAnalyzerConnectivityError, isPublicRenderAnalyzerUrl, normalizeAnalyzerUrl, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
 import {
   deleteStatementByKey,
-  finalizeReport,
-  finalizeReportAsync,
+  DEFAULT_PACE_MONTHS,
+  finalizeStatementByKey,
   getCombinedReportAsync,
   isCachedFile,
   monthCatalog,
@@ -14,8 +14,10 @@ import {
   rememberReport,
   applyMerchantRules,
   reprocessAllStatements,
+  recentBillingKeys,
   summaryRows,
 } from "../services/reportService.js";
+import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import {
   buildReviewQueue,
   merchantCatalog,
@@ -148,19 +150,26 @@ function sanitizeUploadFilename(name: string): string {
 
 router.get("/months", async (_req, res) => {
   const data = await readStatements();
+  const version = await getFinalizeVersion();
   const catalog = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
-  res.json({ months: catalog, summary: summaryRows(data) });
+  res.json({ months: catalog, summary: summaryRows(data, version) });
 });
 
-/** Single round-trip for Home: months + all-month report + fixed charges + living budget. */
-router.get("/home-data", async (_req, res) => {
+/** Single round-trip for Home: months + scoped pace report + fixed charges + living budget. */
+router.get("/home-data", async (req, res) => {
   const data = await readStatements();
+  const version = await getFinalizeVersion();
   const months = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
-  const report = await getCombinedReportAsync(data, null);
+  const paceMonths = Math.max(1, Number(req.query.pace_months ?? DEFAULT_PACE_MONTHS));
+  const paceKeys = recentBillingKeys(data, paceMonths);
+  const report = await getCombinedReportAsync(data, paceKeys, version);
   const budget = loadLivingBudgetData();
   res.json({
     months,
+    summary: summaryRows(data, version),
     report: report ?? null,
+    pace_months: paceKeys.length,
+    pace_months_requested: paceMonths,
     fixed_charges: loadFixedCharges(),
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
   });
@@ -185,9 +194,11 @@ router.delete("/statements/:key", async (req, res) => {
 
 router.get("/report", async (req, res) => {
   const data = await readStatements();
+  const version = await getFinalizeVersion();
   const from = req.query.from as string | undefined;
   const to = req.query.to as string | undefined;
   const month = req.query.month as string | undefined;
+  const monthsParam = req.query.months as string | undefined;
 
   let keys: string[] | null = null;
   if (month) {
@@ -196,9 +207,12 @@ router.get("/report", async (req, res) => {
     keys = monthCatalog(data)
       .map((m) => m.key)
       .filter((k) => k >= from && k <= to);
+  } else if (monthsParam) {
+    const count = Math.max(1, Number(monthsParam));
+    keys = recentBillingKeys(data, count);
   }
 
-  const report = await getCombinedReportAsync(data, keys);
+  const report = await getCombinedReportAsync(data, keys, version);
   if (!report) {
     res.status(404).json({ error: "No statements found" });
     return;
@@ -298,7 +312,8 @@ router.put("/rules", async (req, res) => {
       return;
     }
     const statements = await readStatements();
-    const updated = applyMerchantRules(statements, rules);
+    const version = await getFinalizeVersion();
+    const updated = await applyMerchantRules(statements, rules, version);
     await writeStatements(statements);
     res.json({ saved: true, updated_transactions: updated });
   } catch (e) {
@@ -325,7 +340,8 @@ router.post("/rules/entry", async (req, res) => {
     };
     await writeRules(rules);
     const statements = await readStatements();
-    const updated = applyMerchantRules(statements, rules);
+    const version = await getFinalizeVersion();
+    const updated = await applyMerchantRules(statements, rules, version);
     await writeStatements(statements);
     res.json({ ok: true, updated_transactions: updated });
   } catch (e) {
@@ -336,10 +352,11 @@ router.post("/rules/entry", async (req, res) => {
 
 router.get("/merchants", async (req, res) => {
   const data = await readStatements();
+  const version = await getFinalizeVersion();
   const rules = await readRules();
   const month = req.query.month as string | undefined;
   const keys = month ? [month] : null;
-  const report = await getCombinedReportAsync(data, keys);
+  const report = await getCombinedReportAsync(data, keys, version);
   if (!report) {
     res.json([]);
     return;
@@ -364,6 +381,10 @@ router.post("/sync", async (req, res) => {
   }
 
   if (synced.length) {
+    const version = await getFinalizeVersion();
+    for (const key of synced) {
+      await finalizeStatementByKey(data, key, rules, version);
+    }
     await writeStatements(data);
   } else {
     const result = await reanalyzeAll(data, rules, autoTranslate);
@@ -412,9 +433,10 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const storedReport = provisional ? await normalizeProvisionalChargesAsync(report) : report;
     const savedPath = await saveUploadedXlsx(filename, buffer);
     const key = rememberReport(data, storedReport, savedPath, filename, hash, provisional);
-    applyMerchantRules(data, rules);
+    const version = await getFinalizeVersion();
+    await finalizeStatementByKey(data, key, rules, version);
     await writeStatements(data);
-    res.json({ key, provisional, report: await finalizeReportAsync(data.statements[key]!.report) });
+    res.json({ key, provisional, report: data.statements[key]!.report });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     const waking = isAnalyzerConnectivityError(message);
@@ -443,6 +465,7 @@ router.post("/review/progress/reset", async (_req, res) => {
 
 router.get("/review/queue", async (req, res) => {
   const data = await readStatements();
+  const version = await getFinalizeVersion();
   const rules = await readRules();
   const progress = await readReviewProgress();
   const reviewed = new Set(progress.reviewed_transactions.map(normalizeReviewKey));
@@ -450,7 +473,7 @@ router.get("/review/queue", async (req, res) => {
 
   const month = req.query.month as string | undefined;
   const keys = month ? [month] : null;
-  const report = await getCombinedReportAsync(data, keys);
+  const report = await getCombinedReportAsync(data, keys, version);
   if (!report) {
     res.json({ queue: [], total: 0, reviewed_count: 0 });
     return;

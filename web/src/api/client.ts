@@ -98,17 +98,21 @@ export async function fetchMonths(demo: boolean, token?: string) {
   }>(`${prefix(demo)}/months`, token);
 }
 
-export async function fetchHomeData(demo: boolean, token?: string) {
+export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 4) {
+  const q = paceMonths > 0 ? `?pace_months=${paceMonths}` : "";
   return get<{
     months: MonthItem[];
+    summary: { month: string; billing_date: string; total: number; transactions: number }[];
     report: SpendingReport | null;
+    pace_months?: number;
+    pace_months_requested?: number;
     fixed_charges: ConfiguredCharge[];
     living_budget: {
       segments: import("../utils/livingBudget").LivingBudgetSegment[];
       month_topups: import("../utils/livingBudget").LivingBudgetMonthTopup[];
     };
     demo_as_of?: string;
-  }>(`${prefix(demo)}/home-data`, token);
+  }>(`${prefix(demo)}/home-data${q}`, token);
 }
 
 /** Remove one uploaded statement (billing key YYYY-MM-DD) from storage. */
@@ -119,8 +123,28 @@ export async function deleteStatementMonth(monthKey: string, token?: string) {
   );
 }
 
-export async function fetchReport(demo: boolean, month: string | null, token?: string) {
-  const q = month ? `?month=${encodeURIComponent(month)}` : "";
+export type ReportFetchOpts = {
+  from?: string;
+  to?: string;
+  /** Recent billing keys count (excludes single-month `month` param). */
+  months?: number;
+};
+
+export async function fetchReport(
+  demo: boolean,
+  month: string | null,
+  token?: string,
+  opts?: ReportFetchOpts,
+) {
+  const params = new URLSearchParams();
+  if (month) params.set("month", month);
+  else if (opts?.from && opts?.to) {
+    params.set("from", opts.from);
+    params.set("to", opts.to);
+  } else if (opts?.months != null && opts.months > 0) {
+    params.set("months", String(opts.months));
+  }
+  const q = params.toString() ? `?${params}` : "";
   return get<SpendingReport>(`${prefix(demo)}/report${q}`, token);
 }
 

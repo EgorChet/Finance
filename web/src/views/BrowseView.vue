@@ -241,11 +241,20 @@ async function loadTransactions() {
   }
 }
 
+function defaultBrowseMonthKey(months: MonthItem[]): string {
+  const finals = months.filter((m) => !m.partial);
+  if (finals.length) {
+    return [...finals].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0].key;
+  }
+  return months[0]?.key ?? "";
+}
+
 async function load() {
   loading.value = true;
   try {
     const data = await fetchMonths(auth.isDemo, auth.token || undefined);
     months.value = data.months;
+    selectedMonth.value = defaultBrowseMonthKey(data.months);
     await loadTransactions();
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Could not load data";

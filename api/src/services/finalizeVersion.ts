@@ -1,0 +1,26 @@
+import { createHash } from "crypto";
+import { loadExcludedKeys } from "./exclusions.js";
+import { loadFixedCharges } from "./fixedCharges.js";
+import { loadLivingBudgetData } from "./livingBudget.js";
+import { readRules } from "../storage/index.js";
+
+/** Retired categories — must match reportService CATEGORY_ALIASES. */
+const CATEGORY_ALIASES: Record<string, string> = {
+  "Sibus Flexi": "Groceries",
+  "Home & Electronics": "Home & Furniture",
+};
+
+export async function getFinalizeVersion(): Promise<string> {
+  const rules = await readRules();
+  const fixed = loadFixedCharges();
+  const budget = loadLivingBudgetData();
+  const exclusions = [...loadExcludedKeys()].sort();
+  const payload = JSON.stringify({
+    rules,
+    fixed,
+    budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+    aliases: CATEGORY_ALIASES,
+    exclusions,
+  });
+  return createHash("sha256").update(payload).digest("hex").slice(0, 16);
+}

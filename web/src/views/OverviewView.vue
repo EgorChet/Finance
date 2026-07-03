@@ -56,7 +56,7 @@
       @delete-month="onDeleteStatementMonth"
     />
     <AppLoader
-      v-if="overviewPeriod && !paceReport"
+      v-if="overviewPeriod && periodLoading"
       compact
       title="Loading period"
       subtitle="Aggregating your spending history"
@@ -104,6 +104,11 @@
       :pace-tone="summaryPaceTone"
       @settings-change="onPaceSettingsChange"
     />
+    <div v-if="showPaceHistoryExpand" class="overview-pace-expand">
+      <button type="button" class="btn btn-ghost btn-sm" @click="expandPaceHistory">
+        Show more history ({{ paceExpandLabel }})
+      </button>
+    </div>
     <PendingCycleCard
       v-if="isPendingCycleSelected && selectedCycleStart"
       :cycle-start="selectedCycleStart"
@@ -173,9 +178,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { addExclusion, deleteStatementMonth, fetchFixedCharges, fetchLivingBudget, fetchMonths, fetchReport } from "../api/client";
+import { addExclusion, deleteStatementMonth, fetchHomeData, fetchMonths, fetchReport } from "../api/client";
 import CategoryAccordion from "../components/CategoryAccordion.vue";
 import TransactionList from "../components/TransactionList.vue";
 import TransactionPeriodPicker from "../components/TransactionPeriodPicker.vue";
@@ -238,6 +243,12 @@ import {
   analyzeSpendingPeriod,
   type SpendingPeriodMode,
 } from "../utils/spendingPeriod";
+import { onSpendingRefresh } from "../composables/useSpendingRefresh";
+import {
+  DEFAULT_PACE_MONTHS,
+  nextPaceMonths,
+  paceMonthsLabel,
+} from "../utils/paceMonths";
 
 const auth = useAuthStore();
 const route = useRoute();
@@ -258,6 +269,9 @@ const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
 const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
 const overviewPeriod = ref<SpendingPeriodMode | null>(null);
+const paceMonthsWindow = ref(DEFAULT_PACE_MONTHS);
+const paceReportIsFull = ref(false);
+const periodLoading = ref(false);
 
 const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.value));
 
@@ -487,15 +501,34 @@ const partialTotalSpend = computed(() => {
   return report.value.total_spent;
 });
 
+const showPaceHistoryExpand = computed(
+  () => showPaceCard.value && !paceReportIsFull.value && paceMonthsWindow.value > 0,
+);
+
+const paceExpandLabel = computed(() => {
+  const next = nextPaceMonths(paceMonthsWindow.value);
+  return paceMonthsLabel(next);
+});
+
+function mapSummaryRows(
+  rows: { month: string; billing_date: string; total: number }[],
+  monthItems: MonthItem[],
+) {
+  return rows
+    .filter((row) => !monthItems.some((month) => month.billing_date === row.billing_date && month.partial))
+    .map((row) => ({
+      ...row,
+      month: billingCycleLabel(row.billing_date),
+    }));
+}
 
 async function afterExclusionChange() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   const m = await fetchMonths(demo, token);
-  summary.value = m.summary.map((row) => ({
-    ...row,
-    month: billingCycleLabel(row.billing_date),
-  }));
+  months.value = m.months;
+  summary.value = mapSummaryRows(m.summary, m.months);
+  paceReportIsFull.value = false;
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
@@ -575,9 +608,19 @@ async function refreshReport(month: string | null = selectedMonth.value) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
+    if (month === null && paceReportIsFull.value && paceReport.value) {
+      if (reqId !== reportRequestId) return;
+      report.value = paceReport.value;
+      error.value = "";
+      return;
+    }
     const r = await fetchReport(demo, month, token);
     if (reqId !== reportRequestId) return;
     report.value = r;
+    if (month === null) {
+      paceReport.value = r;
+      paceReportIsFull.value = true;
+    }
     error.value = "";
   } catch (e) {
     if (reqId !== reportRequestId) return;
@@ -588,25 +631,12 @@ async function refreshReport(month: string | null = selectedMonth.value) {
 async function refreshConfiguredCharges() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  try {
-    const data = await fetchFixedCharges(demo, token);
-    configuredCharges.value = data.charges;
-  } catch {
-    configuredCharges.value = [];
-  }
-}
-
-async function refreshLivingBudget() {
-  const demo = auth.isDemo;
-  const token = auth.token || undefined;
-  try {
-    const data = await fetchLivingBudget(demo, token);
-    livingBudgetSegments.value = data.segments.map((s) => normalizeLivingBudgetSegment(s));
-    livingBudgetMonthTopups.value = (data.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
-  } catch {
-    livingBudgetSegments.value = [];
-    livingBudgetMonthTopups.value = [];
-  }
+  const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+  configuredCharges.value = bundle.fixed_charges;
+  livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
+  livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
+    normalizeLivingBudgetMonthTopup(t),
+  );
 }
 
 async function onDeleteStatementMonth(key: string) {
@@ -628,12 +658,8 @@ async function onDeleteStatementMonth(key: string) {
     const m = await fetchMonths(demo, token);
     months.value = m.months;
     partialReportCache.value.delete(key);
-    summary.value = m.summary
-      .filter((row) => !m.months.some((month) => month.billing_date === row.billing_date && month.partial))
-      .map((row) => ({
-        ...row,
-        month: billingCycleLabel(row.billing_date),
-      }));
+    summary.value = mapSummaryRows(m.summary, m.months);
+    paceReportIsFull.value = false;
     await refreshPaceReport();
     if (selectedMonth.value === key || !months.value.some((row) => row.key === selectedMonth.value)) {
       selectedMonth.value = defaultOverviewMonthKey(months.value, cycleDay.value, refDate.value);
@@ -645,13 +671,38 @@ async function onDeleteStatementMonth(key: string) {
   }
 }
 
-async function refreshPaceReport() {
+async function refreshPaceReport(forceFull = false) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    paceReport.value = await fetchReport(demo, null, token);
+    if (forceFull || paceReportIsFull.value) {
+      paceReport.value = await fetchReport(demo, null, token);
+      paceReportIsFull.value = true;
+    } else {
+      paceReport.value = await fetchReport(demo, null, token, { months: paceMonthsWindow.value });
+    }
   } catch {
     paceReport.value = null;
+  }
+}
+
+async function expandPaceHistory() {
+  const next = nextPaceMonths(paceMonthsWindow.value);
+  if (next === 0) {
+    await refreshPaceReport(true);
+    return;
+  }
+  paceMonthsWindow.value = next;
+  await refreshPaceReport();
+}
+
+async function loadFullPaceReport() {
+  if (paceReportIsFull.value) return;
+  periodLoading.value = true;
+  try {
+    await refreshPaceReport(true);
+  } finally {
+    periodLoading.value = false;
   }
 }
 
@@ -667,8 +718,14 @@ function defaultTxPeriod(month: string | null): TransactionPeriod {
 }
 
 function togglePeriod(mode: SpendingPeriodMode) {
-  overviewPeriod.value = overviewPeriod.value === mode ? null : mode;
+  if (overviewPeriod.value === mode) {
+    overviewPeriod.value = null;
+    expandedCategoryKeys.value = [];
+    return;
+  }
+  overviewPeriod.value = mode;
   expandedCategoryKeys.value = [];
+  void loadFullPaceReport();
 }
 
 async function onMonthSelected(month: string | null) {
@@ -679,6 +736,9 @@ async function onMonthSelected(month: string | null) {
   const switchId = ++monthSwitchId;
   reportLoading.value = true;
   try {
+    if (month === null && !paceReportIsFull.value) {
+      await loadFullPaceReport();
+    }
     await refreshReport(month);
   } finally {
     if (switchId === monthSwitchId) {
@@ -704,27 +764,28 @@ async function loadMonths() {
   try {
     const demo = auth.isDemo;
     const token = auth.token || undefined;
-    const m = await fetchMonths(demo, token);
-    months.value = m.months;
-    if (demo && m.demo_as_of) auth.demoAsOf = m.demo_as_of;
+    const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+    months.value = bundle.months;
+    if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
     partialReportCache.value.clear();
-    summary.value = m.summary
-      .filter((row) => !m.months.some((month) => month.billing_date === row.billing_date && month.partial))
-      .map((row) => ({
-        ...row,
-        month: billingCycleLabel(row.billing_date),
-      }));
-    await Promise.all([refreshPaceReport(), refreshConfiguredCharges(), refreshLivingBudget()]);
+    summary.value = mapSummaryRows(bundle.summary, bundle.months);
+    configuredCharges.value = bundle.fixed_charges;
+    paceReport.value = bundle.report;
+    paceReportIsFull.value = false;
+    livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
+    livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
+      normalizeLivingBudgetMonthTopup(t),
+    );
     const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
     pruneStaleManualCycleSpend(todayStart, {
-      statementSavedAt: partialStatementSavedAtForCycle(m.months, todayStart, cycleDay.value),
-      hasStatementSpend: !!findPartialMonth(m.months, todayStart, cycleDay.value),
+      statementSavedAt: partialStatementSavedAtForCycle(bundle.months, todayStart, cycleDay.value),
+      hasStatementSpend: !!findPartialMonth(bundle.months, todayStart, cycleDay.value),
     });
     const queryMonth = typeof route.query.month === "string" ? route.query.month : null;
     const initial =
-      queryMonth && m.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))
+      queryMonth && bundle.months.some((month) => month.key === queryMonth || isCycleMonthKey(queryMonth))
         ? queryMonth
-        : defaultOverviewMonthKey(m.months, cycleDay.value, refDate.value);
+        : defaultOverviewMonthKey(bundle.months, cycleDay.value, refDate.value);
     selectedMonth.value = initial;
     txPeriod.value = defaultTxPeriod(initial);
     await refreshReport(initial);
@@ -735,5 +796,19 @@ async function loadMonths() {
   }
 }
 
-onMounted(loadMonths);
+let stopSpendingRefresh: (() => void) | undefined;
+
+onMounted(() => {
+  void loadMonths();
+  stopSpendingRefresh = onSpendingRefresh(() => {
+    paceMonthsWindow.value = DEFAULT_PACE_MONTHS;
+    paceReportIsFull.value = false;
+    partialReportCache.value.clear();
+    void loadMonths();
+  });
+});
+
+onUnmounted(() => {
+  stopSpendingRefresh?.();
+});
 </script>

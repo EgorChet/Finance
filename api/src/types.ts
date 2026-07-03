@@ -43,6 +43,11 @@ export interface SpendingReport {
   transactions: Transaction[];
 }
 
+export interface StatementSummary {
+  total: number;
+  transaction_count: number;
+}
+
 export interface StatementEntry {
   billing_key: string;
   month_label: string;
@@ -53,6 +58,10 @@ export interface StatementEntry {
   /** Mid-cycle export — does not close the billing cycle until a final upload. */
   provisional?: boolean;
   report: SpendingReport;
+  /** Hash of pipeline inputs when report was last finalized. */
+  finalize_version?: string;
+  /** Cached totals after finalize — used by /months without re-running pipeline. */
+  summary?: StatementSummary;
 }
 
 export interface StatementsData {

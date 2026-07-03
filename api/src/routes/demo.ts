@@ -30,7 +30,10 @@ router.get("/home-data", (_req, res) => {
   const budget = demoLivingBudget();
   res.json({
     months: demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key)),
+    summary: demoSummaryRows(),
     report: getDemoReport(),
+    pace_months: 4,
+    pace_months_requested: 4,
     fixed_charges: demoFixedCharges(),
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
     demo_as_of: DEMO_AS_OF,

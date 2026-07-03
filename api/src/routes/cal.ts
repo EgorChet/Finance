@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { createHash } from "crypto";
 import {
-  applyMerchantRules,
-  finalizeReportAsync,
+  finalizeStatementByKey,
   normalizeProvisionalChargesAsync,
   rememberReport,
 } from "../services/reportService.js";
+import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import { analyzeFileBuffer } from "../services/analyzerClient.js";
 import {
   cancelCalJob,
@@ -84,9 +84,10 @@ async function savePartialCalReportFromXlsx(buffer: Buffer, filename: string) {
     hash,
     true,
   );
-  applyMerchantRules(data, rules);
+  const version = await getFinalizeVersion();
+  await finalizeStatementByKey(data, key, rules, version);
   await writeStatements(data);
-  return { key, report: await finalizeReportAsync(data.statements[key]!.report) };
+  return { key, report: data.statements[key]!.report };
 }
 
 router.post("/sync/start", async (_req, res) => {
