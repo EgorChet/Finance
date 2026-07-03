@@ -591,7 +591,10 @@ async function buildLocalCycleReport(monthKey: string): Promise<SpendingReport> 
   });
 }
 
-async function refreshReport(month: string | null = selectedMonth.value) {
+async function refreshReport(
+  month: string | null = selectedMonth.value,
+  options: { force?: boolean; background?: boolean } = {},
+) {
   if (month && isCycleMonthKey(month)) {
     if (!paceReport.value) await refreshPaceReport();
     report.value = await buildLocalCycleReport(month);
@@ -608,7 +611,7 @@ async function refreshReport(month: string | null = selectedMonth.value) {
       error.value = "";
       return;
     }
-    if (month) {
+    if (month && !options.force) {
       const cached = cachedMonthReport(month);
       if (cached) {
         if (reqId !== reportRequestId) return;
@@ -628,7 +631,7 @@ async function refreshReport(month: string | null = selectedMonth.value) {
     error.value = "";
   } catch (e) {
     if (reqId !== reportRequestId) return;
-    error.value = String(e);
+    if (!options.background) error.value = String(e);
   }
 }
 
@@ -733,6 +736,7 @@ async function onMonthSelected(month: string | null) {
     if (cached) {
       report.value = cached;
       error.value = "";
+      void refreshReport(month, { force: true, background: true });
       return;
     }
   }
