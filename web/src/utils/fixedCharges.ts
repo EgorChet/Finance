@@ -175,6 +175,25 @@ export function oneTimeStatus(chargeDate: string, today = todayIsoDate()): "upco
   return "past";
 }
 
+export function chargeDisplayName(
+  charge: Pick<ConfiguredCharge, "name_en" | "name_he">,
+  fallback = "Unnamed charge",
+): string {
+  const en = charge.name_en?.trim();
+  if (en && !isMostlyHebrew(en)) return en;
+  const he = charge.name_he?.trim();
+  if (he && !isMostlyHebrew(he)) return he;
+  return en || he || fallback;
+}
+
+function isMostlyHebrew(text: string): boolean {
+  return /[\u0590-\u05FF]/.test(text) && !/[a-zA-Z]{2,}/.test(text);
+}
+
+export function groupDisplayName(group: Pick<ChargeGroup, "name_en" | "name_he" | "id">): string {
+  return chargeDisplayName(group, group.id);
+}
+
 export interface ChargeGroup {
   id: string;
   name_en: string;

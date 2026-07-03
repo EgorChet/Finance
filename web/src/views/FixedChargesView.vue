@@ -36,6 +36,7 @@
         :readonly="auth.isDemo"
         :disabled="saving"
         @save="persistCharges"
+        @edit-recurring-charge="editRecurringCharge"
       />
 
       <section id="recurring" class="manual-section">
@@ -102,11 +103,11 @@
         </section>
         <p v-if="status && activeAddForm === 'recurring'" class="recurring-form-error">{{ status }}</p>
 
-        <div v-if="recurringGroups.length" class="recurring-groups">
-          <section v-for="group in recurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
+        <div v-if="visibleRecurringGroups.length" class="recurring-groups">
+          <section v-for="group in visibleRecurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
             <header class="recurring-card-header">
               <div>
-                <h3 class="recurring-card-title">{{ group.name_en }}</h3>
+                <h3 class="recurring-card-title">{{ groupDisplayName(group) }}</h3>
                 <p class="recurring-card-sub">{{ group.category_en }} · {{ timelineSummary(group) }}</p>
               </div>
               <div v-if="!auth.isDemo && isEditingGroup(group)" class="section-header-actions">
@@ -115,7 +116,75 @@
             </header>
 
             <ul class="charge-compact-list">
-              <li v-for="(seg, segIndex) in group.segments" :key="`${group.id}-${segIndex}`" class="charge-compact-row-wrap">
+              <li v-for="(seg, segIndex) in visibleGroupSegments(group)" :key="`${group.id}-${segIndex}`" class="charge-compact-row-wrap">
+                <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
+                  <div class="list-row__main">
+                    <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
+                    <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                  </div>
+                  <span
+                    class="list-row__status recurring-status"
+                    :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month)"
+                  >
+                    {{ statusLabel(seg) }}
+                  </span>
+                  <button
+                    v-if="!auth.isDemo"
+                    type="button"
+                    class="btn btn-edit"
+                    :disabled="saving"
+                    @click="startEditCharge(seg)"
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                <EditPanel
+                  v-else
+                  title="Edit period"
+                  done-label="Save"
+                  :disabled="saving"
+                  deletable
+                  :delete-label="segmentDeleteLabel(group)"
+                  @done="finishEditCharge(seg)"
+                  @cancel="cancelEditCharge(seg)"
+                  @delete="deleteSegmentOrBill(group, seg)"
+                >
+                  <div class="recurring-segment-row">
+                    <div class="field-group">
+                      <label class="field-label">Amount (₪)</label>
+                      <input
+                        v-model.number="seg.amount"
+                        class="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputmode="decimal"
+                      />
+                    </div>
+                    <div class="field-group">
+                      <label class="field-label">From</label>
+                      <MonthSelect v-model="seg.from_month" />
+                    </div>
+                  </div>
+                  <div class="field-group recurring-segment-through">
+                    <label class="field-label">Through</label>
+                    <MonthSelect v-if="!isOngoingThrough(seg.through_month)" v-model="seg.through_month" />
+                    <label class="recurring-ongoing recurring-ongoing--compact">
+                      <ToggleSwitch
+                        :model-value="isOngoingThrough(seg.through_month)"
+                        :disabled="saving"
+                        @update:model-value="toggleOngoing(seg, $event)"
+                      />
+                      <span class="recurring-ongoing-text">No end date</span>
+                    </label>
+                  </div>
+                </EditPanel>
+              </li>
+            </ul>
+
+            <ul v-if="showEndedRecurring && endedGroupSegments(group).length" class="charge-compact-list household-ended-list">
+              <li v-for="(seg, segIndex) in endedGroupSegments(group)" :key="`${group.id}-ended-${segIndex}`" class="charge-compact-row-wrap">
                 <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
                   <div class="list-row__main">
                     <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
@@ -184,7 +253,16 @@
           </section>
         </div>
 
-        <p v-else class="manual-empty">No recurring bills yet.</p>
+        <button
+          v-if="endedRecurringCount"
+          type="button"
+          class="btn btn-ghost household-show-more"
+          @click="showEndedRecurring = !showEndedRecurring"
+        >
+          {{ showEndedRecurring ? "Hide" : "Show" }} ended recurring periods ({{ endedRecurringCount }})
+        </button>
+
+        <p v-if="!recurringGroups.length" class="manual-empty">No recurring bills yet.</p>
       </section>
 
       <section class="manual-section">
@@ -245,12 +323,12 @@
         </section>
         <p v-if="status && activeAddForm === 'once'" class="recurring-form-error">{{ status }}</p>
 
-        <div v-if="oneTimeCharges.length" class="recurring-groups">
+        <div v-if="visibleOneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
-            <li v-for="charge in oneTimeCharges" :key="charge.id" class="charge-compact-row-wrap">
+            <li v-for="charge in visibleOneTimeCharges" :key="charge.id" class="charge-compact-row-wrap">
               <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
                 <div class="list-row__main">
-                  <strong class="list-row__label">{{ charge.name_en }}</strong>
+                  <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
                   <span class="list-row__meta">
                     {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
                   </span>
@@ -318,7 +396,87 @@
           </ul>
         </div>
 
-        <p v-else class="manual-empty">No one-time charges yet.</p>
+        <button
+          v-if="pastOneTimeCharges.length"
+          type="button"
+          class="btn btn-ghost household-show-more"
+          @click="showPastOneTime = !showPastOneTime"
+        >
+          {{ showPastOneTime ? "Hide" : "Show" }} past one-time charges ({{ pastOneTimeCharges.length }})
+        </button>
+
+        <ul v-if="showPastOneTime && pastOneTimeCharges.length" class="charge-compact-list household-ended-list">
+          <li v-for="charge in pastOneTimeCharges" :key="`past-${charge.id}`" class="charge-compact-row-wrap">
+            <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
+              <div class="list-row__main">
+                <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
+                <span class="list-row__meta">
+                  {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
+                </span>
+              </div>
+              <span
+                class="list-row__status recurring-status"
+                :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
+              >
+                {{ oneTimeStatusLabel(charge.charge_date!) }}
+              </span>
+              <button
+                v-if="!auth.isDemo"
+                type="button"
+                class="btn btn-edit"
+                :disabled="saving"
+                @click="startEditCharge(charge)"
+              >
+                Edit
+              </button>
+            </div>
+
+            <EditPanel
+              v-else
+              title="Edit charge"
+              done-label="Save"
+              :disabled="saving"
+              deletable
+              delete-label="Delete charge"
+              @done="finishEditCharge(charge)"
+              @cancel="cancelEditCharge(charge)"
+              @delete="removeOneTime(charge)"
+            >
+              <div class="charge-detail-fields">
+                <div class="field-group">
+                  <label class="field-label">Name</label>
+                  <input v-model="charge.name_en" class="input" />
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Date</label>
+                  <input
+                    class="input"
+                    type="date"
+                    :value="charge.charge_date"
+                    @input="onOneTimeDateChange(charge, ($event.target as HTMLInputElement).value)"
+                  />
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Amount (₪)</label>
+                  <input
+                    v-model.number="charge.amount"
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                  />
+                </div>
+                <div class="field-group">
+                  <label class="field-label">Category</label>
+                  <CategorySelect v-model="charge.category_en" :options="categories" />
+                </div>
+              </div>
+            </EditPanel>
+          </li>
+        </ul>
+
+        <p v-if="!oneTimeCharges.length" class="manual-empty">No one-time charges yet.</p>
       </section>
 
       <ExcludedSection />
@@ -349,8 +507,10 @@ import {
   type ChargeGroup,
   type ConfiguredCharge,
   ONGOING_THROUGH_MONTH,
+  chargeDisplayName,
   currentYearMonth,
   dateToLabel,
+  groupDisplayName,
   groupCharges,
   isMonthlyCharge,
   isOneTimeCharge,
@@ -394,6 +554,8 @@ type AddFormKind = "recurring" | "once";
 const activeAddForm = ref<AddFormKind | null>(null);
 const editingCharge = ref<ConfiguredCharge | null>(null);
 const chargeEditSnapshot = ref<ConfiguredCharge | null>(null);
+const showEndedRecurring = ref(false);
+const showPastOneTime = ref(false);
 
 let saveStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -414,12 +576,46 @@ const newOneTime = ref({
 });
 
 const recurringGroups = computed(() => groupCharges(charges.value.filter(isMonthlyCharge)));
+const visibleRecurringGroups = computed(() =>
+  recurringGroups.value.filter(
+    (group) =>
+      visibleGroupSegments(group).length > 0 ||
+      (showEndedRecurring.value && endedGroupSegments(group).length > 0),
+  ),
+);
 const oneTimeCharges = computed(() =>
   charges.value
     .filter(isOneTimeCharge)
     .sort((a, b) => (b.charge_date ?? "").localeCompare(a.charge_date ?? "")),
 );
+const visibleOneTimeCharges = computed(() =>
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!) !== "past"),
+);
+const pastOneTimeCharges = computed(() =>
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!) === "past"),
+);
+const endedRecurringCount = computed(() =>
+  recurringGroups.value.reduce((sum, group) => sum + endedGroupSegments(group).length, 0),
+);
 const hasUnsavedChanges = computed(() => hydrated.value && isDirty());
+
+function visibleGroupSegments(group: ChargeGroup) {
+  return group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month) !== "ended");
+}
+
+function endedGroupSegments(group: ChargeGroup) {
+  return group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month) === "ended");
+}
+
+function editRecurringCharge(chargeId: string, fromMonth: string) {
+  const charge =
+    charges.value.find(
+      (c) => c.id === chargeId && isMonthlyCharge(c) && c.from_month === fromMonth,
+    ) ?? charges.value.find((c) => c.id === chargeId && isMonthlyCharge(c));
+  document.getElementById("recurring")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!charge || auth.isDemo) return;
+  startEditCharge(charge);
+}
 
 watch(newRecurringOngoing, (on) => {
   if (on) newRecurring.value.through_month = ONGOING_THROUGH_MONTH;
@@ -554,10 +750,24 @@ function segmentDeleteLabel(group: ChargeGroup): string {
 }
 
 async function deleteSegmentOrBill(group: ChargeGroup, seg: ConfiguredCharge) {
+  const label =
+    group.segments.length <= 1
+      ? groupDisplayName(group)
+      : `${formatIls(seg.amount)} (${monthRangeLabel(seg.from_month, seg.through_month)})`;
+  const ok = await confirm({
+    title: group.segments.length <= 1 ? "Remove bill?" : "Delete period?",
+    message:
+      group.segments.length <= 1
+        ? `Remove ${label} from recurring bills?`
+        : `Remove this billing period — ${label}?`,
+    confirmLabel: group.segments.length <= 1 ? "Remove bill" : "Delete period",
+    tone: "danger",
+  });
+  if (!ok) return;
   if (group.segments.length <= 1) {
-    await removeCharge(group.id);
+    await removeCharge(group.id, { skipConfirm: true });
   } else {
-    await removeSegment(seg);
+    await removeSegment(seg, { skipConfirm: true });
   }
 }
 
@@ -678,15 +888,17 @@ function addSegment(group: ChargeGroup) {
   });
 }
 
-async function removeSegment(seg: ConfiguredCharge) {
+async function removeSegment(seg: ConfiguredCharge, options: { skipConfirm?: boolean } = {}) {
   const label = `${formatIls(seg.amount)} (${monthRangeLabel(seg.from_month, seg.through_month)})`;
-  const ok = await confirm({
-    title: "Delete period?",
-    message: `Remove this billing period — ${label}?`,
-    confirmLabel: "Delete period",
-    tone: "danger",
-  });
-  if (!ok) return;
+  if (!options.skipConfirm) {
+    const ok = await confirm({
+      title: "Delete period?",
+      message: `Remove this billing period — ${label}?`,
+      confirmLabel: "Delete period",
+      tone: "danger",
+    });
+    if (!ok) return;
+  }
   if (editingCharge.value === seg) {
     editingCharge.value = null;
     chargeEditSnapshot.value = null;
@@ -696,16 +908,18 @@ async function removeSegment(seg: ConfiguredCharge) {
   await persistCharges();
 }
 
-async function removeCharge(id: string) {
+async function removeCharge(id: string, options: { skipConfirm?: boolean } = {}) {
   const group = recurringGroups.value.find((g) => g.id === id);
-  const label = group?.name_en ?? "this bill";
-  const ok = await confirm({
-    title: "Remove bill?",
-    message: `Remove ${label} from recurring bills?`,
-    confirmLabel: "Remove bill",
-    tone: "danger",
-  });
-  if (!ok) return;
+  const label = group ? groupDisplayName(group) : "this bill";
+  if (!options.skipConfirm) {
+    const ok = await confirm({
+      title: "Remove bill?",
+      message: `Remove ${label} from recurring bills?`,
+      confirmLabel: "Remove bill",
+      tone: "danger",
+    });
+    if (!ok) return;
+  }
   if (group?.segments.some((s) => editingCharge.value === s)) {
     editingCharge.value = null;
     chargeEditSnapshot.value = null;
@@ -717,7 +931,7 @@ async function removeCharge(id: string) {
 async function removeOneTime(charge: ConfiguredCharge) {
   const ok = await confirm({
     title: "Delete charge?",
-    message: `Delete "${charge.name_en}" (${formatIls(charge.amount)})?`,
+    message: `Delete "${chargeDisplayName(charge)}" (${formatIls(charge.amount)})?`,
     confirmLabel: "Delete",
     tone: "danger",
   });

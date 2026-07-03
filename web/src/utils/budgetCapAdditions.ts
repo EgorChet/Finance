@@ -6,6 +6,7 @@ import {
   fatherInjectionForMonth,
   isRentConfiguredCharge,
 } from "./fatherInjection";
+import { chargeDisplayName } from "./fixedCharges";
 
 export { FATHER_INJECTION_LABEL, fatherInjectionForMonth } from "./fatherInjection";
 
@@ -74,7 +75,7 @@ export function capAdditionPeriodsForSegment(
       label = CIBUS_LABEL;
     } else if (isRentConfiguredCharge(charge)) {
       kind = "rent";
-      label = FATHER_INJECTION_LABEL;
+      label = chargeDisplayName(charge, FATHER_INJECTION_LABEL);
     } else {
       continue;
     }
