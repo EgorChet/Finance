@@ -23,21 +23,18 @@
             autocomplete="off"
           />
 
-          <div class="browse-filter-row browse-filter-row--month-recurring">
-            <label class="field-group browse-field">
+          <div class="browse-month-recurring-row">
+            <label class="field-group browse-field browse-month-field">
               <span class="field-label">Month</span>
               <select v-model="selectedMonth" class="input select-field">
                 <option value="">All months</option>
                 <option v-for="m in months" :key="m.key" :value="m.key">{{ m.label }}</option>
               </select>
             </label>
-            <div class="field-group browse-field browse-recurring-field">
-              <span class="field-label">Recurring</span>
-              <label class="browse-recurring-toggle">
-                <ToggleSwitch v-model="includeRecurring" />
-                <span>Include recurring charges</span>
-              </label>
-            </div>
+            <label class="browse-recurring-toggle">
+              <ToggleSwitch v-model="includeRecurring" />
+              <span>Include recurring charges</span>
+            </label>
           </div>
 
           <div class="browse-filter-row browse-filter-row--single">
