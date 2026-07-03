@@ -25,11 +25,6 @@
             :cycle-day="cycleDay"
             :reference-date="refDate"
           />
-          <div v-if="showPaceHistoryExpand" class="home-card-actions home-pace-expand">
-            <button type="button" class="btn btn-ghost btn-sm" @click="expandPaceHistory">
-              Show more history ({{ paceExpandLabel }})
-            </button>
-          </div>
           <div class="home-card-actions">
             <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
           </div>
@@ -74,11 +69,7 @@ import { referenceDate } from "../utils/appDate";
 import { billingCycleLabel, openCycleTabLabel } from "../utils/format";
 import { everydaySpendingTotal } from "../utils/householdBudget";
 import { computeLivePaceHealth } from "../utils/paceHealth";
-import {
-  DEFAULT_PACE_MONTHS,
-  nextPaceMonths,
-  paceMonthsLabel,
-} from "../utils/paceMonths";
+import { DEFAULT_PACE_MONTHS } from "../utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
@@ -125,20 +116,9 @@ const configuredCharges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<ReturnType<typeof normalizeLivingBudgetSegment>[]>([]);
 const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonthTopup>[]>([]);
 const cycleDay = ref(loadCycleDay());
-const paceMonthsWindow = ref(DEFAULT_PACE_MONTHS);
-const paceReportIsFull = ref(false);
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
 const todayIso = computed(() => refDate.value.toISOString().slice(0, 10));
-
-const showPaceHistoryExpand = computed(
-  () => showPaceHealth.value && !paceReportIsFull.value && paceMonthsWindow.value > 0,
-);
-
-const paceExpandLabel = computed(() => {
-  const next = nextPaceMonths(paceMonthsWindow.value);
-  return paceMonthsLabel(next);
-});
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
@@ -283,30 +263,17 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   });
 }
 
-async function loadPaceReport(forceFull = false) {
-  const demo = auth.isDemo;
-  const token = auth.token || undefined;
-  if (forceFull || paceReportIsFull.value) {
-    paceReport.value = await fetchReport(demo, null, token);
-    paceReportIsFull.value = true;
-    return;
-  }
-  const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
-  paceReport.value = bundle.report;
-}
-
 async function loadSpending() {
   spendingLoading.value = true;
   spendingError.value = "";
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    const bundle = await fetchHomeData(demo, token, paceMonthsWindow.value);
+    const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
     months.value = bundle.months;
     if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
     configuredCharges.value = bundle.fixed_charges;
     paceReport.value = bundle.report;
-    paceReportIsFull.value = false;
     livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
     livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
       normalizeLivingBudgetMonthTopup,
@@ -335,34 +302,12 @@ async function loadSpending() {
   }
 }
 
-async function expandPaceHistory() {
-  const next = nextPaceMonths(paceMonthsWindow.value);
-  if (next === 0) {
-    spendingLoading.value = true;
-    try {
-      await loadPaceReport(true);
-    } finally {
-      spendingLoading.value = false;
-    }
-    return;
-  }
-  paceMonthsWindow.value = next;
-  spendingLoading.value = true;
-  try {
-    await loadPaceReport();
-  } finally {
-    spendingLoading.value = false;
-  }
-}
-
 let stopSpendingRefresh: (() => void) | undefined;
 
 onMounted(() => {
   void loadSpending();
   void loadCalendar();
   stopSpendingRefresh = onSpendingRefresh(() => {
-    paceMonthsWindow.value = DEFAULT_PACE_MONTHS;
-    paceReportIsFull.value = false;
     void loadSpending();
   });
 });
