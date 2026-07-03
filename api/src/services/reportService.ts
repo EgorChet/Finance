@@ -210,6 +210,42 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
   };
 }
 
+export async function getPaceBundleAsync(
+  data: StatementsData,
+  keys: string[],
+  version?: string,
+): Promise<{ report: SpendingReport | null; scopedReports: Record<string, SpendingReport> }> {
+  if (!keys.length) return { report: null, scopedReports: {} };
+
+  const finalizeVersion = version ?? await getFinalizeVersion();
+  const orderedKeys = [...keys].sort();
+  const entries = orderedKeys
+    .map((k) => data.statements[k])
+    .filter((e): e is StatementEntry => !!e);
+  if (!entries.length) return { report: null, scopedReports: {} };
+
+  await prefetchRatesForPending(entries.flatMap((e) => e.report.transactions));
+
+  const scopedReports: Record<string, SpendingReport> = {};
+  const finalized: SpendingReport[] = [];
+  for (const key of orderedKeys) {
+    const entry = data.statements[key];
+    if (!entry) continue;
+    const report = getFinalizedReport(entry, finalizeVersion);
+    scopedReports[key] = report;
+    finalized.push(report);
+  }
+
+  if (!finalized.length) return { report: null, scopedReports: {} };
+  if (finalized.length === 1) {
+    return { report: finalized[0], scopedReports };
+  }
+
+  const labels = orderedKeys.map((k) => data.statements[k]?.month_label).filter(Boolean);
+  const label = `${labels[0]} – ${labels[labels.length - 1]} (${orderedKeys.length} months)`;
+  return { report: combineReports(finalized, label), scopedReports };
+}
+
 export async function getCombinedReportAsync(
   data: StatementsData,
   keys: string[] | null,

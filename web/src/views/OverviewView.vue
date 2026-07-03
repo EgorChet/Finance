@@ -258,7 +258,7 @@ const excludingKey = ref<string | null>(null);
 const expandedCategoryKeys = ref<string[]>([]);
 const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
-const partialReportCache = ref<Map<string, SpendingReport>>(new Map());
+const monthReportCache = ref<Map<string, SpendingReport>>(new Map());
 const overviewPeriod = ref<SpendingPeriodMode | null>(null);
 const paceReportIsFull = ref(false);
 const periodLoading = ref(false);
@@ -503,6 +503,18 @@ function mapSummaryRows(
     }));
 }
 
+function seedMonthReportCache(scopedReports?: Record<string, SpendingReport>) {
+  monthReportCache.value.clear();
+  if (!scopedReports) return;
+  for (const [key, scoped] of Object.entries(scopedReports)) {
+    monthReportCache.value.set(key, scoped);
+  }
+}
+
+function cachedMonthReport(key: string): SpendingReport | null {
+  return monthReportCache.value.get(key) ?? null;
+}
+
 async function afterExclusionChange() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -510,6 +522,7 @@ async function afterExclusionChange() {
   months.value = m.months;
   summary.value = mapSummaryRows(m.summary, m.months);
   paceReportIsFull.value = false;
+  monthReportCache.value.clear();
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
@@ -539,11 +552,11 @@ let reportRequestId = 0;
 let monthSwitchId = 0;
 
 async function loadPartialReport(key: string): Promise<SpendingReport | null> {
-  const cached = partialReportCache.value.get(key);
+  const cached = cachedMonthReport(key);
   if (cached) return cached;
   try {
     const r = await fetchReport(auth.isDemo, key, auth.token || undefined);
-    partialReportCache.value.set(key, r);
+    monthReportCache.value.set(key, r);
     return r;
   } catch {
     return null;
@@ -595,9 +608,19 @@ async function refreshReport(month: string | null = selectedMonth.value) {
       error.value = "";
       return;
     }
+    if (month) {
+      const cached = cachedMonthReport(month);
+      if (cached) {
+        if (reqId !== reportRequestId) return;
+        report.value = cached;
+        error.value = "";
+        return;
+      }
+    }
     const r = await fetchReport(demo, month, token);
     if (reqId !== reportRequestId) return;
     report.value = r;
+    if (month) monthReportCache.value.set(month, r);
     if (month === null) {
       paceReport.value = r;
       paceReportIsFull.value = true;
@@ -638,7 +661,7 @@ async function onDeleteStatementMonth(key: string) {
     const token = auth.token || undefined;
     const m = await fetchMonths(demo, token);
     months.value = m.months;
-    partialReportCache.value.delete(key);
+    monthReportCache.value.delete(key);
     summary.value = mapSummaryRows(m.summary, m.months);
     paceReportIsFull.value = false;
     await refreshPaceReport();
@@ -704,6 +727,16 @@ async function onMonthSelected(month: string | null) {
   selectedMonth.value = month;
   expandedCategoryKeys.value = [];
   txPeriod.value = defaultTxPeriod(month);
+
+  if (month && !isCycleMonthKey(month)) {
+    const cached = cachedMonthReport(month);
+    if (cached) {
+      report.value = cached;
+      error.value = "";
+      return;
+    }
+  }
+
   const switchId = ++monthSwitchId;
   reportLoading.value = true;
   try {
@@ -738,7 +771,7 @@ async function loadMonths() {
     const bundle = await fetchHomeData(demo, token, DEFAULT_PACE_MONTHS);
     months.value = bundle.months;
     if (demo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
-    partialReportCache.value.clear();
+    seedMonthReportCache(bundle.scoped_reports);
     summary.value = mapSummaryRows(bundle.summary, bundle.months);
     configuredCharges.value = bundle.fixed_charges;
     paceReport.value = bundle.report;
@@ -773,7 +806,7 @@ onMounted(() => {
   void loadMonths();
   stopSpendingRefresh = onSpendingRefresh(() => {
     paceReportIsFull.value = false;
-    partialReportCache.value.clear();
+    monthReportCache.value.clear();
     void loadMonths();
   });
 });

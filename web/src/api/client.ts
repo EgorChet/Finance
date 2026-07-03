@@ -104,6 +104,8 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
     months: MonthItem[];
     summary: { month: string; billing_date: string; total: number; transactions: number }[];
     report: SpendingReport | null;
+    scoped_reports?: Record<string, SpendingReport>;
+    pace_keys?: string[];
     pace_months?: number;
     pace_months_requested?: number;
     fixed_charges: ConfiguredCharge[];

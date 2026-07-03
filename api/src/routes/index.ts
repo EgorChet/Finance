@@ -8,6 +8,7 @@ import {
   DEFAULT_PACE_MONTHS,
   finalizeStatementByKey,
   getCombinedReportAsync,
+  getPaceBundleAsync,
   isCachedFile,
   monthCatalog,
   normalizeProvisionalChargesAsync,
@@ -162,12 +163,14 @@ router.get("/home-data", async (req, res) => {
   const months = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
   const paceMonths = Math.max(1, Number(req.query.pace_months ?? DEFAULT_PACE_MONTHS));
   const paceKeys = recentBillingKeys(data, paceMonths);
-  const report = await getCombinedReportAsync(data, paceKeys, version);
+  const { report, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
   const budget = loadLivingBudgetData();
   res.json({
     months,
     summary: summaryRows(data, version),
     report: report ?? null,
+    scoped_reports: scopedReports,
+    pace_keys: paceKeys,
     pace_months: paceKeys.length,
     pace_months_requested: paceMonths,
     fixed_charges: loadFixedCharges(),

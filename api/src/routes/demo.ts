@@ -12,6 +12,7 @@ import {
   demoCalendar,
   getDemoReport,
 } from "../data/demoData.js";
+import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
 
@@ -26,14 +27,34 @@ router.get("/months", (_req, res) => {
   });
 });
 
-router.get("/home-data", (_req, res) => {
+router.get("/home-data", (req, res) => {
   const budget = demoLivingBudget();
+  const paceMonths = Math.max(1, Number(req.query.pace_months ?? 4));
+  const catalog = demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key));
+  const paceKeys = catalog.slice(0, paceMonths).map((m) => m.key);
+  const scopedReports = Object.fromEntries(
+    paceKeys.map((key) => [key, getDemoReport(key)]),
+  );
+  const ordered = [...paceKeys].sort();
+  const reports = ordered.map((key) => scopedReports[key]!).filter(Boolean);
+  const orderedLabels = ordered.map((key) => catalog.find((m) => m.key === key)?.label ?? key);
+  const report =
+    reports.length === 0
+      ? null
+      : reports.length === 1
+        ? reports[0]
+        : combineReports(
+            reports,
+            `${orderedLabels[0]} – ${orderedLabels[orderedLabels.length - 1]} (${ordered.length} months)`,
+          );
   res.json({
-    months: demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key)),
+    months: catalog,
     summary: demoSummaryRows(),
-    report: getDemoReport(),
-    pace_months: 4,
-    pace_months_requested: 4,
+    report,
+    scoped_reports: scopedReports,
+    pace_keys: paceKeys,
+    pace_months: paceKeys.length,
+    pace_months_requested: paceMonths,
     fixed_charges: demoFixedCharges(),
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
     demo_as_of: DEMO_AS_OF,
