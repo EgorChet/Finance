@@ -3626,15 +3626,29 @@ button {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  min-height: 2.5rem;
+  margin: 0;
   font-size: 0.88rem;
   color: var(--text);
   cursor: pointer;
+}
+
+.browse-recurring-field {
+  min-width: 0;
+}
+
+.browse-recurring-field .browse-recurring-toggle span {
+  line-height: 1.3;
 }
 
 .browse-filter-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem;
+}
+
+.browse-filter-row--single {
+  grid-template-columns: 1fr;
 }
 
 .browse-field {
@@ -3709,7 +3723,6 @@ button {
   .browse-filter-row {
     grid-template-columns: 1fr;
   }
-
 }
 
 .mappings-search {
