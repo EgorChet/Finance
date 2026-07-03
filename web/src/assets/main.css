@@ -3632,8 +3632,8 @@ button {
 }
 
 .browse-month-field {
-  flex: 0 0 auto;
-  width: 9.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
 }
 
@@ -3645,8 +3645,7 @@ button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   min-height: 2.75rem;
   margin: 0;
   font-size: 0.88rem;
@@ -3744,10 +3743,6 @@ button {
 
   .browse-month-recurring-row {
     gap: 0.55rem 0.75rem;
-  }
-
-  .browse-month-field {
-    width: 7.5rem;
   }
 
   .browse-month-field .browse-month-select.input {
