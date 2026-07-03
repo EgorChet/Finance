@@ -239,6 +239,7 @@ import {
   type SpendingPeriodMode,
 } from "../utils/spendingPeriod";
 import { onSpendingRefresh } from "../composables/useSpendingRefresh";
+import { invalidateSpendingDataCaches } from "../stores/invalidateCaches";
 import { type HomeDataBundle, useHomeDataStore } from "../stores/homeData";
 import { DEFAULT_PACE_MONTHS } from "../utils/paceMonths";
 
@@ -525,7 +526,7 @@ async function afterExclusionChange() {
   summary.value = mapSummaryRows(m.summary, m.months);
   paceReportIsFull.value = false;
   monthReportCache.value.clear();
-  homeData.invalidate();
+  invalidateSpendingDataCaches();
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
 
@@ -641,7 +642,7 @@ async function refreshReport(
 async function refreshConfiguredCharges() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, { force: true });
+  const bundle = await homeData.load(demo, token, { force: true });
   configuredCharges.value = bundle.fixed_charges;
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
@@ -668,7 +669,7 @@ async function onDeleteStatementMonth(key: string) {
     const m = await fetchMonths(demo, token);
     months.value = m.months;
     monthReportCache.value.delete(key);
-    homeData.invalidate();
+    invalidateSpendingDataCaches();
     summary.value = mapSummaryRows(m.summary, m.months);
     paceReportIsFull.value = false;
     await refreshPaceReport();
@@ -804,7 +805,7 @@ async function applyFromBundle(bundle: HomeDataBundle, opts: { preserveSelection
 async function loadMonths(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  const cached = !options.force && !options.background && homeData.peek(demo, token, DEFAULT_PACE_MONTHS);
+  const cached = !options.force && !options.background && homeData.peek(demo, token);
 
   if (cached) {
     try {
@@ -822,7 +823,7 @@ async function loadMonths(options: { background?: boolean; force?: boolean } = {
     error.value = "";
   }
   try {
-    const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, options);
+    const bundle = await homeData.load(demo, token, options);
     await applyFromBundle(bundle, { preserveSelection: options.background });
     if (!options.background) error.value = "";
   } catch (e) {
@@ -839,7 +840,6 @@ onMounted(() => {
   stopSpendingRefresh = onSpendingRefresh(() => {
     paceReportIsFull.value = false;
     monthReportCache.value.clear();
-    homeData.invalidate();
     void loadMonths({ force: true });
   });
 });

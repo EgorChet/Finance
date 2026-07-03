@@ -79,11 +79,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { fetchRules, saveRuleEntry, saveRules } from "../api/client";
+import { saveRuleEntry, saveRules } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import EditPanel from "../components/EditPanel.vue";
 import { useAuthStore } from "../stores/auth";
+import { invalidateRulesDataCaches } from "../stores/invalidateCaches";
+import { useRulesDataStore } from "../stores/viewData";
 import { CATEGORY_PICKLIST } from "../categories";
 import type { MerchantRow } from "../types";
 
@@ -97,6 +99,7 @@ withDefaults(
 const categories = CATEGORY_PICKLIST;
 
 const auth = useAuthStore();
+const rulesData = useRulesDataStore();
 const rows = ref<MerchantRow[]>([]);
 const loading = ref(true);
 const savedSnapshot = ref("{}");
@@ -259,20 +262,37 @@ async function persistRow(hebrew: string): Promise<boolean> {
   }
 }
 
-async function load() {
-  loading.value = true;
-  editingHebrew.value = null;
-  setStatus("");
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && rulesData.peek(demo, token);
+
+  if (cached) {
+    rows.value = rowsFromRules(cached);
+    syncSnapshot();
+    refreshSearchMatches();
+    loading.value = false;
+    void load({ background: true });
+    return;
+  }
+
+  if (!options.background) {
+    loading.value = true;
+    editingHebrew.value = null;
+    setStatus("");
+  }
   try {
-    const rules = await fetchRules(auth.isDemo, auth.token || undefined);
+    const rules = await rulesData.load(demo, token, options);
     rows.value = rowsFromRules(rules);
     syncSnapshot();
     refreshSearchMatches();
   } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
-    syncSnapshot();
+    if (!options.background) {
+      setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
+      syncSnapshot();
+    }
   } finally {
-    loading.value = false;
+    if (!options.background) loading.value = false;
   }
 }
 
@@ -347,7 +367,8 @@ async function importJson(e: Event) {
 
     const result = await saveRules(rulesFromRows(), auth.token || undefined);
     if (!result.saved) throw new Error("Server did not confirm save.");
-    const rules = await fetchRules(false, auth.token || undefined);
+    invalidateRulesDataCaches();
+    const rules = await rulesData.load(false, auth.token || undefined, { force: true });
     rows.value = rowsFromRules(rules);
     syncSnapshot();
     refreshSearchMatches();

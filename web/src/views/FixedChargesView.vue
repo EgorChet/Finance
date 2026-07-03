@@ -329,7 +329,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
-import { fetchFixedCharges, fetchLivingBudget, saveFixedCharges, saveLivingBudget } from "../api/client";
+import { saveFixedCharges, saveLivingBudget } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import EditPanel from "../components/EditPanel.vue";
@@ -340,6 +340,9 @@ import MonthSelect from "../components/MonthSelect.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { SPENDING_CATEGORIES } from "../categories";
 import { useAuthStore } from "../stores/auth";
+import { invalidateHouseholdDataCaches } from "../stores/invalidateCaches";
+import { useHomeDataStore } from "../stores/homeData";
+import { type HouseholdBundle, useHouseholdDataStore } from "../stores/viewData";
 import { confirm } from "../composables/useConfirm";
 import { formatIls } from "../utils/format";
 import {
@@ -372,6 +375,8 @@ import {
 
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
+const homeData = useHomeDataStore();
+const householdData = useHouseholdDataStore();
 const loading = ref(true);
 const hydrated = ref(false);
 const saving = ref(false);
@@ -524,6 +529,7 @@ async function runPersist(): Promise<boolean> {
     }
     await Promise.all(tasks);
     syncSavedSnapshots();
+    invalidateHouseholdDataCaches();
     showSaveStatus("Saved");
     return true;
   } catch (e) {
@@ -832,34 +838,69 @@ async function addOneTime() {
   }
 }
 
-async function load() {
-  loading.value = true;
-  hydrated.value = false;
-  error.value = "";
-  status.value = "";
+async function applyHouseholdBundle(bundle: HouseholdBundle) {
+  charges.value = bundle.charges.map((c) => normalizeConfiguredCharge(c));
+  livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
+  livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
+    normalizeLivingBudgetMonthTopup(t),
+  );
+  syncSavedSnapshots();
+}
+
+function applyHomeBundlePeek() {
+  const cached = homeData.peek(auth.isDemo, auth.token || undefined);
+  if (!cached) return false;
+  charges.value = cached.fixed_charges.map((c) => normalizeConfiguredCharge(c));
+  livingBudgetSegments.value = cached.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
+  livingBudgetMonthTopups.value = (cached.living_budget.month_topups || []).map((t) =>
+    normalizeLivingBudgetMonthTopup(t),
+  );
+  syncSavedSnapshots();
+  return true;
+}
+
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+
+  if (!options.force && !options.background) {
+    const householdCached = householdData.peek(demo, token);
+    if (householdCached) {
+      await applyHouseholdBundle(householdCached);
+      hydrated.value = true;
+      loading.value = false;
+      void load({ background: true });
+      return;
+    }
+    if (applyHomeBundlePeek()) {
+      hydrated.value = true;
+      loading.value = false;
+      void load({ background: true });
+      return;
+    }
+  }
+
+  if (!options.background) {
+    loading.value = true;
+    hydrated.value = false;
+    error.value = "";
+    status.value = "";
+  }
   try {
-    const token = auth.token || undefined;
-    const chargesData = await fetchFixedCharges(auth.isDemo, token);
-    charges.value = chargesData.charges.map((c) => normalizeConfiguredCharge(c));
-    try {
-      const budgetData = await fetchLivingBudget(auth.isDemo, token);
-      livingBudgetSegments.value = budgetData.segments.map((s) => normalizeLivingBudgetSegment(s));
-      livingBudgetMonthTopups.value = (budgetData.month_topups || []).map((t) => normalizeLivingBudgetMonthTopup(t));
-    } catch (budgetErr) {
+    const bundle = await householdData.load(demo, token, options);
+    await applyHouseholdBundle(bundle);
+    error.value = "";
+  } catch (e) {
+    if (!options.background) {
+      error.value = String(e);
+      charges.value = [];
       livingBudgetSegments.value = [];
       livingBudgetMonthTopups.value = [];
-      error.value = `Could not load living budget: ${budgetErr}. Redeploy the Render API if you recently added this feature.`;
+      syncSavedSnapshots();
     }
-    syncSavedSnapshots();
-  } catch (e) {
-    error.value = String(e);
-    charges.value = [];
-    livingBudgetSegments.value = [];
-    livingBudgetMonthTopups.value = [];
-    syncSavedSnapshots();
   } finally {
     hydrated.value = true;
-    loading.value = false;
+    if (!options.background) loading.value = false;
   }
 }
 

@@ -139,13 +139,14 @@ import {
   addCalendarEvent,
   calendarFeedUrl,
   deleteCalendarEvent,
-  fetchCalendar,
   regenerateCalendarFeedToken,
   updateCalendarEvent,
 } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CalendarEventForm from "../components/CalendarEventForm.vue";
 import { useAuthStore } from "../stores/auth";
+import { invalidateCalendarDataCaches } from "../stores/invalidateCaches";
+import { useCalendarDataStore } from "../stores/viewData";
 import type { CalendarEvent } from "../types";
 import { referenceDate } from "../utils/appDate";
 import {
@@ -161,6 +162,7 @@ import {
 import { creatorClass } from "../utils/users";
 
 const auth = useAuthStore();
+const calendarData = useCalendarDataStore();
 const loading = ref(true);
 const saving = ref(false);
 const error = ref("");
@@ -391,18 +393,33 @@ function nextMonth() {
   }
 }
 
-async function load() {
-  loading.value = true;
-  error.value = "";
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && calendarData.peek(demo, token);
+
+  if (cached) {
+    events.value = cached.events;
+    feedToken.value = cached.feed_token;
+    periodFilter.value = defaultPeriodFilter(cached.events, todayIso.value);
+    loading.value = false;
+    void load({ background: true });
+    return;
+  }
+
+  if (!options.background) {
+    loading.value = true;
+    error.value = "";
+  }
   try {
-    const data = await fetchCalendar(auth.isDemo, auth.token || undefined);
+    const data = await calendarData.load(demo, token, options);
     events.value = data.events;
     feedToken.value = data.feed_token;
     periodFilter.value = defaultPeriodFilter(data.events, todayIso.value);
   } catch (e) {
-    error.value = String(e);
+    if (!options.background) error.value = String(e);
   } finally {
-    loading.value = false;
+    if (!options.background) loading.value = false;
   }
 }
 
@@ -434,6 +451,7 @@ async function saveEvent(payload: ReturnType<typeof formToPayload>) {
       viewMonth.value = parseInt(res.event.date.slice(5, 7), 10) - 1;
       closeForm();
     }
+    invalidateCalendarDataCaches();
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -448,6 +466,7 @@ async function deleteEditing() {
   try {
     await deleteCalendarEvent(editingEvent.value.id, auth.token || undefined);
     events.value = events.value.filter((e) => e.id !== editingEvent.value!.id);
+    invalidateCalendarDataCaches();
     closeForm();
   } catch (e) {
     error.value = String(e);

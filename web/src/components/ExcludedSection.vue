@@ -51,31 +51,48 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { fetchExclusions, removeExclusion } from "../api/client";
+import { removeExclusion } from "../api/client";
 import AppLoader from "./AppLoader.vue";
 import { useAuthStore } from "../stores/auth";
+import { useExclusionsDataStore } from "../stores/viewData";
+import { invalidateSpendingDataCaches } from "../stores/invalidateCaches";
 import type { ExcludedItem } from "../types";
 import { formatIls, formatTransactionDate } from "../utils/format";
 
 const auth = useAuthStore();
+const exclusionsData = useExclusionsDataStore();
 const loading = ref(true);
 const error = ref("");
 const status = ref("");
 const entries = ref<ExcludedItem[]>([]);
 const restoringKey = ref<string | null>(null);
 
-async function load() {
-  loading.value = true;
-  error.value = "";
-  status.value = "";
-  try {
-    const data = await fetchExclusions(auth.isDemo, auth.token || undefined);
-    entries.value = data.entries;
-  } catch (e) {
-    error.value = String(e);
-    entries.value = [];
-  } finally {
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && exclusionsData.peek(demo, token);
+
+  if (cached) {
+    entries.value = cached;
     loading.value = false;
+    void load({ background: true });
+    return;
+  }
+
+  if (!options.background) {
+    loading.value = true;
+    error.value = "";
+    status.value = "";
+  }
+  try {
+    entries.value = await exclusionsData.load(demo, token, options);
+  } catch (e) {
+    if (!options.background) {
+      error.value = String(e);
+      entries.value = [];
+    }
+  } finally {
+    if (!options.background) loading.value = false;
   }
 }
 
@@ -86,6 +103,8 @@ async function restore(row: ExcludedItem) {
   try {
     await removeExclusion(row.key, auth.token || undefined);
     entries.value = entries.value.filter((e) => e.key !== row.key);
+    exclusionsData.invalidate();
+    invalidateSpendingDataCaches();
     status.value = "Charge restored — totals will update on Overview.";
   } catch (e) {
     status.value = String(e);

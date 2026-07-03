@@ -1,3 +1,5 @@
+import { invalidateSpendingDataCaches } from "../stores/invalidateCaches";
+
 const listeners = new Set<() => void>();
 
 export function onSpendingRefresh(listener: () => void): () => void {
@@ -6,6 +8,7 @@ export function onSpendingRefresh(listener: () => void): () => void {
 }
 
 export function emitSpendingRefresh(): void {
+  invalidateSpendingDataCaches();
   for (const listener of listeners) {
     listener();
   }

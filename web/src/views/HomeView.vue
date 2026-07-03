@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { fetchCalendar, fetchReport } from "../api/client";
+import { fetchReport } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import SummaryMetrics from "../components/SummaryMetrics.vue";
 import PortfolioSummaryCard from "../components/home/PortfolioSummaryCard.vue";
@@ -64,6 +64,7 @@ import { onSpendingRefresh } from "../composables/useSpendingRefresh";
 import { useAuthStore } from "../stores/auth";
 import { type HomeDataBundle, useHomeDataStore } from "../stores/homeData";
 import { usePortfolioStore } from "../stores/portfolio";
+import { useCalendarDataStore } from "../stores/viewData";
 import { goToSignIn } from "../utils/signIn";
 import type { CalendarEvent, MonthItem, SpendingReport } from "../types";
 import { referenceDate } from "../utils/appDate";
@@ -101,6 +102,7 @@ import {
 
 const auth = useAuthStore();
 const homeData = useHomeDataStore();
+const calendarData = useCalendarDataStore();
 const portfolio = usePortfolioStore();
 const router = useRouter();
 
@@ -221,17 +223,32 @@ const overviewLink = computed(() => {
   return { name: "overview" as const, query: { month: currentMonthKey.value } };
 });
 
-async function loadCalendar() {
-  calendarLoading.value = true;
-  calendarError.value = "";
+async function loadCalendar(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && calendarData.peek(demo, token);
+
+  if (cached) {
+    calendarEvents.value = cached.events;
+    calendarLoading.value = false;
+    void loadCalendar({ background: true });
+    return;
+  }
+
+  if (!options.background) {
+    calendarLoading.value = true;
+    calendarError.value = "";
+  }
   try {
-    const data = await fetchCalendar(auth.isDemo, auth.token || undefined);
+    const data = await calendarData.load(demo, token, options);
     calendarEvents.value = data.events;
   } catch (e) {
-    calendarError.value = String(e);
-    calendarEvents.value = [];
+    if (!options.background) {
+      calendarError.value = String(e);
+      calendarEvents.value = [];
+    }
   } finally {
-    calendarLoading.value = false;
+    if (!options.background) calendarLoading.value = false;
   }
 }
 
@@ -318,7 +335,7 @@ async function applySpendingBundle(bundle: HomeDataBundle, opts: { preserveMonth
 async function loadSpending(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
-  const cached = !options.force && !options.background && homeData.peek(demo, token, DEFAULT_PACE_MONTHS);
+  const cached = !options.force && !options.background && homeData.peek(demo, token);
 
   if (cached) {
     try {
@@ -336,7 +353,7 @@ async function loadSpending(options: { background?: boolean; force?: boolean } =
     spendingError.value = "";
   }
   try {
-    const bundle = await homeData.load(demo, token, DEFAULT_PACE_MONTHS, options);
+    const bundle = await homeData.load(demo, token, options);
     await applySpendingBundle(bundle, { preserveMonth: options.background });
   } catch (e) {
     if (!options.background) {
@@ -354,7 +371,6 @@ onMounted(() => {
   void loadSpending();
   void loadCalendar();
   stopSpendingRefresh = onSpendingRefresh(() => {
-    homeData.invalidate();
     void loadSpending({ force: true });
   });
 });

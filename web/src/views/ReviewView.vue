@@ -45,7 +45,7 @@
           </span>
         </label>
         <div class="review-options-actions">
-          <button type="button" class="btn btn-compact" @click="load">Refresh queue</button>
+          <button type="button" class="btn btn-compact" @click="() => load({ force: true })">Refresh queue</button>
           <button v-if="!auth.isDemo" type="button" class="btn btn-compact btn-ghost" @click="reset">
             Clear progress
           </button>
@@ -196,7 +196,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import {
   confirmReview,
-  fetchReviewQueue,
   fetchReviewSuggestion,
   resetReviewProgress,
 } from "../api/client";
@@ -204,6 +203,8 @@ import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import { useAuthStore } from "../stores/auth";
+import { invalidateRulesDataCaches } from "../stores/invalidateCaches";
+import { useReviewDataStore, type ReviewQueueBundle } from "../stores/reviewData";
 import { confirm as askConfirm } from "../composables/useConfirm";
 import type { ReviewQueueItem } from "../types";
 import { CATEGORY_PICKLIST } from "../categories";
@@ -220,6 +221,7 @@ const SWIPE_THRESHOLD = 90;
 const SWIPE_MAX_ROTATION = 14;
 
 const auth = useAuthStore();
+const reviewData = useReviewDataStore();
 const queue = ref<ReviewQueueItem[]>([]);
 const reviewedCount = ref(0);
 const loading = ref(false);
@@ -423,25 +425,41 @@ async function loadSuggestionForCurrent() {
   }
 }
 
-async function load() {
-  loading.value = true;
-  try {
-    const res = await fetchReviewQueue(
-      auth.isDemo,
-      {
-        includeReviewed: includeReviewed.value,
-        includeLabeled: includeLabeled.value,
-        onePerMerchant: onePerMerchant.value,
-      },
-      auth.token || undefined,
-    );
-    queue.value = res.queue;
-    reviewedCount.value = res.reviewed_count;
-    index.value = 0;
-    resetSwipe();
-    await loadSuggestionForCurrent();
-  } finally {
+function reviewOptions() {
+  return {
+    includeReviewed: includeReviewed.value,
+    includeLabeled: includeLabeled.value,
+    onePerMerchant: onePerMerchant.value,
+  };
+}
+
+async function applyQueue(res: ReviewQueueBundle) {
+  queue.value = res.queue;
+  reviewedCount.value = res.reviewed_count;
+  index.value = 0;
+  resetSwipe();
+  await loadSuggestionForCurrent();
+}
+
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const opts = reviewOptions();
+  const cached = !options.force && !options.background && reviewData.peek(demo, token, opts);
+
+  if (cached) {
+    await applyQueue(cached);
     loading.value = false;
+    void load({ background: true });
+    return;
+  }
+
+  if (!options.background) loading.value = true;
+  try {
+    const res = await reviewData.load(demo, token, opts, options);
+    await applyQueue(res);
+  } finally {
+    if (!options.background) loading.value = false;
   }
 }
 
@@ -478,6 +496,7 @@ async function confirm() {
       }
     }
     suggestionCache.set(hebrew, english.value.trim());
+    invalidateRulesDataCaches();
     await loadSuggestionForCurrent();
   } finally {
     confirming.value = false;
@@ -500,6 +519,8 @@ watch(current, () => {
   resetSwipe();
   void loadSuggestionForCurrent();
 });
-watch([onePerMerchant, includeLabeled, includeReviewed], load);
+watch([onePerMerchant, includeLabeled, includeReviewed], () => {
+  void load({ force: true });
+});
 onMounted(load);
 </script>

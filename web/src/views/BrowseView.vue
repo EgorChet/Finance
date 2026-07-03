@@ -117,12 +117,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { addExclusion, fetchMonths, fetchReport } from "../api/client";
+import { addExclusion, fetchReport } from "../api/client";
 import AppLoader from "../components/AppLoader.vue";
 import CategorySelect from "../components/CategorySelect.vue";
 import ToggleSwitch from "../components/ToggleSwitch.vue";
 import TransactionList from "../components/TransactionList.vue";
 import { useAuthStore } from "../stores/auth";
+import { useHomeDataStore } from "../stores/homeData";
 import { confirm } from "../composables/useConfirm";
 import type { MonthItem, Transaction } from "../types";
 import { CATEGORY_PICKLIST, rollupCategory } from "../categories";
@@ -141,6 +142,7 @@ const amountPresets: AmountPreset[] = [
 ];
 
 const auth = useAuthStore();
+const homeData = useHomeDataStore();
 const loading = ref(true);
 const error = ref("");
 const months = ref<MonthItem[]>([]);
@@ -230,14 +232,29 @@ function clearFilters() {
   maxAmount.value = "";
 }
 
-async function loadTransactions() {
+async function loadTransactions(options: { background?: boolean } = {}) {
   error.value = "";
+  const month = selectedMonth.value || null;
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const scoped = month ? homeData.peek(demo, token)?.scoped_reports?.[month] : null;
+
+  if (scoped && !options.background) {
+    allTransactions.value = [...scoped.transactions];
+    void loadTransactions({ background: true });
+    return;
+  }
+
   try {
-    const report = await fetchReport(auth.isDemo, selectedMonth.value || null, auth.token || undefined);
-    allTransactions.value = [...report.transactions];
+    const report = await fetchReport(demo, month, token);
+    if (month === (selectedMonth.value || null)) {
+      allTransactions.value = [...report.transactions];
+    }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Could not load transactions";
-    allTransactions.value = [];
+    if (!options.background) {
+      error.value = e instanceof Error ? e.message : "Could not load transactions";
+      allTransactions.value = [];
+    }
   }
 }
 
@@ -249,17 +266,30 @@ function defaultBrowseMonthKey(months: MonthItem[]): string {
   return months[0]?.key ?? "";
 }
 
-async function load() {
-  loading.value = true;
-  try {
-    const data = await fetchMonths(auth.isDemo, auth.token || undefined);
-    months.value = data.months;
-    selectedMonth.value = defaultBrowseMonthKey(data.months);
-    await loadTransactions();
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Could not load data";
-  } finally {
+async function load(options: { background?: boolean; force?: boolean } = {}) {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const cached = !options.force && !options.background && homeData.peek(demo, token);
+
+  if (cached) {
+    months.value = cached.months;
+    if (!selectedMonth.value) selectedMonth.value = defaultBrowseMonthKey(cached.months);
     loading.value = false;
+    await loadTransactions();
+    void load({ background: true });
+    return;
+  }
+
+  if (!options.background) loading.value = true;
+  try {
+    const bundle = await homeData.load(demo, token, options);
+    months.value = bundle.months;
+    if (!options.background) selectedMonth.value = defaultBrowseMonthKey(bundle.months);
+    await loadTransactions({ background: options.background });
+  } catch (e) {
+    if (!options.background) error.value = e instanceof Error ? e.message : "Could not load data";
+  } finally {
+    if (!options.background) loading.value = false;
   }
 }
 
