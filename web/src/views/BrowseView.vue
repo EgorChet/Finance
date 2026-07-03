@@ -260,14 +260,6 @@ async function loadTransactions(options: { background?: boolean } = {}) {
   }
 }
 
-function defaultBrowseMonthKey(months: MonthItem[]): string {
-  const finals = months.filter((m) => !m.partial);
-  if (finals.length) {
-    return [...finals].sort((a, b) => b.billing_date.localeCompare(a.billing_date))[0].key;
-  }
-  return months[0]?.key ?? "";
-}
-
 async function load(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -275,7 +267,6 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 
   if (cached) {
     months.value = cached.months;
-    if (!selectedMonth.value) selectedMonth.value = defaultBrowseMonthKey(cached.months);
     loading.value = false;
     await loadTransactions();
     void load({ background: true });
@@ -286,7 +277,6 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
   try {
     const bundle = await homeData.load(demo, token, options);
     months.value = bundle.months;
-    if (!options.background) selectedMonth.value = defaultBrowseMonthKey(bundle.months);
     await loadTransactions({ background: options.background });
   } catch (e) {
     if (!options.background) error.value = e instanceof Error ? e.message : "Could not load data";
