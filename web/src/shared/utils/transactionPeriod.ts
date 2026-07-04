@@ -30,7 +30,32 @@ function inRange(dateIso: string, start: Date, end: Date): boolean {
   return d >= start && d <= end;
 }
 
-/** Sunday-start week containing `reference`. */
+function laterDate(a: Date, b: Date): Date {
+  return a >= b ? a : b;
+}
+
+function earlierDate(a: Date, b: Date): Date {
+  return a <= b ? a : b;
+}
+
+/** Monday-start week containing `reference` (matches calendar grid). */
+export function startOfWeekMonday(reference: Date): Date {
+  const ref = normalizeDate(reference);
+  const start = new Date(ref);
+  const daysFromMonday = (ref.getDay() + 6) % 7;
+  start.setDate(ref.getDate() - daysFromMonday);
+  return start;
+}
+
+/** Sunday end of the Monday-start week containing `reference`. */
+export function endOfWeekSunday(reference: Date): Date {
+  const start = startOfWeekMonday(reference);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return end;
+}
+
+/** @deprecated use startOfWeekMonday */
 export function startOfWeekSunday(reference: Date): Date {
   const ref = normalizeDate(reference);
   const start = new Date(ref);
@@ -56,15 +81,17 @@ export function filterTransactionsByPeriod(
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayIso = isoDateLocal(yesterday);
 
-  const weekStart = startOfWeekSunday(ref);
   const monthStart = new Date(ref.getFullYear(), ref.getMonth(), 1);
-  const monthEnd = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
 
   return transactions.filter((t) => {
     const dateIso = t.date.slice(0, 10);
     if (period === "today") return dateIso === todayIso;
     if (period === "yesterday") return dateIso === yesterdayIso;
-    if (period === "week") return inRange(dateIso, weekStart, ref);
-    return inRange(dateIso, monthStart, monthEnd);
+    if (period === "week") {
+      const weekStart = laterDate(startOfWeekMonday(ref), monthStart);
+      const weekEnd = earlierDate(endOfWeekSunday(ref), ref);
+      return inRange(dateIso, weekStart, weekEnd);
+    }
+    return inRange(dateIso, monthStart, ref);
   });
 }

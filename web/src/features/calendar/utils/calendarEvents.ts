@@ -72,6 +72,18 @@ export function endOfWeekIso(fromIso: string): string {
   return addDaysIso(fromIso, daysUntilSunday);
 }
 
+export function startOfWeekIso(fromIso: string): string {
+  const [y, m, d] = fromIso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const daysFromMonday = (dt.getDay() + 6) % 7;
+  return addDaysIso(fromIso, -daysFromMonday);
+}
+
+export function startOfMonthIso(fromIso: string): string {
+  const [y, m] = fromIso.split("-").map(Number);
+  return `${y}-${String(m).padStart(2, "0")}-01`;
+}
+
 export function endOfMonthIso(fromIso: string): string {
   const [y, m] = fromIso.split("-").map(Number);
   const last = new Date(y, m, 0).getDate();
@@ -80,8 +92,8 @@ export function endOfMonthIso(fromIso: string): string {
 
 export function periodRange(filter: CalendarPeriodFilter, todayIso: string): [string, string] {
   if (filter === "today") return [todayIso, todayIso];
-  if (filter === "week") return [todayIso, endOfWeekIso(todayIso)];
-  return [todayIso, endOfMonthIso(todayIso)];
+  if (filter === "week") return [startOfWeekIso(todayIso), endOfWeekIso(todayIso)];
+  return [startOfMonthIso(todayIso), endOfMonthIso(todayIso)];
 }
 
 export function eventOccursOn(event: CalendarEvent, dateIso: string): boolean {
