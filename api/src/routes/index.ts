@@ -70,7 +70,7 @@ import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, Merchant
 import { userIdFromRequest } from "../auth.js";
 import { calSyncEnabled } from "../storage/calCredentials.js";
 import calRoutes from "./cal.js";
-import { chatAvailable, replyToFinanceChat, streamFinanceChat, parseChatRequest, chatErrorStatus } from "../services/chatService.js";
+import { chatAvailable, replyToFinanceChat, streamFinanceChat, parseChatRequest, chatErrorStatus, chatErrorMessage } from "../services/chatService.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
@@ -126,7 +126,7 @@ router.post("/chat", async (req, res) => {
     const reply = await replyToFinanceChat(message, history);
     res.json({ reply });
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const messageText = chatErrorMessage(e);
     res.status(chatErrorStatus(messageText)).json({ error: messageText });
   }
 });
@@ -140,7 +140,7 @@ router.post("/chat/stream", async (req, res) => {
     const { message, history } = parseChatRequest(req.body);
     await streamFinanceChat(res, message, history);
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const messageText = chatErrorMessage(e);
     if (!res.headersSent) {
       res.status(chatErrorStatus(messageText)).json({ error: messageText });
       return;

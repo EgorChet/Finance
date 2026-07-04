@@ -1,7 +1,10 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim();
 const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
+const DEFAULT_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
 const MAX_EMPTY_RETRIES = 2;
+const MAX_TRANSIENT_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
 const EMPTY_RETRY_NUDGE =
   "Please answer the user's question concisely using only the finance snapshot provided above.";
 
@@ -18,12 +21,68 @@ type GeminiPayload = {
   promptFeedback?: { blockReason?: string };
 };
 
+class GeminiApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "GeminiApiError";
+    this.status = status;
+  }
+}
+
 export function geminiConfigured(): boolean {
   return !!GEMINI_API_KEY;
 }
 
 export function geminiModelName(): string {
   return GEMINI_MODEL;
+}
+
+export function friendlyGeminiError(message: string): string {
+  if (
+    /high demand|overloaded|try again later|capacity|temporarily unavailable|rate limit|too many requests|resource exhausted/i.test(
+      message,
+    )
+  ) {
+    return "The assistant is busy right now. Please wait a moment and try again.";
+  }
+  return message;
+}
+
+function resolveModelChain(): string[] {
+  const primary = GEMINI_MODEL;
+  const fromEnv = process.env.GEMINI_FALLBACK_MODELS?.split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const fallbacks = fromEnv?.length ? fromEnv : DEFAULT_FALLBACK_MODELS;
+  return [primary, ...fallbacks.filter((model) => model !== primary)];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableGeminiError(status: number, message: string): boolean {
+  if (status === 429 || status === 503 || status === 500) return true;
+  return /high demand|overloaded|resource exhausted|try again later|rate limit|capacity|temporarily unavailable|too many requests/i.test(
+    message,
+  );
+}
+
+function shouldRetryGeminiError(error: unknown): boolean {
+  return error instanceof GeminiApiError && isRetryableGeminiError(error.status, error.message);
+}
+
+async function throwGeminiApiError(res: Response): Promise<never> {
+  let message = `Gemini API error (${res.status})`;
+  try {
+    const payload = (await res.json()) as GeminiPayload;
+    if (payload.error?.message) message = payload.error.message;
+  } catch {
+    /* ignore parse errors */
+  }
+  throw new GeminiApiError(message, res.status);
 }
 
 function buildGenerationConfig(model: string): Record<string, unknown> {
@@ -52,11 +111,16 @@ function buildGeminiContents(userMessage: string, history: ChatTurn[]) {
   ];
 }
 
-function buildGeminiRequestBody(systemPrompt: string, userMessage: string, history: ChatTurn[]) {
+function buildGeminiRequestBody(
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[],
+) {
   return {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: buildGeminiContents(userMessage, history),
-    generationConfig: buildGenerationConfig(GEMINI_MODEL),
+    generationConfig: buildGenerationConfig(model),
   };
 }
 
@@ -80,12 +144,13 @@ function emptyResponseDetail(payload: GeminiPayload): string {
   return details.length ? ` (${details.join(", ")})` : "";
 }
 
-function geminiGenerateUrl(streaming: boolean): string {
+function geminiGenerateUrl(model: string, streaming: boolean): string {
   const action = streaming ? "streamGenerateContent?alt=sse" : "generateContent";
-  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:${action}`;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:${action}`;
 }
 
 async function requestGemini(
+  model: string,
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[],
@@ -95,29 +160,49 @@ async function requestGemini(
     throw new Error("GEMINI_API_KEY is not configured on the server");
   }
 
-  return fetch(geminiGenerateUrl(streaming), {
+  return fetch(geminiGenerateUrl(model, streaming), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-goog-api-key": GEMINI_API_KEY,
     },
-    body: JSON.stringify(buildGeminiRequestBody(systemPrompt, userMessage, history)),
+    body: JSON.stringify(buildGeminiRequestBody(model, systemPrompt, userMessage, history)),
   });
 }
 
+async function withModelRetry<T>(operation: (model: string) => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (const model of resolveModelChain()) {
+    let delay = INITIAL_RETRY_DELAY_MS;
+    for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+      try {
+        return await operation(model);
+      } catch (error) {
+        lastError = error;
+        if (!shouldRetryGeminiError(error)) throw error;
+        if (attempt < MAX_TRANSIENT_RETRIES) {
+          await sleep(delay);
+          delay *= 2;
+        }
+      }
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("Gemini request failed");
+}
+
 async function generateGeminiReplyOnce(
+  model: string,
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
 ): Promise<{ text: string; detail: string }> {
-  const res = await requestGemini(systemPrompt, userMessage, history, false);
+  const res = await requestGemini(model, systemPrompt, userMessage, history, false);
+  if (!res.ok) await throwGeminiApiError(res);
+
   const payload = (await res.json()) as GeminiPayload;
-
-  if (!res.ok) {
-    const message = payload.error?.message || `Gemini API error (${res.status})`;
-    throw new Error(message);
-  }
-
   return { text: extractGeminiText(payload), detail: emptyResponseDetail(payload) };
 }
 
@@ -130,7 +215,9 @@ export async function generateGeminiReply(
   let lastDetail = "";
 
   for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-    const { text, detail } = await generateGeminiReplyOnce(systemPrompt, message, history);
+    const { text, detail } = await withModelRetry((model) =>
+      generateGeminiReplyOnce(model, systemPrompt, message, history),
+    );
     if (text) return text;
 
     lastDetail = detail;
@@ -160,22 +247,13 @@ function parseGeminiStreamPayload(data: string): GeminiPayload[] {
 }
 
 async function* streamGeminiReplyOnce(
+  model: string,
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
 ): AsyncGenerator<string, { detail: string }, unknown> {
-  const res = await requestGemini(systemPrompt, userMessage, history, true);
-
-  if (!res.ok) {
-    let message = `Gemini API error (${res.status})`;
-    try {
-      const payload = (await res.json()) as GeminiPayload;
-      if (payload.error?.message) message = payload.error.message;
-    } catch {
-      /* ignore parse errors */
-    }
-    throw new Error(message);
-  }
+  const res = await requestGemini(model, systemPrompt, userMessage, history, true);
+  if (!res.ok) await throwGeminiApiError(res);
 
   const reader = res.body?.getReader();
   if (!reader) {
@@ -224,6 +302,38 @@ async function* streamGeminiReplyOnce(
   return { detail: emptyResponseDetail(lastPayload) };
 }
 
+async function* streamWithModelRetry(
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[],
+): AsyncGenerator<string, { detail: string }, unknown> {
+  let lastError: unknown;
+
+  for (const model of resolveModelChain()) {
+    let delay = INITIAL_RETRY_DELAY_MS;
+    for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+      try {
+        const stream = streamGeminiReplyOnce(model, systemPrompt, userMessage, history);
+        while (true) {
+          const next = await stream.next();
+          if (next.done) return next.value ?? { detail: "" };
+          yield next.value;
+        }
+      } catch (error) {
+        lastError = error;
+        if (!shouldRetryGeminiError(error)) throw error;
+        if (attempt < MAX_TRANSIENT_RETRIES) {
+          await sleep(delay);
+          delay *= 2;
+        }
+      }
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("Gemini request failed");
+}
+
 export async function* streamGeminiReply(
   systemPrompt: string,
   userMessage: string,
@@ -233,7 +343,7 @@ export async function* streamGeminiReply(
   let lastDetail = "";
 
   for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-    const stream = streamGeminiReplyOnce(systemPrompt, message, history);
+    const stream = streamWithModelRetry(systemPrompt, message, history);
     let total = "";
 
     while (true) {

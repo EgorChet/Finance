@@ -45,7 +45,18 @@
         </div>
       </div>
 
-      <p v-if="error" class="chat-error">{{ error }}</p>
+      <div v-if="error" class="chat-error-row">
+        <p class="chat-error">{{ error }}</p>
+        <button
+          v-if="retryMessage"
+          type="button"
+          class="btn btn-retry"
+          :disabled="sending || !chatEnabled"
+          @click="retryLast"
+        >
+          Try again
+        </button>
+      </div>
 
       <form class="chat-form" @submit.prevent="send">
         <textarea
@@ -88,6 +99,60 @@ const loadingConfig = ref(true);
 const messagesEl = ref<HTMLElement | null>(null);
 const reveal = useGradualReveal();
 const activeAssistantIndex = ref<number | null>(null);
+const retryMessage = ref("");
+
+function friendlyChatError(message: string): string {
+  if (
+    /high demand|overloaded|try again later|capacity|temporarily unavailable|rate limit|too many requests|resource exhausted|busy right now/i.test(
+      message,
+    )
+  ) {
+    return "The assistant is busy right now. Please wait a moment and try again.";
+  }
+  return message;
+}
+
+async function submitMessage(text: string, history: ChatMessage[]) {
+  error.value = "";
+  retryMessage.value = "";
+  sending.value = true;
+
+  const assistantIndex = messages.value.length;
+  reveal.reset();
+  activeAssistantIndex.value = assistantIndex;
+  messages.value.push({ role: "assistant", content: "", streaming: true });
+  await scrollToBottom();
+
+  try {
+    await streamFinanceChat(
+      text,
+      history,
+      auth.isDemo,
+      (chunk) => {
+        messages.value[assistantIndex].content += chunk;
+        reveal.append(chunk);
+      },
+      auth.token || undefined,
+    );
+    messages.value[assistantIndex].streaming = false;
+    if (!messages.value[assistantIndex].content.trim()) {
+      messages.value[assistantIndex].content = "No response.";
+      reveal.reset();
+      reveal.append("No response.");
+      reveal.flush();
+      activeAssistantIndex.value = null;
+    }
+  } catch (e) {
+    error.value = friendlyChatError(e instanceof Error ? e.message : "Chat failed");
+    retryMessage.value = text;
+    reveal.reset();
+    activeAssistantIndex.value = null;
+    messages.value.splice(assistantIndex, 1);
+  } finally {
+    sending.value = false;
+    await scrollToBottom();
+  }
+}
 
 function messageText(msg: ChatMessage, index: number): string {
   if (msg.role === "user") return msg.content;
@@ -132,48 +197,16 @@ async function send() {
   const text = draft.value.trim();
   if (!text || sending.value || !chatEnabled.value) return;
 
-  error.value = "";
   messages.value.push({ role: "user", content: text });
   const history = messages.value.slice(0, -1);
   draft.value = "";
-  sending.value = true;
+  await submitMessage(text, history);
+}
 
-  const assistantIndex = messages.value.length;
-  reveal.reset();
-  activeAssistantIndex.value = assistantIndex;
-  messages.value.push({ role: "assistant", content: "", streaming: true });
-  await scrollToBottom();
-
-  try {
-    await streamFinanceChat(
-      text,
-      history,
-      auth.isDemo,
-      (chunk) => {
-        messages.value[assistantIndex].content += chunk;
-        reveal.append(chunk);
-      },
-      auth.token || undefined,
-    );
-    messages.value[assistantIndex].streaming = false;
-    if (!messages.value[assistantIndex].content.trim()) {
-      messages.value[assistantIndex].content = "No response.";
-      reveal.reset();
-      reveal.append("No response.");
-      reveal.flush();
-      activeAssistantIndex.value = null;
-    }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : "Chat failed";
-    reveal.reset();
-    activeAssistantIndex.value = null;
-    messages.value.splice(assistantIndex, 1);
-    messages.value.pop();
-    draft.value = text;
-  } finally {
-    sending.value = false;
-    await scrollToBottom();
-  }
+async function retryLast() {
+  const text = retryMessage.value.trim();
+  if (!text || sending.value || !chatEnabled.value) return;
+  await submitMessage(text, messages.value);
 }
 
 function clearChat() {
@@ -181,6 +214,7 @@ function clearChat() {
   activeAssistantIndex.value = null;
   messages.value = [];
   error.value = "";
+  retryMessage.value = "";
 }
 
 onMounted(async () => {
@@ -297,10 +331,23 @@ onMounted(async () => {
   }
 }
 
+.chat-error-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
 .chat-error {
   color: var(--danger, #dc2626);
   font-size: 0.88rem;
-  margin: 0 0 0.75rem;
+  margin: 0;
+}
+
+.btn-retry {
+  font-size: 0.88rem;
+  padding: 0.35rem 0.65rem;
 }
 
 .chat-form {

@@ -15,7 +15,7 @@ import {
 import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
-import { chatAvailable, replyToDemoFinanceChat, streamDemoFinanceChat, parseChatRequest, chatErrorStatus } from "../services/chatService.js";
+import { chatAvailable, replyToDemoFinanceChat, streamDemoFinanceChat, parseChatRequest, chatErrorStatus, chatErrorMessage } from "../services/chatService.js";
 
 const router = Router();
 
@@ -226,7 +226,7 @@ router.post("/chat", async (req, res) => {
     const reply = await replyToDemoFinanceChat(message, history, demoHomeBundle());
     res.json({ reply, demo: true });
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const messageText = chatErrorMessage(e);
     res.status(chatErrorStatus(messageText)).json({ error: messageText });
   }
 });
@@ -240,7 +240,7 @@ router.post("/chat/stream", async (req, res) => {
     const { message, history } = parseChatRequest(req.body);
     await streamDemoFinanceChat(res, message, history, demoHomeBundle());
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const messageText = chatErrorMessage(e);
     if (!res.headersSent) {
       res.status(chatErrorStatus(messageText)).json({ error: messageText });
       return;

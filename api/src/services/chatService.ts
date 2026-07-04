@@ -1,4 +1,10 @@
-import { generateGeminiReply, geminiConfigured, streamGeminiReply, type ChatTurn } from "./geminiClient.js";
+import {
+  friendlyGeminiError,
+  generateGeminiReply,
+  geminiConfigured,
+  streamGeminiReply,
+  type ChatTurn,
+} from "./geminiClient.js";
 import { buildFinanceContext, buildFinanceContextFromBundle } from "./chatContext.js";
 import type { Response } from "express";
 import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, SpendingReport } from "../types.js";
@@ -38,7 +44,16 @@ function assertChatConfigured(): void {
 }
 
 function chatErrorStatus(message: string): number {
-  return /required|too long/i.test(message) ? 400 : 502;
+  if (/required|too long/i.test(message)) return 400;
+  if (/busy right now|high demand|overloaded|try again later|rate limit|too many requests/i.test(message)) {
+    return 503;
+  }
+  return 502;
+}
+
+function chatErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Chat failed";
+  return friendlyGeminiError(message);
 }
 
 function beginChatStream(res: Response): void {
@@ -67,8 +82,7 @@ async function pipeGeminiStream(
     writeChatStreamEvent(res, { done: true });
     res.end();
   } catch (e) {
-    const messageText = e instanceof Error ? e.message : "Chat failed";
-    writeChatStreamEvent(res, { error: messageText });
+    writeChatStreamEvent(res, { error: chatErrorMessage(e) });
     res.end();
   }
 }
@@ -140,7 +154,7 @@ export async function streamDemoFinanceChat(
   await pipeGeminiStream(res, systemPrompt, trimmed, history);
 }
 
-export { chatErrorStatus };
+export { chatErrorStatus, chatErrorMessage };
 
 export function parseChatRequest(body: unknown): { message: string; history: ClientChatTurn[] } {
   const payload = body as {
