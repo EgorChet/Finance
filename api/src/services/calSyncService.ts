@@ -12,6 +12,7 @@ const DIGITAL_URL = "https://digital-web.cal-online.co.il/";
 const JOB_IDLE_TTL_MS = 10 * 60 * 1000;
 const JOB_MAX_AGE_MS = 20 * 60 * 1000;
 const OTP_WAIT_MS = 3 * 60 * 1000;
+const OTP_SCREEN_TIMEOUT_MS = 120_000;
 const PHASE_TIMEOUT_MS = 180_000;
 const DASHBOARD_TIMEOUT_MS = 60_000;
 const RESTORE_TIMEOUT_MS = 40_000;
@@ -56,8 +57,17 @@ export interface CalSyncJob {
   otpPromise?: Promise<string>;
   otpResolve?: (code: string) => void;
   otpReject?: (err: Error) => void;
+  otpTimer?: ReturnType<typeof setTimeout>;
   pipelineDone?: Promise<void>;
 }
+
+const IN_FLIGHT_STATUSES: CalJobStatus[] = [
+  "starting",
+  "otp_required",
+  "logging_in",
+  "scraping",
+  "saving",
+];
 
 const jobs = new Map<string, CalSyncJob>();
 
@@ -209,11 +219,39 @@ function purgeExpiredJobs(): void {
   }
 }
 
+function abortOtpWait(job: CalSyncJob, reason = "Sync cancelled"): void {
+  if (job.otpTimer) {
+    clearTimeout(job.otpTimer);
+    job.otpTimer = undefined;
+  }
+  const reject = job.otpReject;
+  job.otpResolve = undefined;
+  job.otpReject = undefined;
+  job.otpPromise = undefined;
+  if (reject) reject(new Error(reason));
+}
+
+async function cancelStaleCalJobs(keepJobId: string, logJob?: CalSyncJob): Promise<void> {
+  const stale: string[] = [];
+  for (const [id, job] of jobs) {
+    if (id === keepJobId) continue;
+    if (IN_FLIGHT_STATUSES.includes(job.status)) stale.push(id);
+  }
+  for (const id of stale) {
+    const job = jobs.get(id);
+    if (job) job.status = "cancelled";
+    await cleanupJob(id);
+  }
+  if (stale.length && logJob) {
+    jobLog(logJob, `Cancelled ${stale.length} stale Cal sync job(s)`);
+  }
+}
+
 async function cleanupJob(jobId: string): Promise<void> {
   const job = jobs.get(jobId);
   if (!job) return;
+  abortOtpWait(job, "Sync cancelled");
   jobs.delete(jobId);
-  if (job.otpReject) job.otpReject(new Error("Sync cancelled"));
   if (job.browser) {
     try {
       await job.browser.close();
@@ -472,20 +510,50 @@ async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessio
   return false;
 }
 
+async function waitForOtpScreen(page: Page, job: CalSyncJob): Promise<void> {
+  jobLog(job, "Waiting for SMS OTP screen…");
+  const deadline = Date.now() + OTP_SCREEN_TIMEOUT_MS;
+  const started = Date.now();
+  let smsRetried = false;
+  let lastProgressLog = 0;
+
+  while (Date.now() < deadline) {
+    if (await hasOtpField(page)) return;
+    if (await isLoggedIn(page)) return;
+
+    const now = Date.now();
+    const elapsed = now - started;
+    if (!smsRetried && elapsed >= 15_000) {
+      smsRetried = true;
+      jobLog(job, "OTP screen slow — retrying SMS send…");
+      try {
+        const ctx = await findSelectorContext(page, '[formcontrolname="id"]');
+        if (ctx) {
+          await clickSendSms(ctx);
+          await sleep(3500);
+        }
+      } catch {
+        /* may already be on OTP step */
+      }
+    }
+
+    if (now - lastProgressLog >= 15_000) {
+      const otp = await hasOtpField(page);
+      const login = await loginFormVisible(page);
+      jobLog(job, `Still waiting for OTP screen (url=${page.url()} otpField=${otp} loginForm=${login})`);
+      lastProgressLog = now;
+    }
+    await sleep(500);
+  }
+}
+
 async function performCalLogin(page: Page, job: CalSyncJob, creds: CalCredentialsData): Promise<void> {
   if (job.mode === "auto") {
     throw new Error("Auto sync cannot sign in with SMS. Use Sync Cal to refresh your saved session.");
   }
   await openCalLogin(page, job);
   await fillCredentialsAndRequestSms(page, job, creds);
-
-  jobLog(job, "Waiting for SMS OTP screen…");
-  const otpScreenDeadline = Date.now() + 60_000;
-  while (Date.now() < otpScreenDeadline) {
-    if (await hasOtpField(page)) break;
-    if (await isLoggedIn(page)) break;
-    await sleep(500);
-  }
+  await waitForOtpScreen(page, job);
 
   if (!(await isLoggedIn(page))) {
     if (!(await hasOtpField(page))) {
@@ -493,7 +561,7 @@ async function performCalLogin(page: Page, job: CalSyncJob, creds: CalCredential
     }
     job.status = "otp_required";
     jobLog(job, "SMS sent — enter code in the app");
-    const code = await (job.otpPromise ?? createOtpPromise(job));
+    const code = await createOtpPromise(job);
     await fillOtp(page, job, code);
     await sleep(2000);
   }
@@ -579,21 +647,42 @@ async function fillCredentialsAndRequestSms(
     jobLog(job, "Clicking שלחו לי סיסמה ב-SMS…");
     await clickSendSms(ctx);
   });
-  await sleep(2000);
+  await sleep(3500);
 }
 
 function createOtpPromise(job: CalSyncJob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("SMS code not entered in time")), OTP_WAIT_MS);
+  abortOtpWait(job);
+
+  const promise = new Promise<string>((resolve, reject) => {
+    job.otpTimer = setTimeout(() => {
+      job.otpTimer = undefined;
+      reject(new Error("SMS code not entered in time"));
+    }, OTP_WAIT_MS);
+
     job.otpResolve = (code: string) => {
-      clearTimeout(timer);
+      if (job.otpTimer) {
+        clearTimeout(job.otpTimer);
+        job.otpTimer = undefined;
+      }
+      job.otpResolve = undefined;
+      job.otpReject = undefined;
       resolve(code);
     };
+
     job.otpReject = (err: Error) => {
-      clearTimeout(timer);
+      if (job.otpTimer) {
+        clearTimeout(job.otpTimer);
+        job.otpTimer = undefined;
+      }
+      job.otpResolve = undefined;
+      job.otpReject = undefined;
       reject(err);
     };
   });
+
+  job.otpPromise = promise;
+  void promise.catch(() => {});
+  return promise;
 }
 
 async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
@@ -946,6 +1035,7 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
       await clearCalSession();
     }
   } finally {
+    abortOtpWait(job, "Sync finished");
     if (job.browser) {
       try {
         await job.browser.close();
@@ -1008,7 +1098,7 @@ export async function createCalSyncJob(
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
-  job.otpPromise = createOtpPromise(job);
+  await cancelStaleCalJobs(id, job);
   jobs.set(id, job);
 
   job.pipelineDone = (async () => {
@@ -1047,6 +1137,8 @@ export async function createCalSyncJob(
         }
         job.browser = undefined;
       }
+    } finally {
+      abortOtpWait(job, "Sync finished");
     }
   })();
 
@@ -1063,6 +1155,7 @@ export function submitCalOtpCode(jobId: string, code: string): void {
   job.status = "logging_in";
   jobLog(job, "Signing in with SMS code…");
   job.otpResolve(trimmed);
+  abortOtpWait(job, "OTP submitted");
 }
 
 export async function awaitJobCompletion(jobId: string, timeoutMs = 360_000): Promise<CalSyncJob> {

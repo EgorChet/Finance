@@ -79,6 +79,7 @@ function applyJobStatus(status: {
     stopPolling();
     submitting.value = false;
     statusError.value = status.error || "Cal sync failed";
+    jobId.value = null;
     step.value = "otp";
     emit("error", statusError.value);
   }
