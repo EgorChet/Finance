@@ -216,10 +216,23 @@ export async function warmApi(token?: string) {
 }
 
 export async function fetchAppConfig(token?: string) {
-  return get<{ analyzer_wake_url: string | null; analyzer_wake_from_browser: boolean; cal_sync_enabled?: boolean }>(
-    `${prefix(false)}/config`,
-    token,
-  );
+  return get<{
+    analyzer_wake_url: string | null;
+    analyzer_wake_from_browser: boolean;
+    cal_sync_enabled?: boolean;
+    chat_enabled?: boolean;
+  }>(`${prefix(false)}/config`, token);
+}
+
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export async function sendFinanceChat(
+  message: string,
+  history: ChatMessage[],
+  demo: boolean,
+  token?: string,
+) {
+  return post<{ reply: string }>(`${prefix(demo)}/chat`, { message, history }, token);
 }
 
 export type KaspaQuote = {

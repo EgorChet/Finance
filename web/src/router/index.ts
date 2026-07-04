@@ -18,6 +18,7 @@ const router = createRouter({
         { path: "review", redirect: { name: "merchants" } },
         { path: "mappings", redirect: { name: "merchants", query: { tab: "mappings" } } },
         { path: "household", name: "household", component: () => import("../views/FixedChargesView.vue") },
+        { path: "chat", name: "chat", component: () => import("../views/ChatView.vue") },
         { path: "recurring", redirect: { name: "household" } },
         { path: "excluded", redirect: { name: "household", hash: "#excluded" } },
       ],
