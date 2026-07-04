@@ -323,6 +323,13 @@ async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
   }
 }
 
+async function clearBrowserCookies(page: Page): Promise<void> {
+  const cookies = await page.cookies();
+  if (cookies.length) {
+    await page.deleteCookie(...cookies);
+  }
+}
+
 async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessionData): Promise<boolean> {
   jobLog(job, "Restoring saved Cal session…");
   if (session.cookies.length) {
@@ -611,7 +618,10 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     const savedSession = await readCalSession();
     if (savedSession) {
       loggedIn = await restoreCalSession(page, job, savedSession);
-      if (!loggedIn) await clearCalSession();
+      if (!loggedIn) {
+        await clearCalSession();
+        await clearBrowserCookies(page);
+      }
     }
 
     if (!loggedIn) {
@@ -751,6 +761,8 @@ export function submitCalOtpCode(jobId: string, code: string): void {
   if (trimmed.length < 4) throw new Error("Invalid SMS code");
   if (!job.otpResolve) throw new Error("OTP handler not ready");
   jobLog(job, "OTP submitted from app");
+  job.status = "scraping";
+  job.message = "Verifying SMS code…";
   job.otpResolve(trimmed);
 }
 
