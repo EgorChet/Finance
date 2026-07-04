@@ -266,10 +266,15 @@ async function fillOtp(page: Page, job: CalSyncJob, code: string): Promise<void>
   });
 }
 
+const DASHBOARD_READY_SELECTORS =
+  ".cardDebitsTransactions-main, .last4digits, app-card-in-debits-transactions, .cardInDeatailsTransactions";
+
+async function dashboardReady(page: Page): Promise<boolean> {
+  return findOnPageOrFrames(page, DASHBOARD_READY_SELECTORS);
+}
+
 async function isLoggedIn(page: Page): Promise<boolean> {
-  if (await findOnPageOrFrames(page, ".cardDebitsTransactions-main, .last4digits")) return true;
-  if (/digital-web/i.test(page.url()) && (await hasAuthToken(page))) return true;
-  return false;
+  return dashboardReady(page);
 }
 
 async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean> {
@@ -288,27 +293,39 @@ async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean
   return false;
 }
 
-async function readAuthModule(page: Page): Promise<string | null> {
+async function readSessionStorage(page: Page): Promise<Record<string, string>> {
   try {
-    return await page.evaluate(() => window.sessionStorage.getItem("auth-module"));
+    return await page.evaluate(() => {
+      const out: Record<string, string> = {};
+      for (let i = 0; i < sessionStorage.length; i += 1) {
+        const key = sessionStorage.key(i);
+        if (!key) continue;
+        const value = sessionStorage.getItem(key);
+        if (value != null) out[key] = value;
+      }
+      return out;
+    });
   } catch {
-    return null;
+    return {};
   }
 }
 
-async function writeAuthModule(page: Page, raw: string | null): Promise<void> {
-  if (!raw) return;
-  await page.evaluate((value) => {
-    window.sessionStorage.setItem("auth-module", value);
-  }, raw);
+async function writeSessionStorage(page: Page, items: Record<string, string>): Promise<void> {
+  if (!Object.keys(items).length) return;
+  await page.evaluate((entries) => {
+    for (const [key, value] of Object.entries(entries)) {
+      sessionStorage.setItem(key, value);
+    }
+  }, items);
 }
 
 async function captureCalSession(page: Page): Promise<CalSessionData> {
   const cookies = await page.cookies();
-  const auth_module = await readAuthModule(page);
+  const session_storage = await readSessionStorage(page);
   return {
     cookies,
-    auth_module,
+    auth_module: session_storage["auth-module"] ?? null,
+    session_storage,
     saved_at: new Date().toISOString(),
   };
 }
@@ -329,22 +346,37 @@ async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
 
 async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessionData): Promise<boolean> {
   jobLog(job, "Restoring saved Cal session…");
+
+  await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await sleep(1000);
+
   if (session.cookies.length) {
     await page.setCookie(...session.cookies);
   }
 
-  await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
-  await sleep(1500);
-
-  if (session.auth_module) {
-    await writeAuthModule(page, session.auth_module);
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
-    await sleep(2500);
+  const storage =
+    session.session_storage && Object.keys(session.session_storage).length
+      ? session.session_storage
+      : session.auth_module
+        ? { "auth-module": session.auth_module }
+        : {};
+  if (Object.keys(storage).length) {
+    await writeSessionStorage(page, storage);
   }
 
-  if (await isLoggedIn(page)) {
-    jobLog(job, "Saved session is still valid");
-    return true;
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+  await sleep(2500);
+
+  const deadline = Date.now() + 45_000;
+  while (Date.now() < deadline) {
+    if (await dashboardReady(page)) {
+      jobLog(job, "Saved session is still valid");
+      return true;
+    }
+    if (await hasAuthToken(page)) {
+      jobLog(job, "Session token found — waiting for dashboard…");
+    }
+    await sleep(1500);
   }
 
   jobLog(job, "Saved session expired");
@@ -352,6 +384,9 @@ async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessio
 }
 
 async function performCalLogin(page: Page, job: CalSyncJob, creds: CalCredentialsData): Promise<void> {
+  if (job.mode === "auto") {
+    throw new Error("Auto sync cannot sign in with SMS. Use Sync Cal to refresh your saved session.");
+  }
   await openCalLogin(page, job);
   await fillCredentialsAndRequestSms(page, job, creds);
 
@@ -427,7 +462,7 @@ async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
   if (!clicked) throw new Error("Cal login button (כניסה לחשבון) not found");
 
   await sleep(2500);
-  await requireContext(page, job, '[formcontrolname="id"]');
+  await requireContext(page, job, '[formcontrolname="id"]', 60_000);
   jobLog(job, "Login form ready");
 }
 
@@ -491,12 +526,10 @@ async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
   }
 
   jobLog(job, `At ${page.url()} — waiting for dashboard UI…`);
-  const dashboardSelectors =
-    ".cardDebitsTransactions-main, .last4digits, app-card-in-debits-transactions, .cardInDeatailsTransactions";
   const deadline = Date.now() + DASHBOARD_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
-    if (await findOnPageOrFrames(page, dashboardSelectors)) {
+    if (await dashboardReady(page)) {
       jobLog(job, "Dashboard ready");
       return;
     }
@@ -513,7 +546,7 @@ async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
     await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
     await sleep(5000);
     try {
-      await page.waitForSelector(dashboardSelectors, { visible: true, timeout: 60_000 });
+      await page.waitForSelector(DASHBOARD_READY_SELECTORS, { visible: true, timeout: 60_000 });
       jobLog(job, "Dashboard ready after reload");
       return;
     } catch {
@@ -746,6 +779,7 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     const page = job.page!;
     const chromium = resolveChromiumPath();
     jobLog(job, chromium ? `Chromium: ${chromium}` : "Chromium: bundled (puppeteer)");
+    jobLog(job, `Sync mode: ${job.mode}`);
 
     let loggedIn = false;
     if (job.mode === "auto") {
@@ -820,6 +854,7 @@ export async function cancelCalJob(jobId: string): Promise<void> {
 export function getCalJobStatus(jobId: string): {
   jobId: string;
   status: CalJobStatus;
+  mode: CalSyncMode;
   message: string | null;
   error: string | null;
   logs: CalSyncLogEntry[];
@@ -831,6 +866,7 @@ export function getCalJobStatus(jobId: string): {
   return {
     jobId: job.id,
     status: job.status,
+    mode: job.mode,
     message: job.message ?? null,
     error: job.error ?? null,
     logs: job.logs,

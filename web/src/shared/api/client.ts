@@ -361,6 +361,7 @@ export async function saveCalCredentials(nationalId: string, cardLast4: string, 
 export type CalJobStatusResponse = {
   jobId: string;
   status: string;
+  mode?: CalSyncMode;
   message: string | null;
   error: string | null;
   logs: { at: string; message: string }[];
