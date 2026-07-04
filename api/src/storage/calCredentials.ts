@@ -71,6 +71,14 @@ export async function writeCalCredentials(nationalId: string, cardLast4: string)
     card_last4: cardLast4.trim(),
     updated_at: new Date().toISOString(),
   };
+  const existing = await readCalCredentials();
+  const credsChanged =
+    existing &&
+    (existing.national_id !== data.national_id || existing.card_last4 !== data.card_last4);
+  if (credsChanged) {
+    const { clearCalSession } = await import("./calSession.js");
+    await clearCalSession();
+  }
   if (!supabaseConfigured()) {
     await writeLocal(data);
     return data;

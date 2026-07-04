@@ -27,6 +27,7 @@ const cardLast4 = ref("");
 const otpCode = ref("");
 const jobId = ref<string | null>(null);
 const maskedId = ref<string | null>(null);
+const sessionSaved = ref(false);
 const statusError = ref("");
 const submitting = ref(false);
 const progressMessage = ref("");
@@ -55,6 +56,10 @@ function handOffToBackground(id: string) {
   emit("close");
 }
 
+function shouldBackgroundSync(status: string): boolean {
+  return status === "scraping" || status === "saving";
+}
+
 function applyJobStatus(status: {
   status: string;
   message: string | null;
@@ -69,6 +74,10 @@ function applyJobStatus(status: {
     submitting.value = false;
     progressMessage.value = status.message || "Enter the SMS code from Cal";
     stopPolling();
+    return;
+  }
+  if (shouldBackgroundSync(status.status)) {
+    if (jobId.value) handOffToBackground(jobId.value);
     return;
   }
   if (status.status === "done") {
@@ -113,6 +122,7 @@ async function loadStatus() {
       return;
     }
     maskedId.value = status.national_id_masked;
+    sessionSaved.value = status.session_saved === true;
     if (status.configured) {
       await beginSync();
     } else {
@@ -146,14 +156,17 @@ async function beginSync() {
   statusError.value = "";
   otpCode.value = "";
   jobId.value = null;
-  progressMessage.value = "Connecting to Cal…";
+  progressMessage.value = sessionSaved.value
+    ? "Using saved Cal session…"
+    : "Connecting to Cal…";
   progressLogs.value = [];
   step.value = "loading";
   try {
     const result = await startCalSync(auth.token || undefined);
     jobId.value = result.jobId;
-    step.value = "otp";
-    progressMessage.value = "Waiting for SMS from Cal…";
+    progressMessage.value = sessionSaved.value
+      ? "Using saved Cal session…"
+      : "Waiting for SMS from Cal…";
     startPolling(result.jobId);
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
     applyJobStatus(initial);
@@ -212,6 +225,7 @@ onBeforeUnmount(stopPolling);
       <template v-else-if="step === 'credentials'">
         <p class="upload-type-hint">
           Enter your Cal login details once. They are stored securely on the server (not in the app).
+          After your first SMS login, the session is saved so later syncs skip SMS.
         </p>
         <label class="cal-field">
           <span>Teudat zehut</span>
@@ -237,7 +251,12 @@ onBeforeUnmount(stopPolling);
       <template v-else-if="step === 'otp'">
         <p class="upload-type-hint">
           <template v-if="maskedId">Account {{ maskedId }} — </template>
-          {{ progressMessage || "Enter the SMS code from Cal." }}
+          <template v-if="sessionSaved && !jobId">
+            Saved session found — sync should skip SMS unless it expired.
+          </template>
+          <template v-else>
+            {{ progressMessage || "Enter the SMS code from Cal." }}
+          </template>
         </p>
         <ul v-if="recentLogs.length && !submitting" class="cal-sync-log" aria-live="polite">
           <li v-for="(entry, i) in recentLogs" :key="`${entry.at}-${i}`">
