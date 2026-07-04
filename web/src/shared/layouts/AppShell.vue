@@ -722,7 +722,8 @@ function dismissCalSyncErrorModal() {
 function retryCalSyncFromError() {
   dismissCalSyncErrorModal();
   calSyncLastError.value = null;
-  openCalClassicSync();
+  if (calSessionSaved.value) void openCalAutoSync();
+  else openCalClassicSync();
 }
 
 function onCalSyncStarting(message = "Starting Cal sync…") {
@@ -847,7 +848,7 @@ async function resumeCalSyncIfNeeded() {
       showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
       return;
     }
-    onCalSyncBackground(jobId);
+    onCalSyncBackground(jobId, status.mode === "auto" ? "auto" : "classic");
   } catch {
     clearCalSyncJobId();
   }
@@ -874,6 +875,9 @@ async function openCalAutoSync() {
   onCalSyncStarting("Auto syncing with Cal…");
   try {
     const result = await startCalSync(auth.token || undefined, "auto");
+    if (result.mode !== "auto") {
+      throw new Error("Server started classic sync instead of auto sync — refresh the app and try again.");
+    }
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
     if (initial.status === "error") {
       calSessionSaved.value = false;

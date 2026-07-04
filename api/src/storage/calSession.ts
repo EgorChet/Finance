@@ -12,6 +12,8 @@ import { DATA_DIR } from "./paths.js";
 export interface CalSessionData {
   cookies: Cookie[];
   auth_module: string | null;
+  /** Full sessionStorage snapshot from digital-web (preferred over auth_module alone). */
+  session_storage?: Record<string, string>;
   saved_at: string;
 }
 
