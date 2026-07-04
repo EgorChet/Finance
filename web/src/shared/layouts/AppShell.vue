@@ -629,6 +629,7 @@ watch(
 
 watch(navOpen, (open) => {
   document.body.style.overflow = open ? "hidden" : "";
+  if (open && calSyncEnabled.value) void refreshCalSyncStatus();
 });
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
@@ -770,9 +771,12 @@ async function pollCalSyncBackground(jobId: string) {
     }
 
     if (status.status === "error") {
-      stopCalSyncBackground();
       const isAuto = calSyncBgMode === "auto";
-      if (isAuto) await refreshCalSyncStatus();
+      stopCalSyncBackground();
+      if (isAuto) {
+        calSessionSaved.value = false;
+        await refreshCalSyncStatus();
+      }
       showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
         title: isAuto ? "Auto sync failed" : undefined,
       });
@@ -784,9 +788,12 @@ async function pollCalSyncBackground(jobId: string) {
       state: "syncing",
     };
   } catch (e) {
-    stopCalSyncBackground();
     const isAuto = calSyncBgMode === "auto";
-    if (isAuto) await refreshCalSyncStatus();
+    stopCalSyncBackground();
+    if (isAuto) {
+      calSessionSaved.value = false;
+      await refreshCalSyncStatus();
+    }
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Cal sync failed", [], {
       title: isAuto ? "Auto sync failed" : undefined,
@@ -851,6 +858,7 @@ async function openCalAutoSync() {
     const result = await startCalSync(auth.token || undefined, "auto");
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
     if (initial.status === "error") {
+      calSessionSaved.value = false;
       await refreshCalSyncStatus();
       showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs, {
         title: "Auto sync failed",
@@ -859,6 +867,7 @@ async function openCalAutoSync() {
     }
     onCalSyncBackground(result.jobId, "auto");
   } catch (e) {
+    calSessionSaved.value = false;
     await refreshCalSyncStatus();
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Auto sync could not start", [], {

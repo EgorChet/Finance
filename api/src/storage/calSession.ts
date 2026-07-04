@@ -130,5 +130,9 @@ export async function clearCalSession(): Promise<void> {
     await deleteLocal();
     return;
   }
-  await supabaseFetch("app_state?id=eq.cal_session", { method: "DELETE" });
+  const res = await supabaseFetch("app_state?id=eq.cal_session", { method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to clear Cal session (${res.status}): ${text}`);
+  }
 }
