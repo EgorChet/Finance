@@ -15,6 +15,7 @@ import {
   readCalCredentials,
   writeCalCredentials,
 } from "../storage/calCredentials.js";
+import { readCalSession } from "../storage/calSession.js";
 
 const router = Router();
 
@@ -27,11 +28,14 @@ function assertCalEnabled(): void {
 router.get("/status", async (_req, res) => {
   try {
     const creds = await readCalCredentials();
+    const session = await readCalSession();
     res.json({
       enabled: calSyncEnabled(),
       configured: Boolean(creds),
       national_id_masked: creds ? maskNationalId(creds.national_id) : null,
       card_last4_masked: creds ? `••••${creds.card_last4.slice(-4)}` : null,
+      session_saved: Boolean(session),
+      session_saved_at: session?.saved_at ?? null,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

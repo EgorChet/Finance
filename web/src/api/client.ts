@@ -342,6 +342,8 @@ export type CalSyncStatus = {
   configured: boolean;
   national_id_masked: string | null;
   card_last4_masked: string | null;
+  session_saved?: boolean;
+  session_saved_at?: string | null;
 };
 
 export async function fetchCalStatus(token?: string) {

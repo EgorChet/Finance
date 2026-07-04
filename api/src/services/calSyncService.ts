@@ -1,8 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import puppeteer, { type Browser, type Frame, type Page } from "puppeteer";
+import puppeteer, { type Browser, type Cookie, type Frame, type Page } from "puppeteer";
 import type { CalCredentialsData } from "../storage/calCredentials.js";
+import { clearCalSession, readCalSession, writeCalSession, type CalSessionData } from "../storage/calSession.js";
 import { persistCalSyncExport } from "./calSyncPersist.js";
 
 const LOGIN_URL = "https://www.cal-online.co.il/";
@@ -283,6 +284,93 @@ async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean
   return false;
 }
 
+async function readAuthModule(page: Page): Promise<string | null> {
+  try {
+    return await page.evaluate(() => window.sessionStorage.getItem("auth-module"));
+  } catch {
+    return null;
+  }
+}
+
+async function writeAuthModule(page: Page, raw: string | null): Promise<void> {
+  if (!raw) return;
+  await page.evaluate((value) => {
+    window.sessionStorage.setItem("auth-module", value);
+  }, raw);
+}
+
+async function captureCalSession(page: Page): Promise<CalSessionData> {
+  const cookies = await page.cookies();
+  const auth_module = await readAuthModule(page);
+  return {
+    cookies,
+    auth_module,
+    saved_at: new Date().toISOString(),
+  };
+}
+
+async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
+  try {
+    const session = await captureCalSession(page);
+    if (!session.auth_module && !session.cookies.some((c) => /cal-online/i.test(c.domain || ""))) {
+      jobLog(job, "Session not saved — no auth data found");
+      return;
+    }
+    await writeCalSession(session);
+    jobLog(job, "Cal session saved for next sync");
+  } catch (err) {
+    jobLog(job, `Could not save Cal session: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessionData): Promise<boolean> {
+  jobLog(job, "Restoring saved Cal session…");
+  if (session.cookies.length) {
+    await page.setCookie(...session.cookies);
+  }
+
+  await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await sleep(1500);
+
+  if (session.auth_module) {
+    await writeAuthModule(page, session.auth_module);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+    await sleep(2500);
+  }
+
+  if (await isLoggedIn(page)) {
+    jobLog(job, "Saved session is still valid");
+    return true;
+  }
+
+  jobLog(job, "Saved session expired");
+  return false;
+}
+
+async function performCalLogin(page: Page, job: CalSyncJob, creds: CalCredentialsData): Promise<void> {
+  await openCalLogin(page, job);
+  await fillCredentialsAndRequestSms(page, job, creds);
+
+  jobLog(job, "Waiting for SMS OTP screen…");
+  const otpScreenDeadline = Date.now() + 60_000;
+  while (Date.now() < otpScreenDeadline) {
+    if (await hasOtpField(page)) break;
+    if (await isLoggedIn(page)) break;
+    await sleep(500);
+  }
+
+  if (!(await isLoggedIn(page))) {
+    if (!(await hasOtpField(page))) {
+      throw new Error("SMS OTP screen did not appear");
+    }
+    job.status = "otp_required";
+    jobLog(job, "SMS sent — enter code in the app");
+    const code = await (job.otpPromise ?? createOtpPromise(job));
+    await fillOtp(page, job, code);
+    await sleep(2000);
+  }
+}
+
 async function hasAuthToken(page: Page): Promise<boolean> {
   try {
     return await page.evaluate(() => {
@@ -519,29 +607,19 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     const chromium = resolveChromiumPath();
     jobLog(job, chromium ? `Chromium: ${chromium}` : "Chromium: bundled (puppeteer)");
 
-    await openCalLogin(page, job);
-    await fillCredentialsAndRequestSms(page, job, creds);
-
-    jobLog(job, "Waiting for SMS OTP screen…");
-    const otpScreenDeadline = Date.now() + 60_000;
-    while (Date.now() < otpScreenDeadline) {
-      if (await hasOtpField(page)) break;
-      if (await isLoggedIn(page)) break;
-      await sleep(500);
+    let loggedIn = false;
+    const savedSession = await readCalSession();
+    if (savedSession) {
+      loggedIn = await restoreCalSession(page, job, savedSession);
+      if (!loggedIn) await clearCalSession();
     }
 
-    if (!(await isLoggedIn(page))) {
-      if (!(await hasOtpField(page))) {
-        throw new Error("SMS OTP screen did not appear");
-      }
-      job.status = "otp_required";
-      jobLog(job, "SMS sent — enter code in the app");
-      const code = await (job.otpPromise ?? createOtpPromise(job));
-      await fillOtp(page, job, code);
-      await sleep(2000);
+    if (!loggedIn) {
+      await performCalLogin(page, job, creds);
     }
 
     await waitForDashboard(page, job);
+    await persistCalSession(page, job);
 
     job.status = "scraping";
     const exported = await exportTransactionsExcel(page, job, creds.card_last4);
@@ -559,6 +637,10 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     job.status = "error";
     job.error = e instanceof Error ? e.message : String(e);
     jobLog(job, `Failed: ${job.error}`);
+    const msg = job.error || "";
+    if (/login|otp|session|dashboard|auth/i.test(msg)) {
+      await clearCalSession();
+    }
   } finally {
     if (job.browser) {
       try {
