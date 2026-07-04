@@ -689,22 +689,6 @@ export function getCalJobStatus(jobId: string): {
 export async function createCalSyncJob(creds: CalCredentialsData): Promise<CalSyncJob> {
   purgeExpiredJobs();
   const id = crypto.randomUUID();
-  const executablePath = resolveChromiumPath();
-  jobLog(undefined, "Launching browser (headless)…");
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-blink-features=AutomationControlled",
-      "--lang=he-IL",
-    ],
-    defaultViewport: { width: 1280, height: 900 },
-  });
-  const page = await browser.newPage();
-  await page.setUserAgent(USER_AGENT);
 
   const job: CalSyncJob = {
     id,
@@ -713,14 +697,49 @@ export async function createCalSyncJob(creds: CalCredentialsData): Promise<CalSy
     logs: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    browser,
-    page,
   };
   job.otpPromise = createOtpPromise(job);
   jobs.set(id, job);
-  jobLog(job, "Browser ready");
 
-  job.pipelineDone = runPipeline(job, creds);
+  job.pipelineDone = (async () => {
+    try {
+      jobLog(job, "Launching browser (headless)…");
+      const executablePath = resolveChromiumPath();
+      const browser = await puppeteer.launch({
+        headless: true,
+        executablePath,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-blink-features=AutomationControlled",
+          "--lang=he-IL",
+        ],
+        defaultViewport: { width: 1280, height: 900 },
+      });
+      const page = await browser.newPage();
+      await page.setUserAgent(USER_AGENT);
+      job.browser = browser;
+      job.page = page;
+      jobLog(job, "Browser ready");
+      await runPipeline(job, creds);
+    } catch (e) {
+      if (job.status !== "error" && job.status !== "cancelled") {
+        job.status = "error";
+        job.error = e instanceof Error ? e.message : String(e);
+        jobLog(job, `Failed: ${job.error}`);
+      }
+      if (job.browser) {
+        try {
+          await job.browser.close();
+        } catch {
+          /* ignore */
+        }
+        job.browser = undefined;
+      }
+    }
+  })();
+
   return job;
 }
 

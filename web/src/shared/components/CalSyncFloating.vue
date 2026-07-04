@@ -1,12 +1,23 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from "vue";
+
+const props = defineProps<{
   message: string;
   state: "syncing" | "done" | "error";
 }>();
 
 const emit = defineEmits<{
   dismiss: [];
+  "show-error": [];
 }>();
+
+const displayMessage = computed(() => {
+  const text = props.message?.trim();
+  if (text) return text;
+  if (props.state === "syncing") return "Syncing with Cal…";
+  if (props.state === "done") return "Cal sync complete";
+  return "Cal sync failed";
+});
 </script>
 
 <template>
@@ -15,19 +26,20 @@ const emit = defineEmits<{
     :class="`cal-sync-float--${state}`"
     role="status"
     aria-live="polite"
+    @click="state === 'error' ? emit('show-error') : undefined"
   >
     <span v-if="state === 'syncing'" class="cal-sync-float-icon cal-sync-float-spin" aria-hidden="true">↻</span>
     <span v-else-if="state === 'done'" class="cal-sync-float-icon" aria-hidden="true">✓</span>
     <span v-else class="cal-sync-float-icon" aria-hidden="true">!</span>
-    <span class="cal-sync-float-text">{{ message }}</span>
+    <span class="cal-sync-float-text">{{ displayMessage }}</span>
     <button
-      v-if="state === 'error'"
+      v-if="state === 'error' || state === 'done'"
       type="button"
       class="cal-sync-float-dismiss"
-      aria-label="Dismiss"
-      @click="emit('dismiss')"
+      :aria-label="state === 'error' ? 'View details' : 'Dismiss'"
+      @click.stop="state === 'error' ? emit('show-error') : emit('dismiss')"
     >
-      ×
+      {{ state === "error" ? "…" : "×" }}
     </button>
   </div>
 </template>
@@ -41,7 +53,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  max-width: min(20rem, calc(100vw - 2rem));
+  max-width: min(22rem, calc(100vw - 2rem));
   padding: 0.55rem 0.75rem;
   border-radius: 999px;
   background: var(--surface, #fff);
@@ -59,6 +71,7 @@ const emit = defineEmits<{
 .cal-sync-float--error {
   border-color: var(--danger, #c0392b);
   background: #fff5f5;
+  cursor: pointer;
 }
 
 .cal-sync-float-icon {
@@ -91,9 +104,20 @@ const emit = defineEmits<{
 }
 
 .cal-sync-float-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.cal-sync-float--syncing .cal-sync-float-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cal-sync-float--done .cal-sync-float-text,
+.cal-sync-float--error .cal-sync-float-text {
+  white-space: normal;
 }
 
 .cal-sync-float-dismiss {

@@ -18,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  starting: [];
   background: [jobId: string];
   error: [message: string];
 }>();
@@ -156,6 +157,7 @@ async function beginSync() {
   statusError.value = "";
   otpCode.value = "";
   jobId.value = null;
+  emit("starting");
   try {
     const result = await startCalSync(auth.token || undefined);
     jobId.value = result.jobId;
