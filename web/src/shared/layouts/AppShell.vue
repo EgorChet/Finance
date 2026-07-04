@@ -683,10 +683,14 @@ function formatCalSyncErrorSummary(status: Pick<CalJobStatusResponse, "error" | 
   return status.error?.trim() || status.message?.trim() || "Cal sync failed";
 }
 
+function calSyncRetryLabel(): string {
+  return calSessionSaved.value ? "Try again" : "Sync Cal";
+}
+
 function showCalSyncFailure(
   summary: string,
   logs: { at: string; message: string }[] = [],
-  options: { title?: string; retryLabel?: string } = {},
+  options: { title?: string } = {},
 ) {
   const trimmed = summary.trim() || "Cal sync failed";
   calSyncLastError.value = { summary: trimmed, logs };
@@ -695,7 +699,7 @@ function showCalSyncFailure(
     title: options.title || "Cal sync failed",
     summary: trimmed,
     logs: logs.slice(-20),
-    retryLabel: options.retryLabel || "Try again",
+    retryLabel: calSyncRetryLabel(),
   };
 }
 
@@ -705,7 +709,7 @@ function openCalSyncErrorModal() {
     title: "Cal sync failed",
     summary: calSyncLastError.value.summary,
     logs: calSyncLastError.value.logs.slice(-20),
-    retryLabel: calSessionSaved.value ? "Try again" : "Sync Cal",
+    retryLabel: calSyncRetryLabel(),
   };
 }
 
@@ -716,8 +720,7 @@ function dismissCalSyncErrorModal() {
 function retryCalSyncFromError() {
   dismissCalSyncErrorModal();
   calSyncLastError.value = null;
-  if (calSessionSaved.value) void openCalAutoSync();
-  else openCalClassicSync();
+  openCalClassicSync();
 }
 
 function onCalSyncStarting(message = "Starting Cal sync…") {
@@ -769,10 +772,9 @@ async function pollCalSyncBackground(jobId: string) {
     if (status.status === "error") {
       stopCalSyncBackground();
       const isAuto = calSyncBgMode === "auto";
-      if (isAuto) void refreshCalSyncStatus();
+      if (isAuto) await refreshCalSyncStatus();
       showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
         title: isAuto ? "Auto sync failed" : undefined,
-        retryLabel: isAuto || !calSessionSaved.value ? "Sync Cal" : "Try again",
       });
       return;
     }
@@ -784,11 +786,10 @@ async function pollCalSyncBackground(jobId: string) {
   } catch (e) {
     stopCalSyncBackground();
     const isAuto = calSyncBgMode === "auto";
-    if (isAuto) void refreshCalSyncStatus();
+    if (isAuto) await refreshCalSyncStatus();
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Cal sync failed", [], {
       title: isAuto ? "Auto sync failed" : undefined,
-      retryLabel: isAuto || !calSessionSaved.value ? "Sync Cal" : "Try again",
     });
   }
 }
@@ -819,10 +820,8 @@ async function resumeCalSyncIfNeeded() {
     }
     if (status.status === "error") {
       clearCalSyncJobId();
-      void refreshCalSyncStatus();
-      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
-        retryLabel: calSessionSaved.value ? "Try again" : "Sync Cal",
-      });
+      await refreshCalSyncStatus();
+      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
       return;
     }
     onCalSyncBackground(jobId);
@@ -855,7 +854,6 @@ async function openCalAutoSync() {
       await refreshCalSyncStatus();
       showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs, {
         title: "Auto sync failed",
-        retryLabel: "Sync Cal",
       });
       return;
     }
@@ -865,7 +863,6 @@ async function openCalAutoSync() {
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Auto sync could not start", [], {
       title: "Auto sync failed",
-      retryLabel: "Sync Cal",
     });
   }
 }
