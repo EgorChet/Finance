@@ -70,6 +70,7 @@ import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, Merchant
 import { userIdFromRequest } from "../auth.js";
 import { calSyncEnabled } from "../storage/calCredentials.js";
 import calRoutes from "./cal.js";
+import { chatAvailable, replyToFinanceChat } from "../services/chatService.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
@@ -111,7 +112,35 @@ router.get("/config", (_req, res) => {
     analyzer_wake_url: isPublicRenderAnalyzerUrl(url) ? url : null,
     analyzer_wake_from_browser: analyzerUsesPublicUrl(),
     cal_sync_enabled: calSyncEnabled(),
+    chat_enabled: chatAvailable(),
   });
+});
+
+router.post("/chat", async (req, res) => {
+  const { message, history } = req.body as {
+    message?: string;
+    history?: Array<{ role?: string; content?: string }>;
+  };
+  if (!chatAvailable()) {
+    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
+    return;
+  }
+  try {
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter((turn) => turn?.role === "user" || turn?.role === "assistant")
+          .map((turn) => ({
+            role: turn.role as "user" | "assistant",
+            content: String(turn.content || ""),
+          }))
+      : [];
+    const reply = await replyToFinanceChat(String(message || ""), safeHistory);
+    res.json({ reply });
+  } catch (e) {
+    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const status = /required|too long/i.test(messageText) ? 400 : 502;
+    res.status(status).json({ error: messageText });
+  }
 });
 
 router.get("/kaspa", async (req, res) => {

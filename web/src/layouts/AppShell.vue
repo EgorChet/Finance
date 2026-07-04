@@ -392,6 +392,7 @@ const SYNC_STEPS = [
 const NAV_ITEMS = [
   { to: "/app/home", label: "Home" },
   { to: "/app/overview", label: "Spending" },
+  { to: "/app/chat", label: "Assistant" },
   { to: "/app/calendar", label: "Calendar" },
   { to: "/app/browse", label: "Browse" },
   { to: "/app/merchants", label: "Merchants" },

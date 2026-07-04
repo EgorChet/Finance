@@ -15,8 +15,39 @@ import {
 import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
+import { chatAvailable, replyToDemoFinanceChat } from "../services/chatService.js";
 
 const router = Router();
+
+function demoHomeBundle(paceMonths = 4) {
+  const budget = demoLivingBudget();
+  const catalog = demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key));
+  const paceKeys = catalog.slice(0, paceMonths).map((m) => m.key);
+  const scopedReports = Object.fromEntries(
+    paceKeys.map((key) => [key, getDemoReport(key)]),
+  );
+  const ordered = [...paceKeys].sort();
+  const reports = ordered.map((key) => scopedReports[key]!).filter(Boolean);
+  const orderedLabels = ordered.map((key) => catalog.find((m) => m.key === key)?.label ?? key);
+  const report =
+    reports.length === 0
+      ? null
+      : reports.length === 1
+        ? reports[0]
+        : combineReports(
+            reports,
+            `${orderedLabels[0]} – ${orderedLabels[orderedLabels.length - 1]} (${ordered.length} months)`,
+          );
+  return {
+    months: catalog,
+    report,
+    scoped_reports: scopedReports,
+    pace_keys: paceKeys,
+    fixed_charges: demoFixedCharges().charges,
+    living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+    demo_as_of: DEMO_AS_OF,
+  };
+}
 
 router.get("/months", (_req, res) => {
   res.json({
@@ -183,6 +214,33 @@ router.delete("/calendar/events/:id", (_req, res) => {
 
 router.post("/calendar/regenerate-token", (_req, res) => {
   res.status(403).json({ error: "Calendar disabled in demo mode" });
+});
+
+router.post("/chat", async (req, res) => {
+  const { message, history } = req.body as {
+    message?: string;
+    history?: Array<{ role?: string; content?: string }>;
+  };
+  if (!chatAvailable()) {
+    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
+    return;
+  }
+  try {
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter((turn) => turn?.role === "user" || turn?.role === "assistant")
+          .map((turn) => ({
+            role: turn.role as "user" | "assistant",
+            content: String(turn.content || ""),
+          }))
+      : [];
+    const reply = await replyToDemoFinanceChat(String(message || ""), safeHistory, demoHomeBundle());
+    res.json({ reply, demo: true });
+  } catch (e) {
+    const messageText = e instanceof Error ? e.message : "Chat failed";
+    const status = /required|too long/i.test(messageText) ? 400 : 502;
+    res.status(status).json({ error: messageText });
+  }
 });
 
 export default router;
