@@ -71,12 +71,14 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { fetchAppConfig, streamFinanceChat, type ChatMessage } from "../api/client";
 import { useGradualReveal } from "../composables/useGradualReveal";
 import { useAuthStore } from "../stores/auth";
 import { goToSignIn } from "../utils/signIn";
 
 const auth = useAuthStore();
+const router = useRouter();
 const messages = ref<ChatMessage[]>([]);
 const draft = ref("");
 const sending = ref(false);
@@ -117,7 +119,7 @@ watch(reveal.isRevealing, (revealing) => {
 });
 
 function goSignIn() {
-  goToSignIn();
+  void goToSignIn(router);
 }
 
 async function scrollToBottom() {
