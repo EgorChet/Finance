@@ -1,5 +1,7 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim();
-const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
+// Prefer a stable non-thinking model. gemini-flash-latest is a moving alias that often
+// returns STOP with only thought parts (no visible text) when given a large system prompt.
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash-lite";
 const DEFAULT_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
 const MAX_EMPTY_RETRIES = 2;
@@ -20,6 +22,33 @@ type GeminiPayload = {
   candidates?: GeminiCandidate[];
   promptFeedback?: { blockReason?: string };
 };
+
+/** Compact server logs for Render — never includes prompts, messages, or API keys. */
+function logGemini(event: string, fields: Record<string, string | number | boolean | undefined>): void {
+  const parts = Object.entries(fields)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => `${key}=${value}`);
+  console.info(`[gemini] ${event}${parts.length ? ` ${parts.join(" ")}` : ""}`);
+}
+
+function summarizePayload(payload: GeminiPayload): {
+  finishReason?: string;
+  blockReason?: string;
+  parts: number;
+  thoughtParts: number;
+  visibleChars: number;
+} {
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  const thoughtParts = parts.filter((part) => part.thought === true).length;
+  const visibleChars = extractGeminiText(payload).length;
+  return {
+    finishReason: payload.candidates?.[0]?.finishReason,
+    blockReason: payload.promptFeedback?.blockReason,
+    parts: parts.length,
+    thoughtParts,
+    visibleChars,
+  };
+}
 
 class GeminiApiError extends Error {
   readonly status: number;
@@ -74,7 +103,7 @@ function shouldRetryGeminiError(error: unknown): boolean {
   return error instanceof GeminiApiError && isRetryableGeminiError(error.status, error.message);
 }
 
-async function throwGeminiApiError(res: Response): Promise<never> {
+async function throwGeminiApiError(res: Response, model: string, mode: "generate" | "stream"): Promise<never> {
   let message = `Gemini API error (${res.status})`;
   try {
     const payload = (await res.json()) as GeminiPayload;
@@ -82,6 +111,12 @@ async function throwGeminiApiError(res: Response): Promise<never> {
   } catch {
     /* ignore parse errors */
   }
+  logGemini("http_error", {
+    mode,
+    model,
+    status: res.status,
+    message: message.slice(0, 200),
+  });
   throw new GeminiApiError(message, res.status);
 }
 
@@ -91,11 +126,12 @@ function buildGenerationConfig(model: string): Record<string, unknown> {
     temperature: 0.4,
   };
 
-  // Thinking models can return STOP with no visible text; keep reasoning minimal for chat.
-  if (/gemini-2\.5-(flash|flash-lite)/i.test(model)) {
+  // Thinking models can return STOP with no visible text — disable or minimize reasoning for chat.
+  if (/gemini-2\.5/i.test(model)) {
     config.thinkingConfig = { thinkingBudget: 0 };
   } else if (/gemini-3|flash-latest/i.test(model)) {
-    config.thinkingConfig = { thinkingLevel: "minimal" };
+    // flash-latest may ignore unknown fields; send both shapes when possible.
+    config.thinkingConfig = { thinkingBudget: 0, thinkingLevel: "minimal" };
   }
 
   return config;
@@ -170,40 +206,99 @@ async function requestGemini(
   });
 }
 
-async function withModelRetry<T>(operation: (model: string) => Promise<T>): Promise<T> {
-  let lastError: unknown;
-
-  for (const model of resolveModelChain()) {
-    let delay = INITIAL_RETRY_DELAY_MS;
-    for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
-      try {
-        return await operation(model);
-      } catch (error) {
-        lastError = error;
-        if (!shouldRetryGeminiError(error)) throw error;
-        if (attempt < MAX_TRANSIENT_RETRIES) {
-          await sleep(delay);
-          delay *= 2;
-        }
-      }
-    }
-  }
-
-  if (lastError instanceof Error) throw lastError;
-  throw new Error("Gemini request failed");
-}
-
 async function generateGeminiReplyOnce(
   model: string,
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[] = [],
 ): Promise<{ text: string; detail: string }> {
+  const started = Date.now();
   const res = await requestGemini(model, systemPrompt, userMessage, history, false);
-  if (!res.ok) await throwGeminiApiError(res);
+  if (!res.ok) await throwGeminiApiError(res, model, "generate");
 
   const payload = (await res.json()) as GeminiPayload;
-  return { text: extractGeminiText(payload), detail: emptyResponseDetail(payload) };
+  const summary = summarizePayload(payload);
+  const text = extractGeminiText(payload);
+  const detail = emptyResponseDetail(payload);
+
+  if (text) {
+    logGemini("ok", {
+      mode: "generate",
+      model,
+      ms: Date.now() - started,
+      chars: text.length,
+      finishReason: summary.finishReason,
+    });
+  } else {
+    logGemini("empty", {
+      mode: "generate",
+      model,
+      ms: Date.now() - started,
+      finishReason: summary.finishReason,
+      blockReason: summary.blockReason,
+      parts: summary.parts,
+      thoughtParts: summary.thoughtParts,
+    });
+  }
+
+  return { text, detail };
+}
+
+/** Try each model until one returns visible text (empty is not success). */
+async function generateWithVisibleText(
+  systemPrompt: string,
+  userMessage: string,
+  history: ChatTurn[],
+): Promise<{ text: string; detail: string }> {
+  let lastDetail = "";
+
+  for (const model of resolveModelChain()) {
+    let delay = INITIAL_RETRY_DELAY_MS;
+    for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+      try {
+        logGemini("attempt", {
+          mode: "generate",
+          model,
+          attempt: attempt + 1,
+          maxAttempts: MAX_TRANSIENT_RETRIES + 1,
+        });
+        const result = await generateGeminiReplyOnce(model, systemPrompt, userMessage, history);
+        if (result.text) return result;
+        lastDetail = result.detail;
+        logGemini("fallback_model", { mode: "generate", model, reason: "empty" });
+        break; // empty — try next model, not another transient retry
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const status = error instanceof GeminiApiError ? error.status : undefined;
+        if (!shouldRetryGeminiError(error)) {
+          logGemini("fail", { mode: "generate", model, status, message: message.slice(0, 200) });
+          throw error;
+        }
+        if (attempt < MAX_TRANSIENT_RETRIES) {
+          logGemini("retry", {
+            mode: "generate",
+            model,
+            attempt: attempt + 1,
+            delayMs: delay,
+            status,
+            message: message.slice(0, 200),
+          });
+          await sleep(delay);
+          delay *= 2;
+          continue;
+        }
+        logGemini("fallback_model", {
+          mode: "generate",
+          model,
+          reason: "transient_exhausted",
+          status,
+          message: message.slice(0, 200),
+        });
+      }
+    }
+  }
+
+  return { text: "", detail: lastDetail };
 }
 
 export async function generateGeminiReply(
@@ -214,18 +309,26 @@ export async function generateGeminiReply(
   let message = userMessage;
   let lastDetail = "";
 
+  logGemini("start", {
+    mode: "generate",
+    models: resolveModelChain().join(","),
+    historyTurns: history.length,
+    messageChars: userMessage.length,
+    systemChars: systemPrompt.length,
+  });
+
   for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-    const { text, detail } = await withModelRetry((model) =>
-      generateGeminiReplyOnce(model, systemPrompt, message, history),
-    );
+    const { text, detail } = await generateWithVisibleText(systemPrompt, message, history);
     if (text) return text;
 
     lastDetail = detail;
     if (attempt < MAX_EMPTY_RETRIES) {
+      logGemini("empty_retry", { mode: "generate", attempt: attempt + 1, detail: detail.trim() });
       message = `${userMessage}\n\n(${EMPTY_RETRY_NUDGE})`;
     }
   }
 
+  logGemini("fail", { mode: "generate", reason: "empty", detail: lastDetail.trim() });
   throw new Error(`Gemini returned an empty response${lastDetail}`);
 }
 
@@ -252,11 +355,13 @@ async function* streamGeminiReplyOnce(
   userMessage: string,
   history: ChatTurn[] = [],
 ): AsyncGenerator<string, { detail: string }, unknown> {
+  const started = Date.now();
   const res = await requestGemini(model, systemPrompt, userMessage, history, true);
-  if (!res.ok) await throwGeminiApiError(res);
+  if (!res.ok) await throwGeminiApiError(res, model, "stream");
 
   const reader = res.body?.getReader();
   if (!reader) {
+    logGemini("empty", { mode: "stream", model, reason: "no_body" });
     throw new Error("Gemini returned an empty stream");
   }
 
@@ -264,74 +369,147 @@ async function* streamGeminiReplyOnce(
   let buffer = "";
   let total = "";
   let lastPayload: GeminiPayload = {};
+  let eventsSeen = 0;
+
+  const processEvent = function* (event: string): Generator<string> {
+    for (const line of event.split("\n")) {
+      if (!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim();
+      if (!data || data === "[DONE]") continue;
+
+      for (const payload of parseGeminiStreamPayload(data)) {
+        eventsSeen += 1;
+        lastPayload = payload;
+        const chunk = extractGeminiText(payload);
+        if (!chunk) continue;
+
+        // Gemini may send cumulative text in some models — emit only the delta.
+        let delta = chunk;
+        if (chunk.startsWith(total)) {
+          delta = chunk.slice(total.length);
+          total = chunk;
+        } else {
+          total += chunk;
+        }
+
+        if (delta) yield delta;
+      }
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        for (const chunk of processEvent(buffer)) yield chunk;
+      }
+      break;
+    }
 
     buffer += decoder.decode(value, { stream: true });
     const events = buffer.split("\n\n");
     buffer = events.pop() || "";
 
     for (const event of events) {
-      for (const line of event.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (!data || data === "[DONE]") continue;
-
-        for (const payload of parseGeminiStreamPayload(data)) {
-          lastPayload = payload;
-          const chunk = extractGeminiText(payload);
-          if (!chunk) continue;
-
-          // Gemini may send cumulative text in some models — emit only the delta.
-          let delta = chunk;
-          if (chunk.startsWith(total)) {
-            delta = chunk.slice(total.length);
-            total = chunk;
-          } else {
-            total += chunk;
-          }
-
-          if (delta) yield delta;
-        }
-      }
+      for (const chunk of processEvent(event)) yield chunk;
     }
   }
 
-  return { detail: emptyResponseDetail(lastPayload) };
+  const summary = summarizePayload(lastPayload);
+  const detail = emptyResponseDetail(lastPayload);
+  if (total.trim()) {
+    logGemini("ok", {
+      mode: "stream",
+      model,
+      ms: Date.now() - started,
+      chars: total.length,
+      events: eventsSeen,
+      finishReason: summary.finishReason,
+    });
+  } else {
+    logGemini("empty", {
+      mode: "stream",
+      model,
+      ms: Date.now() - started,
+      events: eventsSeen,
+      finishReason: summary.finishReason,
+      blockReason: summary.blockReason,
+      parts: summary.parts,
+      thoughtParts: summary.thoughtParts,
+    });
+  }
+
+  return { detail };
 }
 
-async function* streamWithModelRetry(
+async function* streamWithVisibleText(
   systemPrompt: string,
   userMessage: string,
   history: ChatTurn[],
 ): AsyncGenerator<string, { detail: string }, unknown> {
   let lastError: unknown;
+  let lastDetail = "";
 
   for (const model of resolveModelChain()) {
     let delay = INITIAL_RETRY_DELAY_MS;
     for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
       try {
+        logGemini("attempt", {
+          mode: "stream",
+          model,
+          attempt: attempt + 1,
+          maxAttempts: MAX_TRANSIENT_RETRIES + 1,
+        });
         const stream = streamGeminiReplyOnce(model, systemPrompt, userMessage, history);
+        let total = "";
         while (true) {
           const next = await stream.next();
-          if (next.done) return next.value ?? { detail: "" };
+          if (next.done) {
+            lastDetail = next.value?.detail || lastDetail;
+            if (total.trim()) return next.value ?? { detail: lastDetail };
+            logGemini("fallback_model", { mode: "stream", model, reason: "empty" });
+            break; // empty — try next model
+          }
+          total += next.value;
           yield next.value;
         }
+        break; // empty stream finished without throw — next model
       } catch (error) {
         lastError = error;
-        if (!shouldRetryGeminiError(error)) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        const status = error instanceof GeminiApiError ? error.status : undefined;
+        if (!shouldRetryGeminiError(error)) {
+          logGemini("fail", { mode: "stream", model, status, message: message.slice(0, 200) });
+          throw error;
+        }
         if (attempt < MAX_TRANSIENT_RETRIES) {
+          logGemini("retry", {
+            mode: "stream",
+            model,
+            attempt: attempt + 1,
+            delayMs: delay,
+            status,
+            message: message.slice(0, 200),
+          });
           await sleep(delay);
           delay *= 2;
+        } else {
+          logGemini("fallback_model", {
+            mode: "stream",
+            model,
+            reason: "transient_exhausted",
+            status,
+            message: message.slice(0, 200),
+          });
         }
       }
     }
   }
 
+  if (lastDetail) return { detail: lastDetail };
   if (lastError instanceof Error) throw lastError;
-  throw new Error("Gemini request failed");
+  return { detail: "" };
 }
 
 export async function* streamGeminiReply(
@@ -342,8 +520,16 @@ export async function* streamGeminiReply(
   let message = userMessage;
   let lastDetail = "";
 
+  logGemini("start", {
+    mode: "stream",
+    models: resolveModelChain().join(","),
+    historyTurns: history.length,
+    messageChars: userMessage.length,
+    systemChars: systemPrompt.length,
+  });
+
   for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-    const stream = streamWithModelRetry(systemPrompt, message, history);
+    const stream = streamWithVisibleText(systemPrompt, message, history);
     let total = "";
 
     while (true) {
@@ -359,9 +545,11 @@ export async function* streamGeminiReply(
     if (total.trim()) return;
 
     if (attempt < MAX_EMPTY_RETRIES) {
+      logGemini("empty_retry", { mode: "stream", attempt: attempt + 1, detail: lastDetail.trim() });
       message = `${userMessage}\n\n(${EMPTY_RETRY_NUDGE})`;
     }
   }
 
+  logGemini("fail", { mode: "stream", reason: "empty", detail: lastDetail.trim() });
   throw new Error(`Gemini returned an empty response${lastDetail}`);
 }
