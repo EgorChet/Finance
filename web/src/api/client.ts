@@ -224,7 +224,7 @@ export async function fetchAppConfig(token?: string) {
   }>(`${prefix(false)}/config`, token);
 }
 
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+export type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
 export async function sendFinanceChat(
   message: string,
@@ -233,6 +233,55 @@ export async function sendFinanceChat(
   token?: string,
 ) {
   return post<{ reply: string }>(`${prefix(demo)}/chat`, { message, history }, token);
+}
+
+export async function streamFinanceChat(
+  message: string,
+  history: ChatMessage[],
+  demo: boolean,
+  onChunk: (text: string) => void,
+  token?: string,
+): Promise<void> {
+  const res = await fetch(`${prefix(demo)}/chat/stream`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify({ message, history }),
+  });
+
+  if (!res.ok) throw new Error(await readApiError(res));
+  if (!res.body) throw new Error("No response stream");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+
+    for (const event of events) {
+      for (const line of event.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (!data) continue;
+
+        let payload: { text?: string; error?: string; done?: boolean };
+        try {
+          payload = JSON.parse(data) as typeof payload;
+        } catch {
+          continue;
+        }
+
+        if (payload.error) throw new Error(payload.error);
+        if (payload.text) onChunk(payload.text);
+        if (payload.done) return;
+      }
+    }
+  }
 }
 
 export type KaspaQuote = {

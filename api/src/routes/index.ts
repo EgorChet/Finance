@@ -70,7 +70,7 @@ import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, Merchant
 import { userIdFromRequest } from "../auth.js";
 import { calSyncEnabled } from "../storage/calCredentials.js";
 import calRoutes from "./cal.js";
-import { chatAvailable, replyToFinanceChat } from "../services/chatService.js";
+import { chatAvailable, replyToFinanceChat, streamFinanceChat, parseChatRequest, chatErrorStatus } from "../services/chatService.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
@@ -117,29 +117,36 @@ router.get("/config", (_req, res) => {
 });
 
 router.post("/chat", async (req, res) => {
-  const { message, history } = req.body as {
-    message?: string;
-    history?: Array<{ role?: string; content?: string }>;
-  };
   if (!chatAvailable()) {
     res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
     return;
   }
   try {
-    const safeHistory = Array.isArray(history)
-      ? history
-          .filter((turn) => turn?.role === "user" || turn?.role === "assistant")
-          .map((turn) => ({
-            role: turn.role as "user" | "assistant",
-            content: String(turn.content || ""),
-          }))
-      : [];
-    const reply = await replyToFinanceChat(String(message || ""), safeHistory);
+    const { message, history } = parseChatRequest(req.body);
+    const reply = await replyToFinanceChat(message, history);
     res.json({ reply });
   } catch (e) {
     const messageText = e instanceof Error ? e.message : "Chat failed";
-    const status = /required|too long/i.test(messageText) ? 400 : 502;
-    res.status(status).json({ error: messageText });
+    res.status(chatErrorStatus(messageText)).json({ error: messageText });
+  }
+});
+
+router.post("/chat/stream", async (req, res) => {
+  if (!chatAvailable()) {
+    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
+    return;
+  }
+  try {
+    const { message, history } = parseChatRequest(req.body);
+    await streamFinanceChat(res, message, history);
+  } catch (e) {
+    const messageText = e instanceof Error ? e.message : "Chat failed";
+    if (!res.headersSent) {
+      res.status(chatErrorStatus(messageText)).json({ error: messageText });
+      return;
+    }
+    res.write(`data: ${JSON.stringify({ error: messageText })}\n\n`);
+    res.end();
   }
 });
 

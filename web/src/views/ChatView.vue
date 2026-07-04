@@ -31,14 +31,17 @@
           v-for="(msg, index) in messages"
           :key="index"
           class="chat-bubble"
-          :class="msg.role === 'user' ? 'chat-bubble--user' : 'chat-bubble--assistant'"
+          :class="[
+            msg.role === 'user' ? 'chat-bubble--user' : 'chat-bubble--assistant',
+            msg.streaming ? 'chat-bubble--streaming' : '',
+          ]"
         >
           <span class="chat-bubble-label">{{ msg.role === "user" ? "You" : "Assistant" }}</span>
-          <p class="chat-bubble-text">{{ msg.content }}</p>
-        </div>
-        <div v-if="sending" class="chat-bubble chat-bubble--assistant chat-bubble--pending">
-          <span class="chat-bubble-label">Assistant</span>
-          <p class="chat-bubble-text">Thinking…</p>
+          <p class="chat-bubble-text">
+            <template v-if="msg.content">{{ msg.content }}</template>
+            <span v-else-if="msg.streaming" class="chat-thinking">Thinking</span>
+            <span v-if="msg.streaming" class="chat-cursor" aria-hidden="true" />
+          </p>
         </div>
       </div>
 
@@ -68,7 +71,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from "vue";
-import { fetchAppConfig, sendFinanceChat, type ChatMessage } from "../api/client";
+import { fetchAppConfig, streamFinanceChat, type ChatMessage } from "../api/client";
 import { useAuthStore } from "../stores/auth";
 import { goToSignIn } from "../utils/signIn";
 
@@ -97,15 +100,32 @@ async function send() {
 
   error.value = "";
   messages.value.push({ role: "user", content: text });
+  const history = messages.value.slice(0, -1);
   draft.value = "";
   sending.value = true;
+
+  const assistantIndex = messages.value.length;
+  messages.value.push({ role: "assistant", content: "", streaming: true });
   await scrollToBottom();
 
   try {
-    const { reply } = await sendFinanceChat(text, messages.value.slice(0, -1), auth.isDemo, auth.token || undefined);
-    messages.value.push({ role: "assistant", content: reply });
+    await streamFinanceChat(
+      text,
+      history,
+      auth.isDemo,
+      (chunk) => {
+        messages.value[assistantIndex].content += chunk;
+        void scrollToBottom();
+      },
+      auth.token || undefined,
+    );
+    messages.value[assistantIndex].streaming = false;
+    if (!messages.value[assistantIndex].content.trim()) {
+      messages.value[assistantIndex].content = "No response.";
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Chat failed";
+    messages.value.splice(assistantIndex, 1);
     messages.value.pop();
     draft.value = text;
   } finally {
@@ -184,8 +204,8 @@ onMounted(async () => {
   max-width: 92%;
 }
 
-.chat-bubble--pending {
-  opacity: 0.75;
+.chat-bubble--streaming {
+  opacity: 0.98;
 }
 
 .chat-bubble-label {
@@ -201,6 +221,36 @@ onMounted(async () => {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.45;
+}
+
+.chat-thinking {
+  color: var(--text-muted);
+}
+
+.chat-thinking::after {
+  content: "…";
+}
+
+.chat-cursor {
+  display: inline-block;
+  width: 0.55rem;
+  height: 1em;
+  margin-left: 0.1rem;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.75;
+  animation: chat-cursor-blink 1s steps(1) infinite;
+}
+
+@keyframes chat-cursor-blink {
+  0%,
+  49% {
+    opacity: 0.75;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .chat-error {

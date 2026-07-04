@@ -15,7 +15,7 @@ import {
 import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
-import { chatAvailable, replyToDemoFinanceChat } from "../services/chatService.js";
+import { chatAvailable, replyToDemoFinanceChat, streamDemoFinanceChat, parseChatRequest, chatErrorStatus } from "../services/chatService.js";
 
 const router = Router();
 
@@ -217,29 +217,36 @@ router.post("/calendar/regenerate-token", (_req, res) => {
 });
 
 router.post("/chat", async (req, res) => {
-  const { message, history } = req.body as {
-    message?: string;
-    history?: Array<{ role?: string; content?: string }>;
-  };
   if (!chatAvailable()) {
     res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
     return;
   }
   try {
-    const safeHistory = Array.isArray(history)
-      ? history
-          .filter((turn) => turn?.role === "user" || turn?.role === "assistant")
-          .map((turn) => ({
-            role: turn.role as "user" | "assistant",
-            content: String(turn.content || ""),
-          }))
-      : [];
-    const reply = await replyToDemoFinanceChat(String(message || ""), safeHistory, demoHomeBundle());
+    const { message, history } = parseChatRequest(req.body);
+    const reply = await replyToDemoFinanceChat(message, history, demoHomeBundle());
     res.json({ reply, demo: true });
   } catch (e) {
     const messageText = e instanceof Error ? e.message : "Chat failed";
-    const status = /required|too long/i.test(messageText) ? 400 : 502;
-    res.status(status).json({ error: messageText });
+    res.status(chatErrorStatus(messageText)).json({ error: messageText });
+  }
+});
+
+router.post("/chat/stream", async (req, res) => {
+  if (!chatAvailable()) {
+    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
+    return;
+  }
+  try {
+    const { message, history } = parseChatRequest(req.body);
+    await streamDemoFinanceChat(res, message, history, demoHomeBundle());
+  } catch (e) {
+    const messageText = e instanceof Error ? e.message : "Chat failed";
+    if (!res.headersSent) {
+      res.status(chatErrorStatus(messageText)).json({ error: messageText });
+      return;
+    }
+    res.write(`data: ${JSON.stringify({ error: messageText })}\n\n`);
+    res.end();
   }
 });
 
