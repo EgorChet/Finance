@@ -38,9 +38,9 @@
         >
           <span class="chat-bubble-label">{{ msg.role === "user" ? "You" : "Assistant" }}</span>
           <p class="chat-bubble-text">
-            <template v-if="msg.content">{{ msg.content }}</template>
-            <span v-else-if="msg.streaming" class="chat-thinking">Thinking</span>
-            <span v-if="msg.streaming" class="chat-cursor" aria-hidden="true" />
+            <template v-if="messageText(msg, index)">{{ messageText(msg, index) }}</template>
+            <span v-else-if="isThinking(msg, index)" class="chat-thinking">Thinking</span>
+            <span v-if="showCursor(msg, index)" class="chat-cursor" aria-hidden="true" />
           </p>
         </div>
       </div>
@@ -70,8 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import { fetchAppConfig, streamFinanceChat, type ChatMessage } from "../api/client";
+import { useGradualReveal } from "../composables/useGradualReveal";
 import { useAuthStore } from "../stores/auth";
 import { goToSignIn } from "../utils/signIn";
 
@@ -83,6 +84,37 @@ const error = ref("");
 const chatEnabled = ref(true);
 const loadingConfig = ref(true);
 const messagesEl = ref<HTMLElement | null>(null);
+const reveal = useGradualReveal();
+const activeAssistantIndex = ref<number | null>(null);
+
+function messageText(msg: ChatMessage, index: number): string {
+  if (msg.role === "user") return msg.content;
+  if (index === activeAssistantIndex.value) return reveal.visible.value;
+  return msg.content;
+}
+
+function isThinking(msg: ChatMessage, index: number): boolean {
+  return msg.role === "assistant" && msg.streaming === true && index === activeAssistantIndex.value && !reveal.visible.value;
+}
+
+function showCursor(msg: ChatMessage, index: number): boolean {
+  if (msg.role !== "assistant" || index !== activeAssistantIndex.value) return false;
+  return msg.streaming === true || reveal.isRevealing.value;
+}
+
+watch(
+  () => reveal.visible.value,
+  () => {
+    void scrollToBottom();
+  },
+);
+
+watch(reveal.isRevealing, (revealing) => {
+  if (revealing) return;
+  const idx = activeAssistantIndex.value;
+  if (idx === null) return;
+  if (!messages.value[idx]?.streaming) activeAssistantIndex.value = null;
+});
 
 function goSignIn() {
   goToSignIn();
@@ -105,6 +137,8 @@ async function send() {
   sending.value = true;
 
   const assistantIndex = messages.value.length;
+  reveal.reset();
+  activeAssistantIndex.value = assistantIndex;
   messages.value.push({ role: "assistant", content: "", streaming: true });
   await scrollToBottom();
 
@@ -115,16 +149,22 @@ async function send() {
       auth.isDemo,
       (chunk) => {
         messages.value[assistantIndex].content += chunk;
-        void scrollToBottom();
+        reveal.append(chunk);
       },
       auth.token || undefined,
     );
     messages.value[assistantIndex].streaming = false;
     if (!messages.value[assistantIndex].content.trim()) {
       messages.value[assistantIndex].content = "No response.";
+      reveal.reset();
+      reveal.append("No response.");
+      reveal.flush();
+      activeAssistantIndex.value = null;
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : "Chat failed";
+    reveal.reset();
+    activeAssistantIndex.value = null;
     messages.value.splice(assistantIndex, 1);
     messages.value.pop();
     draft.value = text;
@@ -135,6 +175,8 @@ async function send() {
 }
 
 function clearChat() {
+  reveal.reset();
+  activeAssistantIndex.value = null;
   messages.value = [];
   error.value = "";
 }
