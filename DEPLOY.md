@@ -76,6 +76,7 @@ Re-run after big local changes if you want production to match.
 | `SUPABASE_SERVICE_KEY` | From Supabase |
 | `STORAGE` | `supabase` |
 | `ALLOWED_ORIGINS` | Your GitHub Pages origin only, e.g. `https://YOUR_USER.github.io` (no path, no trailing slash) |
+| `CAL_SESSION_ENCRYPTION_KEY` | Long random string (Render can auto-generate). Encrypts persisted Cal browser session in Supabase. **Keep stable** — changing it invalidates the saved session (one extra SMS login). |
 
 4. Wait for both services (API + analyzer) to go green.
 5. Copy the API URL, e.g. `https://finance-api-xxxx.onrender.com`.
@@ -195,6 +196,7 @@ Personal data lives in **Supabase**, not in the repo. These paths are gitignored
 - `data/review_progress.json`
 - `data/fixed_charges.json`, `data/living_budget.json`, `data/excluded_transactions.json`
 - `data/user_*.json` (local API cache when `STORAGE=local`)
+- `data/cal_session.json`, `data/cal_credentials.json` (Cal sync session + login hints)
 - `statements/*.xlsx`
 
 If they were committed before, use a **private** repo or remove them from git history before going public.
