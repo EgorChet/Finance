@@ -356,6 +356,12 @@ const budgetRetrospective = computed(() => {
 
 const showTransactions = computed(() => (report.value?.transactions.length ?? 0) > 0);
 
+const liveCycleStartDate = computed(() => {
+  if (!isLiveTransactionView.value) return undefined;
+  const [y, m, d] = cycleStartForDate(refDate.value, cycleDay.value).split("-").map(Number);
+  return new Date(y, m - 1, d);
+});
+
 const periodTransactions = computed(() => {
   if (!report.value) return [];
   return filterTransactionsByPeriod(
@@ -363,6 +369,7 @@ const periodTransactions = computed(() => {
     txPeriod.value,
     refDate.value,
     isLiveTransactionView.value,
+    liveCycleStartDate.value,
   );
 });
 

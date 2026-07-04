@@ -69,6 +69,8 @@ export function filterTransactionsByPeriod(
   reference: Date,
   /** When false (closed statement month), "This month" = all charges in that view. */
   liveView = true,
+  /** When set on the live cycle tab, "This month" = current billing cycle through today. */
+  cycleStart?: Date,
 ): Transaction[] {
   if (!liveView && period === "month") {
     return transactions;
@@ -82,15 +84,20 @@ export function filterTransactionsByPeriod(
   const yesterdayIso = isoDateLocal(yesterday);
 
   const monthStart = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const liveCycleStart = cycleStart ? normalizeDate(cycleStart) : null;
 
   return transactions.filter((t) => {
     const dateIso = t.date.slice(0, 10);
     if (period === "today") return dateIso === todayIso;
     if (period === "yesterday") return dateIso === yesterdayIso;
     if (period === "week") {
-      const weekStart = laterDate(startOfWeekMonday(ref), monthStart);
+      const anchorStart = liveCycleStart ?? monthStart;
+      const weekStart = laterDate(startOfWeekMonday(ref), anchorStart);
       const weekEnd = earlierDate(endOfWeekSunday(ref), ref);
       return inRange(dateIso, weekStart, weekEnd);
+    }
+    if (liveCycleStart) {
+      return inRange(dateIso, liveCycleStart, ref);
     }
     return inRange(dateIso, monthStart, ref);
   });
