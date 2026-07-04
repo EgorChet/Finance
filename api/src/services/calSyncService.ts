@@ -550,6 +550,174 @@ async function setupDownloadDir(page: Page): Promise<string> {
   return downloadDir;
 }
 
+const TRANSACTIONS_VIEW_SELECTORS =
+  ".cardInDeatailsTransactions, app-card-in-deatails-transactions, .transactions-table, .export, button[aria-label*='אקסל'], button[aria-label*='ייצוא'], button[aria-label*='יצוא']";
+
+async function allAliveContexts(page: Page): Promise<PageOrFrame[]> {
+  const contexts: PageOrFrame[] = [page];
+  for (const frame of page.frames()) {
+    if (await frameAlive(frame)) contexts.push(frame);
+  }
+  return contexts;
+}
+
+async function waitForTransactionsView(page: Page, job: CalSyncJob, timeoutMs = 60_000): Promise<void> {
+  jobLog(job, "Waiting for card transactions view…");
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await findSelectorContext(page, TRANSACTIONS_VIEW_SELECTORS)) return;
+    await sleep(500);
+  }
+  throw new Error("Card transactions view did not load");
+}
+
+async function openCardTransactions(page: Page, job: CalSyncJob, cardLast4: string): Promise<void> {
+  const cardCtx = await requireContext(page, job, ".cardDebitsTransactions-main", 60_000);
+  const cardClicked = await cardCtx.evaluate((last4) => {
+    const clickCard = (card: Element): boolean => {
+      if (!(card instanceof HTMLElement)) return false;
+      card.scrollIntoView({ block: "center", inline: "nearest" });
+      card.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      card.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      card.click();
+      return true;
+    };
+    for (const card of document.querySelectorAll(".cardDebitsTransactions-main")) {
+      if (card.textContent?.includes(last4)) return clickCard(card);
+    }
+    const fallback = document.querySelector(".cardDebitsTransactions-main");
+    return fallback ? clickCard(fallback) : false;
+  }, cardLast4);
+  if (!cardClicked) throw new Error("Could not open card transactions view");
+  await waitForTransactionsView(page, job);
+}
+
+type ExportClickResult = "excel" | "menu" | false;
+
+async function clickExportInContext(ctx: PageOrFrame): Promise<ExportClickResult> {
+  return ctx.evaluate(() => {
+    const exportNeedle = /י{1,2}צוא|אקסל|excel/i;
+
+    const queryAllDeep = (selector: string, root: ParentNode = document): Element[] => {
+      const out: Element[] = [];
+      root.querySelectorAll(selector).forEach((el) => out.push(el));
+      root.querySelectorAll("*").forEach((el) => {
+        if (el.shadowRoot) out.push(...queryAllDeep(selector, el.shadowRoot));
+      });
+      return out;
+    };
+
+    const clickEl = (el: Element): void => {
+      if (!(el instanceof HTMLElement)) return;
+      el.scrollIntoView({ block: "center", inline: "nearest" });
+      el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      el.click();
+    };
+
+    const matchesExcelExport = (el: Element): boolean => {
+      const label = el.getAttribute("aria-label") || "";
+      const title = el.getAttribute("title") || "";
+      const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
+      return (
+        /י{1,2}צוא.*אקסל/i.test(label) ||
+        /י{1,2}צוא.*אקסל/i.test(title) ||
+        (exportNeedle.test(text) && /אקסל|excel/i.test(text))
+      );
+    };
+
+    for (const el of queryAllDeep("button, a, [role='button']")) {
+      if (matchesExcelExport(el)) {
+        clickEl(el);
+        return "excel";
+      }
+    }
+
+    for (const el of queryAllDeep("button, a, [role='button']")) {
+      const label = el.getAttribute("aria-label") || "";
+      const title = el.getAttribute("title") || "";
+      const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
+      if (exportNeedle.test(label) || exportNeedle.test(title) || exportNeedle.test(text)) {
+        clickEl(el);
+        return /אקסל|excel/i.test(`${label} ${title} ${text}`) ? "excel" : "menu";
+      }
+    }
+
+    for (const container of queryAllDeep(".export, [class*='export']")) {
+      for (const btn of container.querySelectorAll("button, a, [role='button']")) {
+        const text = btn.textContent?.replace(/\s+/g, " ").trim() || "";
+        const label = btn.getAttribute("aria-label") || "";
+        if (exportNeedle.test(text) || exportNeedle.test(label)) {
+          clickEl(btn);
+          return /אקסל|excel/i.test(`${label} ${text}`) ? "excel" : "menu";
+        }
+      }
+    }
+
+    for (const el of queryAllDeep("button, a, [role='button']")) {
+      const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
+      if (/^י{1,2}צוא$/i.test(text)) {
+        clickEl(el);
+        return "menu";
+      }
+    }
+
+    return false;
+  });
+}
+
+async function collectExportHints(page: Page): Promise<string[]> {
+  const hints: string[] = [];
+  for (const ctx of await allAliveContexts(page)) {
+    try {
+      const frameHints = await ctx.evaluate(() => {
+        const out: string[] = [];
+        const needles = /י{0,2}צוא|אקסל|export/i;
+        for (const el of document.querySelectorAll("button, a, [role='button']")) {
+          const text = el.textContent?.replace(/\s+/g, " ").trim() || "";
+          const label = el.getAttribute("aria-label") || "";
+          const title = el.getAttribute("title") || "";
+          if (needles.test(text) || needles.test(label) || needles.test(title)) {
+            out.push(`<${el.tagName}> text="${text}" aria="${label}" title="${title}"`);
+          }
+        }
+        return out.slice(0, 6);
+      });
+      hints.push(...frameHints);
+    } catch {
+      /* detached frame */
+    }
+  }
+  return hints.slice(0, 10);
+}
+
+async function clickCalExportButton(page: Page, job: CalSyncJob): Promise<void> {
+  jobLog(job, "Clicking יצוא (Excel export)…");
+  const deadline = Date.now() + 45_000;
+  while (Date.now() < deadline) {
+    for (const ctx of await allAliveContexts(page)) {
+      try {
+        const result = await clickExportInContext(ctx);
+        if (result === "excel") return;
+        if (result === "menu") {
+          await sleep(700);
+          const menuPick = await clickExportInContext(ctx);
+          if (menuPick === "excel") return;
+        }
+      } catch {
+        /* detached frame */
+      }
+    }
+    await sleep(500);
+  }
+
+  const hints = await collectExportHints(page);
+  if (hints.length) {
+    jobLog(job, `Export hints: ${hints.join(" | ")}`);
+  }
+  throw new Error("Export button (יצוא / ייצוא לאקסל) not found");
+}
+
 async function exportTransactionsExcel(
   page: Page,
   job: CalSyncJob,
@@ -558,40 +726,8 @@ async function exportTransactionsExcel(
   const downloadDir = await setupDownloadDir(page);
 
   jobLog(job, `Opening card ••••${cardLast4}…`);
-  await page.waitForSelector(".cardDebitsTransactions-main", { visible: true, timeout: 60_000 });
-  const cardClicked = await page.evaluate((last4) => {
-    for (const card of document.querySelectorAll(".cardDebitsTransactions-main")) {
-      if (card.textContent?.includes(last4)) {
-        (card as HTMLElement).click();
-        return true;
-      }
-    }
-    const fallback = document.querySelector(".cardDebitsTransactions-main");
-    if (fallback instanceof HTMLElement) {
-      fallback.click();
-      return true;
-    }
-    return false;
-  }, cardLast4);
-  if (!cardClicked) throw new Error("Could not open card transactions view");
-  await sleep(3500);
-
-  jobLog(job, "Clicking יצוא (Excel export)…");
-  const exportClicked = await page.evaluate(() => {
-    const byLabel = document.querySelector('button[aria-label="ייצוא לאקסל"]');
-    if (byLabel instanceof HTMLElement) {
-      byLabel.click();
-      return true;
-    }
-    for (const btn of document.querySelectorAll(".export button, button")) {
-      if (btn.textContent?.trim() === "יצוא") {
-        (btn as HTMLElement).click();
-        return true;
-      }
-    }
-    return false;
-  });
-  if (!exportClicked) throw new Error('Export button (יצוא) not found');
+  await openCardTransactions(page, job, cardLast4);
+  await clickCalExportButton(page, job);
 
   jobLog(job, "Waiting for Excel file…");
   const buffer = await waitForXlsxDownload(downloadDir);
