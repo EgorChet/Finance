@@ -368,8 +368,14 @@ export type CalJobStatusResponse = {
   statementKey?: string | null;
 };
 
-export async function startCalSync(token?: string) {
-  return post<{ jobId: string; status: string }>(`${prefix(false)}/cal/sync/start`, {}, token);
+export type CalSyncMode = "auto" | "classic";
+
+export async function startCalSync(token?: string, mode: CalSyncMode = "classic") {
+  return post<{ jobId: string; status: string; mode: CalSyncMode }>(
+    `${prefix(false)}/cal/sync/start`,
+    { mode },
+    token,
+  );
 }
 
 export async function fetchCalJobStatus(jobId: string, token?: string) {

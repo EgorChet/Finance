@@ -13,7 +13,6 @@ const auth = useAuthStore();
 
 const props = defineProps<{
   open: boolean;
-  resumeJobId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -29,10 +28,10 @@ const cardLast4 = ref("");
 const otpCode = ref("");
 const jobId = ref<string | null>(null);
 const maskedId = ref<string | null>(null);
-const sessionSaved = ref(false);
 const statusError = ref("");
 const submitting = ref(false);
 const progressMessage = ref("");
+const otpSubmitted = ref(false);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -69,6 +68,12 @@ function applyJobStatus(status: {
     stopPolling();
     return;
   }
+  if (status.status === "logging_in" || status.status === "scraping" || status.status === "saving") {
+    if (otpSubmitted.value && jobId.value) {
+      handOffToBackground(jobId.value);
+    }
+    return;
+  }
   if (status.status === "error") {
     stopPolling();
     submitting.value = false;
@@ -94,27 +99,11 @@ function startPolling(id: string) {
   }, 1000);
 }
 
-async function resumeOtpJob(id: string) {
-  stopPolling();
-  statusError.value = "";
-  otpCode.value = "";
-  jobId.value = id;
-  step.value = "otp";
-  submitting.value = false;
-  progressMessage.value = "Enter the SMS code from Cal";
-  try {
-    const status = await fetchCalJobStatus(id, auth.token || undefined);
-    applyJobStatus(status);
-    if (status.status === "otp_required") startPolling(id);
-  } catch (e) {
-    statusError.value = e instanceof Error ? e.message : String(e);
-  }
-}
-
 async function loadStatus() {
   stopPolling();
   statusError.value = "";
   progressMessage.value = "";
+  otpSubmitted.value = false;
   step.value = "loading";
   try {
     const status = await fetchCalStatus(auth.token || undefined);
@@ -123,7 +112,6 @@ async function loadStatus() {
       return;
     }
     maskedId.value = status.national_id_masked;
-    sessionSaved.value = status.session_saved === true;
     if (status.configured) {
       await beginSync();
     } else {
@@ -156,13 +144,19 @@ async function beginSync() {
   submitting.value = true;
   statusError.value = "";
   otpCode.value = "";
+  otpSubmitted.value = false;
   jobId.value = null;
   emit("starting");
   try {
-    const result = await startCalSync(auth.token || undefined);
+    const result = await startCalSync(auth.token || undefined, "classic");
     jobId.value = result.jobId;
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
     if (initial.status === "otp_required") {
+      applyJobStatus(initial);
+      startPolling(result.jobId);
+      return;
+    }
+    if (initial.status === "error") {
       applyJobStatus(initial);
       return;
     }
@@ -181,7 +175,8 @@ async function submitOtp() {
   statusError.value = "";
   try {
     await submitCalOtp(jobId.value, otpCode.value.replace(/\D/g, ""), auth.token || undefined);
-    handOffToBackground(jobId.value);
+    otpSubmitted.value = true;
+    startPolling(jobId.value);
   } catch (e) {
     statusError.value = e instanceof Error ? e.message : String(e);
     submitting.value = false;
@@ -194,14 +189,13 @@ function close() {
 }
 
 watch(
-  () => [props.open, props.resumeJobId] as const,
-  ([open, resumeJobId]) => {
+  () => props.open,
+  (open) => {
     if (!open) {
       stopPolling();
       return;
     }
-    if (resumeJobId) void resumeOtpJob(resumeJobId);
-    else void loadStatus();
+    void loadStatus();
   },
   { immediate: true },
 );
@@ -212,16 +206,16 @@ onBeforeUnmount(stopPolling);
 <template>
   <div v-if="open" class="process-error-overlay" role="dialog" aria-modal="true">
     <div class="process-error-card upload-type-card">
-      <h3>Sync with Cal</h3>
+      <h3>Sync Cal</h3>
 
       <template v-if="step === 'loading'">
-        <p class="upload-type-hint">Checking Cal sync…</p>
+        <p class="upload-type-hint">Connecting to Cal…</p>
       </template>
 
       <template v-else-if="step === 'credentials'">
         <p class="upload-type-hint">
           Enter your Cal login details once. They are stored securely on the server (not in the app).
-          After your first SMS login, the session is saved so later syncs skip SMS.
+          After your first SMS login, the session is saved so you can use Auto sync Cal next time.
         </p>
         <label class="cal-field">
           <span>Teudat zehut</span>

@@ -19,9 +19,12 @@ const MAX_LOG_LINES = 80;
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 
+export type CalSyncMode = "auto" | "classic";
+
 export type CalJobStatus =
   | "starting"
   | "otp_required"
+  | "logging_in"
   | "scraping"
   | "saving"
   | "done"
@@ -35,6 +38,7 @@ export interface CalSyncLogEntry {
 
 export interface CalSyncJob {
   id: string;
+  mode: CalSyncMode;
   status: CalJobStatus;
   message?: string;
   logs: CalSyncLogEntry[];
@@ -608,14 +612,27 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     jobLog(job, chromium ? `Chromium: ${chromium}` : "Chromium: bundled (puppeteer)");
 
     let loggedIn = false;
-    const savedSession = await readCalSession();
-    if (savedSession) {
+    if (job.mode === "auto") {
+      const savedSession = await readCalSession();
+      if (!savedSession) {
+        throw new Error("No saved Cal session. Use Sync Cal to sign in with SMS.");
+      }
       loggedIn = await restoreCalSession(page, job, savedSession);
-      if (!loggedIn) await clearCalSession();
-    }
-
-    if (!loggedIn) {
-      await performCalLogin(page, job, creds);
+      if (!loggedIn) {
+        await clearCalSession();
+        throw new Error(
+          "Saved Cal session could not be used. The saved login was cleared — use Sync Cal to sign in again with SMS.",
+        );
+      }
+    } else {
+      const savedSession = await readCalSession();
+      if (savedSession) {
+        loggedIn = await restoreCalSession(page, job, savedSession);
+        if (!loggedIn) await clearCalSession();
+      }
+      if (!loggedIn) {
+        await performCalLogin(page, job, creds);
+      }
     }
 
     await waitForDashboard(page, job);
@@ -686,12 +703,16 @@ export function getCalJobStatus(jobId: string): {
   };
 }
 
-export async function createCalSyncJob(creds: CalCredentialsData): Promise<CalSyncJob> {
+export async function createCalSyncJob(
+  creds: CalCredentialsData,
+  mode: CalSyncMode = "classic",
+): Promise<CalSyncJob> {
   purgeExpiredJobs();
   const id = crypto.randomUUID();
 
   const job: CalSyncJob = {
     id,
+    mode,
     status: "starting",
     message: "Starting…",
     logs: [],
@@ -750,7 +771,8 @@ export function submitCalOtpCode(jobId: string, code: string): void {
   const trimmed = code.replace(/\D/g, "");
   if (trimmed.length < 4) throw new Error("Invalid SMS code");
   if (!job.otpResolve) throw new Error("OTP handler not ready");
-  jobLog(job, "OTP submitted from app");
+  job.status = "logging_in";
+  jobLog(job, "Signing in with SMS code…");
   job.otpResolve(trimmed);
 }
 

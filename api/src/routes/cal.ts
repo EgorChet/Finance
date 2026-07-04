@@ -7,6 +7,7 @@ import {
   getCalJobStatus,
   releaseCalJob,
   submitCalOtpCode,
+  type CalSyncMode,
 } from "../services/calSyncService.js";
 import { persistCalSyncExport } from "../services/calSyncPersist.js";
 import {
@@ -65,7 +66,7 @@ router.put("/credentials", async (req, res) => {
   }
 });
 
-router.post("/sync/start", async (_req, res) => {
+router.post("/sync/start", async (req, res) => {
   try {
     assertCalEnabled();
     const creds = await readCalCredentials();
@@ -74,8 +75,10 @@ router.post("/sync/start", async (_req, res) => {
       return;
     }
 
-    const job = await createCalSyncJob(creds);
-    res.json({ jobId: job.id, status: job.status });
+    const modeRaw = String(req.body?.mode || "classic");
+    const mode: CalSyncMode = modeRaw === "auto" ? "auto" : "classic";
+    const job = await createCalSyncJob(creds, mode);
+    res.json({ jobId: job.id, status: job.status, mode: job.mode });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: message });

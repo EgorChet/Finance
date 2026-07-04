@@ -207,11 +207,39 @@
                 </button>
 
                 <button
-                  v-if="showCalSync"
+                  v-if="showCalAutoSync"
                   type="button"
                   class="mobile-nav-action btn"
                   :disabled="processing"
-                  @click="openCalSync"
+                  @click="openCalAutoSync"
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Auto sync Cal
+                </button>
+
+                <button
+                  v-if="showCalClassicSync"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  :disabled="processing"
+                  @click="openCalClassicSync"
                 >
                   <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
                     <path
@@ -219,7 +247,7 @@
                       fill="currentColor"
                     />
                   </svg>
-                  Sync with Cal
+                  Sync Cal
                 </button>
 
                 <button
@@ -309,7 +337,6 @@
 
     <CalSyncDialog
       :open="calSyncOpen"
-      :resume-job-id="calSyncResumeJobId"
       @close="onCalSyncDialogClose"
       @starting="onCalSyncStarting"
       @background="onCalSyncBackground"
@@ -344,7 +371,9 @@
         </div>
         <div class="process-error-actions">
           <button type="button" class="btn" @click="dismissCalSyncErrorModal">Dismiss</button>
-          <button type="button" class="btn btn-primary" @click="retryCalSyncFromError">Try again</button>
+          <button type="button" class="btn btn-primary" @click="retryCalSyncFromError">
+            {{ calSyncErrorModal.retryLabel }}
+          </button>
         </div>
       </div>
     </div>
@@ -382,6 +411,7 @@ import {
   fetchCalStatus,
   finishCalSync,
   startCalSync,
+  type CalSyncMode,
   syncStatements,
   uploadStatement,
   warmAnalyzerService,
@@ -459,13 +489,14 @@ const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const calSyncOpen = ref(false);
-const calSyncResumeJobId = ref<string | null>(null);
 const calSyncEnabled = ref(false);
+const calSessionSaved = ref(false);
 const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
 const calSyncErrorModal = ref<{
   title: string;
   summary: string;
   logs: { at: string; message: string }[];
+  retryLabel: string;
 } | null>(null);
 const calSyncLastError = ref<{
   summary: string;
@@ -475,6 +506,7 @@ const calSyncLastError = ref<{
 let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let calSyncDoneTimer: ReturnType<typeof setTimeout> | null = null;
 let calSyncBgJobId: string | null = null;
+let calSyncBgMode: CalSyncMode | null = null;
 const navOpen = ref(false);
 const portfolioAsset = ref<PortfolioAsset>(readPortfolioAsset());
 let stepTimer: ReturnType<typeof setInterval> | null = null;
@@ -603,14 +635,28 @@ const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 const showCalSync = computed(
   () => Boolean(import.meta.env.VITE_API_URL) && !auth.isDemo && calSyncEnabled.value,
 );
+const showCalAutoSync = computed(() => showCalSync.value && calSessionSaved.value);
+const showCalClassicSync = computed(() => showCalSync.value && !calSessionSaved.value);
+
+async function refreshCalSyncStatus() {
+  if (!import.meta.env.VITE_API_URL || auth.isDemo) return;
+  try {
+    const status = await fetchCalStatus(auth.token || undefined);
+    calSessionSaved.value = status.session_saved === true;
+  } catch {
+    calSessionSaved.value = false;
+  }
+}
 
 async function loadCalSyncConfig() {
   if (!import.meta.env.VITE_API_URL || auth.isDemo) return;
   try {
     const config = await fetchAppConfig(auth.token || undefined);
     calSyncEnabled.value = config.cal_sync_enabled === true;
+    if (calSyncEnabled.value) await refreshCalSyncStatus();
   } catch {
     calSyncEnabled.value = false;
+    calSessionSaved.value = false;
   }
 }
 
@@ -620,6 +666,7 @@ function stopCalSyncBackground() {
     calSyncPollTimer = null;
   }
   calSyncBgJobId = null;
+  calSyncBgMode = null;
   clearCalSyncJobId();
 }
 
@@ -639,14 +686,16 @@ function formatCalSyncErrorSummary(status: Pick<CalJobStatusResponse, "error" | 
 function showCalSyncFailure(
   summary: string,
   logs: { at: string; message: string }[] = [],
+  options: { title?: string; retryLabel?: string } = {},
 ) {
   const trimmed = summary.trim() || "Cal sync failed";
   calSyncLastError.value = { summary: trimmed, logs };
   calSyncFloat.value = null;
   calSyncErrorModal.value = {
-    title: "Cal sync failed",
+    title: options.title || "Cal sync failed",
     summary: trimmed,
     logs: logs.slice(-20),
+    retryLabel: options.retryLabel || "Try again",
   };
 }
 
@@ -656,6 +705,7 @@ function openCalSyncErrorModal() {
     title: "Cal sync failed",
     summary: calSyncLastError.value.summary,
     logs: calSyncLastError.value.logs.slice(-20),
+    retryLabel: calSessionSaved.value ? "Try again" : "Sync Cal",
   };
 }
 
@@ -666,8 +716,8 @@ function dismissCalSyncErrorModal() {
 function retryCalSyncFromError() {
   dismissCalSyncErrorModal();
   calSyncLastError.value = null;
-  calSyncResumeJobId.value = null;
-  calSyncOpen.value = true;
+  if (calSessionSaved.value) void openCalAutoSync();
+  else openCalClassicSync();
 }
 
 function onCalSyncStarting(message = "Starting Cal sync…") {
@@ -675,6 +725,7 @@ function onCalSyncStarting(message = "Starting Cal sync…") {
 }
 
 function refreshAfterCalSync() {
+  void refreshCalSyncStatus();
   window.setTimeout(() => {
     emitSpendingRefresh();
   }, 2200);
@@ -707,17 +758,22 @@ async function pollCalSyncBackground(jobId: string) {
       return;
     }
 
-    if (status.status === "otp_required") {
-      stopCalSyncBackground();
-      calSyncFloat.value = null;
-      calSyncResumeJobId.value = jobId;
-      calSyncOpen.value = true;
+    if (status.status === "otp_required" || status.status === "logging_in") {
+      calSyncFloat.value = {
+        message: status.message?.trim() || "Signing in with Cal…",
+        state: "syncing",
+      };
       return;
     }
 
     if (status.status === "error") {
       stopCalSyncBackground();
-      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
+      const isAuto = calSyncBgMode === "auto";
+      if (isAuto) void refreshCalSyncStatus();
+      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
+        title: isAuto ? "Auto sync failed" : undefined,
+        retryLabel: isAuto || !calSessionSaved.value ? "Sync Cal" : "Try again",
+      });
       return;
     }
 
@@ -727,15 +783,21 @@ async function pollCalSyncBackground(jobId: string) {
     };
   } catch (e) {
     stopCalSyncBackground();
+    const isAuto = calSyncBgMode === "auto";
+    if (isAuto) void refreshCalSyncStatus();
     const message = e instanceof Error ? e.message : String(e);
-    showCalSyncFailure(message.trim() || "Cal sync failed");
+    showCalSyncFailure(message.trim() || "Cal sync failed", [], {
+      title: isAuto ? "Auto sync failed" : undefined,
+      retryLabel: isAuto || !calSessionSaved.value ? "Sync Cal" : "Try again",
+    });
   }
 }
 
-function onCalSyncBackground(jobId: string) {
+function onCalSyncBackground(jobId: string, mode: CalSyncMode = "classic") {
   calSyncOpen.value = false;
   stopCalSyncBackground();
   calSyncBgJobId = jobId;
+  calSyncBgMode = mode;
   saveCalSyncJobId(jobId);
   calSyncFloat.value = { message: "Syncing with Cal…", state: "syncing" };
   void pollCalSyncBackground(jobId);
@@ -757,7 +819,10 @@ async function resumeCalSyncIfNeeded() {
     }
     if (status.status === "error") {
       clearCalSyncJobId();
-      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
+      void refreshCalSyncStatus();
+      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
+        retryLabel: calSessionSaved.value ? "Try again" : "Sync Cal",
+      });
       return;
     }
     onCalSyncBackground(jobId);
@@ -768,42 +833,41 @@ async function resumeCalSyncIfNeeded() {
 
 function onCalSyncDialogClose() {
   calSyncOpen.value = false;
-  calSyncResumeJobId.value = null;
 }
 
-async function openCalSync() {
+function openCalClassicSync() {
+  closeNav();
+  if (!calSyncEnabled.value || auth.isDemo) return;
+  calSyncOpen.value = true;
+}
+
+async function openCalAutoSync() {
   closeNav();
   if (!calSyncEnabled.value || auth.isDemo) {
-    calSyncOpen.value = true;
+    openCalClassicSync();
     return;
   }
-  onCalSyncStarting("Starting Cal sync…");
+  onCalSyncStarting("Auto syncing with Cal…");
   try {
-    const status = await fetchCalStatus(auth.token || undefined);
-    if (status.configured && status.session_saved) {
-      calSyncFloat.value = { message: "Connecting to Cal…", state: "syncing" };
-      const result = await startCalSync(auth.token || undefined);
-      const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
-      if (initial.status === "otp_required") {
-        calSyncFloat.value = null;
-        calSyncResumeJobId.value = result.jobId;
-        calSyncOpen.value = true;
-        return;
-      }
-      if (initial.status === "error") {
-        showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs);
-        return;
-      }
-      onCalSyncBackground(result.jobId);
+    const result = await startCalSync(auth.token || undefined, "auto");
+    const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
+    if (initial.status === "error") {
+      await refreshCalSyncStatus();
+      showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs, {
+        title: "Auto sync failed",
+        retryLabel: "Sync Cal",
+      });
       return;
     }
+    onCalSyncBackground(result.jobId, "auto");
   } catch (e) {
+    await refreshCalSyncStatus();
     const message = e instanceof Error ? e.message : String(e);
-    showCalSyncFailure(message.trim() || "Could not start Cal sync");
-    return;
+    showCalSyncFailure(message.trim() || "Auto sync could not start", [], {
+      title: "Auto sync failed",
+      retryLabel: "Sync Cal",
+    });
   }
-  calSyncFloat.value = null;
-  calSyncOpen.value = true;
 }
 
 function onCalSyncError(message: string) {
