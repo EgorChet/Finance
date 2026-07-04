@@ -23,6 +23,8 @@ data/user_exclusions.json
 data/user_calendar.json
 data/kaspa_price.json
 data/fxcn_price.json
+data/cal_session.json
+data/cal_credentials.json
 
 node_modules/
 api/dist/

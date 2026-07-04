@@ -1,10 +1,19 @@
 import type { Cookie } from "puppeteer";
+import {
+  calSessionEncryptionConfigured,
+  decryptJson,
+  encryptJson,
+  isEncryptedEnvelope,
+  type EncryptedEnvelope,
+} from "../utils/atRestEncryption.js";
 
 export interface CalSessionData {
   cookies: Cookie[];
   auth_module: string | null;
   saved_at: string;
 }
+
+type StoredCalSession = CalSessionData | EncryptedEnvelope;
 
 const LOCAL_PATH_SUFFIX = "cal_session.json";
 
@@ -13,13 +22,43 @@ function localPath(): string {
   return `${dataDir}/${LOCAL_PATH_SUFFIX}`;
 }
 
+function isCalSessionData(value: unknown): value is CalSessionData {
+  if (typeof value !== "object" || value === null) return false;
+  const data = value as CalSessionData;
+  return Array.isArray(data.cookies) && data.cookies.length > 0;
+}
+
+function parseStoredCalSession(raw: unknown): CalSessionData | null {
+  if (isEncryptedEnvelope(raw)) {
+    if (!calSessionEncryptionConfigured()) {
+      console.warn("[cal-session] Encrypted session found but CAL_SESSION_ENCRYPTION_KEY is not set");
+      return null;
+    }
+    try {
+      const data = decryptJson<CalSessionData>(raw);
+      return isCalSessionData(data) ? data : null;
+    } catch (err) {
+      console.warn(
+        `[cal-session] Could not decrypt saved session: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+  }
+  return isCalSessionData(raw) ? raw : null;
+}
+
+function serializeCalSession(data: CalSessionData): StoredCalSession {
+  if (calSessionEncryptionConfigured()) {
+    return encryptJson(data);
+  }
+  return data;
+}
+
 async function readLocal(): Promise<CalSessionData | null> {
   try {
     const { readFile } = await import("fs/promises");
     const raw = await readFile(localPath(), "utf-8");
-    const data = JSON.parse(raw) as CalSessionData;
-    if (!Array.isArray(data.cookies) || !data.cookies.length) return null;
-    return data;
+    return parseStoredCalSession(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -29,7 +68,7 @@ async function writeLocal(data: CalSessionData): Promise<void> {
   const { mkdir, writeFile } = await import("fs/promises");
   const path = localPath();
   await mkdir(path.replace(/\/[^/]+$/, ""), { recursive: true });
-  await writeFile(path, JSON.stringify(data, null, 2), "utf-8");
+  await writeFile(path, JSON.stringify(serializeCalSession(data), null, 2), "utf-8");
 }
 
 async function deleteLocal(): Promise<void> {
@@ -64,13 +103,12 @@ export async function readCalSession(): Promise<CalSessionData | null> {
   if (!supabaseConfigured()) return readLocal();
   const res = await supabaseFetch("app_state?id=eq.cal_session&select=data");
   if (!res.ok) return null;
-  const rows = (await res.json()) as { data: CalSessionData }[];
-  const data = rows[0]?.data;
-  if (!Array.isArray(data?.cookies) || !data.cookies.length) return null;
-  return data;
+  const rows = (await res.json()) as { data: unknown }[];
+  return parseStoredCalSession(rows[0]?.data);
 }
 
 export async function writeCalSession(data: CalSessionData): Promise<void> {
+  const stored = serializeCalSession(data);
   if (!supabaseConfigured()) {
     await writeLocal(data);
     return;
@@ -78,7 +116,7 @@ export async function writeCalSession(data: CalSessionData): Promise<void> {
   const res = await supabaseFetch("app_state", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ id: "cal_session", data }),
+    body: JSON.stringify({ id: "cal_session", data: stored }),
   });
   if (!res.ok) {
     const text = await res.text();
