@@ -8,6 +8,7 @@ import { persistCalSyncExport } from "./calSyncPersist.js";
 
 const LOGIN_URL = "https://www.cal-online.co.il/";
 const DIGITAL_URL = "https://digital-web.cal-online.co.il/";
+const DIGITAL_LOGIN_URL = "https://digital-web.cal-online.co.il/login";
 
 const JOB_IDLE_TTL_MS = 10 * 60 * 1000;
 const JOB_MAX_AGE_MS = 20 * 60 * 1000;
@@ -587,15 +588,25 @@ async function loginFormVisible(page: Page): Promise<boolean> {
   );
 }
 
-async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
-  jobLog(job, "Opening cal-online.co.il…");
-  await page.setViewport({ width: 1280, height: 900 });
-  await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  jobLog(job, `Loaded ${page.url()}`);
-  await sleep(1500);
+async function isCalWafBlock(page: Page): Promise<boolean> {
+  try {
+    const title = await page.title();
+    if (/request rejected/i.test(title)) return true;
+    return await page.evaluate(() => /request rejected/i.test(document.body?.innerText || ""));
+  } catch {
+    return false;
+  }
+}
 
-  jobLog(job, "Clicking כניסה לחשבון…");
-  const clicked = await page.evaluate(() => {
+async function clickCalHomepageLogin(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    for (const el of document.querySelectorAll("a, button, [role=button]")) {
+      const label = el.getAttribute("aria-label") || "";
+      if (label.includes("כניסה לחשבון")) {
+        (el as HTMLElement).click();
+        return true;
+      }
+    }
     for (const strong of document.querySelectorAll("strong")) {
       if (strong.textContent?.includes("כניסה לחשבון")) {
         const target = strong.closest("a, button, [role=button]") ?? strong.parentElement ?? strong;
@@ -609,16 +620,63 @@ async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
       (target as HTMLElement).click();
       return true;
     }
-    const legacy = document.querySelector("#ccLoginDesktopBtn");
+    const legacy = document.querySelector("#ccLoginDesktopBtn, #ccLoginMobileBtn");
     if (legacy instanceof HTMLElement) {
       legacy.click();
       return true;
     }
     return false;
   });
-  if (!clicked) throw new Error("Cal login button (כניסה לחשבון) not found");
+}
 
-  await sleep(2500);
+async function openCalLogin(page: Page, job: CalSyncJob): Promise<void> {
+  await page.setViewport({ width: 1280, height: 900 });
+
+  if (await loginFormVisible(page)) {
+    jobLog(job, "Login form already open");
+    return;
+  }
+
+  jobLog(job, "Opening Cal login page…");
+  await page.goto(DIGITAL_LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  jobLog(job, `Loaded ${page.url()}`);
+
+  const formDeadline = Date.now() + 45_000;
+  while (Date.now() < formDeadline) {
+    if (await loginFormVisible(page)) {
+      jobLog(job, "Login form ready");
+      return;
+    }
+    if (await isCalWafBlock(page)) break;
+    await sleep(500);
+  }
+
+  if (!(await loginFormVisible(page))) {
+    jobLog(job, "Direct login URL did not show form — trying cal-online.co.il homepage…");
+    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    jobLog(job, `Loaded ${page.url()}`);
+    if (await isCalWafBlock(page)) {
+      throw new Error(
+        "Cal site blocked this server (Request Rejected). Try again later or run sync from a different network.",
+      );
+    }
+
+    const clickDeadline = Date.now() + 30_000;
+    let clicked = false;
+    while (Date.now() < clickDeadline && !clicked) {
+      clicked = await clickCalHomepageLogin(page);
+      if (clicked) break;
+      await sleep(500);
+    }
+    if (!clicked) {
+      const diag = await pageDiagnostics(page);
+      throw new Error(`Cal login button (כניסה לחשבון) not found (${diag})`);
+    }
+
+    jobLog(job, "Clicked כניסה לחשבון on homepage");
+    await sleep(2500);
+  }
+
   await requireContext(page, job, '[formcontrolname="id"]', 60_000);
   jobLog(job, "Login form ready");
 }
