@@ -309,7 +309,8 @@
 
     <CalSyncDialog
       :open="calSyncOpen"
-      @close="calSyncOpen = false"
+      :resume-job-id="calSyncResumeJobId"
+      @close="onCalSyncDialogClose"
       @background="onCalSyncBackground"
       @error="onCalSyncError"
     />
@@ -350,7 +351,16 @@ import AppLoader from "@/shared/components/AppLoader.vue";
 import CalSyncDialog from "@/shared/components/CalSyncDialog.vue";
 import CalSyncFloating from "@/shared/components/CalSyncFloating.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
-import { fetchAppConfig, fetchCalJobStatus, finishCalSync, syncStatements, uploadStatement, warmAnalyzerService } from "@/shared/api/client";
+import {
+  fetchAppConfig,
+  fetchCalJobStatus,
+  fetchCalStatus,
+  finishCalSync,
+  startCalSync,
+  syncStatements,
+  uploadStatement,
+  warmAnalyzerService,
+} from "@/shared/api/client";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAppStore } from "@/shared/stores/app";
@@ -423,6 +433,7 @@ const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const calSyncOpen = ref(false);
+const calSyncResumeJobId = ref<string | null>(null);
 const calSyncEnabled = ref(false);
 const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
 
@@ -609,6 +620,14 @@ async function pollCalSyncBackground(jobId: string) {
       return;
     }
 
+    if (status.status === "otp_required") {
+      stopCalSyncBackground();
+      calSyncFloat.value = null;
+      calSyncResumeJobId.value = jobId;
+      calSyncOpen.value = true;
+      return;
+    }
+
     if (status.status === "error") {
       stopCalSyncBackground();
       calSyncFloat.value = {
@@ -664,13 +683,39 @@ async function resumeCalSyncIfNeeded() {
   }
 }
 
-function openCalSync() {
+function onCalSyncDialogClose() {
+  calSyncOpen.value = false;
+  calSyncResumeJobId.value = null;
+}
+
+async function openCalSync() {
   closeNav();
+  if (!calSyncEnabled.value || auth.isDemo) {
+    calSyncOpen.value = true;
+    return;
+  }
+  try {
+    const status = await fetchCalStatus(auth.token || undefined);
+    if (status.configured && status.session_saved) {
+      const result = await startCalSync(auth.token || undefined);
+      const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
+      if (initial.status === "otp_required") {
+        calSyncResumeJobId.value = result.jobId;
+        calSyncOpen.value = true;
+        return;
+      }
+      onCalSyncBackground(result.jobId);
+      return;
+    }
+  } catch {
+    /* fall through to dialog */
+  }
   calSyncOpen.value = true;
 }
 
 function onCalSyncError(message: string) {
   failProcess("Cal sync failed", message, () => {
+    calSyncResumeJobId.value = null;
     calSyncOpen.value = true;
   });
 }
