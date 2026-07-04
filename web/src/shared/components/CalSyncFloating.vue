@@ -66,11 +66,13 @@ const displayMessage = computed(() => {
 .cal-sync-float--done {
   border-color: #2ecc71;
   background: #ecfdf3;
+  color: #14532d;
 }
 
 .cal-sync-float--error {
   border-color: var(--danger, #c0392b);
   background: #fff5f5;
+  color: #991b1b;
   cursor: pointer;
 }
 
