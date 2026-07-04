@@ -697,14 +697,23 @@ async function openCalSync() {
   try {
     const status = await fetchCalStatus(auth.token || undefined);
     if (status.configured && status.session_saved) {
-      const result = await startCalSync(auth.token || undefined);
-      const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
-      if (initial.status === "otp_required") {
-        calSyncResumeJobId.value = result.jobId;
-        calSyncOpen.value = true;
-        return;
+      calSyncFloat.value = { message: "Syncing with Cal…", state: "syncing" };
+      try {
+        const result = await startCalSync(auth.token || undefined);
+        const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
+        if (initial.status === "otp_required") {
+          calSyncFloat.value = null;
+          calSyncResumeJobId.value = result.jobId;
+          calSyncOpen.value = true;
+          return;
+        }
+        onCalSyncBackground(result.jobId);
+      } catch (e) {
+        calSyncFloat.value = {
+          message: e instanceof Error ? e.message : String(e),
+          state: "error",
+        };
       }
-      onCalSyncBackground(result.jobId);
       return;
     }
   } catch {
