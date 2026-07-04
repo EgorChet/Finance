@@ -6,27 +6,32 @@ Parse Leumi Visa exports (Hebrew), summarize spending in English, remember month
 
 ## Quick start (local)
 
-```bash
-# 1. Python analyzer
-pip install -r requirements.txt
-uvicorn analyzer_api.main:app --port 8001
+Uses the **same Supabase project** as production — no local statement files.
 
-# 2. Node API (new terminal) — copy .env.example to .env and set Supabase keys
+```bash
+# Copy env and paste SUPABASE_URL + SUPABASE_SERVICE_KEY from Supabase/Render
+cp .env.example .env
+
+# 1. Python analyzer (statement parsing)
+cd analyzer
+pip install -r requirements.txt
+PYTHONPATH=engine:. uvicorn service.main:app --port 8001
+cd ..
+
+# 2. Product API (new terminal)
 cd api && npm install && npm run dev
 
 # 3. Vue app (new terminal)
 cd web && npm install && npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 — upload statements in the app; they are stored in Supabase.
 
-Or use Docker:
+Or use Docker (still needs Supabase keys in `.env`):
 
 ```bash
 docker compose up --build
 ```
-
-Open http://localhost:5173
 
 ## Auth & demo mode
 
@@ -35,56 +40,45 @@ When deployed, set `AUTH_PASSWORD` and `AUTH_SECRET` on the API (Render).
 - **Sign in** — password protects your real statements
 - **Try demo** — no password; sample spending data only (upload/sync disabled)
 
-Locally, leave `AUTH_PASSWORD` empty to skip login.
+Locally, leave `AUTH_PASSWORD` empty to skip login, or use the values in `.env`.
 
 ## Data
 
-All personal data (statements, merchant rules, fixed charges, living budget, exclusions, calendar) lives in **Supabase** (`app_state` table). Nothing is hardcoded in the repo.
+All personal data lives in **Supabase** (`app_state` table), for both local dev and production.
 
-For local dev, copy `.env.example` → `.env` and set `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`. The API reads and writes through Supabase automatically.
+Monthly workflow: open the app → **Upload statement** for new `.xlsx` files. Nothing is kept in the repo.
 
-To seed Supabase from any local JSON you still have on disk:
-
-```bash
-SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node scripts/seed-supabase.mjs
-```
-
-Put `.xlsx` files in `statements/` and click **Sync** in the app, or run:
+Optional one-time seed from old local JSON (if you still have it):
 
 ```bash
-python cli.py --sync
+SUPABASE_URL=... SUPABASE_SERVICE_KEY=... node tools/seed-supabase.mjs
 ```
 
-(`cli.py` saves to local `data/statements.json` only — use the web app + Supabase for the full workflow.)
+Fully offline without Supabase is possible with `STORAGE=local`, but that is not the normal path.
 
 ## Deploy (free tier, password-protected)
 
-Full step-by-step: **[DEPLOY.md](./DEPLOY.md)**
+Full step-by-step: **[docs/DEPLOY.md](./docs/DEPLOY.md)**
 
 Summary:
 
-1. **Supabase** — store `statements`, rules, review progress (not in git)
+1. **Supabase** — statements, rules, budget, calendar (not in git)
 2. **Render** — API + analyzer; set `AUTH_PASSWORD`, `AUTH_SECRET`, Supabase keys
 3. **GitHub Pages** — Vue app; set repo variable `VITE_API_URL` to your Render API URL
-
-Sign in with the shared password to see real data. **Try demo** works without login (sample data only).
-
-Monthly workflow: sign in on the deployed site → **Upload statement** for new `.xlsx` files.
-
-## CLI (offline)
-
-```bash
-python cli.py --sync
-python cli.py "statements/2026-05-visa-2553.xlsx"
-```
 
 ## Project layout
 
 ```
-web/            Vue 3 SPA
-api/            Node.js Express API
-analyzer_api/   Python FastAPI wrapper
-backend/        Core Python parsing & analysis
-data/           Runtime cache only (gitignored); Supabase is source of truth
-statements/     Bank .xlsx exports (gitignored)
+web/                 Vue UI (features/ = menu pages, shared/ = common code)
+api/                 Product API (Node) — auth, Supabase, chat, calendar, portfolio
+analyzer/
+  service/           HTTP wrapper (FastAPI) — parses uploaded statements
+  engine/            Python library — parse XLSX, translate, categorize
+tools/               Deploy check + optional Supabase seed
+docs/                Deploy guide
+supabase/            Database schema
+docker-compose.yml   Local full stack
+render.yaml          Render blueprint (API + analyzer)
 ```
+
+**Ignore at the root:** `.venv/` (Python env), `.env` (secrets), `.github/` (CI for Pages).

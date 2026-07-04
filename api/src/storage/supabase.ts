@@ -1,6 +1,6 @@
 /**
- * Supabase storage adapter — used automatically when SUPABASE_URL + SUPABASE_SERVICE_KEY are set.
- * Set STORAGE=local to force file storage for offline dev without Supabase.
+ * Supabase storage adapter — default when SUPABASE_URL + SUPABASE_SERVICE_KEY are set.
+ * Set STORAGE=local only for fully offline file-based dev.
  */
 import type {
   ExclusionsData,

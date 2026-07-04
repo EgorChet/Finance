@@ -13,8 +13,7 @@ import type {
   ReviewProgressData,
   StatementsData,
 } from "../types.js";
-
-const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "..", "data");
+import { DATA_DIR, STATEMENTS_DIR, useLocalFileStorage } from "./paths.js";
 
 const STATEMENTS_PATH = path.join(DATA_DIR, "statements.json");
 const RULES_PATH = path.join(DATA_DIR, "merchant_rules.json");
@@ -26,8 +25,6 @@ const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
 const CALENDAR_PATH = path.join(DATA_DIR, "user_calendar.json");
-const PROJECT_ROOT = path.resolve(DATA_DIR, "..");
-const STATEMENTS_DIR = path.join(PROJECT_ROOT, "statements");
 const XLSX_DIRS = [STATEMENTS_DIR];
 
 export function fileHash(buffer: Buffer): string {
@@ -207,6 +204,9 @@ export async function writeCalendar(data: CalendarData): Promise<void> {
 }
 
 export async function discoverXlsxFiles(): Promise<string[]> {
+  // Folder sync is only for STORAGE=local. With Supabase, use Upload in the app.
+  if (!useLocalFileStorage()) return [];
+
   const found = new Set<string>();
   for (const dir of XLSX_DIRS) {
     try {
@@ -224,9 +224,9 @@ export async function discoverXlsxFiles(): Promise<string[]> {
 }
 
 export async function saveUploadedXlsx(filename: string, buffer: Buffer): Promise<string> {
-  if (process.env.STORAGE === "supabase") {
-    return `upload:${filename}`;
-  }
+  // With Supabase the parsed report is stored in the DB; no need to keep the .xlsx on disk.
+  if (!useLocalFileStorage()) return `upload:${filename}`;
+
   await fs.mkdir(STATEMENTS_DIR, { recursive: true });
   const dest = path.join(STATEMENTS_DIR, filename);
   await fs.writeFile(dest, buffer);

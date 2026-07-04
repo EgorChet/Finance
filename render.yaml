@@ -35,7 +35,7 @@ services:
   - type: web
     name: finance-analyzer
     runtime: docker
-    dockerfilePath: ./analyzer_api/Dockerfile
+    dockerfilePath: ./analyzer/Dockerfile
     dockerContext: .
     plan: free
     healthCheckPath: /health

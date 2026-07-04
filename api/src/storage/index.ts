@@ -1,12 +1,10 @@
 import * as local from "./local.js";
 import * as supabase from "./supabase.js";
+import { useLocalFileStorage } from "./paths.js";
 import { invalidateStatementsCache, readStatementsWithCache } from "./statementsCache.js";
 
-/** Use Supabase whenever credentials are set; set STORAGE=local to force file storage for offline dev. */
-const useSupabase =
-  supabase.supabaseConfigured() && process.env.STORAGE !== "local";
-
-const store = useSupabase ? supabase : local;
+/** Supabase by default when credentials are set; STORAGE=local forces disk files. */
+const store = useLocalFileStorage() ? local : supabase;
 
 async function readStatementsRaw(): Promise<import("../types.js").StatementsData> {
   return store.readStatements();

@@ -1,4 +1,4 @@
-/** Foreign-currency → ILS for Leumi Visa exports (mirrors backend/fx.py). */
+/** Foreign-currency → ILS for Leumi Visa exports (mirrors analyzer/engine/fx.py). */
 import type { Transaction } from "../types.js";
 import { getRateToIls } from "./fxRates.js";
 

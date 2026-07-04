@@ -2,7 +2,7 @@ services:
   analyzer:
     build:
       context: .
-      dockerfile: analyzer_api/Dockerfile
+      dockerfile: analyzer/Dockerfile
     ports:
       - "8001:8001"
 
@@ -17,17 +17,14 @@ services:
     environment:
       PORT: "3000"
       ANALYZER_URL: http://analyzer:8001
-      DATA_DIR: /app/data
       CAL_SYNC_ENABLED: ${CAL_SYNC_ENABLED:-true}
-      STORAGE: ${STORAGE:-local}
+      # Default: Supabase when SUPABASE_* keys are set in .env
+      STORAGE: ${STORAGE:-}
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-    volumes:
-      - ./statements:/app/statements
-      - ./data:/app/data
     depends_on:
       - analyzer
 

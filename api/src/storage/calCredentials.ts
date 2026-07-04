@@ -1,3 +1,6 @@
+import path from "path";
+import { DATA_DIR } from "./paths.js";
+
 export interface CalCredentialsData {
   national_id: string;
   card_last4: string;
@@ -7,8 +10,7 @@ export interface CalCredentialsData {
 const LOCAL_PATH_SUFFIX = "cal_credentials.json";
 
 function localPath(): string {
-  const dataDir = process.env.DATA_DIR || "./data";
-  return `${dataDir}/${LOCAL_PATH_SUFFIX}`;
+  return path.join(DATA_DIR, LOCAL_PATH_SUFFIX);
 }
 
 async function readLocal(): Promise<CalCredentialsData | null> {
@@ -25,9 +27,9 @@ async function readLocal(): Promise<CalCredentialsData | null> {
 
 async function writeLocal(data: CalCredentialsData): Promise<void> {
   const { mkdir, writeFile } = await import("fs/promises");
-  const path = localPath();
-  await mkdir(path.replace(/\/[^/]+$/, ""), { recursive: true });
-  await writeFile(path, JSON.stringify(data, null, 2), "utf-8");
+  const filePath = localPath();
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
 async function supabaseFetch(path: string, init?: RequestInit): Promise<Response> {

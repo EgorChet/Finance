@@ -1,3 +1,4 @@
+import path from "path";
 import type { Cookie } from "puppeteer";
 import {
   calSessionEncryptionConfigured,
@@ -6,6 +7,7 @@ import {
   isEncryptedEnvelope,
   type EncryptedEnvelope,
 } from "../utils/atRestEncryption.js";
+import { DATA_DIR } from "./paths.js";
 
 export interface CalSessionData {
   cookies: Cookie[];
@@ -18,8 +20,7 @@ type StoredCalSession = CalSessionData | EncryptedEnvelope;
 const LOCAL_PATH_SUFFIX = "cal_session.json";
 
 function localPath(): string {
-  const dataDir = process.env.DATA_DIR || "./data";
-  return `${dataDir}/${LOCAL_PATH_SUFFIX}`;
+  return path.join(DATA_DIR, LOCAL_PATH_SUFFIX);
 }
 
 function isCalSessionData(value: unknown): value is CalSessionData {
@@ -66,9 +67,9 @@ async function readLocal(): Promise<CalSessionData | null> {
 
 async function writeLocal(data: CalSessionData): Promise<void> {
   const { mkdir, writeFile } = await import("fs/promises");
-  const path = localPath();
-  await mkdir(path.replace(/\/[^/]+$/, ""), { recursive: true });
-  await writeFile(path, JSON.stringify(serializeCalSession(data), null, 2), "utf-8");
+  const filePath = localPath();
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(serializeCalSession(data), null, 2), "utf-8");
 }
 
 async function deleteLocal(): Promise<void> {
