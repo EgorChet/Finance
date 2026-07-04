@@ -311,6 +311,7 @@
       :open="calSyncOpen"
       :resume-job-id="calSyncResumeJobId"
       @close="onCalSyncDialogClose"
+      @starting="onCalSyncStarting"
       @background="onCalSyncBackground"
       @error="onCalSyncError"
     />
@@ -321,8 +322,32 @@
         :state="calSyncFloat.state"
         :message="calSyncFloat.message"
         @dismiss="dismissCalSyncFloat"
+        @show-error="openCalSyncErrorModal"
       />
     </Teleport>
+
+    <div
+      v-if="calSyncErrorModal"
+      class="process-error-overlay"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="cal-sync-error-title"
+    >
+      <div class="process-error-card cal-sync-error-card">
+        <h3 id="cal-sync-error-title">{{ calSyncErrorModal.title }}</h3>
+        <p class="cal-sync-error-summary">{{ calSyncErrorModal.summary }}</p>
+        <div v-if="calSyncErrorModal.logs.length" class="cal-sync-error-logs">
+          <p class="cal-sync-error-logs-title">What happened</p>
+          <ul>
+            <li v-for="(entry, i) in calSyncErrorModal.logs" :key="i">{{ entry.message }}</li>
+          </ul>
+        </div>
+        <div class="process-error-actions">
+          <button type="button" class="btn" @click="dismissCalSyncErrorModal">Dismiss</button>
+          <button type="button" class="btn btn-primary" @click="retryCalSyncFromError">Try again</button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
       <div class="process-error-card upload-type-card">
@@ -360,6 +385,7 @@ import {
   syncStatements,
   uploadStatement,
   warmAnalyzerService,
+  type CalJobStatusResponse,
 } from "@/shared/api/client";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
@@ -436,6 +462,15 @@ const calSyncOpen = ref(false);
 const calSyncResumeJobId = ref<string | null>(null);
 const calSyncEnabled = ref(false);
 const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
+const calSyncErrorModal = ref<{
+  title: string;
+  summary: string;
+  logs: { at: string; message: string }[];
+} | null>(null);
+const calSyncLastError = ref<{
+  summary: string;
+  logs: { at: string; message: string }[];
+} | null>(null);
 
 let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let calSyncDoneTimer: ReturnType<typeof setTimeout> | null = null;
@@ -597,6 +632,48 @@ function dismissCalSyncFloat() {
   stopCalSyncBackground();
 }
 
+function formatCalSyncErrorSummary(status: Pick<CalJobStatusResponse, "error" | "message">): string {
+  return status.error?.trim() || status.message?.trim() || "Cal sync failed";
+}
+
+function showCalSyncFailure(
+  summary: string,
+  logs: { at: string; message: string }[] = [],
+) {
+  const trimmed = summary.trim() || "Cal sync failed";
+  calSyncLastError.value = { summary: trimmed, logs };
+  calSyncFloat.value = null;
+  calSyncErrorModal.value = {
+    title: "Cal sync failed",
+    summary: trimmed,
+    logs: logs.slice(-20),
+  };
+}
+
+function openCalSyncErrorModal() {
+  if (!calSyncLastError.value) return;
+  calSyncErrorModal.value = {
+    title: "Cal sync failed",
+    summary: calSyncLastError.value.summary,
+    logs: calSyncLastError.value.logs.slice(-20),
+  };
+}
+
+function dismissCalSyncErrorModal() {
+  calSyncErrorModal.value = null;
+}
+
+function retryCalSyncFromError() {
+  dismissCalSyncErrorModal();
+  calSyncLastError.value = null;
+  calSyncResumeJobId.value = null;
+  calSyncOpen.value = true;
+}
+
+function onCalSyncStarting(message = "Starting Cal sync…") {
+  calSyncFloat.value = { message, state: "syncing" };
+}
+
 function refreshAfterCalSync() {
   window.setTimeout(() => {
     emitSpendingRefresh();
@@ -612,10 +689,20 @@ async function pollCalSyncBackground(jobId: string) {
       stopCalSyncBackground();
       if (!status.saved) {
         calSyncFloat.value = { message: "Saving statement…", state: "syncing" };
-        await finishCalSync(jobId, auth.token || undefined);
+        try {
+          await finishCalSync(jobId, auth.token || undefined);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          showCalSyncFailure(message.trim() || "Failed to save Cal statement", status.logs);
+          return;
+        }
       }
-      calSyncFloat.value = { message: "Cal sync complete", state: "done" };
-      calSyncDoneTimer = window.setTimeout(dismissCalSyncFloat, 3500);
+      calSyncLastError.value = null;
+      calSyncFloat.value = {
+        message: "Cal sync complete — statement saved",
+        state: "done",
+      };
+      calSyncDoneTimer = window.setTimeout(dismissCalSyncFloat, 6000);
       refreshAfterCalSync();
       return;
     }
@@ -630,23 +717,18 @@ async function pollCalSyncBackground(jobId: string) {
 
     if (status.status === "error") {
       stopCalSyncBackground();
-      calSyncFloat.value = {
-        message: status.error || "Cal sync failed",
-        state: "error",
-      };
+      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
       return;
     }
 
     calSyncFloat.value = {
-      message: status.message || "Syncing with Cal…",
+      message: status.message?.trim() || "Syncing with Cal…",
       state: "syncing",
     };
   } catch (e) {
     stopCalSyncBackground();
-    calSyncFloat.value = {
-      message: e instanceof Error ? e.message : String(e),
-      state: "error",
-    };
+    const message = e instanceof Error ? e.message : String(e);
+    showCalSyncFailure(message.trim() || "Cal sync failed");
   }
 }
 
@@ -675,6 +757,7 @@ async function resumeCalSyncIfNeeded() {
     }
     if (status.status === "error") {
       clearCalSyncJobId();
+      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
       return;
     }
     onCalSyncBackground(jobId);
@@ -694,30 +777,38 @@ async function openCalSync() {
     calSyncOpen.value = true;
     return;
   }
+  onCalSyncStarting("Starting Cal sync…");
   try {
     const status = await fetchCalStatus(auth.token || undefined);
     if (status.configured && status.session_saved) {
+      calSyncFloat.value = { message: "Connecting to Cal…", state: "syncing" };
       const result = await startCalSync(auth.token || undefined);
       const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
       if (initial.status === "otp_required") {
+        calSyncFloat.value = null;
         calSyncResumeJobId.value = result.jobId;
         calSyncOpen.value = true;
+        return;
+      }
+      if (initial.status === "error") {
+        showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs);
         return;
       }
       onCalSyncBackground(result.jobId);
       return;
     }
-  } catch {
-    /* fall through to dialog */
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    showCalSyncFailure(message.trim() || "Could not start Cal sync");
+    return;
   }
+  calSyncFloat.value = null;
   calSyncOpen.value = true;
 }
 
 function onCalSyncError(message: string) {
-  failProcess("Cal sync failed", message, () => {
-    calSyncResumeJobId.value = null;
-    calSyncOpen.value = true;
-  });
+  calSyncFloat.value = null;
+  showCalSyncFailure(message.trim() || "Cal sync failed");
 }
 
 onMounted(() => {
@@ -861,3 +952,47 @@ function goLogin() {
   void goToSignIn(router);
 }
 </script>
+
+<style scoped>
+.cal-sync-error-card {
+  width: min(100%, 28rem);
+  max-height: min(85vh, 32rem);
+  overflow: auto;
+}
+
+.cal-sync-error-summary {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cal-sync-error-logs {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 88%, var(--surface));
+  border: 1px solid var(--border);
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.cal-sync-error-logs-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.cal-sync-error-logs ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.cal-sync-error-logs li + li {
+  margin-top: 0.35rem;
+}
+</style>
