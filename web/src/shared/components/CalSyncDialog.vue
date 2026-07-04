@@ -13,6 +13,7 @@ const auth = useAuthStore();
 
 const props = defineProps<{
   open: boolean;
+  resumeJobId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -31,7 +32,6 @@ const sessionSaved = ref(false);
 const statusError = ref("");
 const submitting = ref(false);
 const progressMessage = ref("");
-const progressLogs = ref<{ at: string; message: string }[]>([]);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -40,8 +40,6 @@ const canSaveCredentials = computed(
 );
 
 const canSubmitOtp = computed(() => otpCode.value.replace(/\D/g, "").length >= 4);
-
-const recentLogs = computed(() => progressLogs.value.slice(-6));
 
 function stopPolling() {
   if (pollTimer) {
@@ -56,32 +54,18 @@ function handOffToBackground(id: string) {
   emit("close");
 }
 
-function shouldBackgroundSync(status: string): boolean {
-  return status === "scraping" || status === "saving";
-}
-
 function applyJobStatus(status: {
   status: string;
   message: string | null;
   error: string | null;
-  logs: { at: string; message: string }[];
 }) {
   if (status.message) progressMessage.value = status.message;
-  if (status.logs.length) progressLogs.value = status.logs;
 
   if (status.status === "otp_required") {
     step.value = "otp";
     submitting.value = false;
     progressMessage.value = status.message || "Enter the SMS code from Cal";
     stopPolling();
-    return;
-  }
-  if (shouldBackgroundSync(status.status)) {
-    if (jobId.value) handOffToBackground(jobId.value);
-    return;
-  }
-  if (status.status === "done") {
-    if (jobId.value) handOffToBackground(jobId.value);
     return;
   }
   if (status.status === "error") {
@@ -109,11 +93,27 @@ function startPolling(id: string) {
   }, 1000);
 }
 
+async function resumeOtpJob(id: string) {
+  stopPolling();
+  statusError.value = "";
+  otpCode.value = "";
+  jobId.value = id;
+  step.value = "otp";
+  submitting.value = false;
+  progressMessage.value = "Enter the SMS code from Cal";
+  try {
+    const status = await fetchCalJobStatus(id, auth.token || undefined);
+    applyJobStatus(status);
+    if (status.status === "otp_required") startPolling(id);
+  } catch (e) {
+    statusError.value = e instanceof Error ? e.message : String(e);
+  }
+}
+
 async function loadStatus() {
   stopPolling();
   statusError.value = "";
   progressMessage.value = "";
-  progressLogs.value = [];
   step.value = "loading";
   try {
     const status = await fetchCalStatus(auth.token || undefined);
@@ -156,20 +156,15 @@ async function beginSync() {
   statusError.value = "";
   otpCode.value = "";
   jobId.value = null;
-  progressMessage.value = sessionSaved.value
-    ? "Using saved Cal session…"
-    : "Connecting to Cal…";
-  progressLogs.value = [];
-  step.value = "loading";
   try {
     const result = await startCalSync(auth.token || undefined);
     jobId.value = result.jobId;
-    progressMessage.value = sessionSaved.value
-      ? "Using saved Cal session…"
-      : "Waiting for SMS from Cal…";
-    startPolling(result.jobId);
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
-    applyJobStatus(initial);
+    if (initial.status === "otp_required") {
+      applyJobStatus(initial);
+      return;
+    }
+    handOffToBackground(result.jobId);
   } catch (e) {
     submitting.value = false;
     statusError.value = e instanceof Error ? e.message : String(e);
@@ -197,10 +192,14 @@ function close() {
 }
 
 watch(
-  () => props.open,
-  (open) => {
-    if (open) void loadStatus();
-    else stopPolling();
+  () => [props.open, props.resumeJobId] as const,
+  ([open, resumeJobId]) => {
+    if (!open) {
+      stopPolling();
+      return;
+    }
+    if (resumeJobId) void resumeOtpJob(resumeJobId);
+    else void loadStatus();
   },
   { immediate: true },
 );
@@ -214,12 +213,7 @@ onBeforeUnmount(stopPolling);
       <h3>Sync with Cal</h3>
 
       <template v-if="step === 'loading'">
-        <p class="upload-type-hint">{{ progressMessage || "Connecting to Cal…" }}</p>
-        <ul v-if="recentLogs.length" class="cal-sync-log" aria-live="polite">
-          <li v-for="(entry, i) in recentLogs" :key="`${entry.at}-${i}`">
-            {{ entry.message }}
-          </li>
-        </ul>
+        <p class="upload-type-hint">Checking Cal sync…</p>
       </template>
 
       <template v-else-if="step === 'credentials'">
@@ -251,18 +245,8 @@ onBeforeUnmount(stopPolling);
       <template v-else-if="step === 'otp'">
         <p class="upload-type-hint">
           <template v-if="maskedId">Account {{ maskedId }} — </template>
-          <template v-if="sessionSaved && !jobId">
-            Saved session found — sync should skip SMS unless it expired.
-          </template>
-          <template v-else>
-            {{ progressMessage || "Enter the SMS code from Cal." }}
-          </template>
+          {{ progressMessage || "Enter the SMS code from Cal." }}
         </p>
-        <ul v-if="recentLogs.length && !submitting" class="cal-sync-log" aria-live="polite">
-          <li v-for="(entry, i) in recentLogs" :key="`${entry.at}-${i}`">
-            {{ entry.message }}
-          </li>
-        </ul>
         <form class="cal-otp-form" @submit.prevent="submitOtp">
           <label class="cal-field">
             <span>SMS code</span>
@@ -331,19 +315,6 @@ onBeforeUnmount(stopPolling);
   margin-top: 0.75rem;
   color: var(--danger, #c0392b);
   font-size: 0.9rem;
-}
-
-.cal-sync-log {
-  margin: 0.75rem 0 0;
-  padding-left: 1.1rem;
-  font-size: 0.8rem;
-  opacity: 0.75;
-  max-height: 8rem;
-  overflow-y: auto;
-}
-
-.cal-sync-log li {
-  margin: 0.15rem 0;
 }
 
 .cal-otp-form {
