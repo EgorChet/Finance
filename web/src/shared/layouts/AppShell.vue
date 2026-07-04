@@ -337,8 +337,8 @@
 
     <CalSyncDialog
       :open="calSyncOpen"
+      :resume-job-id="calSyncResumeJobId"
       @close="onCalSyncDialogClose"
-      @starting="onCalSyncStarting"
       @background="onCalSyncBackground"
       @error="onCalSyncError"
     />
@@ -489,6 +489,7 @@ const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
 const calSyncOpen = ref(false);
+const calSyncResumeJobId = ref<string | null>(null);
 const calSyncEnabled = ref(false);
 const calSessionSaved = ref(false);
 const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
@@ -762,7 +763,22 @@ async function pollCalSyncBackground(jobId: string) {
       return;
     }
 
-    if (status.status === "otp_required" || status.status === "logging_in") {
+    if (status.status === "otp_required") {
+      if (calSyncBgMode !== "auto") {
+        stopCalSyncBackground();
+        calSyncFloat.value = null;
+        calSyncResumeJobId.value = jobId;
+        calSyncOpen.value = true;
+        return;
+      }
+      calSyncFloat.value = {
+        message: status.message?.trim() || "Signing in with Cal…",
+        state: "syncing",
+      };
+      return;
+    }
+
+    if (status.status === "logging_in") {
       calSyncFloat.value = {
         message: status.message?.trim() || "Signing in with Cal…",
         state: "syncing",
@@ -839,11 +855,13 @@ async function resumeCalSyncIfNeeded() {
 
 function onCalSyncDialogClose() {
   calSyncOpen.value = false;
+  calSyncResumeJobId.value = null;
 }
 
 function openCalClassicSync() {
   closeNav();
   if (!calSyncEnabled.value || auth.isDemo) return;
+  calSyncResumeJobId.value = null;
   calSyncOpen.value = true;
 }
 

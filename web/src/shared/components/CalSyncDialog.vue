@@ -13,11 +13,11 @@ const auth = useAuthStore();
 
 const props = defineProps<{
   open: boolean;
+  resumeJobId?: string | null;
 }>();
 
 const emit = defineEmits<{
   close: [];
-  starting: [];
   background: [jobId: string];
   error: [message: string];
 }>();
@@ -54,6 +54,10 @@ function handOffToBackground(id: string) {
   emit("close");
 }
 
+function shouldHandOff(status: string): boolean {
+  return status === "logging_in" || status === "scraping" || status === "saving" || status === "done";
+}
+
 function applyJobStatus(status: {
   status: string;
   message: string | null;
@@ -65,13 +69,10 @@ function applyJobStatus(status: {
     step.value = "otp";
     submitting.value = false;
     progressMessage.value = status.message || "Enter the SMS code from Cal";
-    stopPolling();
     return;
   }
-  if (status.status === "logging_in" || status.status === "scraping" || status.status === "saving") {
-    if (otpSubmitted.value && jobId.value) {
-      handOffToBackground(jobId.value);
-    }
+  if (shouldHandOff(status.status)) {
+    if (jobId.value) handOffToBackground(jobId.value);
     return;
   }
   if (status.status === "error") {
@@ -85,6 +86,14 @@ function applyJobStatus(status: {
 
 function startPolling(id: string) {
   stopPolling();
+  void (async () => {
+    try {
+      const status = await fetchCalJobStatus(id, auth.token || undefined);
+      applyJobStatus(status);
+    } catch (e) {
+      statusError.value = e instanceof Error ? e.message : String(e);
+    }
+  })();
   pollTimer = setInterval(() => {
     void (async () => {
       try {
@@ -97,6 +106,27 @@ function startPolling(id: string) {
       }
     })();
   }, 1000);
+}
+
+async function resumeOtpJob(id: string) {
+  stopPolling();
+  statusError.value = "";
+  otpCode.value = "";
+  otpSubmitted.value = false;
+  jobId.value = id;
+  step.value = "otp";
+  submitting.value = false;
+  progressMessage.value = "Enter the SMS code from Cal";
+  try {
+    const status = await fetchCalStatus(auth.token || undefined);
+    maskedId.value = status.national_id_masked;
+    const job = await fetchCalJobStatus(id, auth.token || undefined);
+    applyJobStatus(job);
+    if (job.status === "otp_required") startPolling(id);
+    else if (shouldHandOff(job.status) && jobId.value) handOffToBackground(jobId.value);
+  } catch (e) {
+    statusError.value = e instanceof Error ? e.message : String(e);
+  }
 }
 
 async function loadStatus() {
@@ -146,21 +176,18 @@ async function beginSync() {
   otpCode.value = "";
   otpSubmitted.value = false;
   jobId.value = null;
-  emit("starting");
+  step.value = "loading";
   try {
     const result = await startCalSync(auth.token || undefined, "classic");
     jobId.value = result.jobId;
     const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
-    if (initial.status === "otp_required") {
-      applyJobStatus(initial);
-      startPolling(result.jobId);
+    applyJobStatus(initial);
+    if (initial.status === "error") return;
+    if (shouldHandOff(initial.status) && jobId.value) {
+      handOffToBackground(jobId.value);
       return;
     }
-    if (initial.status === "error") {
-      applyJobStatus(initial);
-      return;
-    }
-    handOffToBackground(result.jobId);
+    startPolling(result.jobId);
   } catch (e) {
     submitting.value = false;
     statusError.value = e instanceof Error ? e.message : String(e);
@@ -189,13 +216,14 @@ function close() {
 }
 
 watch(
-  () => props.open,
-  (open) => {
+  () => [props.open, props.resumeJobId] as const,
+  ([open, resumeJobId]) => {
     if (!open) {
       stopPolling();
       return;
     }
-    void loadStatus();
+    if (resumeJobId) void resumeOtpJob(resumeJobId);
+    else void loadStatus();
   },
   { immediate: true },
 );
@@ -209,7 +237,7 @@ onBeforeUnmount(stopPolling);
       <h3>Sync Cal</h3>
 
       <template v-if="step === 'loading'">
-        <p class="upload-type-hint">Connecting to Cal…</p>
+        <p class="upload-type-hint">{{ progressMessage || "Connecting to Cal…" }}</p>
       </template>
 
       <template v-else-if="step === 'credentials'">
