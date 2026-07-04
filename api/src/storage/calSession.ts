@@ -14,6 +14,8 @@ export interface CalSessionData {
   auth_module: string | null;
   /** Full sessionStorage snapshot from digital-web (preferred over auth_module alone). */
   session_storage?: Record<string, string>;
+  /** Full localStorage from digital-web. */
+  local_storage?: Record<string, string>;
   saved_at: string;
 }
 

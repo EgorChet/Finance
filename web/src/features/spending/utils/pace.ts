@@ -13,7 +13,6 @@ import {
 } from "@/features/household/utils/fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "@/shared/utils/format";
 import { dedupeTransactionSnapshots, filterSpendTransactions } from "@/shared/utils/transaction";
-import { logPaceDebug } from "@/features/spending/utils/paceDebug";
 
 export interface BillingCycle {
   start: Date;
@@ -93,47 +92,6 @@ export interface PaceResult {
   cycleEnd: string;
   dataStale: boolean;
   latestBillingDate: string | null;
-}
-
-export interface PaceDebugCycleRow {
-  cycleStart: string;
-  label: string;
-  dayIndex: number;
-  visaExport: number;
-  configuredFromTxs: number;
-  configuredFromSettings: number;
-  totalAtDay: number;
-}
-
-export interface PaceDebugInfo {
-  includeFixed: boolean;
-  cycleDay: number;
-  dayIndex: number;
-  cycleLength: number;
-  cycleStart: string;
-  cycleEnd: string;
-  configuredChargeSource: { fromApi: number; fromInferred: number; merged: number };
-  configuredChargesUsed: { id: string; name: string; amount: number }[];
-  historicalCycles: PaceDebugCycleRow[];
-  usualAtDayFormula: string;
-  usualAtDay: number;
-  current: {
-    source: "override" | "manual" | "bucket";
-    total: number;
-    note: string;
-  };
-  projection: {
-    projectedEveryday: number;
-    usualAtDayBaseline: number;
-    secondHalfMultiplier: number;
-    projectedTotal: number;
-    projectedAtUsualPaceForecast: number;
-    structuralConfiguredAtDay: number;
-    structuralConfiguredFullCycle: number;
-    adjustedUsualFullMonth: number;
-    visaRatio: number | null;
-    formula: string;
-  };
 }
 
 function parseIsoDate(dateStr: string): Date {
@@ -371,32 +329,6 @@ function mergeConfiguredChargeLists(
   const byId = new Map(inferred.map((c) => [c.id, c]));
   for (const charge of primary) byId.set(charge.id, charge);
   return [...byId.values()];
-}
-
-function everydaySpendBreakdownAtDay(
-  bucket: CycleBucket,
-  dayIndex: number,
-  charges: ConfiguredCharge[],
-  cycleDay: number,
-): {
-  visaExport: number;
-  configuredFromTxs: number;
-  configuredFromSettings: number;
-  total: number;
-} {
-  const visaExport = statementEverydayAtDay(bucket, dayIndex);
-  const { fromTxs, fromSettings } = configuredEverydayBreakdownForBucket(
-    bucket,
-    dayIndex,
-    charges,
-    cycleDay,
-  );
-  return {
-    visaExport,
-    configuredFromTxs: fromTxs,
-    configuredFromSettings: fromSettings,
-    total: roundMoney(visaExport + fromTxs + fromSettings),
-  };
 }
 
 function everydaySpendAtDay(
@@ -959,10 +891,6 @@ export function computePace(
 
   let projectedTotal: number;
   let adjustedUsualFullMonth = historicalFullCycleEverydayAvg;
-  let structuralConfiguredAtDay = 0;
-  let structuralConfiguredFullCycle = 0;
-  let visaRatio: number | null = null;
-  let projectionFormula = "";
 
   if (!includeFixed && historicalFullCycleEverydayAvg > 0 && compareAvg > 0 && currentSpend > 0) {
     const adjusted = projectEverydayWithStructuralAdjustment({
@@ -976,19 +904,10 @@ export function computePace(
     });
     projectedTotal = adjusted.projectedTotal;
     adjustedUsualFullMonth = adjusted.adjustedUsualFullMonth;
-    structuralConfiguredAtDay = adjusted.structuralAtDay;
-    structuralConfiguredFullCycle = adjusted.structuralFullCycle;
-    visaRatio = adjusted.visaRatio;
-    projectionFormula =
-      visaRatio != null
-        ? `Visa pace ×${visaRatio} on historical Visa avg + ₪${currentConfiguredFullCycle} extras this cycle`
-        : `Adjusted usual ₪${adjustedUsualFullMonth} × behavioral pace`;
   } else if (includeFixed) {
     projectedTotal = roundMoney(projectionFixed + projectedEveryday);
-    projectionFormula = `Fixed ₪${projectionFixed} + extrapolated everyday`;
   } else {
     projectedTotal = projectedEveryday;
-    projectionFormula = "Extrapolated everyday from current variable spend";
   }
 
   const projectedOtherFixed = roundMoney(Math.max(0, projectionFixed - configuredMonthlyBills));
@@ -1030,93 +949,6 @@ export function computePace(
   const dataStale = latestBilling
     ? parseIsoDate(latestBilling) < cycle.start
     : false;
-
-  const historicalDebugCycles: PaceDebugCycleRow[] = usedSnapshots.map((s) => {
-    const cycleStart = isoDate(s.start);
-    if (!includeFixed) {
-      const breakdown = everydaySpendBreakdownAtDay(
-        s.bucket,
-        cycle.dayIndex,
-        historicalConfiguredCharges,
-        cycleDay,
-      );
-      return {
-        cycleStart,
-        label: billingCycleLabel(cycleStart),
-        dayIndex: cycle.dayIndex,
-        visaExport: breakdown.visaExport,
-        configuredFromTxs: breakdown.configuredFromTxs,
-        configuredFromSettings: breakdown.configuredFromSettings,
-        totalAtDay: breakdown.total,
-      };
-    }
-    return {
-      cycleStart,
-      label: billingCycleLabel(cycleStart),
-      dayIndex: cycle.dayIndex,
-      visaExport: roundMoney(s.total),
-      configuredFromTxs: 0,
-      configuredFromSettings: 0,
-      totalAtDay: roundMoney(s.total),
-    };
-  });
-
-  const usualParts = historicalDebugCycles.map((row) => row.totalAtDay);
-  const usualFormula =
-    usualParts.length > 0
-      ? `(${usualParts.map((v) => v.toFixed(2)).join(" + ")}) / ${usualParts.length}`
-      : "no completed cycles";
-
-  let currentSource: PaceDebugInfo["current"]["source"] = "bucket";
-  let currentNote = "Summed from transactions in the current billing cycle.";
-  if (options.statementSpendOverride != null) {
-    currentSource = "override";
-    currentNote = "Everyday spending tile total (Visa export + extra charges).";
-  } else if (manualEveryday !== null) {
-    currentSource = "manual";
-    currentNote = "Manual everyday entry for this cycle.";
-  }
-
-  const debug: PaceDebugInfo = {
-    includeFixed,
-    cycleDay,
-    dayIndex: cycle.dayIndex,
-    cycleLength: cycle.cycleLength,
-    cycleStart: cycleStartIso,
-    cycleEnd: cycleEndIso,
-    configuredChargeSource: {
-      fromApi: apiConfiguredCharges.length,
-      fromInferred: inferredConfiguredCharges.length,
-      merged: configuredList.length,
-    },
-    configuredChargesUsed: configuredList
-      .filter(isConfiguredEverydayCharge)
-      .map((c) => ({ id: c.id, name: c.name_en, amount: c.amount })),
-    historicalCycles: historicalDebugCycles,
-    usualAtDayFormula: usualFormula,
-    usualAtDay: historicalAvgAtDay,
-    current: {
-      source: currentSource,
-      total: currentSpend,
-      note: currentNote,
-    },
-    projection: {
-      projectedEveryday,
-      usualAtDayBaseline,
-      secondHalfMultiplier,
-      projectedTotal,
-      projectedAtUsualPaceForecast,
-      structuralConfiguredAtDay,
-      structuralConfiguredFullCycle,
-      adjustedUsualFullMonth,
-      visaRatio,
-      formula: !includeFixed
-        ? projectionFormula || `Extrapolate usual ₪${usualAtDayBaseline} at day ${cycle.dayIndex}`
-        : projectionFormula || `Fixed ₪${projectionFixed} + extrapolated everyday`,
-    },
-  };
-
-  logPaceDebug(debug);
 
   return {
     currentSpend,

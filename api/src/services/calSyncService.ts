@@ -13,7 +13,10 @@ const JOB_IDLE_TTL_MS = 10 * 60 * 1000;
 const JOB_MAX_AGE_MS = 20 * 60 * 1000;
 const OTP_WAIT_MS = 3 * 60 * 1000;
 const PHASE_TIMEOUT_MS = 180_000;
-const DASHBOARD_TIMEOUT_MS = 150_000;
+const DASHBOARD_TIMEOUT_MS = 60_000;
+const RESTORE_TIMEOUT_MS = 40_000;
+const DASHBOARD_SELECTORS =
+  ".cardDebitsTransactions-main, .last4digits, app-card-in-debits-transactions, .cardInDeatailsTransactions";
 const MAX_LOG_LINES = 80;
 
 const USER_AGENT =
@@ -266,15 +269,15 @@ async function fillOtp(page: Page, job: CalSyncJob, code: string): Promise<void>
   });
 }
 
-const DASHBOARD_READY_SELECTORS =
-  ".cardDebitsTransactions-main, .last4digits, app-card-in-debits-transactions, .cardInDeatailsTransactions";
-
 async function dashboardReady(page: Page): Promise<boolean> {
-  return findOnPageOrFrames(page, DASHBOARD_READY_SELECTORS);
+  return findOnPageOrFrames(page, DASHBOARD_SELECTORS);
 }
 
 async function isLoggedIn(page: Page): Promise<boolean> {
-  return dashboardReady(page);
+  if (await dashboardReady(page)) return true;
+  // Token alone means login finished (post-OTP), not that the SPA rendered.
+  if (/digital-web/i.test(page.url()) && (await hasAuthToken(page))) return true;
+  return false;
 }
 
 async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean> {
@@ -293,39 +296,102 @@ async function findOnPageOrFrames(page: Page, selector: string): Promise<boolean
   return false;
 }
 
-async function readSessionStorage(page: Page): Promise<Record<string, string>> {
+async function readBrowserStorage(page: Page): Promise<{
+  session_storage: Record<string, string>;
+  local_storage: Record<string, string>;
+}> {
+  return page.evaluate(() => {
+    const session_storage: Record<string, string> = {};
+    const local_storage: Record<string, string> = {};
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key != null) session_storage[key] = sessionStorage.getItem(key) ?? "";
+    }
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key != null) local_storage[key] = localStorage.getItem(key) ?? "";
+    }
+    return { session_storage, local_storage };
+  });
+}
+
+async function captureAllCookies(page: Page): Promise<Cookie[]> {
   try {
-    return await page.evaluate(() => {
-      const out: Record<string, string> = {};
-      for (let i = 0; i < sessionStorage.length; i += 1) {
-        const key = sessionStorage.key(i);
-        if (!key) continue;
-        const value = sessionStorage.getItem(key);
-        if (value != null) out[key] = value;
-      }
-      return out;
-    });
+    const cdp = await page.createCDPSession();
+    const { cookies } = await cdp.send("Network.getAllCookies");
+    return cookies
+      .filter((c) => /cal-online/i.test(c.domain))
+      .map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        expires: c.expires,
+        size: c.size,
+        httpOnly: c.httpOnly,
+        secure: c.secure,
+        session: c.session,
+        sameSite: c.sameSite as Cookie["sameSite"],
+      }));
   } catch {
-    return {};
+    return page.cookies(DIGITAL_URL, LOGIN_URL);
   }
 }
 
-async function writeSessionStorage(page: Page, items: Record<string, string>): Promise<void> {
-  if (!Object.keys(items).length) return;
-  await page.evaluate((entries) => {
-    for (const [key, value] of Object.entries(entries)) {
-      sessionStorage.setItem(key, value);
+async function applyCookies(page: Page, cookies: Cookie[], job: CalSyncJob): Promise<void> {
+  let ok = 0;
+  let failed = 0;
+  for (const cookie of cookies) {
+    try {
+      const url = /digital-web/i.test(cookie.domain || "") ? DIGITAL_URL : LOGIN_URL;
+      await page.setCookie({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path || "/",
+        ...(cookie.expires && cookie.expires > 0 ? { expires: cookie.expires } : {}),
+        httpOnly: cookie.httpOnly,
+        secure: cookie.secure,
+        ...(cookie.sameSite ? { sameSite: cookie.sameSite } : {}),
+        url,
+      });
+      ok += 1;
+    } catch {
+      failed += 1;
     }
-  }, items);
+  }
+  jobLog(job, failed ? `Restored ${ok} cookies (${failed} skipped)` : `Restored ${ok} cookies`);
+}
+
+function sessionStorageFrom(session: CalSessionData): Record<string, string> {
+  if (session.session_storage && Object.keys(session.session_storage).length > 0) {
+    return session.session_storage;
+  }
+  if (session.auth_module) return { "auth-module": session.auth_module };
+  return {};
+}
+
+async function pageDiagnostics(page: Page): Promise<string> {
+  let title = "(unknown)";
+  try {
+    title = await page.title();
+  } catch {
+    /* ignore */
+  }
+  const token = await hasAuthToken(page);
+  const loginForm = await loginFormVisible(page);
+  const dash = await dashboardReady(page);
+  return `url=${page.url()} title=${JSON.stringify(title)} token=${token} loginForm=${loginForm} dashboard=${dash}`;
 }
 
 async function captureCalSession(page: Page): Promise<CalSessionData> {
-  const cookies = await page.cookies();
-  const session_storage = await readSessionStorage(page);
+  const cookies = await captureAllCookies(page);
+  const { session_storage, local_storage } = await readBrowserStorage(page);
   return {
     cookies,
     auth_module: session_storage["auth-module"] ?? null,
     session_storage,
+    local_storage,
     saved_at: new Date().toISOString(),
   };
 }
@@ -338,7 +404,11 @@ async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
       return;
     }
     await writeCalSession(session);
-    jobLog(job, "Cal session saved for next sync");
+    const storageKeys = Object.keys(session.session_storage ?? {}).length;
+    jobLog(
+      job,
+      `Cal session saved for next sync (${session.cookies.length} cookies, ${storageKeys} session keys)`,
+    );
   } catch (err) {
     jobLog(job, `Could not save Cal session: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -347,39 +417,58 @@ async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
 async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessionData): Promise<boolean> {
   jobLog(job, "Restoring saved Cal session…");
 
-  await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
-  await sleep(1000);
+  const sessionEntries = sessionStorageFrom(session);
+  const localEntries = session.local_storage ?? {};
+  // Inject storage before any page script runs so the SPA boots already authenticated.
+  await page.evaluateOnNewDocument(
+    (sessionStorageEntries: Record<string, string>, localStorageEntries: Record<string, string>) => {
+      for (const [key, value] of Object.entries(sessionStorageEntries)) {
+        window.sessionStorage.setItem(key, value);
+      }
+      for (const [key, value] of Object.entries(localStorageEntries)) {
+        window.localStorage.setItem(key, value);
+      }
+    },
+    sessionEntries,
+    localEntries,
+  );
 
   if (session.cookies.length) {
-    await page.setCookie(...session.cookies);
+    await applyCookies(page, session.cookies, job);
   }
 
-  const storage =
-    session.session_storage && Object.keys(session.session_storage).length
-      ? session.session_storage
-      : session.auth_module
-        ? { "auth-module": session.auth_module }
-        : {};
-  if (Object.keys(storage).length) {
-    await writeSessionStorage(page, storage);
-  }
+  await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
 
-  await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
-  await sleep(2500);
-
-  const deadline = Date.now() + 45_000;
+  jobLog(job, `At ${page.url()} — waiting for dashboard UI…`);
+  const deadline = Date.now() + RESTORE_TIMEOUT_MS;
+  let lastProgressLog = 0;
   while (Date.now() < deadline) {
     if (await dashboardReady(page)) {
       jobLog(job, "Saved session is still valid");
       return true;
     }
-    if (await hasAuthToken(page)) {
-      jobLog(job, "Session token found — waiting for dashboard…");
+    const now = Date.now();
+    if (now - lastProgressLog >= 10_000) {
+      jobLog(
+        job,
+        (await hasAuthToken(page))
+          ? "Session token found — waiting for dashboard…"
+          : "No session token yet — waiting for dashboard…",
+      );
+      lastProgressLog = now;
     }
-    await sleep(1500);
+    await sleep(2000);
   }
 
-  jobLog(job, "Saved session expired");
+  jobLog(job, "Dashboard not ready after restore — reloading once…");
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+  await sleep(5000);
+  if (await dashboardReady(page)) {
+    jobLog(job, "Saved session is still valid");
+    return true;
+  }
+
+  jobLog(job, `Saved session could not restore dashboard (${await pageDiagnostics(page)})`);
   return false;
 }
 
@@ -508,6 +597,11 @@ function createOtpPromise(job: CalSyncJob): Promise<string> {
 }
 
 async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
+  if (await dashboardReady(page)) {
+    jobLog(job, "Dashboard ready");
+    return;
+  }
+
   jobLog(job, "Waiting for login to finish…");
   const loginDeadline = Date.now() + 60_000;
   while (Date.now() < loginDeadline) {
@@ -526,34 +620,51 @@ async function waitForDashboard(page: Page, job: CalSyncJob): Promise<void> {
   }
 
   jobLog(job, `At ${page.url()} — waiting for dashboard UI…`);
-  const deadline = Date.now() + DASHBOARD_TIMEOUT_MS;
+  const started = Date.now();
+  const deadline = started + DASHBOARD_TIMEOUT_MS;
+  let lastProgressLog = 0;
+  let reloaded = false;
 
   while (Date.now() < deadline) {
     if (await dashboardReady(page)) {
-      jobLog(job, "Dashboard ready");
+      jobLog(job, reloaded ? "Dashboard ready after reload" : "Dashboard ready");
       return;
     }
-    if (await hasAuthToken(page)) {
-      jobLog(job, "Session token found — waiting for UI…");
-    } else {
-      jobLog(job, "No session token yet…");
+
+    // One reload at the halfway mark, still within the 60s budget.
+    if (
+      !reloaded &&
+      Date.now() - started >= DASHBOARD_TIMEOUT_MS / 2 &&
+      (await hasAuthToken(page))
+    ) {
+      const remainingMs = Math.max(5_000, deadline - Date.now());
+      jobLog(job, "Reloading dashboard (token present, UI slow)…");
+      reloaded = true;
+      try {
+        await page.reload({
+          waitUntil: "domcontentloaded",
+          timeout: Math.min(remainingMs, 15_000),
+        });
+      } catch {
+        /* keep polling until deadline */
+      }
+      continue;
+    }
+
+    const now = Date.now();
+    if (now - lastProgressLog >= 10_000) {
+      jobLog(
+        job,
+        (await hasAuthToken(page))
+          ? "Session token found — waiting for UI…"
+          : "No session token yet…",
+      );
+      lastProgressLog = now;
     }
     await sleep(2000);
   }
 
-  if (await hasAuthToken(page)) {
-    jobLog(job, "Reloading dashboard (token present, UI slow)…");
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
-    await sleep(5000);
-    try {
-      await page.waitForSelector(DASHBOARD_READY_SELECTORS, { visible: true, timeout: 60_000 });
-      jobLog(job, "Dashboard ready after reload");
-      return;
-    } catch {
-      /* fall through */
-    }
-  }
-
+  jobLog(job, `Dashboard timeout (${await pageDiagnostics(page)})`);
   throw new Error(`Cal dashboard did not load after login (${page.url()})`);
 }
 
@@ -798,7 +909,10 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
       const savedSession = await readCalSession();
       if (savedSession) {
         loggedIn = await restoreCalSession(page, job, savedSession);
-        if (!loggedIn) await clearCalSession();
+        if (!loggedIn) {
+          await clearCalSession();
+          jobLog(job, "Saved session cleared — signing in with SMS");
+        }
       }
       if (!loggedIn) {
         await performCalLogin(page, job, creds);
@@ -812,6 +926,9 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     const exported = await exportTransactionsExcel(page, job, creds.card_last4);
     job.xlsxBuffer = exported.buffer;
     job.xlsxFilename = exported.filename;
+
+    // Refresh saved session after export in case cookies/tokens rotated.
+    await persistCalSession(page, job);
 
     job.status = "saving";
     jobLog(job, "Saving statement…");
