@@ -568,7 +568,7 @@ async function buildLocalCycleReport(monthKey: string): Promise<SpendingReport> 
   const { end } = getCycleRangeForStart(start, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
   const statementAt = partial?.saved_at ?? null;
-  let txs = paceReport.value?.transactions ?? [];
+  let txs: Transaction[] = [];
   let hasPartialData = false;
   if (partial) {
     const partialReport = await loadPartialReport(partial.key);

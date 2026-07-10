@@ -66,7 +66,7 @@ import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/ho
 import { usePortfolioStore } from "@/shared/stores/portfolio";
 import { useCalendarDataStore } from "@/shared/stores/viewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
-import type { CalendarEvent, MonthItem, SpendingReport } from "@/shared/types";
+import type { CalendarEvent, MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
@@ -253,7 +253,7 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   const { end } = getCycleRangeForStart(start, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
   const statementAt = partial?.saved_at ?? null;
-  let txs = paceReport.value?.transactions ?? [];
+  let txs: Transaction[] = [];
   let hasPartialData = false;
   if (partial) {
     try {
@@ -261,7 +261,7 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
       txs = partialReport.transactions;
       hasPartialData = true;
     } catch {
-      /* use pace txs */
+      /* no partial snapshot — show manual spend only */
     }
   }
   pruneStaleManualCycleSpend(start, {
