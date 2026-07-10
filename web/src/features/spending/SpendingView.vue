@@ -96,6 +96,7 @@
       :partial-total-spend="partialTotalSpend"
       :reference-date="refDate"
       :cycle-day="cycleDay"
+      :cycle-start="activeCycleStart"
       :living-budget="resolvedLivingBudget"
       :living-budget-base="livingBudgetBaseAmount"
       :living-budget-topup="livingBudgetTopupExtra"
@@ -456,7 +457,7 @@ const cycleEverydaySpend = computed(() => {
 
 const summaryPaceTone = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
-  const start = cycleStartForDate(refDate.value, cycleDay.value);
+  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
   const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
   return computeLivePaceHealth({
     transactions: paceTransactions.value,

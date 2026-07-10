@@ -135,6 +135,25 @@ export function cycleStartForDate(date: Date, cycleDay: number): string {
   return isoDate(getBillingCycle(date, cycleDay).start);
 }
 
+/** Day index and length for a specific billing cycle, capping at cycle end once it has closed. */
+export function billingCycleProgress(
+  cycleStart: string,
+  cycleDay: number,
+  today = new Date(),
+): { dayIndex: number; cycleLength: number; start: string; end: string } {
+  const anchor = parseIsoDate(cycleStart);
+  const cycle = getBillingCycle(anchor, cycleDay);
+  const start = isoDate(cycle.start);
+  const end = isoDate(cycle.end);
+  const endDate = cycle.end;
+  const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const effectiveDate =
+    todayNorm > endDate ? endDate : todayNorm < cycle.start ? cycle.start : todayNorm;
+  const dayIndex = Math.max(1, daysBetween(cycle.start, effectiveDate) + 1);
+  const cycleLength = daysBetween(cycle.start, cycle.end) + 1;
+  return { dayIndex, cycleLength, start, end };
+}
+
 /** e.g. 13 Jun → 14 May (tomorrow's calendar day, one month earlier). */
 export function previousMonthTomorrowDate(today: Date): Date {
   const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -573,6 +592,8 @@ export function computePace(
     statementSpendOverride?: number | null;
     /** Everyday portion for projection when override total includes fixed categories. */
     statementVariableOverride?: number | null;
+    /** Billing cycle being viewed (defaults to the cycle containing today). */
+    cycleStart?: string;
   } = {},
 ): PaceResult | null {
   const cycleDay = options.cycleDay ?? 10;
@@ -580,16 +601,20 @@ export function computePace(
   const today = options.today ?? new Date();
   const todayNorm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const cycle = getBillingCycle(todayNorm, cycleDay);
-  const currentKey = cycleKey(cycle.start);
+  const viewedCycleStart = options.cycleStart ?? cycleStartForDate(todayNorm, cycleDay);
+  const { dayIndex, cycleLength, start: cycleStartIso, end: cycleEndIso } = billingCycleProgress(
+    viewedCycleStart,
+    cycleDay,
+    todayNorm,
+  );
+  const cycleStartDate = parseIsoDate(cycleStartIso);
+  const currentKey = cycleStartIso;
   const apiConfiguredCharges = options.configuredCharges ?? [];
   const inferredConfiguredCharges = inferConfiguredChargesFromTransactions([
     ...transactions,
     ...(options.cycleTransactions ?? []),
   ]);
   const configuredList = mergeConfiguredChargeLists(apiConfiguredCharges, inferredConfiguredCharges);
-  const cycleStartIso = isoDate(cycle.start);
-  const cycleEndIso = isoDate(cycle.end);
   /** Per-cycle extras from settings (real from_month) — not inferred charges with fake dates. */
   const historicalConfiguredCharges = apiConfiguredCharges;
 
@@ -623,9 +648,9 @@ export function computePace(
       if (key === currentKey) continue;
       if (bucket.end >= todayNorm) continue;
       const total = !includeFixed
-        ? everydaySpendAtDay(bucket, cycle.dayIndex, historicalConfiguredCharges, cycleDay)
-        : spendAtDay(bucket, cycle.dayIndex).total;
-      const atDay = spendAtDay(bucket, cycle.dayIndex);
+        ? everydaySpendAtDay(bucket, dayIndex, historicalConfiguredCharges, cycleDay)
+        : spendAtDay(bucket, dayIndex).total;
+      const atDay = spendAtDay(bucket, dayIndex);
       if (total > 0 || bucket.txs.length > 0) {
         rows.push({
           start: bucket.start,
@@ -651,8 +676,8 @@ export function computePace(
   const historicalFixedAtDay = usedSnapshots.map((s) => s.fixed);
   const historicalVariableAtDay = usedSnapshots.map((s) => roundMoney(s.total - s.fixed));
 
-  const fixedBreakdown = averageBreakdown(usedBuckets, cycle.dayIndex, "fixed", cyclesUsed);
-  const variableBreakdown = averageBreakdown(usedBuckets, cycle.dayIndex, "variable", cyclesUsed);
+  const fixedBreakdown = averageBreakdown(usedBuckets, dayIndex, "fixed", cyclesUsed);
+  const variableBreakdown = averageBreakdown(usedBuckets, dayIndex, "variable", cyclesUsed);
   const recentCycles: PaceCycleSnapshot[] = usedSnapshots.map((s) => ({
     cycleStart: isoDate(s.start),
     label: billingCycleLabel(isoDate(s.start)),
@@ -759,7 +784,7 @@ export function computePace(
       currentFixedAtDay = 0;
     }
   } else if (currentBucket) {
-    const atDay = spendAtDay(currentBucket, cycle.dayIndex);
+    const atDay = spendAtDay(currentBucket, dayIndex);
     if (includeFixed) {
       currentFixedAtDay = atDay.fixed;
       currentVariableAtDay = roundMoney(atDay.total - atDay.fixed);
@@ -780,14 +805,14 @@ export function computePace(
   const calibrationSnapshots = historicalSnapshots.slice(0, SECOND_HALF_CALIBRATION_CYCLES);
   const calibrationBuckets = calibrationSnapshots.map((s) => s.bucket);
   const { multiplier: secondHalfMultiplier, fromHistory: secondHalfFromHistory } =
-    calibrateSecondHalfMultiplier(calibrationBuckets, cycle.cycleLength);
+    calibrateSecondHalfMultiplier(calibrationBuckets, cycleLength);
 
   const projectedVariable =
-    cycle.dayIndex > 0
+    dayIndex > 0
       ? projectVariableWithCycleShape(
           currentVariableAtDay,
-          cycle.dayIndex,
-          cycle.cycleLength,
+          dayIndex,
+          cycleLength,
           secondHalfMultiplier,
         )
       : currentVariableAtDay;
@@ -822,8 +847,8 @@ export function computePace(
   function extrapolateHistoricalVariable(spendAtDay: number): number {
     return extrapolateToFullCycle(
       spendAtDay,
-      cycle.dayIndex,
-      cycle.cycleLength,
+      dayIndex,
+      cycleLength,
       secondHalfMultiplier,
     );
   }
@@ -847,7 +872,7 @@ export function computePace(
     !includeFixed && usedSnapshots.length > 0
       ? averageConfiguredEverydayAtDay(
           usedSnapshots,
-          cycle.dayIndex,
+          dayIndex,
           historicalConfiguredCharges,
           cycleDay,
         )
@@ -868,7 +893,7 @@ export function computePace(
   const currentConfiguredAtDay = !includeFixed
     ? currentConfiguredEverydayAtDay(
         currentBucket,
-        cycle.dayIndex,
+        dayIndex,
         cycleStartIso,
         cycleEndIso,
         configuredList,
@@ -879,7 +904,7 @@ export function computePace(
     ? configuredEverydayFromConfigAtDay(
         cycleStartIso,
         cycleEndIso,
-        cycle.cycleLength,
+        cycleLength,
         configuredList,
         cycleDay,
       )
@@ -947,7 +972,7 @@ export function computePace(
 
   const latestBilling = options.latestBillingDate ?? null;
   const dataStale = latestBilling
-    ? parseIsoDate(latestBilling) < cycle.start
+    ? parseIsoDate(latestBilling) < cycleStartDate
     : false;
 
   return {
@@ -957,8 +982,8 @@ export function computePace(
     manualEverydaySpend: manualEveryday,
     configuredChargesTotal,
     configuredCharges,
-    dayIndex: cycle.dayIndex,
-    cycleLength: cycle.cycleLength,
+    dayIndex,
+    cycleLength,
     historicalAvgAtDay,
     historicalAvgFixedAtDay,
     historicalAvgVariableAtDay,
@@ -989,8 +1014,8 @@ export function computePace(
     secondHalfMultiplier,
     secondHalfFromHistory,
     secondHalfCalibrationCycles: SECOND_HALF_CALIBRATION_CYCLES,
-    cycleStart: isoDate(cycle.start),
-    cycleEnd: isoDate(cycle.end),
+    cycleStart: cycleStartIso,
+    cycleEnd: cycleEndIso,
     dataStale,
     latestBillingDate: latestBilling,
   };

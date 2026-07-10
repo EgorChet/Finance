@@ -2,10 +2,10 @@ import type { Transaction } from "@/shared/types";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "@/features/household/utils/livingBudget";
 import {
+  billingCycleProgress,
   computePace,
   cycleStartForDate,
   effectiveManualCycleSpend,
-  getBillingCycle,
   loadPaceAvgCycles,
   type PaceAvgCycles,
 } from "@/features/spending/utils/pace";
@@ -39,8 +39,8 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
   if (livingBudget == null || livingBudget <= 0) return null;
 
   const norm = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
-  const cycle = getBillingCycle(norm, cycleDay);
   const cycleStart = options.cycleStart ?? cycleStartForDate(norm, cycleDay);
+  const progress = billingCycleProgress(cycleStart, cycleDay, referenceDate);
 
   const statementOverride =
     options.cycleEverydaySpend != null && options.cycleEverydaySpend > 0
@@ -58,6 +58,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
     statementSpendOverride: statementOverride,
     statementVariableOverride: statementOverride,
     today: referenceDate,
+    cycleStart,
   });
 
   if (!pace || pace.historicalAvgAtDay <= 0 || pace.currentSpend <= 0) return null;
@@ -73,7 +74,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
       allTransactions: transactions,
       cycleStart,
       cycleDay,
-      dayIndex: cycle.dayIndex,
+      dayIndex: progress.dayIndex,
       budgetSegments: options.budgetSegments ?? [],
       budgetMonthTopups: options.budgetMonthTopups ?? [],
       configuredCharges: options.configuredCharges ?? [],

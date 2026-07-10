@@ -144,6 +144,15 @@ const isPartialCycle = computed(() => {
   return cycleNeedsOpenTab(start, cycleDay.value, months.value);
 });
 
+const activeCycleStart = computed((): string | null => {
+  const key = currentMonthKey.value;
+  if (!key) return null;
+  if (isCycleMonthKey(key)) return cycleStartFromMonthKey(key);
+  const month = months.value.find((m) => m.key === key);
+  if (month?.partial) return cycleStartForStatementBilling(month.billing_date, cycleDay.value);
+  return null;
+});
+
 const livingBudgetAmount = computed(() =>
   resolveLivingBudgetAmount(
     currentMonthKey.value,
@@ -179,7 +188,7 @@ const showPaceHealth = computed(() => {
 
 const summaryPaceTone = computed(() => {
   if (!showPaceHealth.value || !spendingReport.value) return null;
-  const start = cycleStartForDate(refDate.value, cycleDay.value);
+  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
   const partial = findPartialMonth(months.value, start, cycleDay.value);
   const statementAt = partial?.saved_at ?? null;
   const hasStatementSpend = everydaySpendingTotal(spendingReport.value.transactions) > 0;
