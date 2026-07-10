@@ -8,6 +8,10 @@ import type {
   Transaction,
 } from "../types.js";
 import { monthLabelFromIso } from "../utils/dates.js";
+import {
+  billingCycleLabelFromIso,
+  inferBillingDateFromTransactions,
+} from "../utils/billingCycle.js";
 import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyExclusions } from "./exclusions.js";
@@ -98,8 +102,31 @@ export async function persistFinalizedStatementAsync(
 }
 
 function billingKey(dateStr: string | undefined): string {
-  if (!dateStr) return "unknown";
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return "unknown";
   return dateStr.slice(0, 10);
+}
+
+function resolveReportBillingDate(report: SpendingReport): string | undefined {
+  const raw = report.metadata.billing_date as string | undefined;
+  if (raw && /^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const inferred = inferBillingDateFromTransactions(report.transactions);
+  if (inferred) {
+    report.metadata.billing_date = inferred;
+    return inferred;
+  }
+  return undefined;
+}
+
+/** Drop a stale statement bucket when the same file is re-saved under the correct billing key. */
+export function removeStatementByKeyIfHash(
+  data: StatementsData,
+  key: string,
+  fileHash: string,
+): void {
+  const entry = data.statements[key];
+  if (entry?.file_hash === fileHash) {
+    delete data.statements[key];
+  }
 }
 
 function monthLabel(dateStr: string): string {
@@ -112,10 +139,13 @@ export function monthCatalog(data: StatementsData): MonthCatalogItem[] {
     .map((key) => {
       const entry = data.statements[key];
       const billing = entry.report.metadata.billing_date as string | undefined;
+      const billingIso = billing && /^\d{4}-\d{2}-\d{2}/.test(billing) ? billing.slice(0, 10) : key;
+      const cycleLabel =
+        billingIso !== "unknown" ? billingCycleLabelFromIso(billingIso) : entry.month_label || "Unknown cycle";
       return {
         key,
-        label: entry.month_label || monthLabel(billing || key),
-        billing_date: billing || key,
+        label: entry.provisional ? `${cycleLabel} · partial` : cycleLabel,
+        billing_date: billingIso !== "unknown" ? billingIso : billing || key,
         partial: entry.provisional === true,
         saved_at: entry.saved_at,
       };
@@ -331,7 +361,7 @@ export function rememberReport(
   hash: string,
   provisional = false,
 ): string {
-  const billing = report.metadata.billing_date as string | undefined;
+  const billing = resolveReportBillingDate(report);
   const key = billingKey(billing);
   const storedReport: SpendingReport = {
     ...report,
@@ -342,7 +372,7 @@ export function rememberReport(
   };
   data.statements[key] = {
     billing_key: key,
-    month_label: billing ? monthLabel(billing) : "Unknown",
+    month_label: billing ? billingCycleLabelFromIso(billing) : "Unknown cycle",
     source_file: sourceFile,
     source_path: sourcePath,
     file_hash: hash,
@@ -351,6 +381,36 @@ export function rememberReport(
     report: storedReport,
   };
   return key;
+}
+
+/** Move legacy `unknown` buckets onto the inferred billing key (partial exports without header). */
+export function repairMiskeyedStatements(data: StatementsData): number {
+  let repaired = 0;
+  for (const key of [...Object.keys(data.statements)]) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+    const entry = data.statements[key];
+    if (!entry) continue;
+    const report: SpendingReport = {
+      ...entry.report,
+      metadata: { ...entry.report.metadata },
+      transactions: [...entry.report.transactions],
+    };
+    const billing = resolveReportBillingDate(report);
+    if (!billing) continue;
+    const newKey = billingKey(billing);
+    if (newKey === "unknown" || newKey === key) continue;
+    rememberReport(
+      data,
+      report,
+      entry.source_path,
+      entry.source_file,
+      entry.file_hash,
+      entry.provisional === true,
+    );
+    delete data.statements[key];
+    repaired += 1;
+  }
+  return repaired;
 }
 
 export function isCachedFile(data: StatementsData, hash: string): boolean {

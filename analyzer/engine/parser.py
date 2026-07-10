@@ -76,6 +76,33 @@ def _find_header_row(rows: list[tuple]) -> Optional[int]:
     return None
 
 
+def _infer_billing_date_from_transactions(
+    transactions: list[Transaction],
+    cycle_day: int = 10,
+) -> Optional[date]:
+    """Partial exports often omit the Hebrew billing header — infer from latest charge."""
+    if not transactions:
+        return None
+    latest = max(tx.date for tx in transactions)
+    y, m, d = latest.year, latest.month, latest.day
+    if d < cycle_day:
+        if m == 1:
+            y -= 1
+            m = 12
+        else:
+            m -= 1
+    import calendar
+
+    last = calendar.monthrange(y, m)[1]
+    cycle_start = date(y, m, min(cycle_day, last))
+    if cycle_start.month == 12:
+        ny, nm = cycle_start.year + 1, 1
+    else:
+        ny, nm = cycle_start.year, cycle_start.month + 1
+    last2 = calendar.monthrange(ny, nm)[1]
+    return date(ny, nm, min(cycle_day, last2))
+
+
 def _parse_billing_date(rows: list[tuple]) -> Optional[date]:
     pattern = re.compile(r"עסקאות לחיוב ב-(\d{2})/(\d{2})/(\d{4})")
     for row in rows[:10]:
@@ -164,6 +191,9 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
             )
         except (ValueError, TypeError):
             continue
+
+    if billing_date is None and transactions:
+        billing_date = _infer_billing_date_from_transactions(transactions)
 
     metadata = {
         "sheet_name": sheet.title,
