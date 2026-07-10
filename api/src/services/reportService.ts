@@ -417,6 +417,30 @@ export function isCachedFile(data: StatementsData, hash: string): boolean {
   return Object.values(data.statements).some((e) => e.file_hash === hash);
 }
 
+export function findStatementByHash(
+  data: StatementsData,
+  hash: string,
+): { key: string; entry: StatementEntry } | null {
+  for (const [key, entry] of Object.entries(data.statements)) {
+    if (entry.file_hash === hash) {
+      return { key, entry };
+    }
+  }
+  return null;
+}
+
+/** Mark a stored partial statement as final without re-uploading the xlsx. */
+export function promoteStatementToFinal(entry: StatementEntry): void {
+  entry.provisional = false;
+  entry.report = {
+    ...entry.report,
+    metadata: {
+      ...entry.report.metadata,
+      provisional: false,
+    },
+  };
+}
+
 /** Storage keys must be safe path segments — billing dates or legacy buckets like `unknown`. */
 export function isSafeStatementKey(key: string): boolean {
   if (!key || key.length > 64) return false;

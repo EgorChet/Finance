@@ -406,12 +406,21 @@ export async function cancelCalSync(jobId: string, token?: string) {
   return del<{ ok: boolean }>(`${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}`, token);
 }
 
+export interface UploadStatementResult {
+  key?: string;
+  provisional?: boolean;
+  skipped?: boolean;
+  upgraded?: boolean;
+  reason?: string;
+  report?: SpendingReport;
+}
+
 export async function uploadStatement(
   file: File,
   statementType: "partial" | "final",
   token?: string,
   autoTranslate = true,
-) {
+): Promise<UploadStatementResult> {
   const form = new FormData();
   form.append("file", file);
   form.append("auto_translate", String(autoTranslate));

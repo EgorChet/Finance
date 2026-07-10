@@ -982,10 +982,21 @@ async function runUpload(file: File, statementType: "partial" | "final") {
       }
     }
     startStepTimer(UPLOAD_STEPS.length - 2);
-    await uploadStatement(file, statementType, auth.token || undefined);
+    const result = await uploadStatement(file, statementType, auth.token || undefined);
     clearStepTimer();
     processStep.value = UPLOAD_STEPS.length - 1;
-    processSubtitle.value = "Done — refreshing your data…";
+    if (result.skipped) {
+      processSubtitle.value =
+        result.reason === "unchanged"
+          ? "Already uploaded — this month was not changed."
+          : "Upload skipped — nothing changed.";
+      await new Promise((r) => setTimeout(r, 1200));
+      processing.value = false;
+      return;
+    }
+    processSubtitle.value = result.upgraded
+      ? "Cycle closed — refreshing your data…"
+      : "Done — refreshing your data…";
     await new Promise((r) => setTimeout(r, 500));
     processing.value = false;
     emitSpendingRefresh();

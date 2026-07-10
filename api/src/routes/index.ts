@@ -9,8 +9,10 @@ import {
   finalizeStatementByKey,
   getCombinedReportAsync,
   getPaceBundleAsync,
+  findStatementByHash,
   isCachedFile,
   monthCatalog,
+  promoteStatementToFinal,
   normalizeProvisionalChargesAsync,
   repairMiskeyedStatements,
   rememberReport,
@@ -472,9 +474,26 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
   try {
     const data = await readStatements();
-    if (isCachedFile(data, hash) && !provisional) {
-      res.json({ skipped: true, reason: "unchanged" });
-      return;
+    if (!provisional) {
+      const existing = findStatementByHash(data, hash);
+      if (existing && existing.entry.provisional !== true) {
+        res.json({ skipped: true, reason: "unchanged" });
+        return;
+      }
+      if (existing && existing.entry.provisional === true) {
+        promoteStatementToFinal(existing.entry);
+        const rules = await readRules();
+        const version = await getFinalizeVersion();
+        await finalizeStatementByKey(data, existing.key, rules, version);
+        await writeStatements(data);
+        res.json({
+          key: existing.key,
+          provisional: false,
+          upgraded: true,
+          report: data.statements[existing.key]!.report,
+        });
+        return;
+      }
     }
 
     const rules = await readRules();
