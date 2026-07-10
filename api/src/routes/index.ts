@@ -481,9 +481,10 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const waking = isAnalyzerConnectivityError(message);
     console.error("Upload failed:", message);
     res.status(waking ? 503 : 500).json({
-      error: waking
-        ? "Analyzer is waking up (Render free tier). Wait ~30 seconds and try again."
-        : message,
+      error:
+        waking && !message.startsWith("Analyzer error")
+          ? "Analyzer is waking up (Render free tier). Wait ~30 seconds and try again."
+          : message,
     });
   }
 });
