@@ -595,6 +595,14 @@ async function refreshReport(
   month: string | null = selectedMonth.value,
   options: { force?: boolean; background?: boolean } = {},
 ) {
+  if (
+    month &&
+    !isCycleMonthKey(month) &&
+    !months.value.some((row) => row.key === month)
+  ) {
+    month = defaultOverviewMonthKey(months.value, cycleDay.value, refDate.value);
+    selectedMonth.value = month;
+  }
   if (month && isCycleMonthKey(month)) {
     if (!paceReport.value) await refreshPaceReport();
     report.value = await buildLocalCycleReport(month);
@@ -675,7 +683,13 @@ async function onDeleteStatementMonth(key: string) {
     }
     await refreshReport(selectedMonth.value);
   } catch (e) {
-    error.value = String(e);
+    await confirm({
+      title: "Could not delete statement",
+      message: e instanceof Error ? e.message : String(e),
+      confirmLabel: "OK",
+      cancelLabel: "Close",
+      tone: "danger",
+    });
   }
 }
 
