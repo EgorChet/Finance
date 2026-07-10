@@ -209,6 +209,7 @@ import {
   latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
   loadPaceIncludeFixed,
+  formatOverviewMonthLabel,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
   pruneStaleManualCycleSpend,
@@ -277,20 +278,7 @@ const periodAnalysis = computed(() => {
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
-  const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
-  return merged.map((m) => {
-    if (m.inProgress || m.pendingStatement) {
-      return { ...m, label: openCycleTabLabel(m.billing_date) };
-    }
-    const base = billingCycleLabel(m.billing_date);
-    if (m.partial) {
-      const cycleStart = cycleStartForStatementBilling(m.billing_date, cycleDay.value);
-      const isCurrentCycle =
-        cycleStart === todayStart && cycleNeedsOpenTab(cycleStart, cycleDay.value, months.value);
-      return { ...m, label: `${base} · partial`, isCurrentCycle };
-    }
-    return { ...m, label: base };
-  });
+  return merged.map((m) => formatOverviewMonthLabel(m, months.value, cycleDay.value, refDate.value));
 });
 
 const switchingMonthLabel = computed(() => {

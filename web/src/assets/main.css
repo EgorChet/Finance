@@ -602,6 +602,17 @@ button {
   background: color-mix(in srgb, var(--accent, #4f8cff) 10%, var(--surface));
 }
 
+.living-budget-current__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.living-budget-current__actions {
+  flex-shrink: 0;
+}
+
 .living-budget-current__eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.78rem;

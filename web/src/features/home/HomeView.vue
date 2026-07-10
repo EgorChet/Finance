@@ -68,7 +68,6 @@ import { useCalendarDataStore } from "@/shared/stores/viewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { CalendarEvent, MonthItem, SpendingReport } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
-import { billingCycleLabel, openCycleTabLabel } from "@/shared/utils/format";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
@@ -94,6 +93,7 @@ import {
   isCycleMonthKey,
   loadCycleDay,
   loadPaceIncludeFixed,
+  formatOverviewMonthLabel,
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
   pruneStaleManualCycleSpend,
@@ -126,20 +126,7 @@ const todayIso = computed(() => refDate.value.toISOString().slice(0, 10));
 
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
-  const todayStart = cycleStartForDate(refDate.value, cycleDay.value);
-  return merged.map((m) => {
-    if (m.inProgress || m.pendingStatement) {
-      return { ...m, label: openCycleTabLabel(m.billing_date) };
-    }
-    const base = billingCycleLabel(m.billing_date);
-    if (m.partial) {
-      const cycleStart = cycleStartForStatementBilling(m.billing_date, cycleDay.value);
-      const isCurrentCycle =
-        cycleStart === todayStart && cycleNeedsOpenTab(cycleStart, cycleDay.value, months.value);
-      return { ...m, label: `${base} · partial`, isCurrentCycle };
-    }
-    return { ...m, label: base };
-  });
+  return merged.map((m) => formatOverviewMonthLabel(m, months.value, cycleDay.value, refDate.value));
 });
 
 const cycleLabel = computed(() => {

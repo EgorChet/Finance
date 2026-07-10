@@ -25,16 +25,84 @@
     <div v-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
 
     <template v-else>
-      <article v-if="headlineSegment" class="living-budget-current">
-        <p class="living-budget-current__eyebrow">
-          {{ headlineSegmentIsActive ? "Current budget" : "Upcoming budget" }}
-        </p>
-        <div class="living-budget-current__total">{{ formatIls(segmentTotalCap(headlineSegment.seg)) }}</div>
-        <p class="living-budget-current__period">{{ monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month) }}</p>
-        <p v-if="segmentCapVaries(headlineSegment.seg)" class="living-budget-current__vary">
-          Total varies when Cibus or rent amounts change
-        </p>
-      </article>
+      <template v-if="headlineSegment">
+        <article
+          v-if="readonly || !isEditingSegment(headlineSegment.index)"
+          class="living-budget-current"
+        >
+          <div class="living-budget-current__header">
+            <div>
+              <p class="living-budget-current__eyebrow">
+                {{ headlineSegmentIsActive ? "Current budget" : "Upcoming budget" }}
+              </p>
+              <div class="living-budget-current__total">{{ formatIls(segmentTotalCap(headlineSegment.seg)) }}</div>
+              <p class="living-budget-current__period">
+                {{ monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month) }}
+              </p>
+              <p v-if="segmentCapVaries(headlineSegment.seg)" class="living-budget-current__vary">
+                Total varies when Cibus or rent amounts change
+              </p>
+            </div>
+            <div v-if="!readonly" class="living-budget-current__actions">
+              <button
+                type="button"
+                class="btn btn-edit"
+                :disabled="disabled"
+                @click="startEditSegment(headlineSegment.index)"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <EditPanel
+          v-else
+          title="Edit period"
+          done-label="Save"
+          :disabled="disabled"
+          deletable
+          :delete-label="segmentDeleteLabel"
+          @done="finishEditSegment(headlineSegment.index)"
+          @cancel="cancelEditSegment(headlineSegment.index)"
+          @delete="removeSegment(headlineSegment.seg)"
+        >
+          <div class="recurring-segment-row">
+            <div class="field-group">
+              <label class="field-label">Salary after tax (₪)</label>
+              <input
+                v-model.number="headlineSegment.seg.amount"
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                inputmode="decimal"
+                :disabled="disabled"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">From</label>
+              <MonthSelect v-model="headlineSegment.seg.from_month" :disabled="disabled" />
+            </div>
+          </div>
+          <div class="field-group recurring-segment-through">
+            <label class="field-label">Through</label>
+            <MonthSelect
+              v-if="!isOngoingThrough(headlineSegment.seg.through_month)"
+              v-model="headlineSegment.seg.through_month"
+              :disabled="disabled"
+            />
+            <label class="recurring-ongoing recurring-ongoing--compact">
+              <ToggleSwitch
+                :model-value="isOngoingThrough(headlineSegment.seg.through_month)"
+                :disabled="disabled"
+                @update:model-value="toggleOngoing(headlineSegment.seg, $event)"
+              />
+              <span class="recurring-ongoing-text">No end date</span>
+            </label>
+          </div>
+        </EditPanel>
+      </template>
 
       <ul v-if="listedSegments.length" class="charge-compact-list living-budget-period-list">
         <li
