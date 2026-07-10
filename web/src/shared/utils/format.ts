@@ -121,9 +121,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 /** Format YYYY-MM-DD as "Mon YYYY" without timezone drift. */
 export function monthLabelFromIso(dateStr: string): string {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return "Unknown cycle";
   const [y, m] = dateStr.slice(0, 10).split("-");
   const monthIndex = parseInt(m, 10) - 1;
-  if (monthIndex < 0 || monthIndex > 11 || !y) return dateStr;
+  if (monthIndex < 0 || monthIndex > 11 || !y) return "Unknown cycle";
   return `${MONTHS[monthIndex]} ${y}`;
 }
 
@@ -141,9 +142,14 @@ export function openCycleTabLabel(cycleStartIso: string): string {
  * (e.g. 10 Apr–9 May → "Apr 2026", statement dated 10 May → "Apr 2026").
  */
 export function billingCycleLabel(isoDateStr: string): string {
+  if (!isoDateStr || !/^\d{4}-\d{2}-\d{2}/.test(isoDateStr)) {
+    return "Unknown cycle";
+  }
   const d = parseIsoDate(isoDateStr);
   d.setMonth(d.getMonth() - 1);
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  const month = d.getMonth();
+  if (month < 0 || month > 11) return "Unknown cycle";
+  return `${MONTHS[month]} ${d.getFullYear()}`;
 }
 
 export function formatDate(dateStr: string): string {

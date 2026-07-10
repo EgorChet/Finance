@@ -12,7 +12,9 @@ import {
   isCachedFile,
   monthCatalog,
   normalizeProvisionalChargesAsync,
+  repairMiskeyedStatements,
   rememberReport,
+  removeStatementByKeyIfHash,
   applyMerchantRules,
   reprocessAllStatements,
   recentBillingKeys,
@@ -187,6 +189,10 @@ function sanitizeUploadFilename(name: string): string {
 
 router.get("/months", async (_req, res) => {
   const data = await readStatements();
+  const repaired = repairMiskeyedStatements(data);
+  if (repaired > 0) {
+    await writeStatements(data);
+  }
   const version = await getFinalizeVersion();
   const catalog = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
   res.json({ months: catalog, summary: summaryRows(data, version) });
@@ -472,6 +478,9 @@ router.post("/upload", upload.single("file"), async (req, res) => {
     const storedReport = provisional ? await normalizeProvisionalChargesAsync(report) : report;
     const savedPath = await saveUploadedXlsx(filename, buffer);
     const key = rememberReport(data, storedReport, savedPath, filename, hash, provisional);
+    if (key !== "unknown") {
+      removeStatementByKeyIfHash(data, "unknown", hash);
+    }
     const version = await getFinalizeVersion();
     await finalizeStatementByKey(data, key, rules, version);
     await writeStatements(data);
