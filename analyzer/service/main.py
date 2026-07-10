@@ -5,7 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -69,6 +69,9 @@ async def analyze_upload(
         report = analyze_file(tmp_path, auto_translate=auto_translate, mapper=mapper)
         report.metadata["source_file"] = file.filename or tmp_path.name
         return report_to_dict(report)
+    except Exception as exc:
+        print(f"analyze-file failed: {exc!r}", flush=True)
+        raise HTTPException(status_code=500, detail=str(exc) or "Statement parse failed") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
 

@@ -135,6 +135,29 @@ export async function warmAnalyzer(): Promise<boolean> {
   return false;
 }
 
+const ANALYZE_RETRY_ATTEMPTS = Number(process.env.ANALYZER_ANALYZE_ATTEMPTS || 3);
+const ANALYZE_RETRY_DELAY_MS = Number(process.env.ANALYZER_ANALYZE_RETRY_DELAY_MS || 8000);
+
+function buildAnalyzeFileForm(buffer: Buffer, filename: string): FormData {
+  const form = new FormData();
+  form.append("file", new Blob([new Uint8Array(buffer)]), filename);
+  return form;
+}
+
+function analyzerHttpErrorMessage(status: number, text: string): string {
+  const body = text.trim();
+  if (status === 502 && !body) {
+    return (
+      "Analyzer error 502: The parser service dropped the connection (common on Render free tier while waking or under load). " +
+      "Wait about a minute and try again, or open the analyzer URL in a browser tab first."
+    );
+  }
+  if ((status === 503 || status === 504) && !body) {
+    return `Analyzer error ${status}: The parser service is still starting — wait and try again.`;
+  }
+  return `Analyzer error ${status}: ${body || "(empty response)"}`;
+}
+
 export async function analyzeFileBuffer(
   buffer: Buffer,
   filename: string,
@@ -144,15 +167,31 @@ export async function analyzeFileBuffer(
   if (!ready) {
     throw new Error(analyzerNotReadyMessage());
   }
-  const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(buffer)]), filename);
+
   const url = `/analyze-file?auto_translate=${autoTranslate}`;
-  const res = await fetchAnalyzer(url, { method: "POST", body: form });
-  if (!res.ok) {
+  let lastError = analyzerHttpErrorMessage(0, "");
+
+  for (let attempt = 0; attempt < ANALYZE_RETRY_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      console.warn(`analyze-file retry ${attempt + 1}/${ANALYZE_RETRY_ATTEMPTS}: ${lastError}`);
+      if (ANALYZER_USES_PUBLIC_URL) {
+        await pingAnalyzerBase();
+        await new Promise((r) => setTimeout(r, ANALYZER_WAKE_PAUSE_MS));
+      }
+      await warmAnalyzer();
+      await new Promise((r) => setTimeout(r, ANALYZE_RETRY_DELAY_MS));
+    }
+
+    const res = await fetchAnalyzer(url, { method: "POST", body: buildAnalyzeFileForm(buffer, filename) });
+    if (res.ok) {
+      return (await res.json()) as SpendingReport;
+    }
     const text = await res.text();
-    throw new Error(`Analyzer error ${res.status}: ${text}`);
+    lastError = analyzerHttpErrorMessage(res.status, text);
+    if (!WARMUP_RETRYABLE_STATUS.has(res.status)) break;
   }
-  return (await res.json()) as SpendingReport;
+
+  throw new Error(lastError);
 }
 
 export async function translateMerchant(hebrew: string): Promise<string> {
@@ -184,7 +223,7 @@ export async function analyzeCalTransactions(
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Analyzer error ${res.status}: ${text}`);
+    throw new Error(analyzerHttpErrorMessage(res.status, text));
   }
   return (await res.json()) as SpendingReport;
 }
@@ -240,7 +279,7 @@ export function analyzerNotReadyMessage(): string {
   );
 }
 
-/** True only for cold-start / connectivity failures — not analyzer HTTP 4xx/5xx. */
+/** True for cold-start / connectivity failures and retryable analyzer gateway errors. */
 export function isAnalyzerConnectivityError(message: string): boolean {
   return (
     message.includes("ECONNREFUSED") ||
@@ -249,6 +288,9 @@ export function isAnalyzerConnectivityError(message: string): boolean {
     message.includes("fetch failed") ||
     message.includes("Analyzer unreachable") ||
     message.includes("Analyzer not ready") ||
+    message.includes("Analyzer error 502") ||
+    message.includes("Analyzer error 503") ||
+    message.includes("Analyzer error 504") ||
     (message.includes("abort") && !message.includes("Analyzer error"))
   );
 }
