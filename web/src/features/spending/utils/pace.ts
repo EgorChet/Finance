@@ -1169,14 +1169,37 @@ export function findPartialMonth(
   return months.find((m) => !isCycleMonthKey(m.key) && m.billing_date === billing && m.partial);
 }
 
-/** Skip the synthetic · now tab when a partial statement already covers that cycle. */
+/** Skip synthetic cycle tabs when a partial statement already covers that cycle. */
 export function openCycleTabRedundant(
   openCycle: MonthItem,
   months: MonthItem[],
   cycleDay = 10,
 ): boolean {
-  if (!openCycle.inProgress) return false;
   return !!findPartialMonth(months, openCycle.billing_date, cycleDay);
+}
+
+/** Month-picker labels: partial → pending once the billing cycle has ended. */
+export function formatOverviewMonthLabel(
+  m: MonthItem,
+  months: MonthItem[],
+  cycleDay: number,
+  today = new Date(),
+): MonthItem {
+  if (m.inProgress || m.pendingStatement) {
+    return { ...m, label: openCycleTabLabel(m.billing_date) };
+  }
+  const base = billingCycleLabel(m.billing_date);
+  if (m.partial) {
+    const cycleStart = cycleStartForStatementBilling(m.billing_date, cycleDay);
+    const needsOpen = cycleNeedsOpenTab(cycleStart, cycleDay, months);
+    const todayStart = cycleStartForDate(today, cycleDay);
+    const isCurrentCycle = cycleStart === todayStart && needsOpen;
+    if (needsOpen && isCycleEnded(cycleStart, cycleDay, today)) {
+      return { ...m, label: `${base} · pending`, pendingStatement: true };
+    }
+    return { ...m, label: `${base} · partial`, isCurrentCycle };
+  }
+  return { ...m, label: base };
 }
 
 export function cycleHasFinalStatement(
