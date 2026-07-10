@@ -117,7 +117,7 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
   }>(`${prefix(demo)}/home-data${q}`, token);
 }
 
-/** Remove one uploaded statement (billing key YYYY-MM-DD) from storage. */
+/** Remove one uploaded statement (billing key YYYY-MM-DD or legacy bucket like `unknown`). */
 export async function deleteStatementMonth(monthKey: string, token?: string) {
   return del<{ ok: boolean; key: string; total_months: number }>(
     `${prefix(false)}/statements/${encodeURIComponent(monthKey)}`,

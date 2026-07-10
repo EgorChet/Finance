@@ -417,7 +417,13 @@ export function isCachedFile(data: StatementsData, hash: string): boolean {
   return Object.values(data.statements).some((e) => e.file_hash === hash);
 }
 
-/** Remove one stored statement export (billing key YYYY-MM-DD). */
+/** Storage keys must be safe path segments — billing dates or legacy buckets like `unknown`. */
+export function isSafeStatementKey(key: string): boolean {
+  if (!key || key.length > 64) return false;
+  if (key.includes("/") || key.includes("\\") || key.includes("..")) return false;
+  return true;
+}
+
 export function deleteStatementByKey(data: StatementsData, key: string): boolean {
   if (!data.statements[key]) return false;
   delete data.statements[key];

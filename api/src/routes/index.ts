@@ -15,6 +15,7 @@ import {
   repairMiskeyedStatements,
   rememberReport,
   removeStatementByKeyIfHash,
+  isSafeStatementKey,
   applyMerchantRules,
   reprocessAllStatements,
   recentBillingKeys,
@@ -188,11 +189,7 @@ function sanitizeUploadFilename(name: string): string {
 }
 
 router.get("/months", async (_req, res) => {
-  const data = await readStatements();
-  const repaired = repairMiskeyedStatements(data);
-  if (repaired > 0) {
-    await writeStatements(data);
-  }
+  const data = await loadStatementsRepaired();
   const version = await getFinalizeVersion();
   const catalog = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
   res.json({ months: catalog, summary: summaryRows(data, version) });
@@ -200,7 +197,7 @@ router.get("/months", async (_req, res) => {
 
 /** Single round-trip for Home: months + scoped pace report + fixed charges + living budget. */
 router.get("/home-data", async (req, res) => {
-  const data = await readStatements();
+  const data = await loadStatementsRepaired();
   const version = await getFinalizeVersion();
   const months = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key));
   const paceMonths = Math.max(1, Number(req.query.pace_months ?? DEFAULT_PACE_MONTHS));
@@ -220,11 +217,18 @@ router.get("/home-data", async (req, res) => {
   });
 });
 
-const STATEMENT_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+async function loadStatementsRepaired(): Promise<Awaited<ReturnType<typeof readStatements>>> {
+  const data = await readStatements();
+  const repaired = repairMiskeyedStatements(data);
+  if (repaired > 0) {
+    await writeStatements(data);
+  }
+  return data;
+}
 
 router.delete("/statements/:key", async (req, res) => {
-  const key = String(req.params.key || "").trim();
-  if (!STATEMENT_KEY_RE.test(key)) {
+  const key = decodeURIComponent(String(req.params.key || "").trim());
+  if (!isSafeStatementKey(key)) {
     res.status(400).json({ error: "Invalid statement key" });
     return;
   }
@@ -238,7 +242,7 @@ router.delete("/statements/:key", async (req, res) => {
 });
 
 router.get("/report", async (req, res) => {
-  const data = await readStatements();
+  const data = await loadStatementsRepaired();
   const version = await getFinalizeVersion();
   const from = req.query.from as string | undefined;
   const to = req.query.to as string | undefined;
