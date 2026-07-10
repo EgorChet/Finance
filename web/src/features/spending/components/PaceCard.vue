@@ -178,11 +178,10 @@ import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "@/features/hou
 import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
+  billingCycleProgress,
   computePace,
   cycleStartForDate,
   effectiveManualCycleSpend,
-  getBillingCycle,
-  getCycleRangeForStart,
   loadCycleDay,
   loadPaceAvgCycles,
   pruneStaleManualCycleSpend,
@@ -205,6 +204,8 @@ const props = defineProps<{
   referenceDate?: Date;
   /** Billing cycle start day (default from settings). */
   cycleDay?: number;
+  /** Selected billing cycle — when viewing a partial/past cycle, not today's cycle. */
+  cycleStart?: string | null;
   /** Resolved living budget for this cycle (incl. Cibus + monthly injection). */
   livingBudget?: number | null;
   /** Base budget before monthly injection. */
@@ -224,15 +225,13 @@ const avgCycles = ref(loadPaceAvgCycles());
 
 const cycleInfo = computed(() => {
   const today = props.referenceDate ?? new Date();
-  const norm = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const cycle = getBillingCycle(norm, cycleDay.value);
-  const start = cycleStartForDate(norm, cycleDay.value);
-  const { end } = getCycleRangeForStart(start, cycleDay.value);
+  const start = props.cycleStart ?? cycleStartForDate(today, cycleDay.value);
+  const progress = billingCycleProgress(start, cycleDay.value, today);
   return {
-    dayIndex: cycle.dayIndex,
-    cycleLength: cycle.cycleLength,
-    cycleStart: start,
-    cycleEnd: end,
+    dayIndex: progress.dayIndex,
+    cycleLength: progress.cycleLength,
+    cycleStart: progress.start,
+    cycleEnd: progress.end,
   };
 });
 
@@ -308,6 +307,7 @@ const pace = computed(() =>
     statementSpendOverride: everydaySpendOverride.value,
     statementVariableOverride: everydaySpendOverride.value,
     today: props.referenceDate,
+    cycleStart: cycleStart.value,
   }),
 );
 
