@@ -1220,7 +1220,7 @@ export function formatOverviewMonthLabel(
     const todayStart = cycleStartForDate(today, cycleDay);
     const isCurrentCycle = cycleStart === todayStart && needsOpen;
     if (needsOpen && isCycleEnded(cycleStart, cycleDay, today)) {
-      return { ...m, label: `${base} · pending`, pendingStatement: true };
+      return { ...m, label: base, pendingStatement: true };
     }
     return { ...m, label: `${base} · partial`, isCurrentCycle };
   }
