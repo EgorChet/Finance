@@ -959,15 +959,15 @@ export function computePace(
       currentConfiguredFullCycle,
       usualConfiguredFullCycle,
       historicalFullCycleEverydayAvg,
-      dayIndex: cycle.dayIndex,
-      cycleLength: cycle.cycleLength,
+      dayIndex,
+      cycleLength,
     });
     projectedTotal = adjusted.projectedTotal;
     adjustedUsualFullMonth = adjusted.adjustedUsualFullMonth;
 
-    const trust = projectionTrust(cycle.dayIndex, cycle.cycleLength);
+    const trust = projectionTrust(dayIndex, cycleLength);
     if (trust < 1 && adjustedUsualFullMonth > 0) {
-      const spendRatio = dampedPaceRatio(currentSpend / compareAvg, cycle.dayIndex, cycle.cycleLength);
+      const spendRatio = dampedPaceRatio(currentSpend / compareAvg, dayIndex, cycleLength);
       projectedTotal = roundMoney(adjustedUsualFullMonth * spendRatio);
     }
   } else if (includeFixed) {
