@@ -8,7 +8,7 @@
         <div>
           <h2 class="page-title">Household</h2>
           <p class="page-lead" style="margin-bottom: 0">
-            Living budget, recurring bills, one-time charges, and exclusions.
+            Living budget, recurring bills, one-time charges, exclusions, and splits.
           </p>
         </div>
         <p
@@ -559,6 +559,7 @@
       </section>
 
       <ExcludedSection />
+      <AdjustmentsSection />
     </template>
   </div>
 </template>
@@ -570,6 +571,7 @@ import { saveFixedCharges, saveLivingBudget } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
 import EditPanel from "@/shared/components/EditPanel.vue";
+import AdjustmentsSection from "@/features/household/components/AdjustmentsSection.vue";
 import ExcludedSection from "@/features/household/components/ExcludedSection.vue";
 import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";

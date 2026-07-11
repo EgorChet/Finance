@@ -93,14 +93,14 @@ export function homeSubsectionKey(category: string): string {
 }
 
 export function homeSubsectionTotals(
-  transactions: { category_en: string; charge_amount: number }[],
+  transactions: { category_en: string; charge_amount: number; effective_amount?: number }[],
 ): { category_en: string; total: number }[] {
   const map = new Map<string, number>();
   for (const tx of transactions) {
     const cat = tx.category_en?.trim() || "Uncategorized";
     if (!isHomeSubsection(cat)) continue;
     const key = homeSubsectionKey(cat);
-    map.set(key, (map.get(key) || 0) + tx.charge_amount);
+    map.set(key, (map.get(key) || 0) + (tx.effective_amount ?? tx.charge_amount));
   }
   return [...map.entries()]
     .map(([category_en, total]) => ({ category_en, total: Math.round(total * 100) / 100 }))

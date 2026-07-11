@@ -1,3 +1,4 @@
+import { refreshAdjustmentsCache } from "../services/adjustments.js";
 import { refreshExclusionsCache } from "../services/exclusions.js";
 import { refreshFixedChargesCache } from "../services/fixedCharges.js";
 import { refreshLivingBudgetCache } from "../services/livingBudget.js";
@@ -13,6 +14,7 @@ export async function ensureAuxCachesFresh(): Promise<void> {
   lastRefreshAt = now;
   await Promise.all([
     refreshExclusionsCache(),
+    refreshAdjustmentsCache(),
     refreshFixedChargesCache(),
     refreshLivingBudgetCache(),
     ensureDailyFallback(),

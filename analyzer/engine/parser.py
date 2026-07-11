@@ -22,6 +22,8 @@ _PENDING_AMOUNT_CURRENCY = re.compile(
     r"(\d[\d,]*(?:\.\d+)?)\s*(PLN|USD|EUR|GBP|BGN|AMD)\b",
     re.IGNORECASE,
 )
+_PENDING_AMOUNT_SYMBOL = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(\$|€|£)")
+_SYMBOL_TO_CURRENCY = {"$": "USD", "€": "EUR", "£": "GBP"}
 _PENDING_AMOUNT_ILS = re.compile(r"(\d[\d.,]*)\s*₪")
 
 
@@ -65,6 +67,9 @@ def parse_pending_currencies(rows: list[tuple], header_idx: int) -> dict[float, 
         for match in _PENDING_AMOUNT_CURRENCY.finditer(text):
             amt = _amount_key(_parse_amount_token(match.group(1)))
             by_amount[amt] = match.group(2).upper()
+        for match in _PENDING_AMOUNT_SYMBOL.finditer(text):
+            amt = _amount_key(_parse_amount_token(match.group(1)))
+            by_amount[amt] = _SYMBOL_TO_CURRENCY[match.group(2)]
     return by_amount
 
 

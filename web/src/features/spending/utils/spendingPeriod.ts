@@ -1,6 +1,7 @@
 import type { Transaction } from "@/shared/types";
 import { rollupCategory } from "@/shared/categories";
 import { formatIls, roundMoney } from "@/shared/utils/format";
+import { effectiveSpend } from "@/shared/utils/transaction";
 
 export type SpendingPeriodMode = "ytd" | "rolling12";
 
@@ -122,14 +123,14 @@ function filterWindow(transactions: Transaction[], window: PeriodWindow): Transa
 }
 
 function sumTransactions(transactions: Transaction[]): number {
-  return roundMoney(transactions.reduce((sum, tx) => sum + tx.charge_amount, 0));
+  return roundMoney(transactions.reduce((sum, tx) => sum + effectiveSpend(tx), 0));
 }
 
 function categoryMap(transactions: Transaction[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const tx of transactions) {
     const cat = rollupCategory(tx.category_en);
-    map.set(cat, roundMoney((map.get(cat) ?? 0) + tx.charge_amount));
+    map.set(cat, roundMoney((map.get(cat) ?? 0) + effectiveSpend(tx)));
   }
   return map;
 }
@@ -139,7 +140,7 @@ function monthlyTotals(transactions: Transaction[], window: PeriodWindow): Month
   for (const tx of transactions) {
     if (!transactionInWindow(tx, window)) continue;
     const key = tx.date.slice(0, 7);
-    map.set(key, roundMoney((map.get(key) ?? 0) + tx.charge_amount));
+    map.set(key, roundMoney((map.get(key) ?? 0) + effectiveSpend(tx)));
   }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))

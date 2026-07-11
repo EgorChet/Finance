@@ -5,6 +5,7 @@ import {
   rollupCategory,
 } from "@/shared/categories";
 import { roundMoney, formatIls } from "@/shared/utils/format";
+import { effectiveSpend } from "@/shared/utils/transaction";
 import { getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "@/features/spending/utils/pace";
 import { subscriptionSubsectionLabel } from "@/features/spending/utils/subscriptionSections";
 
@@ -208,7 +209,7 @@ function sumScopeThroughDay(
     const d = parseIsoDate(tx.date);
     const day = daysBetween(cycleStart, d) + 1;
     if (day > dayIndex) continue;
-    sum += tx.charge_amount;
+    sum += effectiveSpend(tx);
   }
   return roundMoney(sum);
 }

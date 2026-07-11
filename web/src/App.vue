@@ -1,11 +1,13 @@
 <template>
   <RouterView />
   <ConfirmDialog />
+  <AdjustChargeDialog />
   <AppUpdateBanner />
 </template>
 
 <script setup lang="ts">
 import { onMounted } from "vue";
+import AdjustChargeDialog from "@/shared/components/AdjustChargeDialog.vue";
 import AppUpdateBanner from "@/shared/components/AppUpdateBanner.vue";
 import ConfirmDialog from "@/shared/components/ConfirmDialog.vue";
 import { useAuthStore } from "@/shared/stores/auth";

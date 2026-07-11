@@ -4,6 +4,7 @@
  */
 import type {
   ExclusionsData,
+  AdjustmentsData,
   FixedChargesData,
   FxFallbackData,
   KaspaPriceCache,
@@ -132,6 +133,35 @@ export async function writeExclusions(data: ExclusionsData): Promise<void> {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "exclusions", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readAdjustments(): Promise<AdjustmentsData> {
+  if (!supabaseConfigured()) return local.readAdjustments();
+  const res = await supabaseFetch("app_state?id=eq.adjustments&select=data");
+  if (!res.ok) return { entries: [], updated_at: null };
+  const rows = (await res.json()) as { data: AdjustmentsData }[];
+  const data = rows[0]?.data;
+  return {
+    entries: data?.entries || [],
+    updated_at: data?.updated_at ?? null,
+  };
+}
+
+export async function writeAdjustments(data: AdjustmentsData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeAdjustments(data);
+    return;
+  }
+  data.updated_at = new Date().toISOString();
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "adjustments", data }),
   });
   if (!res.ok) {
     const text = await res.text();

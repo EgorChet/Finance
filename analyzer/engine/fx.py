@@ -423,13 +423,9 @@ def resolve_charge_ils(
         amount=amount,
     )
 
-    # Pending — column 3 not final; use FX even if charge_amount was already estimated.
+    # Pending — column 3 not final; header currency wins when present.
     if pending:
-        detected = detect_currency(merchant, amount, None, None)
-        if explicit_currency and not (explicit_currency == "USD" and detected == "ILS"):
-            currency = explicit_currency
-        else:
-            currency = detected
+        currency = explicit_currency or detect_currency(merchant, amount, None, None)
         if currency == "ILS":
             return _round_money(amount), "ILS", True
         rate_date = tx_date or date.today()

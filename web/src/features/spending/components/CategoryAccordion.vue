@@ -149,8 +149,11 @@
                 :show-category="false"
                 :statement-billing="statementBilling"
                 :excludeable="excludeable"
+                :adjustable="adjustable"
                 :excluding-key="excludingKey"
+                :adjusting-key="adjustingKey"
                 @exclude="(tx) => emit('exclude', tx)"
+                @adjust="(tx) => emit('adjust', tx)"
               />
             </div>
           </template>
@@ -231,8 +234,11 @@
                 :show-category="false"
                 :statement-billing="statementBilling"
                 :excludeable="excludeable"
+                :adjustable="adjustable"
                 :excluding-key="excludingKey"
+                :adjusting-key="adjustingKey"
                 @exclude="(tx) => emit('exclude', tx)"
+                @adjust="(tx) => emit('adjust', tx)"
               />
             </div>
           </template>
@@ -313,8 +319,11 @@
                 :show-category="false"
                 :statement-billing="statementBilling"
                 :excludeable="excludeable"
+                :adjustable="adjustable"
                 :excluding-key="excludingKey"
+                :adjusting-key="adjustingKey"
                 @exclude="(tx) => emit('exclude', tx)"
+                @adjust="(tx) => emit('adjust', tx)"
               />
             </div>
           </template>
@@ -330,8 +339,11 @@
               :show-category="false"
               :statement-billing="statementBilling"
               :excludeable="excludeable"
+              :adjustable="adjustable"
               :excluding-key="excludingKey"
+              :adjusting-key="adjustingKey"
               @exclude="(tx) => emit('exclude', tx)"
+              @adjust="(tx) => emit('adjust', tx)"
             />
           </template>
         </div>
@@ -367,6 +379,7 @@ import {
 } from "@/features/spending/utils/categoryCompare";
 import { CHART_COLORS, formatIls, roundMoney } from "@/shared/utils/format";
 import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "@/features/spending/utils/subscriptionSections";
+import { effectiveSpend } from "@/shared/utils/transaction";
 
 const props = defineProps<{
   categories: CategorySummary[];
@@ -375,7 +388,9 @@ const props = defineProps<{
   expandedKeys: string[];
   statementBilling?: string | null;
   excludeable?: boolean;
+  adjustable?: boolean;
   excludingKey?: string | null;
+  adjustingKey?: string | null;
   showCompare?: boolean;
   allTransactions?: Transaction[];
   cycleDay?: number;
@@ -386,6 +401,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:expandedKeys": [string[]];
   exclude: [Transaction];
+  adjust: [Transaction];
 }>();
 
 const compareExpandedKeys = ref<string[]>([]);
@@ -601,7 +617,7 @@ function txsForOtherSub(categoryEn: string): Transaction[] {
 
 function leafMeta(key: string): string {
   const txs = txsForLeaf(key);
-  const share = props.totalSpent ? Math.round((txs.reduce((s, t) => s + t.charge_amount, 0) / props.totalSpent) * 100) : 0;
+  const share = props.totalSpent ? Math.round((txs.reduce((s, t) => s + effectiveSpend(t), 0) / props.totalSpent) * 100) : 0;
   return `${share}% of total · ${txs.length.toLocaleString()} ${txs.length === 1 ? "charge" : "charges"}`;
 }
 

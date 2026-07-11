@@ -20,22 +20,38 @@
       <div v-for="row in visibleRows" :key="row.key" class="tx-row">
         <div class="tx-row-top">
           <div class="tx-row-merchant">{{ row.merchant }}</div>
-          <div class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">{{ formatChargeAmount(row.tx) }}</div>
+          <div class="tx-row-amount-col">
+            <div class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">
+              {{ formatChargeAmount(row.tx) }}
+            </div>
+            <div v-if="row.reimbursementLabel" class="tx-row-reimbursement">{{ row.reimbursementLabel }}</div>
+          </div>
         </div>
         <div class="tx-row-meta">
           <span class="tx-row-meta-text">
             {{ row.dateLabel }}
             <span v-if="showCategory && row.category"> · {{ row.category }}</span>
           </span>
-          <button
-            v-if="excludeable"
-            type="button"
-            class="tx-exclude-btn"
-            :disabled="excludingKey === row.key"
-            @click="emitExclude(row.tx)"
-          >
-            {{ excludingKey === row.key ? "…" : "Exclude" }}
-          </button>
+          <div v-if="excludeable || adjustable" class="tx-row-actions">
+            <button
+              v-if="adjustable"
+              type="button"
+              class="tx-exclude-btn"
+              :disabled="actingKey === row.key"
+              @click="emitAdjust(row.tx)"
+            >
+              {{ actingKey === row.key ? "…" : row.adjustLabel }}
+            </button>
+            <button
+              v-if="excludeable"
+              type="button"
+              class="tx-exclude-btn"
+              :disabled="actingKey === row.key"
+              @click="emitExclude(row.tx)"
+            >
+              {{ actingKey === row.key ? "…" : "Exclude" }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -98,7 +114,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
-import { formatChargeAmount, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
+import { formatChargeAmount, formatIls, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
 import { transactionRowKey } from "@/shared/utils/transaction";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
@@ -114,7 +130,9 @@ const props = withDefaults(
     statementBilling?: string | null;
     showSort?: boolean;
     excludeable?: boolean;
+    adjustable?: boolean;
     excludingKey?: string | null;
+    adjustingKey?: string | null;
   }>(),
   {
     title: "Transactions",
@@ -124,13 +142,18 @@ const props = withDefaults(
     statementBilling: null,
     showSort: true,
     excludeable: false,
+    adjustable: false,
     excludingKey: null,
+    adjustingKey: null,
   },
 );
 
 const emit = defineEmits<{
   exclude: [tx: Transaction];
+  adjust: [tx: Transaction];
 }>();
+
+const actingKey = computed(() => props.adjustingKey || props.excludingKey);
 
 const showAll = ref(false);
 const currentPage = ref(1);
@@ -164,7 +187,11 @@ const sorted = computed(() => {
   const dir = sortDir.value === "asc" ? 1 : -1;
   txs.sort((a, b) => {
     if (sortKey.value === "date") return dir * a.date.localeCompare(b.date);
-    if (sortKey.value === "amount") return dir * (a.charge_amount - b.charge_amount);
+    if (sortKey.value === "amount") {
+      const aAmt = a.effective_amount ?? a.charge_amount;
+      const bAmt = b.effective_amount ?? b.charge_amount;
+      return dir * (aAmt - bAmt);
+    }
     if (sortKey.value === "category") {
       return dir * (a.category_en || "").localeCompare(b.category_en || "");
     }
@@ -199,12 +226,20 @@ const visibleRows = computed(() => {
     dateLabel: formatChargeDate(t),
     merchant: t.merchant_en || t.merchant_he,
     category: t.category_en || "Uncategorized",
-    amount: t.charge_amount,
+    amount: t.effective_amount ?? t.charge_amount,
+    adjustLabel: t.reimbursement ? "Edit split" : "Split",
+    reimbursementLabel: t.reimbursement
+      ? `${formatIls(t.charge_amount)} − ${formatIls(t.reimbursement)} back`
+      : null,
   }));
 });
 
 function emitExclude(tx: Transaction) {
   emit("exclude", tx);
+}
+
+function emitAdjust(tx: Transaction) {
+  emit("adjust", tx);
 }
 
 function formatChargeDate(tx: Transaction): string {

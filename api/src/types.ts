@@ -14,6 +14,12 @@ export interface Transaction {
   original_currency?: string | null;
   /** True when charge_amount was estimated from FX rates (pending export). */
   charge_estimated?: boolean;
+  /** Amount reimbursed by others — set at finalize from user adjustments. */
+  reimbursement?: number;
+  /** Net spend after reimbursement (charge_amount − reimbursement). */
+  effective_amount?: number;
+  /** Optional note for the reimbursement (e.g. "Friends paid back"). */
+  reimbursement_note?: string;
 }
 
 export interface CategorySummary {
@@ -118,6 +124,27 @@ export interface ExcludedItemView extends ExcludedEntry {
   merchant_en?: string;
   amount?: number;
   can_restore: boolean;
+}
+
+export interface AdjustmentEntry {
+  key: string;
+  reimbursement: number;
+  note?: string;
+  added_at?: string;
+}
+
+export interface AdjustmentsData {
+  entries: AdjustmentEntry[];
+  updated_at?: string | null;
+}
+
+export interface AdjustmentItemView extends AdjustmentEntry {
+  date?: string;
+  merchant_he?: string;
+  merchant_en?: string;
+  amount?: number;
+  effective_amount?: number;
+  can_remove: boolean;
 }
 
 export type ChargeSchedule = "monthly" | "once";

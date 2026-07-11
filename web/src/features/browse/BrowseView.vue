@@ -109,8 +109,11 @@
           show-category
           :default-limit="100"
           :excludeable="!auth.isDemo"
+          :adjustable="!auth.isDemo"
           :excluding-key="excludingKey"
+          :adjusting-key="adjustingKey"
           @exclude="excludeTransaction"
+          @adjust="adjustTransaction"
         />
       </template>
     </template>
@@ -119,7 +122,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { addExclusion, fetchReport } from "@/shared/api/client";
+import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
@@ -127,12 +130,16 @@ import TransactionList from "@/shared/components/TransactionList.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { confirm } from "@/shared/composables/useConfirm";
+import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, Transaction } from "@/shared/types";
 import { CATEGORY_PICKLIST, rollupCategory } from "@/shared/categories";
 import { formatIls } from "@/shared/utils/format";
 import { loadBrowseIncludeRecurring, saveBrowseIncludeRecurring } from "@/features/browse/utils/browsePreferences";
 import { isSystemRecurringTransaction } from "@/features/household/utils/householdBudget";
+import { effectiveSpend } from "@/shared/utils/transaction";
 import { transactionKey } from "@/shared/utils/transactionKey";
+import { invalidateSpendingDataCaches } from "@/shared/stores/invalidateCaches";
+import { useAdjustmentsDataStore } from "@/shared/stores/viewData";
 
 type AmountPreset = { id: string; label: string; min: number | null; max: number | null };
 
@@ -155,6 +162,8 @@ const categoryFilter = ref("");
 const minAmount = ref("");
 const maxAmount = ref("");
 const excludingKey = ref<string | null>(null);
+const adjustingKey = ref<string | null>(null);
+const adjustmentsData = useAdjustmentsDataStore();
 const includeRecurring = ref(loadBrowseIncludeRecurring());
 
 watch(includeRecurring, (value) => {
@@ -205,7 +214,7 @@ const filteredTransactions = computed(() => {
 });
 
 const filteredTotal = computed(() =>
-  filteredTransactions.value.reduce((sum, tx) => sum + tx.charge_amount, 0),
+  filteredTransactions.value.reduce((sum, tx) => sum + effectiveSpend(tx), 0),
 );
 
 function parseAmount(raw: string | number): number | null {
@@ -300,10 +309,37 @@ async function excludeTransaction(tx: Transaction) {
   try {
     await addExclusion({ transaction: tx, note: "Not my spend" }, auth.token || undefined);
     allTransactions.value = allTransactions.value.filter((t) => transactionKey(t) !== key);
+    adjustmentsData.invalidate();
+    invalidateSpendingDataCaches();
   } catch (e) {
     window.alert(String(e));
   } finally {
     excludingKey.value = null;
+  }
+}
+
+async function adjustTransaction(tx: Transaction) {
+  if (auth.isDemo) return;
+  const result = await adjustCharge({
+    transaction: tx,
+    currentReimbursement: tx.reimbursement,
+    note: tx.reimbursement_note,
+  });
+  if (!result) return;
+  const key = transactionKey(tx);
+  adjustingKey.value = key;
+  try {
+    await upsertAdjustment(
+      { transaction: tx, reimbursement: result.reimbursement, note: result.note },
+      auth.token || undefined,
+    );
+    adjustmentsData.invalidate();
+    invalidateSpendingDataCaches();
+    await loadTransactions();
+  } catch (e) {
+    window.alert(String(e));
+  } finally {
+    adjustingKey.value = null;
   }
 }
 

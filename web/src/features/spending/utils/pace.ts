@@ -12,7 +12,7 @@ import {
   transactionDateForCharge,
 } from "@/features/household/utils/fixedCharges";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "@/shared/utils/format";
-import { dedupeTransactionSnapshots, filterSpendTransactions } from "@/shared/utils/transaction";
+import { dedupeTransactionSnapshots, effectiveSpend, filterSpendTransactions } from "@/shared/utils/transaction";
 
 export interface BillingCycle {
   start: Date;
@@ -202,12 +202,12 @@ function spendAtDay(
     const d = parseIsoDate(tx.date);
     const day = daysBetween(bucket.start, d) + 1;
     if (day > dayIndex) continue;
-    total += tx.charge_amount;
+    total += effectiveSpend(tx);
     if (isFixedChargeTx(tx)) {
-      fixed += tx.charge_amount;
+      fixed += effectiveSpend(tx);
       const label = tx.merchant_en || tx.merchant_he || "Unknown";
       const cur = fixedByMerchant.get(label) || { amount: 0, configured: isConfiguredCharge(tx) };
-      cur.amount += tx.charge_amount;
+      cur.amount += effectiveSpend(tx);
       cur.configured = cur.configured || isConfiguredCharge(tx);
       fixedByMerchant.set(label, cur);
     } else {
@@ -253,7 +253,7 @@ function statementEverydayAtDay(bucket: CycleBucket, dayIndex: number): number {
     if (isEverydayPaceExcludedTransaction(tx) || isConfiguredChargeTransaction(tx)) continue;
     const d = parseIsoDate(tx.date);
     const day = daysBetween(bucket.start, d) + 1;
-    if (day <= dayIndex) sum += tx.charge_amount;
+    if (day <= dayIndex) sum += effectiveSpend(tx);
   }
   return roundMoney(sum);
 }
@@ -266,7 +266,7 @@ function configuredEverydayFromBucketAtDay(bucket: CycleBucket, dayIndex: number
     if (isEverydayPaceExcludedTransaction(tx)) continue;
     const d = parseIsoDate(tx.date);
     const day = daysBetween(bucket.start, d) + 1;
-    if (day <= dayIndex) sum += tx.charge_amount;
+    if (day <= dayIndex) sum += effectiveSpend(tx);
   }
   return roundMoney(sum);
 }
@@ -332,7 +332,7 @@ function inferConfiguredChargesFromTransactions(transactions: Transaction[]): Co
       id,
       name_en: tx.merchant_en,
       name_he: tx.merchant_he,
-      amount: tx.charge_amount,
+      amount: effectiveSpend(tx),
       category_en: tx.category_en || "Uncategorized",
       from_month: "2020-01",
       through_month: ONGOING_THROUGH_MONTH,
@@ -401,6 +401,8 @@ function projectEverydayWithStructuralAdjustment(options: {
   currentConfiguredFullCycle: number;
   usualConfiguredFullCycle: number;
   historicalFullCycleEverydayAvg: number;
+  dayIndex: number;
+  cycleLength: number;
 }): {
   projectedTotal: number;
   adjustedUsualFullMonth: number;
@@ -416,6 +418,8 @@ function projectEverydayWithStructuralAdjustment(options: {
     currentConfiguredFullCycle,
     usualConfiguredFullCycle,
     historicalFullCycleEverydayAvg,
+    dayIndex,
+    cycleLength,
   } = options;
 
   const structuralAtDay = roundMoney(Math.max(0, currentConfiguredAtDay - usualConfiguredAtDay));
@@ -428,7 +432,7 @@ function projectEverydayWithStructuralAdjustment(options: {
   const usualVisaAtDay = roundMoney(Math.max(0, compareAvg - usualConfiguredAtDay));
 
   if (usualVisaAtDay > 0 && compareAvg > 0) {
-    const visaRatio = currentVisaAtDay / usualVisaAtDay;
+    const visaRatio = dampedPaceRatio(currentVisaAtDay / usualVisaAtDay, dayIndex, cycleLength);
     const historicalVisaFullCycleAvg = roundMoney(
       Math.max(0, historicalFullCycleEverydayAvg - usualConfiguredFullCycle),
     );
@@ -443,7 +447,11 @@ function projectEverydayWithStructuralAdjustment(options: {
   }
 
   const behavioralCurrent = roundMoney(currentSpend - structuralAtDay);
-  const fallbackRatio = compareAvg > 0 ? behavioralCurrent / compareAvg : 1;
+  const fallbackRatio = dampedPaceRatio(
+    compareAvg > 0 ? behavioralCurrent / compareAvg : 1,
+    dayIndex,
+    cycleLength,
+  );
   return {
     projectedTotal: roundMoney(adjustedUsualFullMonth * fallbackRatio),
     adjustedUsualFullMonth,
@@ -456,8 +464,32 @@ function projectEverydayWithStructuralAdjustment(options: {
 /** Fallback when no completed cycles to learn from — flat (linear) extrapolation. */
 export const DEFAULT_SECOND_HALF_MULTIPLIER = 1;
 
+/** Don't extrapolate day-level spikes to a full month until the cycle is this far in. */
+export const MIN_DAYS_FOR_MONTH_PROJECTION = 7;
+
 /** Always learn second-half shape from this many most recent completed cycles. */
 export const SECOND_HALF_CALIBRATION_CYCLES = 3;
+
+function minDaysForProjection(cycleLength: number): number {
+  return Math.min(MIN_DAYS_FOR_MONTH_PROJECTION, Math.max(3, Math.ceil(cycleLength / 4)));
+}
+
+/** 0 early in the cycle → 1 once enough days have passed to trust month-end extrapolation. */
+export function projectionTrust(dayIndex: number, cycleLength: number): number {
+  if (dayIndex <= 0) return 0;
+  return Math.min(1, dayIndex / minDaysForProjection(cycleLength));
+}
+
+function dampedPaceRatio(rawRatio: number, dayIndex: number, cycleLength: number): number {
+  if (!Number.isFinite(rawRatio) || rawRatio <= 0) return 1;
+  const trust = projectionTrust(dayIndex, cycleLength);
+  return 1 + (rawRatio - 1) * trust;
+}
+
+function effectiveProjectionDayIndex(dayIndex: number, cycleLength: number): number {
+  if (dayIndex <= 0) return 0;
+  return Math.max(dayIndex, minDaysForProjection(cycleLength));
+}
 
 function midpointDay(cycleLength: number): number {
   return Math.ceil(cycleLength / 2);
@@ -488,7 +520,8 @@ export function projectVariableWithCycleShape(
   secondHalfMultiplier: number,
 ): number {
   if (dayIndex <= 0 || spendSoFar <= 0) return spendSoFar;
-  const through = weightThroughDay(dayIndex, cycleLength, secondHalfMultiplier);
+  const effectiveDay = effectiveProjectionDayIndex(dayIndex, cycleLength);
+  const through = weightThroughDay(effectiveDay, cycleLength, secondHalfMultiplier);
   if (through <= 0) return spendSoFar;
   const total = totalCycleWeight(cycleLength, secondHalfMultiplier);
   return roundMoney((spendSoFar / through) * total);
@@ -710,7 +743,7 @@ export function computePace(
   if (currentBucket) {
     for (const tx of currentBucket.txs) {
       const d = parseIsoDate(tx.date);
-      if (d <= todayNorm) statementSpend += tx.charge_amount;
+      if (d <= todayNorm) statementSpend += effectiveSpend(tx);
     }
   }
   statementSpend = roundMoney(statementSpend);
@@ -926,9 +959,17 @@ export function computePace(
       currentConfiguredFullCycle,
       usualConfiguredFullCycle,
       historicalFullCycleEverydayAvg,
+      dayIndex: cycle.dayIndex,
+      cycleLength: cycle.cycleLength,
     });
     projectedTotal = adjusted.projectedTotal;
     adjustedUsualFullMonth = adjusted.adjustedUsualFullMonth;
+
+    const trust = projectionTrust(cycle.dayIndex, cycle.cycleLength);
+    if (trust < 1 && adjustedUsualFullMonth > 0) {
+      const spendRatio = dampedPaceRatio(currentSpend / compareAvg, cycle.dayIndex, cycle.cycleLength);
+      projectedTotal = roundMoney(adjustedUsualFullMonth * spendRatio);
+    }
   } else if (includeFixed) {
     projectedTotal = roundMoney(projectionFixed + projectedEveryday);
   } else {
@@ -1424,10 +1465,10 @@ export function buildCycleReport(
   const catTotals = new Map<string, { total: number; count: number; he: string | null }>();
   let statementTotal = 0;
   for (const tx of txs) {
-    statementTotal += tx.charge_amount;
+    statementTotal += effectiveSpend(tx);
     const cat = tx.category_en || "Uncategorized";
     const cur = catTotals.get(cat) || { total: 0, count: 0, he: tx.category_he };
-    cur.total += tx.charge_amount;
+    cur.total += effectiveSpend(tx);
     cur.count += 1;
     catTotals.set(cat, cur);
   }

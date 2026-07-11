@@ -50,6 +50,11 @@ import {
   transactionKey,
 } from "../services/exclusions.js";
 import {
+  listAdjustments,
+  removeAdjustment,
+  upsertAdjustment,
+} from "../services/adjustments.js";
+import {
   loadFixedCharges,
   saveFixedCharges,
   validateFixedCharges,
@@ -346,6 +351,43 @@ router.post("/exclusions/remove", async (req, res) => {
     return;
   }
   await removeExclusion(key);
+  res.json({ ok: true });
+});
+
+router.get("/adjustments", async (_req, res) => {
+  const entries = await listAdjustments();
+  res.json({ entries, total: entries.length });
+});
+
+router.post("/adjustments", async (req, res) => {
+  const { key, reimbursement, note, transaction } = req.body as {
+    key?: string;
+    reimbursement?: number;
+    note?: string;
+    transaction?: { date: string; merchant_he: string; charge_amount: number };
+  };
+  const resolvedKey =
+    key?.trim() ||
+    (transaction ? transactionKey(transaction as import("../types.js").Transaction) : "");
+  if (!resolvedKey) {
+    res.status(400).json({ error: "key or transaction required" });
+    return;
+  }
+  if (reimbursement == null || !Number.isFinite(Number(reimbursement))) {
+    res.status(400).json({ error: "reimbursement required" });
+    return;
+  }
+  const entry = await upsertAdjustment(resolvedKey, Number(reimbursement), note);
+  res.json({ ok: true, entry });
+});
+
+router.post("/adjustments/remove", async (req, res) => {
+  const { key } = req.body as { key?: string };
+  if (!key?.trim()) {
+    res.status(400).json({ error: "key required" });
+    return;
+  }
+  await removeAdjustment(key);
   res.json({ ok: true });
 });
 

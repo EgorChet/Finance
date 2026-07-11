@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import type {
   ExclusionsData,
+  AdjustmentsData,
   FixedChargesData,
   FxFallbackData,
   KaspaPriceCache,
@@ -19,6 +20,7 @@ const STATEMENTS_PATH = path.join(DATA_DIR, "statements.json");
 const RULES_PATH = path.join(DATA_DIR, "merchant_rules.json");
 const REVIEW_PATH = path.join(DATA_DIR, "review_progress.json");
 const EXCLUSIONS_PATH = path.join(DATA_DIR, "user_exclusions.json");
+const ADJUSTMENTS_PATH = path.join(DATA_DIR, "user_adjustments.json");
 const FIXED_CHARGES_PATH = path.join(DATA_DIR, "user_fixed_charges.json");
 const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
@@ -96,6 +98,25 @@ export async function writeExclusions(data: ExclusionsData): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   data.updated_at = new Date().toISOString();
   await fs.writeFile(EXCLUSIONS_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export async function readAdjustments(): Promise<AdjustmentsData> {
+  try {
+    const raw = await fs.readFile(ADJUSTMENTS_PATH, "utf-8");
+    const data = JSON.parse(raw) as AdjustmentsData;
+    return {
+      entries: data.entries || [],
+      updated_at: data.updated_at ?? null,
+    };
+  } catch {
+    return { entries: [], updated_at: null };
+  }
+}
+
+export async function writeAdjustments(data: AdjustmentsData): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  data.updated_at = new Date().toISOString();
+  await fs.writeFile(ADJUSTMENTS_PATH, JSON.stringify(data, null, 2), "utf-8");
 }
 
 export async function readFixedCharges(): Promise<FixedChargesData> {

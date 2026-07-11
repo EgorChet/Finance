@@ -196,6 +196,18 @@ router.post("/exclusions/remove", (_req, res) => {
   res.status(403).json({ error: "Exclusions disabled in demo mode" });
 });
 
+router.get("/adjustments", (_req, res) => {
+  res.json({ entries: [], total: 0, demo: true });
+});
+
+router.post("/adjustments", (_req, res) => {
+  res.status(403).json({ error: "Adjustments disabled in demo mode" });
+});
+
+router.post("/adjustments/remove", (_req, res) => {
+  res.status(403).json({ error: "Adjustments disabled in demo mode" });
+});
+
 router.get("/calendar", (_req, res) => {
   res.json(demoCalendar());
 });

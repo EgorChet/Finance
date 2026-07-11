@@ -207,15 +207,14 @@ def test_pending_english_israeli_merchant_is_ils():
     assert estimated is True
 
 
-def test_pending_english_merchant_corrects_stale_usd_estimate():
-    """Re-normalize must undo a prior USD misread on pending rows."""
+def test_pending_english_merchant_defaults_to_ils_without_header():
+    """Pending rows without header currency fall back to merchant heuristics."""
     charge, currency, estimated = resolve_charge_ils(
         11,
         32.78,
         "ROY SWEETS",
         "עסקה בקליטה",
         tx_date=date(2026, 7, 1),
-        explicit_currency="USD",
     )
     assert charge == 11
     assert currency == "ILS"
@@ -246,6 +245,44 @@ def test_parse_pending_currencies_comma_decimal_ils():
         ("תאריך", "שם בית עסק", "סכום"),
     ]
     assert parse_pending_currencies(rows, 1) == {39.9: "ILS"}
+
+
+def test_parse_pending_currencies_dollar_symbol():
+    rows = [
+        ("עסקאות בתהליך קליטה 1,895.16 ₪ ובנוסף 75.00 $",),
+        ("תאריך", "שם בית עסק", "סכום"),
+    ]
+    assert parse_pending_currencies(rows, 1) == {1895.16: "ILS", 75.0: "USD"}
+
+
+@patch("fx.get_rate_to_ils", return_value=3.55)
+def test_pending_aerohandling_usd_from_dollar_header(_mock):
+    charge, currency, estimated = resolve_charge_ils(
+        75,
+        None,
+        "אירוהנדלינג AEROHANDLING",
+        "עסקה בקליטה",
+        tx_date=date(2026, 7, 11),
+        explicit_currency="USD",
+    )
+    assert currency == "USD"
+    assert estimated is True
+    assert charge == round(75 * 3.55, 2)
+
+
+def test_parser_aerohandling_from_jul11_statement():
+    from pathlib import Path
+    from parser import parse_leumi_visa_xlsx
+
+    path = Path(__file__).resolve().parents[3] / "local" / "statements" / "Partial"
+    files = list(path.glob("*11.07.26*.xlsx"))
+    assert files, "Jul 11 partial statement fixture missing"
+    txs, meta = parse_leumi_visa_xlsx(files[0])
+    assert meta["pending_currencies"]["75.0"] == "USD"
+    aero = next(tx for tx in txs if "AEROHANDLING" in tx.merchant_he)
+    assert aero.original_currency == "USD"
+    assert aero.charge_estimated is True
+    assert aero.charge_amount != 75
 
 
 def test_installment_uses_ils_slice():

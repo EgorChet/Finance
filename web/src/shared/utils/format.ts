@@ -83,9 +83,16 @@ export function formatChargeAmount(tx: {
   original_currency?: string | null;
   charge_estimated?: boolean;
   transaction_type_he?: string;
+  reimbursement?: number;
+  effective_amount?: number;
 }): string {
   const refund = isRefundTransaction(tx);
-  const displayAmount = refund ? Math.abs(tx.charge_amount) : tx.charge_amount;
+  const hasReimbursement = !refund && tx.reimbursement != null && tx.reimbursement > 0;
+  const displayAmount = refund
+    ? Math.abs(tx.charge_amount)
+    : hasReimbursement
+      ? (tx.effective_amount ?? tx.charge_amount - tx.reimbursement!)
+      : tx.charge_amount;
   const ils = formatIls(displayAmount);
   const signedIls = refund ? `−${ils}` : ils;
   const currency = tx.original_currency;

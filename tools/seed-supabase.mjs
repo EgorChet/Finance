@@ -28,6 +28,7 @@ const EMPTY = {
   living_budget: { segments: [], month_topups: [], updated_at: null },
   fixed_charges: { charges: [], updated_at: null },
   exclusions: { entries: [], restored_keys: [], updated_at: null },
+  adjustments: { entries: [], updated_at: null },
   calendar: { events: [], updated_at: null },
 };
 
@@ -38,6 +39,7 @@ const rows = [
   { id: "living_budget", file: "living_budget.json", alt: "user_living_budget.json" },
   { id: "fixed_charges", file: "fixed_charges.json", alt: "user_fixed_charges.json" },
   { id: "exclusions", file: "excluded_transactions.json", alt: "user_exclusions.json" },
+  { id: "adjustments", file: "user_adjustments.json" },
   { id: "calendar", file: "user_calendar.json" },
 ];
 

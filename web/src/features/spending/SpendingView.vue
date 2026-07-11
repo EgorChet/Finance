@@ -124,10 +124,13 @@
           show-category
           :statement-billing="statementBilling"
           :excludeable="!auth.isDemo"
+          :adjustable="!auth.isDemo"
           :excluding-key="excludingKey"
+          :adjusting-key="adjustingKey"
           :show-sort="false"
           :default-limit="50"
           @exclude="excludeTransaction"
+          @adjust="adjustTransaction"
         />
       </section>
     </template>
@@ -140,13 +143,16 @@
       :total-spent="report.total_spent"
       :statement-billing="selectedMonth ? statementBilling : null"
       :excludeable="!auth.isDemo"
+      :adjustable="!auth.isDemo"
       :excluding-key="excludingKey"
+      :adjusting-key="adjustingKey"
       :show-compare="partialStatementActive"
       :all-transactions="paceTransactions"
       :cycle-day="cycleDay"
       :cycle-start="activeCycleStart ?? undefined"
       :reference-date="refDate"
       @exclude="excludeTransaction"
+      @adjust="adjustTransaction"
     />
     </template>
     <template v-if="showTransactions && !isLiveTransactionView">
@@ -160,9 +166,12 @@
           paginated
           :statement-billing="statementBilling"
           :excludeable="!auth.isDemo"
+          :adjustable="!auth.isDemo"
           :excluding-key="excludingKey"
+          :adjusting-key="adjustingKey"
           :default-limit="25"
           @exclude="excludeTransaction"
+          @adjust="adjustTransaction"
         />
       </section>
     </template>
@@ -176,7 +185,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport } from "@/shared/api/client";
+import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import CategoryAccordion from "@/features/spending/components/CategoryAccordion.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import TransactionPeriodPicker from "@/shared/components/TransactionPeriodPicker.vue";
@@ -190,6 +199,7 @@ import SpendingPeriodPanel from "@/features/spending/components/SpendingPeriodPa
 import SummaryMetrics from "@/features/spending/components/SummaryMetrics.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { confirm } from "@/shared/composables/useConfirm";
+import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import {
   rollupCategoriesForDisplay,
@@ -242,6 +252,7 @@ import {
 } from "@/features/spending/utils/spendingPeriod";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { invalidateSpendingDataCaches } from "@/shared/stores/invalidateCaches";
+import { useAdjustmentsDataStore } from "@/shared/stores/viewData";
 import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/homeData";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 
@@ -260,6 +271,8 @@ const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
 const selectedMonth = ref<string | null>(null);
 const excludingKey = ref<string | null>(null);
+const adjustingKey = ref<string | null>(null);
+const adjustmentsData = useAdjustmentsDataStore();
 const expandedCategoryKeys = ref<string[]>([]);
 const txPeriod = ref<TransactionPeriod>("today");
 const cycleDay = ref(loadCycleDay());
@@ -514,7 +527,7 @@ function cachedMonthReport(key: string): SpendingReport | null {
   return monthReportCache.value.get(key) ?? null;
 }
 
-async function afterExclusionChange() {
+async function afterSpendOverrideChange() {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   const m = await fetchMonths(demo, token);
@@ -522,6 +535,7 @@ async function afterExclusionChange() {
   summary.value = mapSummaryRows(m.summary, m.months);
   paceReportIsFull.value = false;
   monthReportCache.value.clear();
+  adjustmentsData.invalidate();
   invalidateSpendingDataCaches();
   await Promise.all([refreshReport(), refreshPaceReport()]);
 }
@@ -540,11 +554,34 @@ async function excludeTransaction(tx: Transaction) {
   excludingKey.value = key;
   try {
     await addExclusion({ transaction: tx, note: "Not my spend" }, auth.token || undefined);
-    await afterExclusionChange();
+    await afterSpendOverrideChange();
   } catch (e) {
     window.alert(String(e));
   } finally {
     excludingKey.value = null;
+  }
+}
+
+async function adjustTransaction(tx: Transaction) {
+  if (auth.isDemo) return;
+  const result = await adjustCharge({
+    transaction: tx,
+    currentReimbursement: tx.reimbursement,
+    note: tx.reimbursement_note,
+  });
+  if (!result) return;
+  const key = transactionKey(tx);
+  adjustingKey.value = key;
+  try {
+    await upsertAdjustment(
+      { transaction: tx, reimbursement: result.reimbursement, note: result.note },
+      auth.token || undefined,
+    );
+    await afterSpendOverrideChange();
+  } catch (e) {
+    window.alert(String(e));
+  } finally {
+    adjustingKey.value = null;
   }
 }
 

@@ -12,6 +12,9 @@ export interface Transaction {
   billing_month?: string | null;
   original_currency?: string | null;
   charge_estimated?: boolean;
+  reimbursement?: number;
+  effective_amount?: number;
+  reimbursement_note?: string;
 }
 
 export interface CategorySummary {
@@ -79,6 +82,19 @@ export interface ExcludedItem {
   merchant_en?: string;
   amount?: number;
   can_restore: boolean;
+}
+
+export interface AdjustmentItem {
+  key: string;
+  reimbursement: number;
+  note?: string;
+  added_at?: string;
+  date?: string;
+  merchant_he?: string;
+  merchant_en?: string;
+  amount?: number;
+  effective_amount?: number;
+  can_remove: boolean;
 }
 
 export type CalendarRecurrence = "none" | "weekly" | "monthly" | "yearly";

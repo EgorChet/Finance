@@ -107,6 +107,11 @@
                       <tr class="pace-simple-table-group">
                         <td colspan="2">Month-end estimate</td>
                       </tr>
+                      <tr v-if="!projectionReliable" class="pace-simple-table-note">
+                        <td colspan="2">
+                          Early in the cycle — estimate assumes your current pace, not a full-month spike.
+                        </td>
+                      </tr>
                       <tr>
                         <td>Your everyday month</td>
                         <td>~{{ formatIls(projectedTotal) }}</td>
@@ -184,6 +189,7 @@ import {
   effectiveManualCycleSpend,
   loadCycleDay,
   loadPaceAvgCycles,
+  projectionTrust,
   pruneStaleManualCycleSpend,
   saveManualCycleSpend,
 } from "@/features/spending/utils/pace";
@@ -322,6 +328,10 @@ const showEntryPanel = computed(() => {
   return true;
 });
 
+const projectionReliable = computed(
+  () => projectionTrust(cycleInfo.value.dayIndex, cycleInfo.value.cycleLength) >= 1,
+);
+
 const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
 
 const paceCompareAvg = computed(() => pace.value?.historicalAvgAtDay ?? 0);
@@ -383,6 +393,12 @@ const projectedDeltaClass = computed(() => {
 
 const verdictStatus = computed(() => {
   if (injectionCushionVerdict.value) return injectionCushionVerdict.value.status;
+  if (!projectionReliable.value) {
+    const nowGap = pace.value?.vsAvgDelta ?? 0;
+    if (Math.abs(nowGap) < 50) return "Early in the cycle";
+    if (nowGap > 0) return "Above usual so far";
+    return "Below usual so far";
+  }
   if (paceTone.value === "bad" || paceTone.value === "warn") return "Overspending";
 
   const monthGap = projectedVsUsualDelta.value;
@@ -393,6 +409,13 @@ const verdictStatus = computed(() => {
 
 const verdictDelta = computed(() => {
   if (injectionCushionVerdict.value) return "";
+
+  if (!projectionReliable.value) {
+    const nowGap = pace.value?.vsAvgDelta ?? 0;
+    if (Math.abs(nowGap) < 50) return "Not enough of the cycle has passed for a month-end forecast";
+    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
+    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
+  }
 
   const monthGap = projectedVsUsualDelta.value;
   if (Math.abs(monthGap) < 50) {

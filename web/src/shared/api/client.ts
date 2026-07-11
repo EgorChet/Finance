@@ -490,6 +490,28 @@ export async function removeExclusion(key: string, token?: string) {
   return post<{ ok: boolean }>(`${prefix(false)}/exclusions/remove`, { key }, token);
 }
 
+export async function fetchAdjustments(demo: boolean, token?: string) {
+  return get<{ entries: import("@/shared/types").AdjustmentItem[]; total: number }>(
+    `${prefix(demo)}/adjustments`,
+    token,
+  );
+}
+
+export async function upsertAdjustment(
+  body: { key?: string; reimbursement: number; note?: string; transaction?: Transaction },
+  token?: string,
+) {
+  return post<{ ok: boolean; entry: import("@/shared/types").AdjustmentItem }>(
+    `${prefix(false)}/adjustments`,
+    body,
+    token,
+  );
+}
+
+export async function removeAdjustment(key: string, token?: string) {
+  return post<{ ok: boolean }>(`${prefix(false)}/adjustments/remove`, { key }, token);
+}
+
 export type CalendarEvent = import("@/shared/types").CalendarEvent;
 
 export type CalendarResponse = {

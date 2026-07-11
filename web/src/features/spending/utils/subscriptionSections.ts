@@ -1,5 +1,6 @@
 import type { Transaction } from "@/shared/types";
 import { subscriptionVendor } from "@/features/spending/utils/subscriptions";
+import { effectiveSpend } from "@/shared/utils/transaction";
 
 const MOBILE_RE =
   /\bcellcom\b|hot\s*mobile|הוט\s*מובייל|pelephone|פלאפון|סלקום|\bgolan\b|גולן|partner\s*mobile|012\s*mobile|wecom|019\s*mobile/i;
@@ -22,7 +23,7 @@ export function subscriptionSubsectionTotals(
   const map = new Map<string, number>();
   for (const tx of transactions) {
     const label = subscriptionSubsectionLabel(tx);
-    map.set(label, (map.get(label) || 0) + tx.charge_amount);
+    map.set(label, (map.get(label) || 0) + effectiveSpend(tx));
   }
   return [...map.entries()]
     .map(([name, total]) => ({ name, total: Math.round(total * 100) / 100 }))

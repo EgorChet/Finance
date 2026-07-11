@@ -1,4 +1,5 @@
 import type { FixedCharge, FixedChargesData, SpendingReport, Transaction } from "../types.js";
+import { effectiveSpend } from "../utils/spend.js";
 import { readFixedCharges, writeFixedCharges } from "../storage/index.js";
 import { monthLabelFromIso } from "../utils/dates.js";
 
@@ -141,9 +142,10 @@ function mergeCategorySummaries(report: SpendingReport): SpendingReport["by_cate
   let grand = 0;
   for (const tx of report.transactions) {
     const cat = tx.category_en || "Uncategorized";
-    grand += tx.charge_amount;
+    const spend = effectiveSpend(tx);
+    grand += spend;
     const cur = totals.get(cat) || { total: 0, count: 0, he: tx.category_he };
-    cur.total += tx.charge_amount;
+    cur.total += spend;
     cur.count += 1;
     totals.set(cat, cur);
   }
@@ -168,7 +170,7 @@ function topMerchants(report: SpendingReport): SpendingReport["top_merchants"] {
       he: tx.merchant_he,
       cat: tx.category_en,
     };
-    cur.total += tx.charge_amount;
+    cur.total += effectiveSpend(tx);
     cur.count += 1;
     totals.set(key, cur);
   }
@@ -247,7 +249,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
   }
 
   const dates = merged.map((t) => t.date).sort();
-  const total = merged.reduce((s, t) => s + t.charge_amount, 0);
+  const total = merged.reduce((s, t) => s + effectiveSpend(t), 0);
   const augmented: SpendingReport = {
     ...report,
     transactions: merged,
@@ -269,7 +271,7 @@ export function augmentReport(report: SpendingReport): SpendingReport {
 export function rebuildReportSummaries(report: SpendingReport): SpendingReport {
   const txs = report.transactions;
   const dates = txs.map((t) => t.date).sort();
-  const total = txs.reduce((s, t) => s + t.charge_amount, 0);
+  const total = txs.reduce((s, t) => s + effectiveSpend(t), 0);
   const updated: SpendingReport = {
     ...report,
     total_spent: total,

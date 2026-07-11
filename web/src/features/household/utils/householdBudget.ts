@@ -1,6 +1,6 @@
 import { rollupCategory } from "@/shared/categories";
 import type { Transaction } from "@/shared/types";
-import { parseInstallment } from "@/shared/utils/transaction";
+import { effectiveSpend, parseInstallment } from "@/shared/utils/transaction";
 import { roundMoney } from "@/shared/utils/format";
 
 const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
@@ -49,7 +49,7 @@ export function isEverydayPaceExcludedTransaction(tx: Transaction): boolean {
 
 export function monthlyBillsTotal(transactions: Transaction[]): number {
   return roundMoney(
-    transactions.filter(isMonthlyBillTransaction).reduce((s, tx) => s + tx.charge_amount, 0),
+    transactions.filter(isMonthlyBillTransaction).reduce((s, tx) => s + effectiveSpend(tx), 0),
   );
 }
 
@@ -59,7 +59,7 @@ export function everydayTransactions(transactions: Transaction[]): Transaction[]
 
 /** Everything on the card except rent, car loan, and Dev Institute. */
 export function everydaySpendingTotal(transactions: Transaction[]): number {
-  return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + tx.charge_amount, 0));
+  return roundMoney(everydayTransactions(transactions).reduce((s, tx) => s + effectiveSpend(tx), 0));
 }
 
 export function isPendingTransaction(tx: Transaction): boolean {
@@ -79,10 +79,10 @@ export function everydaySpendingSettlement(transactions: Transaction[]): {
   let pendingCount = 0;
   for (const tx of everydayTransactions(transactions)) {
     if (isPendingTransaction(tx)) {
-      pending += tx.charge_amount;
+      pending += effectiveSpend(tx);
       pendingCount += 1;
     } else {
-      posted += tx.charge_amount;
+      posted += effectiveSpend(tx);
       postedCount += 1;
     }
   }
@@ -107,9 +107,9 @@ export function monthlyBillsBreakdown(transactions: Transaction[]): {
   let carLoan = 0;
   let devInstitute = 0;
   for (const tx of transactions) {
-    if (isRentTransaction(tx)) rent += tx.charge_amount;
-    else if (isCarLoanTransaction(tx)) carLoan += tx.charge_amount;
-    else if (isDevInstituteTransaction(tx)) devInstitute += tx.charge_amount;
+    if (isRentTransaction(tx)) rent += effectiveSpend(tx);
+    else if (isCarLoanTransaction(tx)) carLoan += effectiveSpend(tx);
+    else if (isDevInstituteTransaction(tx)) devInstitute += effectiveSpend(tx);
   }
   rent = roundMoney(rent);
   carLoan = roundMoney(carLoan);
@@ -167,7 +167,7 @@ export function configuredEverydayChargeRows(transactions: Transaction[]): {
     .map((tx) => ({
       id: chargeId(tx) || tx.merchant_en || tx.merchant_he,
       label: tx.merchant_en || tx.merchant_he,
-      amount: roundMoney(tx.charge_amount),
+      amount: roundMoney(effectiveSpend(tx)),
     }))
     .sort((a, b) => b.amount - a.amount);
 }
@@ -194,10 +194,10 @@ export function everydaySpendingComposition(transactions: Transaction[]): {
   let exportPendingCount = 0;
   for (const tx of exportTxs) {
     if (isPendingTransaction(tx)) {
-      exportPending += tx.charge_amount;
+      exportPending += effectiveSpend(tx);
       exportPendingCount += 1;
     } else {
-      exportPosted += tx.charge_amount;
+      exportPosted += effectiveSpend(tx);
       exportPostedCount += 1;
     }
   }
@@ -226,7 +226,7 @@ export function everydaySpendingByCategory(transactions: Transaction[]): {
   for (const tx of everydayTransactions(transactions)) {
     const cat = rollupCategory(tx.category_en?.trim() || "Uncategorized");
     const cur = map.get(cat) || { total: 0, count: 0 };
-    cur.total += tx.charge_amount;
+    cur.total += effectiveSpend(tx);
     cur.count += 1;
     map.set(cat, cur);
   }
@@ -253,7 +253,7 @@ export function budgetSpendBreakdown(transactions: Transaction[]): {
   let devInstitute = 0;
   let carLoan = 0;
   for (const tx of transactions) {
-    const amt = tx.charge_amount;
+    const amt = effectiveSpend(tx);
     if (isRentTransaction(tx)) rent += amt;
     else if (isCarLoanTransaction(tx)) carLoan += amt;
     else if (isDevInstituteTransaction(tx)) devInstitute += amt;

@@ -6,6 +6,14 @@ export function isRefundTypeHe(transactionTypeHe: string | null | undefined): bo
   return REFUND_TYPE_MARKERS.some((m) => transactionTypeHe.includes(m));
 }
 
+/** Net spend counted toward totals — after any user reimbursement. */
+export function effectiveSpend(tx: {
+  charge_amount: number;
+  effective_amount?: number;
+}): number {
+  return tx.effective_amount ?? tx.charge_amount;
+}
+
 /** Bank credit / refund row. */
 export function isRefundTransaction(tx: {
   charge_amount: number;

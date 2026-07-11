@@ -14,6 +14,7 @@ import {
 } from "../utils/billingCycle.js";
 import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
+import { applyAdjustments } from "./adjustments.js";
 import { applyExclusions } from "./exclusions.js";
 import { dedupeTransactionSnapshots, normalizeForeignCharges, shouldSkipNonSpendRow } from "../utils/fx.js";
 import { prefetchRatesForPending } from "../utils/fxRates.js";
@@ -67,7 +68,7 @@ export function finalizeReport(report: SpendingReport): SpendingReport {
   const withFx = changed
     ? rebuildReportSummaries({ ...base, transactions: normalizedTxs })
     : base;
-  return applyExclusions(augmentReport(remapLegacyCategories(withFx)));
+  return applyAdjustments(applyExclusions(augmentReport(remapLegacyCategories(withFx))));
 }
 
 export async function finalizeReportAsync(report: SpendingReport): Promise<SpendingReport> {

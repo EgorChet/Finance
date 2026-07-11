@@ -4583,6 +4583,23 @@ table.rules select {
   line-height: 1.35;
 }
 
+.tx-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.35rem;
+}
+
+.tx-row-amount-col {
+  text-align: right;
+}
+
+.tx-row-reimbursement {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
 .tx-exclude-btn {
   flex-shrink: 0;
   margin: 0;
@@ -4613,8 +4630,16 @@ table.rules select {
   min-height: 36px;
 }
 
-.pace-manual {
-  margin-bottom: 0;
+.tx-row-actions .tx-exclude-btn {
+  min-height: 36px;
+}
+
+.pace-simple-table-note td {
+  padding-top: 0.15rem;
+  padding-bottom: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.35;
 }
 
 .pace-manual-label {
