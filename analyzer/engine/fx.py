@@ -17,7 +17,7 @@ _USD_MERCHANT = re.compile(
     r"OPENAI|CURSOR|AWS\s|APPLE\.COM|MIDJOURNEY|AIRBNB|GOOGLE|GITHUB|MICROSOFT|"
     r"NETFLIX|SPOTIFY|TRIP\.COM|AIRALO|OMIO|BOUNCE|FILTERLY|SPECIALSCOMEDY|"
     r"yollacalls|CONCERTPLACE|BANDCAMP|economybookings|TradeInn|Farfetch|"
-    r"HOTEL & RESORTS|DRIVALIA|SKIS ROSSIGNOL|EL AL \d",
+    r"HOTEL & RESORTS|DRIVALIA|SKIS ROSSIGNOL|EL AL \d|AEROHANDLING",
     re.IGNORECASE,
 )
 _EUR_MERCHANT = re.compile(
@@ -36,6 +36,12 @@ def _round_money(value: float) -> float:
 
 def _has_hebrew(text: str) -> bool:
     return bool(_HEBREW.search(text))
+
+
+def _is_hebrew_only_merchant(merchant: str) -> bool:
+    if not _has_hebrew(merchant):
+        return False
+    return re.search(r"[A-Za-z]{4,}", merchant) is None
 
 
 def _looks_like_ils_price(amount: float) -> bool:
@@ -74,7 +80,7 @@ def detect_currency(
     if explicit_currency:
         return explicit_currency
 
-    if _has_hebrew(merchant):
+    if _is_hebrew_only_merchant(merchant):
         return "ILS"
 
     if _ILS_MERCHANT.search(merchant):

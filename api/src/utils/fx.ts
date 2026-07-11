@@ -5,7 +5,7 @@ import { getRateToIls } from "./fxRates.js";
 const HEBREW = /[\u0590-\u05FF]/;
 const COUNTRY_SUFFIX = /\s([A-Z]{2})\s*$/;
 const USD_MERCHANT =
-  /OPENAI|CURSOR|AWS\s|APPLE\.COM|MIDJOURNEY|AIRBNB|GOOGLE|GITHUB|MICROSOFT|NETFLIX|SPOTIFY|TRIP\.COM|AIRALO|OMIO|BOUNCE|FILTERLY|SPECIALSCOMEDY|yollacalls|CONCERTPLACE|BANDCAMP|economybookings|TradeInn|Farfetch|HOTEL & RESORTS|DRIVALIA|SKIS ROSSIGNOL|EL AL \d/i;
+  /OPENAI|CURSOR|AWS\s|APPLE\.COM|MIDJOURNEY|AIRBNB|GOOGLE|GITHUB|MICROSOFT|NETFLIX|SPOTIFY|TRIP\.COM|AIRALO|OMIO|BOUNCE|FILTERLY|SPECIALSCOMEDY|yollacalls|CONCERTPLACE|BANDCAMP|economybookings|TradeInn|Farfetch|HOTEL & RESORTS|DRIVALIA|SKIS ROSSIGNOL|EL AL \d|AEROHANDLING/i;
 const EUR_MERCHANT =
   /\b(SRL|SPA|OOD|EOOD|GMBH|TERMINI|ROMA|MILANO|AUTOGRILL|UBR\*|AVIS|ZARA|COS|UNIQLO|POLENE|VIvat|PAUL AIRPORT|DEDEM SPA|PIERLUIGI|SUMUP|MANGO ROMA)\b/i;
 const BGN_MERCHANT = /\b(EOOD|OOD|BALGARIYA|BURGAS|BULGARIA|AMREST KOFI)\b/i;
@@ -18,6 +18,12 @@ function roundMoney(value: number): number {
 
 function hasHebrew(text: string): boolean {
   return HEBREW.test(text);
+}
+
+/** Hebrew-only local merchants — bilingual names (e.g. אירוונדלינג AEROHANDLING) may be foreign. */
+function isHebrewOnlyMerchant(merchant: string): boolean {
+  if (!hasHebrew(merchant)) return false;
+  return !/[A-Za-z]{4,}/.test(merchant);
 }
 
 /** Israeli App Store / local tiers often end in .00 or .90 (not USD .99). */
@@ -47,7 +53,7 @@ export function detectCurrency(
 ): string {
   if (explicitCurrency) return explicitCurrency;
 
-  if (hasHebrew(merchant)) return "ILS";
+  if (isHebrewOnlyMerchant(merchant)) return "ILS";
 
   if (ILS_MERCHANT.test(merchant)) return "ILS";
 
@@ -99,9 +105,11 @@ function explicitCurrencyForTx(
   pendingCurrencies?: Record<string, string> | null,
 ): string | null | undefined {
   if (isPendingCharge(tx.charge_amount, tx.notes, tx.transaction_type_he, tx.amount)) {
-    // Only the statement header is authoritative for pending rows — do not reuse a
-    // stale original_currency from an earlier export (e.g. Apple ₪39.90 saved as USD).
-    return pendingCurrencyForAmount(tx.amount, pendingCurrencies) ?? null;
+    const fromHeader = pendingCurrencyForAmount(tx.amount, pendingCurrencies);
+    if (fromHeader) return fromHeader;
+    const stored = tx.original_currency?.trim();
+    if (stored && stored !== "ILS") return stored;
+    return null;
   }
   return tx.original_currency;
 }

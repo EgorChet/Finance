@@ -239,6 +239,28 @@ def test_detect_currency_honors_explicit_ils():
     assert detect_currency("APPLE.COM/BILL ITUNES.COM IE", 39.99, None, "ILS") == "ILS"
 
 
+def test_detect_currency_bilingual_aerohandling_pending_usd():
+    assert detect_currency("אירוהנדלינג AEROHANDLING", 75, None) == "USD"
+
+
+def test_detect_currency_hebrew_only_stays_ils():
+    assert detect_currency("גוסטו תל אביב", 325, None) == "ILS"
+
+
+@patch("fx.get_rate_to_ils", return_value=3.55)
+def test_pending_aerohandling_usd_without_header(_mock):
+    charge, currency, estimated = resolve_charge_ils(
+        75,
+        None,
+        "אירוהנדלינג AEROHANDLING",
+        "עסקה בקליטה",
+        tx_date=date(2026, 7, 11),
+    )
+    assert currency == "USD"
+    assert estimated is True
+    assert charge == round(75 * 3.55, 2)
+
+
 def test_parse_pending_currencies_comma_decimal_ils():
     rows = [
         ("עסקאות בתהליך קליטה 39,90 ₪",),

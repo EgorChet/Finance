@@ -11,6 +11,9 @@ const CATEGORY_ALIASES: Record<string, string> = {
   "Home & Electronics": "Home & Furniture",
 };
 
+/** Bump when FX / pending-currency normalization logic changes — forces stored reports to re-finalize. */
+const FX_PIPELINE_VERSION = 2;
+
 export async function getFinalizeVersion(): Promise<string> {
   const rules = await readRules();
   const fixed = loadFixedCharges();
@@ -24,6 +27,7 @@ export async function getFinalizeVersion(): Promise<string> {
     aliases: CATEGORY_ALIASES,
     exclusions,
     adjustments,
+    fxPipeline: FX_PIPELINE_VERSION,
   });
   return createHash("sha256").update(payload).digest("hex").slice(0, 16);
 }
