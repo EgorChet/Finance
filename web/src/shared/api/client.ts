@@ -344,6 +344,7 @@ export type CalSyncStatus = {
   card_last4_masked: string | null;
   session_saved?: boolean;
   session_saved_at?: string | null;
+  session_age_minutes?: number | null;
 };
 
 export async function fetchCalStatus(token?: string) {

@@ -498,10 +498,12 @@ const calSyncErrorModal = ref<{
   summary: string;
   logs: { at: string; message: string }[];
   retryLabel: string;
+  forceClassicRetry: boolean;
 } | null>(null);
 const calSyncLastError = ref<{
   summary: string;
   logs: { at: string; message: string }[];
+  forceClassicRetry: boolean;
 } | null>(null);
 
 let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
@@ -685,33 +687,38 @@ function formatCalSyncErrorSummary(status: Pick<CalJobStatusResponse, "error" | 
   return status.error?.trim() || status.message?.trim() || "Cal sync failed";
 }
 
-function calSyncRetryLabel(): string {
-  return calSessionSaved.value ? "Try again" : "Sync Cal";
+function calSyncRetryLabel(forceClassic: boolean): string {
+  if (forceClassic || !calSessionSaved.value) return "Sync Cal";
+  return "Try again";
 }
 
 function showCalSyncFailure(
   summary: string,
   logs: { at: string; message: string }[] = [],
-  options: { title?: string } = {},
+  options: { title?: string; forceClassicRetry?: boolean } = {},
 ) {
   const trimmed = summary.trim() || "Cal sync failed";
-  calSyncLastError.value = { summary: trimmed, logs };
+  const forceClassicRetry = options.forceClassicRetry === true;
+  calSyncLastError.value = { summary: trimmed, logs, forceClassicRetry };
   calSyncFloat.value = null;
   calSyncErrorModal.value = {
     title: options.title || "Cal sync failed",
     summary: trimmed,
     logs: logs.slice(-20),
-    retryLabel: calSyncRetryLabel(),
+    retryLabel: calSyncRetryLabel(forceClassicRetry),
+    forceClassicRetry,
   };
 }
 
 function openCalSyncErrorModal() {
   if (!calSyncLastError.value) return;
+  const forceClassicRetry = calSyncLastError.value.forceClassicRetry;
   calSyncErrorModal.value = {
     title: "Cal sync failed",
     summary: calSyncLastError.value.summary,
     logs: calSyncLastError.value.logs.slice(-20),
-    retryLabel: calSyncRetryLabel(),
+    retryLabel: calSyncRetryLabel(forceClassicRetry),
+    forceClassicRetry,
   };
 }
 
@@ -720,10 +727,13 @@ function dismissCalSyncErrorModal() {
 }
 
 function retryCalSyncFromError() {
+  const forceClassic = calSyncErrorModal.value?.forceClassicRetry === true;
   dismissCalSyncErrorModal();
   calSyncLastError.value = null;
-  if (calSessionSaved.value) void openCalAutoSync();
-  else openCalClassicSync();
+  // After Auto sync fails the saved Cal website session is gone — always use Sync Cal (SMS).
+  // Never retry Auto sync from the error modal; that was a no-op loop.
+  if (forceClassic || !calSessionSaved.value) openCalClassicSync();
+  else void openCalAutoSync();
 }
 
 function onCalSyncStarting(message = "Starting Cal sync…") {
@@ -796,6 +806,7 @@ async function pollCalSyncBackground(jobId: string) {
       }
       showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
         title: isAuto ? "Auto sync failed" : undefined,
+        forceClassicRetry: isAuto,
       });
       return;
     }
@@ -814,6 +825,7 @@ async function pollCalSyncBackground(jobId: string) {
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Cal sync failed", [], {
       title: isAuto ? "Auto sync failed" : undefined,
+      forceClassicRetry: isAuto,
     });
   }
 }
@@ -884,6 +896,7 @@ async function openCalAutoSync() {
       await refreshCalSyncStatus();
       showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs, {
         title: "Auto sync failed",
+        forceClassicRetry: true,
       });
       return;
     }
@@ -894,6 +907,7 @@ async function openCalAutoSync() {
     const message = e instanceof Error ? e.message : String(e);
     showCalSyncFailure(message.trim() || "Auto sync could not start", [], {
       title: "Auto sync failed",
+      forceClassicRetry: true,
     });
   }
 }

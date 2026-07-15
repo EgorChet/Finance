@@ -4,6 +4,7 @@ import { join } from "path";
 import puppeteer, { type Browser, type Cookie, type Frame, type Page } from "puppeteer";
 import type { CalCredentialsData } from "../storage/calCredentials.js";
 import { clearCalSession, readCalSession, writeCalSession, type CalSessionData } from "../storage/calSession.js";
+import { assessCalSessionFreshness } from "./calSessionFreshness.js";
 import { persistCalSyncExport } from "./calSyncPersist.js";
 
 const LOGIN_URL = "https://www.cal-online.co.il/";
@@ -454,7 +455,17 @@ async function persistCalSession(page: Page, job: CalSyncJob): Promise<void> {
 }
 
 async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessionData): Promise<boolean> {
-  jobLog(job, "Restoring saved Cal session…");
+  const freshness = assessCalSessionFreshness(session);
+  if (!freshness.usable) {
+    jobLog(job, `Saved session not usable before browser restore: ${freshness.reason}`);
+    return false;
+  }
+  if (freshness.savedAgeMs != null) {
+    const ageMin = Math.round(freshness.savedAgeMs / 60_000);
+    jobLog(job, `Restoring saved Cal session (saved ~${ageMin} min ago)…`);
+  } else {
+    jobLog(job, "Restoring saved Cal session…");
+  }
 
   const sessionEntries = sessionStorageFrom(session);
   const localEntries = session.local_storage ?? {};
@@ -479,20 +490,40 @@ async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessio
   await page.goto(DIGITAL_URL, { waitUntil: "domcontentloaded", timeout: 90_000 });
 
   jobLog(job, `At ${page.url()} — waiting for dashboard UI…`);
-  const deadline = Date.now() + RESTORE_TIMEOUT_MS;
+  const started = Date.now();
+  const deadline = started + RESTORE_TIMEOUT_MS;
   let lastProgressLog = 0;
+  let loginFormSeenAt: number | null = null;
+
   while (Date.now() < deadline) {
     if (await dashboardReady(page)) {
       jobLog(job, "Saved session is still valid");
       return true;
     }
+
+    const hasToken = await hasAuthToken(page);
+    const onLogin = await loginFormVisible(page);
+
+    // Cal redirects expired sessions to the login form quickly — don't wait the full restore budget.
+    if (onLogin && !hasToken) {
+      if (loginFormSeenAt == null) loginFormSeenAt = Date.now();
+      else if (Date.now() - loginFormSeenAt >= 8_000) {
+        jobLog(job, `Saved session expired (login form after restore — ${await pageDiagnostics(page)})`);
+        return false;
+      }
+    } else {
+      loginFormSeenAt = null;
+    }
+
     const now = Date.now();
     if (now - lastProgressLog >= 10_000) {
       jobLog(
         job,
-        (await hasAuthToken(page))
+        hasToken
           ? "Session token found — waiting for dashboard…"
-          : "No session token yet — waiting for dashboard…",
+          : onLogin
+            ? "Login form visible — session may be expired…"
+            : "No session token yet — waiting for dashboard…",
       );
       lastProgressLog = now;
     }
@@ -505,6 +536,11 @@ async function restoreCalSession(page: Page, job: CalSyncJob, session: CalSessio
   if (await dashboardReady(page)) {
     jobLog(job, "Saved session is still valid");
     return true;
+  }
+
+  if ((await loginFormVisible(page)) && !(await hasAuthToken(page))) {
+    jobLog(job, `Saved session expired after reload (${await pageDiagnostics(page)})`);
+    return false;
   }
 
   jobLog(job, `Saved session could not restore dashboard (${await pageDiagnostics(page)})`);
@@ -1045,20 +1081,33 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
       if (!savedSession) {
         throw new Error("No saved Cal session. Use Sync Cal to sign in with SMS.");
       }
+      const freshness = assessCalSessionFreshness(savedSession);
+      if (!freshness.usable) {
+        await clearCalSession();
+        throw new Error(
+          `${freshness.reason || "Saved Cal session expired"}. Login details are still saved — use Sync Cal once with SMS to refresh Auto sync.`,
+        );
+      }
       loggedIn = await restoreCalSession(page, job, savedSession);
       if (!loggedIn) {
         await clearCalSession();
         throw new Error(
-          "Saved Cal session could not be used. The saved login was cleared — use Sync Cal to sign in again with SMS.",
+          "Saved Cal session expired or could not be restored. Login details are still saved — use Sync Cal once with SMS to refresh Auto sync.",
         );
       }
     } else {
       const savedSession = await readCalSession();
       if (savedSession) {
-        loggedIn = await restoreCalSession(page, job, savedSession);
-        if (!loggedIn) {
+        const freshness = assessCalSessionFreshness(savedSession);
+        if (!freshness.usable) {
           await clearCalSession();
-          jobLog(job, "Saved session cleared — signing in with SMS");
+          jobLog(job, `Saved session skipped (${freshness.reason}) — signing in with SMS`);
+        } else {
+          loggedIn = await restoreCalSession(page, job, savedSession);
+          if (!loggedIn) {
+            await clearCalSession();
+            jobLog(job, "Saved session cleared — signing in with SMS");
+          }
         }
       }
       if (!loggedIn) {
@@ -1089,7 +1138,8 @@ async function runPipeline(job: CalSyncJob, creds: CalCredentialsData): Promise<
     job.error = e instanceof Error ? e.message : String(e);
     jobLog(job, `Failed: ${job.error}`);
     const msg = job.error || "";
-    if (/login|otp|session|dashboard|auth/i.test(msg)) {
+    // Only clear the browser session on auth/session failures — never wipe national_id / card digits.
+    if (/login|otp|session|dashboard|auth|expired/i.test(msg)) {
       await clearCalSession();
     }
   } finally {

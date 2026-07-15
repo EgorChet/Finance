@@ -244,7 +244,8 @@ onBeforeUnmount(stopPolling);
       <template v-else-if="step === 'credentials'">
         <p class="upload-type-hint">
           Enter your Cal login details once. They are stored securely on the server (not in the app).
-          After your first SMS login, the session is saved so you can use Auto sync Cal next time.
+          After SMS login, Auto sync works for a few hours — Cal expires the website session, not your
+          saved teudat/card digits. When Auto sync disappears, use Sync Cal once with SMS to refresh it.
         </p>
         <label class="cal-field">
           <span>Teudat zehut</span>

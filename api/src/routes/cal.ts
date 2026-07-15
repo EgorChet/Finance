@@ -10,13 +10,14 @@ import {
   type CalSyncMode,
 } from "../services/calSyncService.js";
 import { persistCalSyncExport } from "../services/calSyncPersist.js";
+import { assessCalSessionFreshness } from "../services/calSessionFreshness.js";
 import {
   calSyncEnabled,
   maskNationalId,
   readCalCredentials,
   writeCalCredentials,
 } from "../storage/calCredentials.js";
-import { readCalSession } from "../storage/calSession.js";
+import { clearCalSession, readCalSession } from "../storage/calSession.js";
 
 const router = Router();
 
@@ -29,14 +30,28 @@ function assertCalEnabled(): void {
 router.get("/status", async (_req, res) => {
   try {
     const creds = await readCalCredentials();
-    const session = await readCalSession();
+    let session = await readCalSession();
+    let freshness = assessCalSessionFreshness(session);
+    // Drop clearly expired browser sessions so Auto sync disappears and Sync Cal (SMS) is offered.
+    // Credentials (teudat + card last4) stay — only the Cal website login cookie/token is cleared.
+    if (session && !freshness.usable) {
+      try {
+        await clearCalSession();
+      } catch {
+        /* ignore — still report as not saved */
+      }
+      session = null;
+      freshness = assessCalSessionFreshness(null);
+    }
     res.json({
       enabled: calSyncEnabled(),
       configured: Boolean(creds),
       national_id_masked: creds ? maskNationalId(creds.national_id) : null,
       card_last4_masked: creds ? `••••${creds.card_last4.slice(-4)}` : null,
-      session_saved: Boolean(session),
+      session_saved: Boolean(session) && freshness.usable,
       session_saved_at: session?.saved_at ?? null,
+      session_age_minutes:
+        freshness.savedAgeMs != null ? Math.round(freshness.savedAgeMs / 60_000) : null,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
