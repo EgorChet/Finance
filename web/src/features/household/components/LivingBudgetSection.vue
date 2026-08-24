@@ -718,20 +718,17 @@ function prevMonthBefore(ym: string): string {
 }
 
 function addSegment() {
+  // Sort to find the chronologically last segment
   const sorted = [...segments.value].sort((a, b) => a.from_month.localeCompare(b.from_month));
   const last = sorted[sorted.length - 1];
   
-  // Suggest a start date for the new segment, but don't modify existing segments
+  // New segment starts the month after the last segment ends (or current month if no segments)
   let fromMonth = nowYm.value;
   if (last) {
-    if (isOngoingThrough(last.through_month)) {
-      // If last segment is ongoing, suggest current month or the month after its start
-      const afterLast = nextMonthAfter(last.from_month);
-      fromMonth = afterLast > nowYm.value ? afterLast : nowYm.value;
-    } else {
-      // If last segment has an end date, suggest the month after it ends
-      fromMonth = nextMonthAfter(last.through_month);
-    }
+    // If the last segment is "ongoing" (through 2035-12), start after its from_month
+    // Otherwise, start the month after it ends
+    const lastEndMonth = isOngoingThrough(last.through_month) ? last.from_month : last.through_month;
+    fromMonth = nextMonthAfter(lastEndMonth);
   }
   
   const newSeg: LivingBudgetSegment = {
@@ -740,7 +737,7 @@ function addSegment() {
     through_month: ONGOING_THROUGH_MONTH,
   };
   
-  // Add the new segment WITHOUT modifying existing ones
+  // Add the new segment - NEVER modify existing segments
   segments.value = [...segments.value, newSeg];
   editingTopup.value = null;
   topupEditSnapshot.value = null;
