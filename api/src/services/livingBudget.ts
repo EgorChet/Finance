@@ -1,9 +1,7 @@
-import type { LivingBudgetData, LivingBudgetMonthTopup, LivingBudgetSegment } from "../types.js";
+import type { FixedCharge, LivingBudgetData, LivingBudgetMonthTopup, LivingBudgetSegment } from "../types.js";
 import { readLivingBudget, writeLivingBudget } from "../storage/index.js";
 
 export const ONGOING_THROUGH_MONTH = "2035-12";
-/** Employer Cibus card — loaded monthly, spent as groceries; not on the Visa export. */
-export const CIBUS_MONTHLY_ALLOWANCE = 600;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 let cached: LivingBudgetData | null = null;
@@ -32,6 +30,69 @@ function normalizeData(user: LivingBudgetData): LivingBudgetData {
   };
 }
 
+// ===== Cap additions (Cibus + Rent) =====
+
+const CIBUS_CHARGE_IDS = new Set(["cibus-card", "cibus"]);
+const CIBUS_NAME_RE = /\bcibus\b/i;
+const RENT_CHARGE_IDS = new Set(["flat-rent", "rent"]);
+const RENT_NAME_RE = /\b(flat rent|rent\b|שכירות)/i;
+const CAR_LOAN_NAME_RE = /\b(car loan|הלוואת רכב)/i;
+
+function isMonthlyCharge(charge: FixedCharge): boolean {
+  return charge.schedule !== "once";
+}
+
+function isConfiguredEverydayCharge(charge: FixedCharge): boolean {
+  // Everyday charges exclude rent, car loans, education (fixed cost categories)
+  // For simplicity, we check if it's NOT a rent charge using the naming patterns
+  const name = `${charge.name_en} ${charge.name_he || ""}`;
+  return !RENT_NAME_RE.test(name) || CAR_LOAN_NAME_RE.test(name);
+}
+
+function isCibusConfiguredCharge(charge: FixedCharge): boolean {
+  if (CIBUS_CHARGE_IDS.has(charge.id)) return true;
+  const name = `${charge.name_en} ${charge.name_he || ""}`;
+  return CIBUS_NAME_RE.test(name) && isConfiguredEverydayCharge(charge);
+}
+
+function isRentConfiguredCharge(charge: FixedCharge): boolean {
+  if (RENT_CHARGE_IDS.has(charge.id)) return true;
+  const name = `${charge.name_en} ${charge.name_he || ""}`;
+  return RENT_NAME_RE.test(name) && !CAR_LOAN_NAME_RE.test(name);
+}
+
+function chargesForMonth(ym: string, charges: FixedCharge[]): FixedCharge[] {
+  return charges.filter((c) => c.from_month <= ym && ym <= c.through_month);
+}
+
+function cibusChargeForMonth(ym: string, charges: FixedCharge[]): FixedCharge | null {
+  const active = chargesForMonth(ym, charges).filter(
+    (c) => isCibusConfiguredCharge(c) && isMonthlyCharge(c),
+  );
+  return active.find((c) => CIBUS_CHARGE_IDS.has(c.id)) ?? active[0] ?? null;
+}
+
+function rentChargeForMonth(ym: string, charges: FixedCharge[]): FixedCharge | null {
+  const active = chargesForMonth(ym, charges).filter(
+    (c) => isRentConfiguredCharge(c) && isMonthlyCharge(c),
+  );
+  return active.find((c) => RENT_CHARGE_IDS.has(c.id)) ?? active[0] ?? null;
+}
+
+function cibusAllowanceForMonth(ym: string, charges: FixedCharge[]): number {
+  const charge = cibusChargeForMonth(ym, charges);
+  return charge ? Math.round(charge.amount * 100) / 100 : 0;
+}
+
+function fatherInjectionForMonth(ym: string, charges: FixedCharge[]): number {
+  const charge = rentChargeForMonth(ym, charges);
+  return charge ? Math.round(charge.amount * 100) / 100 : 0;
+}
+
+function capAdditionsForMonth(ym: string, charges: FixedCharge[]): number {
+  return Math.round((cibusAllowanceForMonth(ym, charges) + fatherInjectionForMonth(ym, charges)) * 100) / 100;
+}
+
 export async function refreshLivingBudgetCache(): Promise<void> {
   const user = await readLivingBudget();
   cached = normalizeData(user);
@@ -54,10 +115,10 @@ export function loadLivingBudgetMonthTopups(): LivingBudgetMonthTopup[] {
   return loadLivingBudgetData().month_topups || [];
 }
 
-function livingBudgetBaseForMonth(ym: string, segments: LivingBudgetSegment[]): number | null {
+function livingBudgetBaseForMonth(ym: string, segments: LivingBudgetSegment[], charges: FixedCharge[] = []): number | null {
   const match = segments.find((s) => s.from_month <= ym && ym <= s.through_month);
   if (!match) return null;
-  return Math.round((match.amount + CIBUS_MONTHLY_ALLOWANCE) * 100) / 100;
+  return Math.round((match.amount + capAdditionsForMonth(ym, charges)) * 100) / 100;
 }
 
 function monthTopupExtraForMonth(ym: string, monthTopups: LivingBudgetMonthTopup[]): number {
@@ -70,8 +131,9 @@ export function livingBudgetForMonth(
   ym: string,
   segments = loadLivingBudgetSegments(),
   monthTopups = loadLivingBudgetMonthTopups(),
+  charges: FixedCharge[] = [],
 ): number | null {
-  const base = livingBudgetBaseForMonth(ym, segments);
+  const base = livingBudgetBaseForMonth(ym, segments, charges);
   if (base === null) return null;
   return Math.round((base + monthTopupExtraForMonth(ym, monthTopups)) * 100) / 100;
 }
@@ -104,6 +166,7 @@ export function validateLivingBudgetSegments(segments: LivingBudgetSegment[]): s
 export function validateLivingBudgetMonthTopups(
   monthTopups: LivingBudgetMonthTopup[],
   segments: LivingBudgetSegment[],
+  charges: FixedCharge[] = [],
 ): string | null {
   const seen = new Set<string>();
   for (const raw of monthTopups) {
@@ -112,7 +175,7 @@ export function validateLivingBudgetMonthTopups(
     if (!Number.isFinite(topup.extra) || topup.extra <= 0) return "Each monthly extra must be positive";
     if (seen.has(topup.month)) return `Only one extra amount per month (${topup.month})`;
     seen.add(topup.month);
-    if (livingBudgetBaseForMonth(topup.month, segments) === null) {
+    if (livingBudgetBaseForMonth(topup.month, segments, charges) === null) {
       return `No base budget covers ${topup.month}`;
     }
   }
@@ -122,21 +185,23 @@ export function validateLivingBudgetMonthTopups(
 export function validateLivingBudget(
   segments: LivingBudgetSegment[],
   monthTopups: LivingBudgetMonthTopup[] = [],
+  charges: FixedCharge[] = [],
 ): string | null {
   const segmentError = validateLivingBudgetSegments(segments);
   if (segmentError) return segmentError;
-  return validateLivingBudgetMonthTopups(monthTopups, segments);
+  return validateLivingBudgetMonthTopups(monthTopups, segments, charges);
 }
 
 export async function saveLivingBudget(
   segments: LivingBudgetSegment[],
   monthTopups: LivingBudgetMonthTopup[] = [],
+  charges: FixedCharge[] = [],
 ): Promise<LivingBudgetData> {
   const normalized: LivingBudgetData = {
     segments: segments.map(normalizeSegment).sort((a, b) => a.from_month.localeCompare(b.from_month)),
     month_topups: monthTopups.map(normalizeMonthTopup).sort((a, b) => a.month.localeCompare(b.month)),
   };
-  const error = validateLivingBudget(normalized.segments, normalized.month_topups);
+  const error = validateLivingBudget(normalized.segments, normalized.month_topups, charges);
   if (error) throw new Error(error);
   await writeLivingBudget(normalized);
   cached = null;
