@@ -714,6 +714,17 @@ watch(newRecurringOngoing, (on) => {
   }
 });
 
+// Clear validation error when budget data becomes valid
+watch([livingBudgetSegments, livingBudgetMonthTopups], () => {
+  if (status.value && isBudgetDirty()) {
+    const budgetError = validateLivingBudget(livingBudgetSegments.value, livingBudgetMonthTopups.value);
+    if (!budgetError) {
+      status.value = "";
+      saveError.value = false;
+    }
+  }
+}, { deep: true });
+
 function toggleAddForm(kind: AddFormKind) {
   if (activeAddForm.value === kind) {
     activeAddForm.value = null;

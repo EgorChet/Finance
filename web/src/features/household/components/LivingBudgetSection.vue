@@ -524,28 +524,42 @@ const sortedSegments = computed(() =>
 );
 
 const headlineSegment = computed(() => {
-  const active = sortedSegments.value.find(
-    ({ seg }) => segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "active",
-  );
+  // If we're editing a segment, keep the layout stable by using status from the snapshot
+  const editingIndex = editingSegmentIndex.value;
+  
+  const active = sortedSegments.value.find(({ seg, index }) => {
+    // Use snapshot data for the segment being edited to prevent jumping
+    const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+    return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "active";
+  });
   if (active) return active;
+  
   return (
-    sortedSegments.value.find(
-      ({ seg }) => segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "upcoming",
-    ) ?? null
+    sortedSegments.value.find(({ seg, index }) => {
+      const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+      return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "upcoming";
+    }) ?? null
   );
 });
 
-const headlineSegmentIsActive = computed(
-  () =>
-    !!headlineSegment.value &&
-    segmentStatus(headlineSegment.value.seg.from_month, headlineSegment.value.seg.through_month, nowYm.value) ===
-      "active",
-);
+const headlineSegmentIsActive = computed(() => {
+  if (!headlineSegment.value) return false;
+  const editingIndex = editingSegmentIndex.value;
+  const seg = headlineSegment.value.seg;
+  const index = headlineSegment.value.index;
+  // Use snapshot data for the segment being edited to prevent jumping
+  const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+  return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "active";
+});
 
 const listedSegments = computed(() => {
   const headline = headlineSegment.value;
-  return sortedSegments.value.filter(({ seg }) => {
-    if (segmentStatus(seg.from_month, seg.through_month, nowYm.value) === "ended") return false;
+  const editingIndex = editingSegmentIndex.value;
+  
+  return sortedSegments.value.filter(({ seg, index }) => {
+    // Use snapshot data for the segment being edited to prevent jumping
+    const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+    if (segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "ended") return false;
     if (!headline) return true;
     return seg !== headline.seg;
   });
