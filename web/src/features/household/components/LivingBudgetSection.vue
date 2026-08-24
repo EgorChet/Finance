@@ -27,7 +27,7 @@
     <template v-else>
       <template v-if="headlineSegment">
         <article
-          v-if="readonly || !isEditingSegment(headlineSegment.index)"
+          v-if="readonly || !isEditingSegment(headlineSegment.seg)"
           class="living-budget-current"
         >
           <div class="living-budget-current__header">
@@ -48,7 +48,7 @@
                 type="button"
                 class="btn btn-edit"
                 :disabled="disabled"
-                @click="startEditSegment(headlineSegment.index)"
+                @click="startEditSegment(headlineSegment.seg)"
               >
                 Edit
               </button>
@@ -63,8 +63,8 @@
           :disabled="disabled"
           deletable
           :delete-label="segmentDeleteLabel"
-          @done="finishEditSegment(headlineSegment.index)"
-          @cancel="cancelEditSegment(headlineSegment.index)"
+          @done="finishEditSegment(headlineSegment.seg)"
+          @cancel="cancelEditSegment(headlineSegment.seg)"
           @delete="removeSegment(headlineSegment.seg)"
         >
           <div class="recurring-segment-row">
@@ -106,11 +106,11 @@
 
       <ul v-if="listedSegments.length" class="charge-compact-list living-budget-period-list">
         <li
-          v-for="{ seg, index } in listedSegments"
-          :key="`budget-seg-${index}`"
+          v-for="{ seg } in listedSegments"
+          :key="`budget-seg-${seg.from_month}-${seg.through_month}`"
           class="charge-compact-row-wrap"
         >
-          <article v-if="readonly || !isEditingSegment(index)" class="living-budget-card">
+          <article v-if="readonly || !isEditingSegment(seg)" class="living-budget-card">
             <header class="living-budget-card__header">
               <div class="living-budget-card__summary">
                 <div class="living-budget-card__total">{{ formatIls(segmentTotalCap(seg)) }}</div>
@@ -131,7 +131,7 @@
                     type="button"
                     class="btn btn-edit"
                     :disabled="disabled"
-                    @click="startEditSegment(index)"
+                    @click="startEditSegment(seg)"
                   >
                     Edit
                   </button>
@@ -200,8 +200,8 @@
             :disabled="disabled"
             deletable
             :delete-label="segmentDeleteLabel"
-            @done="finishEditSegment(index)"
-            @cancel="cancelEditSegment(index)"
+            @done="finishEditSegment(seg)"
+            @cancel="cancelEditSegment(seg)"
             @delete="removeSegment(seg)"
           >
             <div class="recurring-segment-row">
@@ -249,11 +249,11 @@
 
       <ul v-if="showEndedBudget && endedSegments.length" class="charge-compact-list living-budget-period-list household-ended-list">
         <li
-          v-for="{ seg, index } in endedSegments"
-          :key="`budget-ended-${index}`"
+          v-for="{ seg } in endedSegments"
+          :key="`budget-ended-${seg.from_month}-${seg.through_month}`"
           class="charge-compact-row-wrap"
         >
-          <article v-if="readonly || !isEditingSegment(index)" class="living-budget-card living-budget-card--ended">
+          <article v-if="readonly || !isEditingSegment(seg)" class="living-budget-card living-budget-card--ended">
             <header class="living-budget-card__header">
               <div class="living-budget-card__summary">
                 <div class="living-budget-card__total">{{ formatIls(segmentTotalCap(seg)) }}</div>
@@ -268,7 +268,7 @@
                     type="button"
                     class="btn btn-edit"
                     :disabled="disabled"
-                    @click="startEditSegment(index)"
+                    @click="startEditSegment(seg)"
                   >
                     Edit
                   </button>
@@ -284,8 +284,8 @@
             :disabled="disabled"
             deletable
             :delete-label="segmentDeleteLabel"
-            @done="finishEditSegment(index)"
-            @cancel="cancelEditSegment(index)"
+            @done="finishEditSegment(seg)"
+            @cancel="cancelEditSegment(seg)"
             @delete="removeSegment(seg)"
           >
             <div class="recurring-segment-row">
@@ -498,7 +498,7 @@ const emit = defineEmits<{
 
 const segments = defineModel<LivingBudgetSegment[]>("segments", { required: true });
 const monthTopups = defineModel<LivingBudgetMonthTopup[]>("monthTopups", { required: true });
-const editingSegmentIndex = ref<number | null>(null);
+const editingSegment = ref<LivingBudgetSegment | null>(null);
 const editingTopup = ref<LivingBudgetMonthTopup | null>(null);
 const segmentEditSnapshot = ref<LivingBudgetSegment | null>(null);
 const topupEditSnapshot = ref<LivingBudgetMonthTopup | null>(null);
@@ -525,18 +525,18 @@ const sortedSegments = computed(() =>
 
 const headlineSegment = computed(() => {
   // If we're editing a segment, keep the layout stable by using status from the snapshot
-  const editingIndex = editingSegmentIndex.value;
+  const editingSeg = editingSegment.value;
   
-  const active = sortedSegments.value.find(({ seg, index }) => {
+  const active = sortedSegments.value.find(({ seg }) => {
     // Use snapshot data for the segment being edited to prevent jumping
-    const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+    const checkSeg = seg === editingSeg && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
     return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "active";
   });
   if (active) return active;
   
   return (
-    sortedSegments.value.find(({ seg, index }) => {
-      const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+    sortedSegments.value.find(({ seg }) => {
+      const checkSeg = seg === editingSeg && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
       return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "upcoming";
     }) ?? null
   );
@@ -544,21 +544,20 @@ const headlineSegment = computed(() => {
 
 const headlineSegmentIsActive = computed(() => {
   if (!headlineSegment.value) return false;
-  const editingIndex = editingSegmentIndex.value;
+  const editingSeg = editingSegment.value;
   const seg = headlineSegment.value.seg;
-  const index = headlineSegment.value.index;
   // Use snapshot data for the segment being edited to prevent jumping
-  const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+  const checkSeg = seg === editingSeg && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
   return segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "active";
 });
 
 const listedSegments = computed(() => {
   const headline = headlineSegment.value;
-  const editingIndex = editingSegmentIndex.value;
+  const editingSeg = editingSegment.value;
   
-  return sortedSegments.value.filter(({ seg, index }) => {
+  return sortedSegments.value.filter(({ seg }) => {
     // Use snapshot data for the segment being edited to prevent jumping
-    const checkSeg = index === editingIndex && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
+    const checkSeg = seg === editingSeg && segmentEditSnapshot.value ? segmentEditSnapshot.value : seg;
     if (segmentStatus(checkSeg.from_month, checkSeg.through_month, nowYm.value) === "ended") return false;
     if (!headline) return true;
     return seg !== headline.seg;
@@ -615,8 +614,8 @@ function topupRowKey(topup: LivingBudgetMonthTopup, index: number): string {
   return `topup-${topup.month}-${index}`;
 }
 
-function isEditingSegment(index: number): boolean {
-  return editingSegmentIndex.value === index;
+function isEditingSegment(seg: LivingBudgetSegment): boolean {
+  return editingSegment.value === seg;
 }
 
 function isEditingTopup(topup: LivingBudgetMonthTopup): boolean {
@@ -631,39 +630,44 @@ function editRecurringCharge(chargeId: string, fromMonth: string) {
   emit("editRecurringCharge", chargeId, fromMonth);
 }
 
-function startEditSegment(index: number) {
+function startEditSegment(seg: LivingBudgetSegment) {
   editingTopup.value = null;
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  editingSegmentIndex.value = index;
-  segmentEditSnapshot.value = { ...segments.value[index] };
+  editingSegment.value = seg;
+  segmentEditSnapshot.value = { ...seg };
   segmentIsNew.value = false;
 }
 
-async function finishEditSegment(index: number) {
-  if (editingSegmentIndex.value !== index) return;
-  editingSegmentIndex.value = null;
+async function finishEditSegment(seg: LivingBudgetSegment) {
+  if (editingSegment.value !== seg) return;
+  editingSegment.value = null;
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
   emit("save");
 }
 
-function cancelEditSegment(index: number) {
-  if (editingSegmentIndex.value !== index) return;
+function cancelEditSegment(seg: LivingBudgetSegment) {
+  if (editingSegment.value !== seg) return;
 
   if (segmentIsNew.value) {
-    segments.value = segments.value.filter((_, i) => i !== index);
+    // Remove the new segment
+    segments.value = segments.value.filter((s) => s !== seg);
   } else if (segmentEditSnapshot.value) {
-    segments.value[index] = { ...segmentEditSnapshot.value };
+    // Restore the segment from snapshot
+    const index = segments.value.indexOf(seg);
+    if (index !== -1) {
+      segments.value[index] = { ...segmentEditSnapshot.value };
+    }
   }
 
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
-  editingSegmentIndex.value = null;
+  editingSegment.value = null;
 }
 
 function startEditTopup(topup: LivingBudgetMonthTopup) {
-  editingSegmentIndex.value = null;
+  editingSegment.value = null;
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
   editingTopup.value = topup;
@@ -718,7 +722,7 @@ function prevMonthBefore(ym: string): string {
 }
 
 function addSegment() {
-  // Sort to find the chronologically last segment
+  // Sort to find the chronologically last segment  
   const sorted = [...segments.value].sort((a, b) => a.from_month.localeCompare(b.from_month));
   const last = sorted[sorted.length - 1];
   
@@ -737,14 +741,18 @@ function addSegment() {
     through_month: ONGOING_THROUGH_MONTH,
   };
   
-  // Add the new segment - NEVER modify existing segments
-  segments.value = [...segments.value, newSeg];
+  // Set edit state BEFORE adding to segments
   editingTopup.value = null;
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  editingSegmentIndex.value = segments.value.length - 1;
   segmentEditSnapshot.value = { ...newSeg };
   segmentIsNew.value = true;
+  
+  // Add the new segment
+  segments.value = [...segments.value, newSeg];
+  
+  // Set editing to the new segment (use the reference from the array)
+  editingSegment.value = segments.value[segments.value.length - 1];
 }
 
 async function removeSegment(seg: LivingBudgetSegment) {
@@ -755,11 +763,11 @@ async function removeSegment(seg: LivingBudgetSegment) {
     tone: "danger",
   });
   if (!ok) return;
-  const index = segments.value.indexOf(seg);
-  if (editingSegmentIndex.value === index) editingSegmentIndex.value = null;
-  else if (editingSegmentIndex.value !== null && editingSegmentIndex.value > index) {
-    editingSegmentIndex.value -= 1;
+  
+  if (editingSegment.value === seg) {
+    editingSegment.value = null;
   }
+  
   segments.value = segments.value.filter((s) => s !== seg);
   emit("save");
 }
@@ -772,7 +780,7 @@ function addMonthTopup() {
   }
   const newTopup: LivingBudgetMonthTopup = { month, extra: 500 };
   monthTopups.value = [...monthTopups.value, newTopup];
-  editingSegmentIndex.value = null;
+  editingSegment.value = null;
   segmentEditSnapshot.value = null;
   segmentIsNew.value = false;
   editingTopup.value = newTopup;
