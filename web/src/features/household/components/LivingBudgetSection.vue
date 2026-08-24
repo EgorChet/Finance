@@ -741,18 +741,18 @@ function addSegment() {
     through_month: ONGOING_THROUGH_MONTH,
   };
   
-  // Set edit state BEFORE adding to segments
+  // Add the new segment FIRST
+  segments.value.push(newSeg);
+  
+  // NOW set the editing state - use the actual reference from the array
+  const addedSegment = segments.value[segments.value.length - 1];
+  
   editingTopup.value = null;
   topupEditSnapshot.value = null;
   topupIsNew.value = false;
-  segmentEditSnapshot.value = { ...newSeg };
+  segmentEditSnapshot.value = { ...addedSegment };
   segmentIsNew.value = true;
-  
-  // Add the new segment
-  segments.value = [...segments.value, newSeg];
-  
-  // Set editing to the new segment (use the reference from the array)
-  editingSegment.value = segments.value[segments.value.length - 1];
+  editingSegment.value = addedSegment;
 }
 
 async function removeSegment(seg: LivingBudgetSegment) {
