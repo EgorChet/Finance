@@ -313,12 +313,13 @@ router.put("/living-budget", async (req, res) => {
     res.status(400).json({ error: "segments array required" });
     return;
   }
-  const error = validateLivingBudget(segments, monthTopups);
+  const charges = loadFixedCharges();
+  const error = validateLivingBudget(segments, monthTopups, charges);
   if (error) {
     res.status(400).json({ error });
     return;
   }
-  const saved = await saveLivingBudget(segments, monthTopups);
+  const saved = await saveLivingBudget(segments, monthTopups, charges);
   res.json({ saved: true, segments: saved.segments, month_topups: saved.month_topups || [] });
 });
 
