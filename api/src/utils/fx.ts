@@ -97,6 +97,11 @@ export function pendingCurrencyForAmount(
     const hit = pendingCurrencies[k];
     if (hit) return hit;
   }
+  // Foreign amounts are listed individually on the Leumi header. The ₪ figure is often a
+  // total of several pending ILS lines — unmatched pending amounts belong to that bucket.
+  if (Object.values(pendingCurrencies).some((currency) => currency === "ILS")) {
+    return "ILS";
+  }
   return undefined;
 }
 

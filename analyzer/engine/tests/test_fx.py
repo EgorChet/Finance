@@ -2,7 +2,7 @@ from datetime import date
 from unittest.mock import patch
 
 from fx import detect_currency, resolve_charge_ils, should_skip_installment_row, should_skip_non_spend_row
-from parser import parse_pending_currencies
+from parser import parse_pending_currencies, pending_currency_for_amount
 
 
 def test_cursor_usd_uses_bank_ils_charge():
@@ -67,6 +67,96 @@ def test_parse_pending_currencies_from_header():
         ("תאריך", "שם בית עסק", "סכום"),
     ]
     assert parse_pending_currencies(rows, 1) == {313.82: "ILS", 469.4: "PLN"}
+
+
+def test_pending_currency_ils_bucket_covers_line_items():
+    """Header ₪ total is a sum — individual pending lines still count as ILS."""
+    pending = {705.91: "ILS"}
+    assert pending_currency_for_amount(192.91, pending) == "ILS"
+    assert pending_currency_for_amount(400, pending) == "ILS"
+    assert pending_currency_for_amount(705.91, pending) == "ILS"
+
+
+def test_pending_currency_foreign_amount_wins_over_ils_bucket():
+    pending = {313.82: "ILS", 469.4: "PLN"}
+    assert pending_currency_for_amount(469.4, pending) == "PLN"
+    assert pending_currency_for_amount(50, pending) == "ILS"
+
+
+def test_pending_currency_no_ils_bucket_without_match():
+    pending = {75.0: "USD"}
+    assert pending_currency_for_amount(75, pending) == "USD"
+    assert pending_currency_for_amount(50, pending) is None
+
+
+def test_pending_cursor_ils_from_header_bucket():
+    """CURSOR is usually USD, but this statement's pending bucket is ₪-only."""
+    charge, currency, estimated = resolve_charge_ils(
+        192.91,
+        None,
+        "CURSOR, AI POWERED IDE +18314259504 US",
+        "עסקה בקליטה",
+        tx_date=date(2026, 10, 16),
+        explicit_currency="ILS",
+    )
+    assert charge == 192.91
+    assert currency == "ILS"
+    assert estimated is True
+
+
+def test_parser_cursor_pending_ils_from_ils_only_header():
+    """Pending header '705.91 ₪' is a sum — CURSOR 192.91 must not be treated as USD."""
+    from datetime import datetime
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from openpyxl import Workbook
+
+    from parser import parse_leumi_visa_xlsx
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["פירוט עסקאות"])
+    ws.append([])
+    ws.append(["עסקאות לחיוב ב-10/11/2026: 2,250.73 ₪"])
+    ws.append(["עסקאות בתהליך קליטה 705.91 ₪"])
+    ws.append(["תאריך", "שם בית עסק", "סכום", "סכום חיוב", "סוג", "ענף", "הערות"])
+    ws.append(
+        [
+            datetime(2026, 10, 16),
+            "CURSOR, AI POWERED IDE +18314259504 US",
+            192.91,
+            None,
+            "רכישה רגילה",
+            "מחשבים",
+            "עסקה בקליטה",
+        ]
+    )
+    ws.append([datetime(2026, 10, 16), "לאומי בונוס פ", 400, None, "רכישה רגילה", "אירועים", "עסקה בקליטה"])
+    ws.append([datetime(2026, 10, 16), "ארקפה פולג", 78, None, "רכישה רגילה", "מסעדות", "עסקה בקליטה"])
+    ws.append(
+        [
+            datetime(2026, 10, 14),
+            'סנטרל פארק בע"מ- אפליקציה',
+            35,
+            None,
+            "רכישה רגילה",
+            "תיירות",
+            "עסקה בקליטה",
+        ]
+    )
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "pending_ils_cursor.xlsx"
+        wb.save(path)
+        txs, meta = parse_leumi_visa_xlsx(path)
+
+    assert meta["pending_currencies"]["705.91"] == "ILS"
+    cursor = next(tx for tx in txs if "CURSOR" in tx.merchant_he)
+    assert cursor.amount == 192.91
+    assert cursor.charge_amount == 192.91
+    assert cursor.original_currency == "ILS"
+    assert cursor.charge_estimated is True
 
 
 def test_pending_yalla_balagan_uses_ils_from_header():
