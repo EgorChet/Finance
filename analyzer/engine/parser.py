@@ -73,6 +73,24 @@ def parse_pending_currencies(rows: list[tuple], header_idx: int) -> dict[float, 
     return by_amount
 
 
+def pending_currency_for_amount(
+    amount: float,
+    pending_currencies: dict[float, str],
+) -> Optional[str]:
+    """Map a pending line amount to currency from the statement header.
+
+    Foreign amounts are listed individually (e.g. '469.40 PLN') and match exactly.
+    The ₪ figure is often a *total* of several pending ILS lines — so when the header
+    has an ILS bucket and this amount is not a listed foreign amount, treat it as ILS.
+    """
+    hit = pending_currencies.get(_amount_key(amount))
+    if hit:
+        return hit
+    if any(currency == "ILS" for currency in pending_currencies.values()):
+        return "ILS"
+    return None
+
+
 def _find_header_row(rows: list[tuple]) -> Optional[int]:
     for idx, row in enumerate(rows):
         joined = " ".join(str(cell) for cell in row if cell is not None)
@@ -149,7 +167,10 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
             ):
                 continue
             merchant = str(row[1] or "").strip()
-            explicit = pending_currencies.get(_amount_key(amount))
+            if is_pending_charge(row[3], notes, transaction_type_he=tx_type, amount=amount):
+                explicit = pending_currency_for_amount(amount, pending_currencies)
+            else:
+                explicit = pending_currencies.get(_amount_key(amount))
             currency = detect_currency(merchant, amount, None, explicit)
             if currency != "ILS":
                 rate_pairs.add((currency, _to_date(row[0]).isoformat()))
@@ -170,7 +191,11 @@ def parse_leumi_visa_xlsx(path: Path) -> tuple[list[Transaction], dict]:
             if should_skip_non_spend_row(row[3], merchant, notes, transaction_type_he=tx_type):
                 continue
             tx_date = _to_date(row[0])
-            explicit = pending_currencies.get(_amount_key(amount))
+            # Header ILS totals cover several pending lines; only pending rows use that default.
+            if is_pending_charge(row[3], notes, transaction_type_he=tx_type, amount=amount):
+                explicit = pending_currency_for_amount(amount, pending_currencies)
+            else:
+                explicit = pending_currencies.get(_amount_key(amount))
             charge_ils, original_currency, estimated = resolve_charge_ils(
                 amount,
                 row[3],
