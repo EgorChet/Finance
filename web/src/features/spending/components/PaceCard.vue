@@ -369,7 +369,9 @@ const injectionCushionVerdict = computed(() =>
 );
 
 const paceTone = computed(
-  () => props.paceTone ?? paceHealthTone(budgetContext.value, projectedVsUsualDelta.value),
+  () =>
+    props.paceTone ??
+    paceHealthTone(budgetContext.value, projectedVsUsualDelta.value, pace.value?.vsAvgDelta ?? 0),
 );
 
 const budgetNote = computed(() => {
@@ -391,7 +393,10 @@ const projectedDeltaClass = computed(() => {
   return "";
 });
 
+const overBudgetNow = computed(() => (budgetContext.value?.moneyLeft ?? 0) < 0);
+
 const verdictStatus = computed(() => {
+  if (overBudgetNow.value) return "Over budget";
   if (injectionCushionVerdict.value) return injectionCushionVerdict.value.status;
   if (!projectionReliable.value) {
     const nowGap = pace.value?.vsAvgDelta ?? 0;
@@ -408,6 +413,11 @@ const verdictStatus = computed(() => {
 });
 
 const verdictDelta = computed(() => {
+  if (overBudgetNow.value && budgetContext.value) {
+    const over = `${formatIls(Math.abs(budgetContext.value.moneyLeft))} over this cycle's budget`;
+    const nowGap = pace.value?.vsAvgDelta ?? 0;
+    return nowGap > 50 ? `${over} · ~${formatAboutIls(nowGap)} above usual so far` : over;
+  }
   if (injectionCushionVerdict.value) return "";
 
   if (!projectionReliable.value) {

@@ -240,6 +240,8 @@ export function paceInjectionCushionVerdict(ctx: PaceBudgetContext): {
   if (ctx.topupExtra <= 0 || netVsLast == null || paceGap >= -50 || netVsLast <= 50) {
     return null;
   }
+  // The injection can't "cover" anything once the cap itself is exceeded.
+  if (ctx.moneyLeft < 0 || ctx.projectedMoneyLeft < 0) return null;
 
   const reserve = roundMoney(netVsLast + paceGap);
   if (reserve <= 0) return null;
@@ -264,15 +266,22 @@ export type PaceHealthTone = "good" | "warn" | "bad";
 export function paceHealthTone(
   ctx: PaceBudgetContext | null,
   projectedVsUsualDelta: number,
+  /** Everyday spend so far minus usual spend at this point in the cycle. */
+  spentVsUsualSoFar = 0,
 ): PaceHealthTone {
+  const aheadOfUsualSoFar = spentVsUsualSoFar > 50;
   if (ctx) {
+    // Over the cap, now or by the end of the cycle: never green.
+    if (ctx.moneyLeft < 0 || ctx.projectedMoneyLeft < 0) return "bad";
     const paceGap = roundMoney(ctx.projectedMoneyLeft - ctx.usualProjectedMoneyLeft);
     const overspending = projectedVsUsualDelta > 50 || paceGap < -50;
-    if (!overspending) return "good";
-    if (paceInjectionCushionVerdict(ctx)) return "warn";
-    return "bad";
+    if (overspending) return paceInjectionCushionVerdict(ctx) ? "warn" : "bad";
+    // Forecast looks fine, but more than usual is already spent: flag it, don't say "good".
+    if (aheadOfUsualSoFar) return "warn";
+    return "good";
   }
   if (projectedVsUsualDelta > 50) return "bad";
+  if (aheadOfUsualSoFar) return "warn";
   return "good";
 }
 
