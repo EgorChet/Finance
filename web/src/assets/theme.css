@@ -1140,3 +1140,317 @@ body {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
 }
+
+/* ---------- Sheet editor (edit / add forms) ---------- */
+
+html.sheet-editor-open,
+html.sheet-editor-open body {
+  overflow: hidden;
+}
+
+.sheet-editor {
+  display: flex;
+  flex-direction: column;
+  max-height: 92dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.5rem 1.15rem max(1.15rem, env(safe-area-inset-bottom));
+}
+
+.sheet-editor__head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.sheet-editor__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.sheet-editor__cancel {
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 0.4rem 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.sheet-editor__subtitle {
+  margin: 0 0 0.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.sheet-editor__body {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 0 0.5rem;
+}
+
+.sheet-editor__error {
+  margin: 0.25rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.sheet-editor__foot {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 1rem;
+}
+
+.sheet-editor__save {
+  width: 100%;
+  min-height: 54px;
+  border-radius: 18px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.sheet-editor__delete {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.sheet-editor__delete:disabled,
+.sheet-editor__cancel:disabled {
+  opacity: 0.45;
+}
+
+/* Fields inside a sheet: large labels and 16px+ text so iOS never zooms. */
+.sheet-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.sheet-field__label {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.sheet-field__hint {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.sheet-editor .input,
+.sheet-editor .select-field {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.05rem;
+  background-color: var(--surface-alt);
+}
+
+.sheet-editor .input:focus,
+.sheet-editor .select-field:focus {
+  background-color: var(--surface-alt);
+}
+
+.sheet-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.sheet-editor .month-select {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 0.5rem;
+}
+
+/* Big amount input with a currency prefix, keypad opens via inputmode="decimal". */
+.sheet-amount {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 72px;
+  padding: 0 1rem;
+  border-radius: var(--radius-inner);
+  background: var(--surface-alt);
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.sheet-amount:focus-within {
+  border-color: var(--accent);
+}
+
+.sheet-amount__currency {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sheet-amount__input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet-amount__input::placeholder {
+  color: var(--text-faint);
+}
+
+.sheet-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 52px;
+  padding: 0 1rem;
+  border-radius: var(--radius-control);
+  background: var(--surface-alt);
+  font-weight: 600;
+}
+
+.sheet-editor__secondary {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 650;
+}
+
+/* Read-only rows that open the sheet on tap. */
+.row-tappable {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.row-tappable:hover {
+  background-color: color-mix(in srgb, var(--text) 4%, var(--surface));
+}
+
+.row-tappable:active {
+  transform: scale(0.99);
+}
+
+.row-tappable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.row-chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: 0.25rem;
+  border-right: 2px solid var(--text-faint);
+  border-top: 2px solid var(--text-faint);
+  transform: rotate(45deg);
+}
+
+.sheet-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Wider screens: the sheet becomes a centred card. */
+@media (min-width: 641px) {
+  .sheet-editor-backdrop {
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .sheet-editor {
+    max-width: 460px;
+    border-radius: 26px;
+    max-height: min(88dvh, 760px);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  .sheet-editor .tx-sheet-grabber {
+    display: none;
+  }
+
+  .sheet-editor-backdrop.tx-sheet-enter-from .sheet-editor,
+  .sheet-editor-backdrop.tx-sheet-leave-to .sheet-editor {
+    transform: translateY(16px) scale(0.98);
+  }
+}
+
+.mappings-sheet-hebrew {
+  display: block;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface-alt) 60%, transparent);
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Tappable rows fill their card instead of drawing a second box inside it. */
+.mappings-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mappings-card > .list-row,
+.charge-compact-row-wrap > .list-row,
+.recurring-card-single.list-row {
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+}
+
+.mappings-card > .list-row {
+  padding: 0.8rem 0.95rem;
+}
+
+.recurring-card--compact:has(> .recurring-card-single) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.recurring-card-single.list-row {
+  padding: 0.9rem 1rem;
+}

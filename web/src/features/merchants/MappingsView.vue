@@ -37,42 +37,53 @@
       </div>
       <div v-if="filteredRows.length" class="mappings-list">
         <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-          <div v-if="!isEditing(row)" class="list-row">
+          <component
+            :is="auth.readOnly ? 'div' : 'button'"
+            :type="auth.readOnly ? undefined : 'button'"
+            class="list-row"
+            :class="{ 'row-tappable': !auth.readOnly }"
+            :disabled="!auth.readOnly && !!savingHebrew"
+            @click="!auth.readOnly && startEdit(row.Hebrew)"
+          >
             <div class="list-row__main list-row__main--inline">
               <span v-if="showHebrew(row)" class="mappings-row-hebrew" dir="rtl">{{ row.Hebrew }}</span>
               <span class="list-row__label">{{ primaryLabel(row) }}</span>
               <span v-if="row.Category" class="mappings-category-tag">{{ row.Category }}</span>
             </div>
-            <button
-              v-if="!auth.readOnly"
-              type="button"
-              class="btn btn-edit"
-              :disabled="!!savingHebrew"
-              @click="startEdit(row.Hebrew)"
-            >
-              Edit
-            </button>
-          </div>
+            <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
+          </component>
+        </article>
+      </div>
+      <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
 
-          <EditPanel
-            v-else
-            title="Edit mapping"
-            :done-label="savingHebrew === row.Hebrew ? '…' : 'Save'"
-            :disabled="savingHebrew === row.Hebrew"
-            @done="doneEdit(row)"
-            @cancel="cancelEdit(row.Hebrew)"
-          >
-            <input v-model="row.English" class="input" placeholder="English name" />
+      <SheetEditor
+        :open="!!editingRow"
+        title="Edit mapping"
+        :busy="!!editingRow && savingHebrew === editingRow.Hebrew"
+        :error="statusIsError ? statusMessage : ''"
+        @save="editingRow && doneEdit(editingRow)"
+        @cancel="editingRow && cancelEdit(editingRow.Hebrew)"
+      >
+        <template v-if="editingRow">
+          <div class="sheet-field">
+            <span class="sheet-field__label">Name on the statement</span>
+            <span class="mappings-sheet-hebrew" dir="rtl">{{ editingRow.Hebrew }}</span>
+          </div>
+          <label class="sheet-field">
+            <span class="sheet-field__label">English name</span>
+            <input v-model="editingRow.English" class="input" placeholder="English name" enterkeyhint="done" />
+          </label>
+          <label class="sheet-field">
+            <span class="sheet-field__label">Category</span>
             <CategorySelect
-              v-model="row.Category"
+              v-model="editingRow.Category"
               :options="categories"
               allow-empty
               empty-label="Uncategorized"
             />
-          </EditPanel>
-        </article>
-      </div>
-      <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
+          </label>
+        </template>
+      </SheetEditor>
     </template>
   </div>
 </template>
@@ -82,7 +93,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { saveRuleEntry, saveRules } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
-import EditPanel from "@/shared/components/EditPanel.vue";
+import SheetEditor from "@/shared/components/SheetEditor.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { invalidateRulesDataCaches } from "@/shared/stores/invalidateCaches";
 import { useRulesDataStore } from "@/shared/stores/viewData";
@@ -150,9 +161,10 @@ function refreshSearchMatches() {
 
 watch(searchQuery, refreshSearchMatches);
 
-function isEditing(row: MerchantRow): boolean {
-  return !auth.readOnly && editingHebrew.value === row.Hebrew;
-}
+const editingRow = computed<MerchantRow | null>(() => {
+  if (auth.readOnly || !editingHebrew.value) return null;
+  return rows.value.find((row) => row.Hebrew === editingHebrew.value) ?? null;
+});
 
 const filteredRows = computed(() => {
   let list: MerchantRow[];
@@ -301,12 +313,14 @@ async function startEdit(hebrew: string) {
     const ok = await persistRow(editingHebrew.value);
     if (!ok) return;
   }
+  if (statusIsError.value) setStatus("");
   editingHebrew.value = hebrew;
   const row = rows.value.find((r) => r.Hebrew === hebrew);
   if (row) row.Category = row.Category || "";
 }
 
 function cancelEdit(hebrew: string) {
+  if (statusIsError.value) setStatus("");
   restoreRow(hebrew);
   editingHebrew.value = null;
   refreshSearchMatches();
