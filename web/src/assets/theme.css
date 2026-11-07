@@ -1833,11 +1833,6 @@ html.sheet-editor-open body {
     background: none;
   }
 
-  .app-header-brand .app-kaspa-logo {
-    width: 16px;
-    height: 16px;
-  }
-
   .app-header-brand .app-kaspa-portfolio {
     font-size: 0.92rem;
     font-weight: 700;
@@ -1968,7 +1963,6 @@ html.sheet-editor-open body {
 
 /* Small phones (iPhone SE, 320px): keep the switch and the value; refresh stays on Home. */
 @media (max-width: 374px) {
-  .app-header-brand .app-kaspa-logo,
   .app-header-brand .app-portfolio-refresh {
     display: none;
   }
@@ -1996,4 +1990,77 @@ html.sheet-editor-open body {
   .app-layout--readonly .app-header-brand {
     padding-right: 0.55rem;
   }
+}
+
+/* Budget: Recurring and One-time fold away with a one-line summary; + adds without opening. */
+.fold-section__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fold-section__toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fold-section__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.fold-section__title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fold-section__summary {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fold-section__body {
+  margin-top: 0.75rem;
+  animation: theme-fade-in 0.2s ease-out both;
+}
+
+.fold-section__body > .manual-section-lead {
+  margin: 0 0 0.75rem;
+}
+
+/* The KAS tab is the Kaspa logo itself; dimmed when the other asset is selected. */
+.app-portfolio-tab-logo {
+  display: block;
+  width: 18px;
+  height: 18px;
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.app-portfolio-tab--active .app-portfolio-tab-logo {
+  opacity: 1;
+  filter: none;
+}
+
+.app-portfolio-tab:has(.app-portfolio-tab-logo) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
