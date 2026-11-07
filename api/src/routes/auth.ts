@@ -1,5 +1,5 @@
 import { Router } from "express";
-import {
+import { userCanEdit,
   authEnabled,
   bearerToken,
   checkPassword,
@@ -47,6 +47,7 @@ router.post("/login", (req, res) => {
     auth_required: true,
     user: userId,
     label: profile.label,
+    can_edit: userCanEdit(userId),
     users: listAuthUsers(),
   });
 });
@@ -57,6 +58,7 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({
     user: profile.id,
     label: profile.label,
+    can_edit: userCanEdit(details.userId),
     users: listAuthUsers(),
   });
 });

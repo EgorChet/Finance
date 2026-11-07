@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'app-layout--readonly': auth.readOnly && !auth.isDemo }">
     <header class="app-header">
       <button
         type="button"
@@ -62,6 +62,7 @@
           <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
         </div>
       </div>
+      <span v-if="auth.readOnly && !auth.isDemo" class="readonly-badge" title="Only Egor can make changes">View only</span>
     </header>
 
     <Teleport to="body">
@@ -180,6 +181,7 @@
 
                 <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
                 <button
+                  v-if="auth.isDemo || auth.canEdit"
                   type="button"
                   class="mobile-nav-action btn"
                   :disabled="processing"
@@ -207,7 +209,7 @@
                 </button>
 
                 <button
-                  v-if="showLocalSync"
+                  v-if="showLocalSync && (auth.isDemo || auth.canEdit)"
                   type="button"
                   class="mobile-nav-action btn"
                   :disabled="processing"
@@ -267,9 +269,31 @@
       </template>
     </Teleport>
 
-    <main class="main">
+    <main class="main main--with-tabbar">
       <RouterView />
     </main>
+    <nav class="app-tabbar" aria-label="Sections">
+      <RouterLink
+        v-for="item in tabItems"
+        :key="item.to"
+        class="app-tab"
+        :class="{ 'app-tab--active': isTabActive(item.to) }"
+        :to="item.to"
+        :aria-current="isTabActive(item.to) ? 'page' : undefined"
+      >
+        <svg class="app-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            :d="item.icon"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span class="app-tab-label">{{ item.label }}</span>
+      </RouterLink>
+    </nav>
 
     <AppLoader
       v-if="processing"
@@ -373,6 +397,23 @@ const NAV_ITEMS = [
 ] as const;
 
 const navItems = NAV_ITEMS;
+
+/** Bottom tab bar: the four screens used most, one thumb-tap away. Everything else stays in the menu. */
+const HOME_TAB = { to: "/app/home", label: "Home", icon: "M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" };
+const SPENDING_TAB = { to: "/app/overview", label: "Spending", icon: "M4 19V11M10 19V5M16 19v-6M22 19H2" };
+const REVIEW_TAB = { to: "/app/merchants", label: "Review", icon: "M5 12.5 9.5 17 19 7" };
+const BROWSE_TAB = { to: "/app/browse", label: "Browse", icon: "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" };
+const BUDGET_TAB = { to: "/app/household", label: "Budget", icon: "M4 7h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 7l2-3h12l2 3M15 13h2" };
+// View-only members get Browse instead of Review (labelling charges is an edit).
+const tabItems = computed(() =>
+  auth.readOnly && !auth.isDemo
+    ? [HOME_TAB, SPENDING_TAB, BROWSE_TAB, BUDGET_TAB]
+    : [HOME_TAB, SPENDING_TAB, REVIEW_TAB, BUDGET_TAB],
+);
+
+function isTabActive(to: string): boolean {
+  return route.path === to || route.path.startsWith(`${to}/`);
+}
 
 const app = useAppStore();
 
