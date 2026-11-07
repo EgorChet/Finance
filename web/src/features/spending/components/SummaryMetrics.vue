@@ -17,10 +17,28 @@
             <div class="metric-label">{{ budgetLabel }}</div>
             <div class="metric-value">{{ budgetDisplayValue }}</div>
           </template>
+          <div
+            class="metric-budget-progress"
+            role="progressbar"
+            :aria-valuenow="budgetUsedPct"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="`${budgetUsedPct}% of the living budget used`"
+          >
+            <span class="metric-budget-progress__fill" :style="{ width: `${budgetUsedPct}%` }" />
+          </div>
           <p class="metric-budget-formula">{{ budgetFormula }}</p>
           <ul class="metric-budget-breakdown">
             <li>
-              <span>Everyday</span>
+              <button
+                v-if="compact && everydayBreakdownEnabled"
+                type="button"
+                class="metric-budget-breakdown__link"
+                @click="openEverydayBreakdown"
+              >
+                Everyday ›
+              </button>
+              <span v-else>Everyday</span>
               <span>{{ formatIls(budgetEveryday) }}</span>
             </li>
             <li v-if="budgetRent > 0">
@@ -50,13 +68,14 @@
           <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
         </div>
       </div>
-      <div class="metric-card">
+      <div v-if="!compact" class="metric-card">
         <div class="metric-label">Total spent</div>
         <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
         <div class="metric-sub">{{ everydayPct }}% everyday · {{ monthlyBillsPct }}% bills</div>
       </div>
       <component
         :is="everydayCardTag"
+        v-if="!compact"
         class="metric-card"
         :class="{ 'metric-card-clickable': everydayBreakdownEnabled, active: everydayBreakdownOpen }"
         :type="everydayBreakdownEnabled ? 'button' : undefined"
@@ -203,6 +222,10 @@ const budgetCarLoan = computed(() => budgetBreakdown.value.carLoan);
 const budgetLeft = computed(() =>
   props.livingBudget !== null ? moneyLeft(props.report.transactions, props.livingBudget) : null,
 );
+const budgetUsedPct = computed(() => {
+  if (!props.livingBudget || props.livingBudget <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((budgetSpent.value / props.livingBudget) * 100)));
+});
 const isOverBudget = computed(() => budgetLeft.value !== null && budgetLeft.value < 0);
 const overAmount = computed(() => Math.abs(budgetLeft.value ?? 0));
 

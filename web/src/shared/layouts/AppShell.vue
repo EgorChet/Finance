@@ -12,6 +12,7 @@
           <span /><span /><span />
         </span>
       </button>
+      <span class="app-header-title" aria-hidden="true"><span class="app-header-logo">₪</span></span>
       <div class="app-header-brand">
         <div class="app-portfolio-switch">
           <div class="app-portfolio-tabs" role="tablist" aria-label="Portfolio asset">

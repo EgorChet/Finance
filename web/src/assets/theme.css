@@ -1454,3 +1454,532 @@ html.sheet-editor-open body {
 .recurring-card-single.list-row {
   padding: 0.9rem 1rem;
 }
+
+/* ---------- Loading: skeletons instead of spinners ---------- */
+
+.skeleton {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.25rem 0 0.5rem;
+  animation: theme-fade-in 0.25s ease-out both;
+}
+
+.skeleton--compact {
+  gap: 0.45rem;
+  padding: 0.25rem 0;
+}
+
+.skeleton-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skeleton-block,
+.skeleton-row--card {
+  border-radius: var(--radius-inner);
+  background: color-mix(in srgb, var(--surface-alt) 70%, transparent);
+}
+
+.skeleton-block {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+}
+
+.skeleton-block--hero {
+  min-height: 150px;
+  align-content: start;
+  padding: 1.2rem;
+  border-radius: var(--radius-card);
+}
+
+.skeleton-block--card {
+  min-height: 110px;
+}
+
+.skeleton-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.skeleton-row--card {
+  padding: 0.95rem 1rem;
+}
+
+.skeleton-col {
+  display: grid;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.skeleton-line {
+  display: block;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--text) 7%, transparent) 30%,
+    color-mix(in srgb, var(--text) 14%, transparent) 50%,
+    color-mix(in srgb, var(--text) 7%, transparent) 70%
+  );
+  background-size: 300% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line--sm { height: 0.6rem; }
+.skeleton-line--lg { height: 1.3rem; }
+.skeleton-line--xl { height: 2.2rem; border-radius: 12px; }
+.skeleton-line--pill { height: 1.7rem; width: 42%; }
+.skeleton-line--w20 { width: 20%; }
+.skeleton-line--w30 { width: 30%; }
+.skeleton-line--w35 { width: 35%; }
+.skeleton-line--w40 { width: 40%; }
+.skeleton-line--w45 { width: 45%; }
+.skeleton-line--w50 { width: 50%; }
+.skeleton-line--w55 { width: 55%; }
+.skeleton-line--w60 { width: 60%; }
+.skeleton-line--w70 { width: 70%; }
+.skeleton-line--w80 { width: 80%; }
+.skeleton-line--w90 { width: 90%; }
+
+.skeleton-caption {
+  margin: 0.2rem 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.skeleton-caption-enter-active { transition: opacity 0.4s ease; }
+.skeleton-caption-enter-from { opacity: 0; }
+
+@keyframes skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line { animation: none; }
+}
+
+/* Content that replaces a skeleton eases in instead of popping. */
+@media (prefers-reduced-motion: no-preference) {
+  .summary-metrics,
+  .manual-section,
+  .home-portfolio-hero,
+  .mappings-list,
+  .tx-row-mobile,
+  .review-card,
+  .recurring-groups {
+    animation: theme-fade-in 0.3s ease-out both;
+  }
+}
+
+/* Budget hero: how much of the living budget is used. */
+.metric-budget-progress {
+  height: 6px;
+  margin: 0.75rem 0 0.15rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+}
+
+.metric-budget-progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0.85;
+  transition: width 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.metric-budget-breakdown__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---------- Rarely used Budget sections: one quiet card with disclosure rows ---------- */
+
+.minor-sections {
+  margin-top: 1.25rem;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.minor-sections__title {
+  margin: 0;
+  padding: 1rem 1.1rem 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.minor-sections .minor-section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.minor-sections .minor-section + .minor-section {
+  border-top: 1px solid var(--border);
+}
+
+.minor-section__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 54px;
+  padding: 0.75rem 1.1rem;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.minor-section__title {
+  flex: 1;
+}
+
+.minor-section__count {
+  min-width: 1.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.minor-section__chevron {
+  width: 8px;
+  height: 8px;
+  margin: 0 0.25rem 0 0.15rem;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+.minor-section__chevron.is-open {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.minor-section__body {
+  padding: 0 1.1rem 1rem;
+}
+
+.minor-section__body .manual-section-lead {
+  margin: 0 0 0.75rem;
+}
+
+.living-budget-topups-add {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.2rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.living-budget-topups-add__hint {
+  margin-left: 0.35rem;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+/* Budget card: show what the total is made of, with an explicit Edit on each editable part. */
+.budget-parts {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0.35rem 0 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+}
+
+.budget-parts__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 46px;
+}
+
+.budget-parts__label {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.budget-parts__value {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-edit-btn {
+  flex: none;
+  min-width: 56px;
+  min-height: 32px;
+  padding: 0.3rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+
+.budget-edit-btn:disabled {
+  opacity: 0.45;
+}
+
+.living-budget-breakdown__value .budget-edit-btn {
+  margin-left: 0.5rem;
+}
+
+/* Phones: a calm app bar. Logo on the left, one compact portfolio pill on the right
+   (asset switch, value, refresh). Prices and holdings are also on Home and in the menu. */
+.app-header-title {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .app-header-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .app-header-logo {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    color: #fff;
+    background: var(--accent-gradient);
+  }
+
+  .app-header-brand {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 40px;
+    padding: 0 0.3rem 0 0.25rem;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card), inset 0 0 0 1px var(--border);
+  }
+
+  /* Let the switch's children join the pill so they can be ordered: tabs, value, refresh. */
+  .app-header-brand .app-portfolio-switch {
+    display: contents;
+  }
+
+  .app-header-brand .app-portfolio-tabs {
+    order: 1;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--surface-alt);
+  }
+
+  .app-header-brand .app-portfolio-tab {
+    min-height: 28px;
+    padding: 0 0.55rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .app-header-brand .app-portfolio-tab--active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
+  .app-header-brand .app-kaspa-strip {
+    order: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0 0.15rem;
+    border: 0;
+    background: none;
+  }
+
+  .app-header-brand .app-kaspa-logo {
+    width: 16px;
+    height: 16px;
+  }
+
+  .app-header-brand .app-kaspa-portfolio {
+    font-size: 0.92rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .app-header-brand .app-portfolio-refresh {
+    order: 3;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    display: grid;
+    place-items: center;
+  }
+
+  .app-header-brand .app-portfolio-refresh-icon {
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+}
+
+/* Right side of a list row: amount on top, a status pill only when it says something. */
+.row-aside {
+  display: grid;
+  justify-items: end;
+  gap: 0.3rem;
+  flex: none;
+  text-align: right;
+}
+
+.row-aside__amount {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.row-aside__status {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+}
+
+/* Spending: clear breathing room and one heading style between sections. */
+.tx-section,
+.category-accordion {
+  margin-top: 1.75rem;
+}
+
+.tx-section-title,
+.section-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.month-picker__hint--subtle {
+  font-size: 0.74rem;
+  color: var(--text-faint);
+}
+
+/* Review: queue options as a tidy disclosure row instead of a bare <details> triangle. */
+.review-options-panel {
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: var(--surface);
+}
+
+.review-options-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 50px;
+  padding: 0.7rem 1rem;
+  list-style: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.review-options-summary::-webkit-details-marker {
+  display: none;
+}
+
+.review-options-summary::marker {
+  content: "";
+}
+
+.review-options-summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+.review-options-panel[open] .review-options-summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+/* Very narrow phones (SE, 320px): the portfolio pill gets the room, the logo steps aside. */
+@media (max-width: 359px) {
+  .app-header-title {
+    display: none;
+  }
+
+  .app-header-brand {
+    margin-left: auto;
+  }
+}

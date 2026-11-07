@@ -190,58 +190,6 @@ button {
   line-height: 1.35;
 }
 
-.edit-panel {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.85rem;
-  background: var(--surface-alt);
-}
-
-.edit-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.65rem;
-}
-
-.edit-panel__title {
-  margin: 0;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.edit-panel__head .btn-icon {
-  min-width: 36px;
-  min-height: 36px;
-}
-
-.edit-panel__foot .btn-icon {
-  min-width: 40px;
-  min-height: 40px;
-}
-
-.edit-panel__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.edit-panel__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-}
-
-.edit-panel__done {
-  min-height: 40px;
-  margin-left: auto;
-}
-
 .section-header-actions {
   display: flex;
   align-items: center;

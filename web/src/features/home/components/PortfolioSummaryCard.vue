@@ -15,7 +15,7 @@
         {{ refreshing ? "Refreshing…" : "Refresh" }}
       </button>
     </header>
-    <AppLoader v-if="loading" title="Loading portfolio" subtitle="Fetching quotes" />
+    <AppLoader v-if="loading" variant="card" title="Loading portfolio" />
     <template v-else>
       <p v-if="combinedUsd != null" class="home-portfolio-hero">
         {{ formatUsd(combinedUsd, 0) }}

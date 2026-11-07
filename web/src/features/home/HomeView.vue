@@ -12,7 +12,7 @@
         <h3 class="home-card-title">Spending</h3>
         <span v-if="cycleLabel" class="home-card-meta">{{ cycleLabel }}</span>
       </header>
-      <AppLoader v-if="spendingLoading" title="Loading spending" subtitle="Fetching this cycle" />
+      <AppLoader v-if="spendingLoading" variant="hero" title="Loading spending" />
       <template v-else>
         <p v-if="spendingError" class="home-card-error">{{ spendingError }}</p>
         <template v-else-if="spendingReport">
@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { fetchReport } from "@/shared/api/client";
@@ -294,7 +295,7 @@ async function loadSpending(options: { background?: boolean; force?: boolean } =
       spendingLoading.value = false;
       void loadSpending({ background: true });
     } catch (e) {
-      spendingError.value = String(e);
+      spendingError.value = friendlyError(e);
     }
     return;
   }
@@ -308,7 +309,7 @@ async function loadSpending(options: { background?: boolean; force?: boolean } =
     await applySpendingBundle(bundle, { preserveMonth: options.background });
   } catch (e) {
     if (!options.background) {
-      spendingError.value = String(e);
+      spendingError.value = friendlyError(e);
       spendingReport.value = null;
     }
   } finally {

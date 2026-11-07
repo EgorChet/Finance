@@ -121,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, ref, watch } from "vue";
 import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
@@ -312,7 +313,7 @@ async function excludeTransaction(tx: Transaction) {
     adjustmentsData.invalidate();
     invalidateSpendingDataCaches();
   } catch (e) {
-    window.alert(String(e));
+    window.alert(friendlyError(e));
   } finally {
     excludingKey.value = null;
   }
@@ -337,7 +338,7 @@ async function adjustTransaction(tx: Transaction) {
     invalidateSpendingDataCaches();
     await loadTransactions();
   } catch (e) {
-    window.alert(String(e));
+    window.alert(friendlyError(e));
   } finally {
     adjustingKey.value = null;
   }

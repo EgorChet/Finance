@@ -6,7 +6,7 @@
     <div class="recurring-header">
       <div class="recurring-header-top">
         <div>
-          <h2 class="page-title">Household</h2>
+          <h2 class="page-title">Budget</h2>
           <p class="page-lead" style="margin-bottom: 0">
             Living budget, recurring bills, one-time charges, exclusions, and splits.
           </p>
@@ -23,7 +23,8 @@
 
     <AppLoader
       v-if="loading"
-      title="Loading household settings"
+      variant="hero"
+      title="Loading budget"
       subtitle="Fetching budget, bills, and exclusions"
     />
     <template v-else>
@@ -69,13 +70,17 @@
               >
                 <div class="list-row__main">
                   <strong class="list-row__label">{{ groupDisplayName(group) }}</strong>
-                  <span class="list-row__meta">{{ recurringSegmentMeta(group, singleVisibleSegment(group)!) }}</span>
+                  <span class="list-row__meta">{{ group.category_en }} · {{ monthRangeLabel(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month) }}</span>
                 </div>
-                <span
-                  class="list-row__status recurring-status"
-                  :class="'recurring-status-' + segmentStatus(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month, referenceYm)"
-                >
-                  {{ statusLabel(singleVisibleSegment(group)!) }}
+                <span class="row-aside">
+                  <span class="row-aside__amount">{{ formatIls(singleVisibleSegment(group)!.amount) }}</span>
+                  <span
+                    v-if="statusLabel(singleVisibleSegment(group)!) !== 'Active'"
+                    class="row-aside__status recurring-status"
+                    :class="'recurring-status-' + segmentStatus(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month, referenceYm)"
+                  >
+                    {{ statusLabel(singleVisibleSegment(group)!) }}
+                  </span>
                 </span>
                 <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
               </component>
@@ -104,14 +109,17 @@
                     @click="!auth.readOnly && startEditCharge(seg)"
                   >
                     <div class="list-row__main">
-                      <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
-                      <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                      <span class="list-row__label">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
                     </div>
-                    <span
-                      class="list-row__status recurring-status"
-                      :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
-                    >
-                      {{ statusLabel(seg) }}
+                    <span class="row-aside">
+                      <span class="row-aside__amount">{{ formatIls(seg.amount) }}</span>
+                      <span
+                        v-if="statusLabel(seg) !== 'Active'"
+                        class="row-aside__status recurring-status"
+                        :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
+                      >
+                        {{ statusLabel(seg) }}
+                      </span>
                     </span>
                     <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
                   </component>
@@ -130,14 +138,17 @@
                     @click="!auth.readOnly && startEditCharge(seg)"
                   >
                     <div class="list-row__main">
-                      <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
-                      <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                      <span class="list-row__label">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
                     </div>
-                    <span
-                      class="list-row__status recurring-status"
-                      :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
-                    >
-                      {{ statusLabel(seg) }}
+                    <span class="row-aside">
+                      <span class="row-aside__amount">{{ formatIls(seg.amount) }}</span>
+                      <span
+                        v-if="statusLabel(seg) !== 'Active'"
+                        class="row-aside__status recurring-status"
+                        :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
+                      >
+                        {{ statusLabel(seg) }}
+                      </span>
                     </span>
                     <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
                   </component>
@@ -187,15 +198,17 @@
               >
                 <div class="list-row__main">
                   <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
-                  <span class="list-row__meta">
-                    {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
-                  </span>
+                  <span class="list-row__meta">{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
                 </div>
-                <span
-                  class="list-row__status recurring-status"
-                  :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
-                >
-                  {{ oneTimeStatusLabel(charge.charge_date!) }}
+                <span class="row-aside">
+                  <span class="row-aside__amount">{{ formatIls(charge.amount) }}</span>
+                  <span
+                    v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
+                    class="row-aside__status recurring-status"
+                    :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
+                  >
+                    {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Scheduled' }}
+                  </span>
                 </span>
                 <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
               </component>
@@ -224,15 +237,17 @@
               >
                 <div class="list-row__main">
                   <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
-                  <span class="list-row__meta">
-                    {{ formatIls(charge.amount) }} · {{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}
-                  </span>
+                  <span class="list-row__meta">{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
                 </div>
-                <span
-                  class="list-row__status recurring-status"
-                  :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
-                >
-                  {{ oneTimeStatusLabel(charge.charge_date!) }}
+                <span class="row-aside">
+                  <span class="row-aside__amount">{{ formatIls(charge.amount) }}</span>
+                  <span
+                    v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
+                    class="row-aside__status recurring-status"
+                    :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
+                  >
+                    {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Scheduled' }}
+                  </span>
                 </span>
                 <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
               </component>
@@ -377,13 +392,17 @@
         </label>
       </SheetEditor>
 
-      <ExcludedSection />
-      <AdjustmentsSection />
+      <div class="minor-sections">
+        <h3 class="minor-sections__title">More</h3>
+        <ExcludedSection />
+        <AdjustmentsSection />
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { saveFixedCharges, saveLivingBudget } from "@/shared/api/client";
@@ -656,8 +675,8 @@ async function runPersist(): Promise<boolean> {
     showSaveStatus("Saved");
     return true;
   } catch (e) {
-    showSaveStatus(String(e), true);
-    status.value = String(e);
+    showSaveStatus(friendlyError(e), true);
+    status.value = friendlyError(e);
     return false;
   } finally {
     saving.value = false;
@@ -780,10 +799,6 @@ function throughLabel(throughMonth: string): string {
 function singleVisibleSegment(group: ChargeGroup): ConfiguredCharge | null {
   const visible = visibleGroupSegments(group);
   return visible.length === 1 ? visible[0]! : null;
-}
-
-function recurringSegmentMeta(group: ChargeGroup, seg: ConfiguredCharge): string {
-  return `${group.category_en} · ${formatIls(seg.amount)} · ${monthRangeLabel(seg.from_month, seg.through_month)}`;
 }
 
 function statusLabel(seg: ConfiguredCharge): string {
@@ -1079,7 +1094,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
     error.value = "";
   } catch (e) {
     if (!options.background) {
-      error.value = String(e);
+      error.value = friendlyError(e);
       charges.value = [];
       livingBudgetSegments.value = [];
       livingBudgetMonthTopups.value = [];
