@@ -864,3 +864,126 @@ body {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
+
+/* ---------- Dialogs ---------- */
+
+.confirm-overlay,
+.process-error-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-dialog,
+.everyday-breakdown-dialog,
+.category-compare-dialog,
+.process-error-card {
+  background: var(--surface);
+  border: 0;
+  border-radius: 26px;
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+}
+
+.confirm-dialog-title,
+.process-error-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.confirm-dialog-message,
+.adjust-dialog-lead,
+.adjust-dialog-hint {
+  color: var(--text-muted);
+}
+
+.confirm-dialog-actions .btn,
+.process-error-actions .btn {
+  min-height: 50px;
+  border-radius: 16px;
+}
+
+/* Phones: every dialog becomes a bottom sheet within thumb reach. */
+@media (max-width: 640px) {
+  .confirm-overlay,
+  .process-error-overlay {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .confirm-dialog,
+  .everyday-breakdown-dialog,
+  .category-compare-dialog,
+  .process-error-card {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 88dvh;
+    overflow-y: auto;
+    margin: 0 !important;
+    border-radius: 26px 26px 0 0 !important;
+    padding: 0.6rem 1.15rem max(1.15rem, env(safe-area-inset-bottom)) !important;
+    position: relative;
+  }
+
+  /* Grabber handle, like native iOS sheets. */
+  .confirm-dialog::before,
+  .everyday-breakdown-dialog::before,
+  .category-compare-dialog::before,
+  .process-error-card::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--border-strong);
+    margin: 0.15rem auto 1rem;
+  }
+
+  /* Buttons stack full width, primary action on top. */
+  .confirm-dialog-actions,
+  .process-error-actions {
+    display: flex !important;
+    flex-direction: column-reverse !important;
+    gap: 0.5rem !important;
+  }
+
+  .confirm-dialog-actions .btn,
+  .process-error-actions .btn {
+    width: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .confirm-dialog,
+    .everyday-breakdown-dialog,
+    .category-compare-dialog,
+    .process-error-card {
+      animation: sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+    }
+
+    .confirm-overlay,
+    .process-error-overlay {
+      animation: sheet-fade 0.2s ease both;
+    }
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
