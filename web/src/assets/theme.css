@@ -987,3 +987,156 @@ body {
     opacity: 1;
   }
 }
+
+/* ---------- Budget (household) screen ---------- */
+
+.manual-section {
+  padding: 1.1rem 1.1rem 1.15rem;
+  margin: 0 0 0.85rem;
+}
+
+.manual-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.manual-section-header > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.manual-section-title {
+  margin: 0 0 0.25rem;
+}
+
+.manual-section-lead {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* Round accent "+" next to a section title. */
+.section-header-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.section-header-actions .btn,
+.section-header-actions button {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+/* "Add recurring bill" etc.: compact accent pill, not a full-width grey slab. */
+.recurring-add-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin: 0 0 0.75rem;
+}
+
+.recurring-add-toolbar .btn {
+  width: auto;
+  min-height: 40px;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.recurring-add-toolbar .btn.btn-primary {
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* Add-form panel and items inside a section: soft inner tiles. */
+.recurring-add,
+.recurring-add--panel,
+.living-budget-card,
+.recurring-segment-row,
+.charge-compact-row-wrap,
+.living-budget-topup-row {
+  background: var(--surface-alt);
+  border: 0 !important;
+  border-radius: var(--radius-inner);
+}
+
+.recurring-add--panel {
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.charge-compact-list,
+.living-budget-period-list,
+.household-ended-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.manual-empty {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-inner);
+  background: color-mix(in srgb, var(--surface-alt) 60%, transparent);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.household-show-more {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Phones: titles are self-explanatory; keep explanations short. */
+@media (max-width: 640px) {
+  .page-lead {
+    display: none;
+  }
+
+  .manual-section-lead {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .manual-section-lead:active,
+  .manual-section-lead:focus-within {
+    -webkit-line-clamp: unset;
+  }
+
+  .main {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
+/* Every icon "+" inside a budget section matches the round accent style. */
+.manual-section .btn-icon:not(.btn-icon-danger) {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
