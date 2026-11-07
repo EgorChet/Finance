@@ -1,5 +1,6 @@
 <template>
   <div class="merchants-page">
+    <h2 class="page-title">Review</h2>
     <div class="merchants-tabs" role="tablist" aria-label="Merchants">
       <button
         type="button"

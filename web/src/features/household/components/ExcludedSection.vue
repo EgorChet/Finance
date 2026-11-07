@@ -1,13 +1,19 @@
 <template>
-  <section id="excluded" class="manual-section excluded-section">
-    <header class="manual-section-header">
-      <div>
-        <h3 class="manual-section-title">Excluded charges</h3>
-        <p class="manual-section-lead">
-          Hidden from totals, charts, and pace. Restore a charge to count it in your spending again.
-        </p>
-      </div>
-    </header>
+  <section id="excluded" class="manual-section excluded-section minor-section">
+    <button
+      type="button"
+      class="minor-section__toggle"
+      :aria-expanded="open"
+      aria-controls="excluded-body"
+      @click="open = !open"
+    >
+      <span class="minor-section__title">Excluded charges</span>
+      <span class="minor-section__count">{{ loading ? "…" : entries.length }}</span>
+      <span class="minor-section__chevron" :class="{ 'is-open': open }" aria-hidden="true" />
+    </button>
+
+    <div v-show="open" id="excluded-body" class="minor-section__body">
+    <p class="manual-section-lead">Hidden from totals, charts, and pace. Restore a charge to count it in your spending again.</p>
 
     <AppLoader
       v-if="loading"
@@ -47,11 +53,14 @@
       </div>
       <p v-if="status" class="excluded-section-status">{{ status }}</p>
     </template>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { friendlyError } from "@/shared/utils/friendlyError";
 import { onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { removeExclusion } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import { useAuthStore } from "@/shared/stores/auth";
@@ -61,6 +70,8 @@ import type { ExcludedItem } from "@/shared/types";
 import { formatIls, formatTransactionDate } from "@/shared/utils/format";
 
 const auth = useAuthStore();
+// Rarely used: collapsed by default, opened when linked to directly (#excluded).
+const open = ref(useRoute().hash === "#excluded");
 const exclusionsData = useExclusionsDataStore();
 const loading = ref(true);
 const error = ref("");
@@ -100,7 +111,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
     entries.value = await exclusionsData.load(demo, token, options);
   } catch (e) {
     if (!options.background) {
-      error.value = String(e);
+      error.value = friendlyError(e);
       entries.value = [];
     }
   } finally {
@@ -119,7 +130,7 @@ async function restore(row: ExcludedItem) {
     invalidateSpendingDataCaches();
     status.value = "Charge restored — totals will update on Overview.";
   } catch (e) {
-    status.value = String(e);
+    status.value = friendlyError(e);
   } finally {
     restoringKey.value = null;
   }

@@ -59,6 +59,7 @@
 
     <AppLoader
       v-if="loading"
+      variant="card"
       title="Loading queue"
       subtitle="Finding charges that still need a label"
     />

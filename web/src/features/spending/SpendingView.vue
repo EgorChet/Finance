@@ -1,8 +1,8 @@
 <template>
   <AppLoader
     v-if="loading"
-    title="Loading spending overview"
-    subtitle="Fetching your statements and cycle data"
+    variant="hero"
+    title="Loading spending"
   />
   <ErrorBanner
     v-else-if="error"
@@ -67,6 +67,7 @@
     />
     <AppLoader
       v-else-if="reportLoading"
+      variant="hero"
       title="Loading month"
       :subtitle="switchingMonthLabel"
     />
@@ -135,7 +136,6 @@
       </section>
     </template>
     <template v-if="showCategoryExplorer">
-    <p class="section-title">Where did the money go?</p>
     <CategoryAccordion
       v-model:expanded-keys="expandedCategoryKeys"
       :categories="displayCategories"
@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport, upsertAdjustment } from "@/shared/api/client";
@@ -556,7 +557,7 @@ async function excludeTransaction(tx: Transaction) {
     await addExclusion({ transaction: tx, note: "Not my spend" }, auth.token || undefined);
     await afterSpendOverrideChange();
   } catch (e) {
-    window.alert(String(e));
+    window.alert(friendlyError(e));
   } finally {
     excludingKey.value = null;
   }
@@ -579,7 +580,7 @@ async function adjustTransaction(tx: Transaction) {
     );
     await afterSpendOverrideChange();
   } catch (e) {
-    window.alert(String(e));
+    window.alert(friendlyError(e));
   } finally {
     adjustingKey.value = null;
   }
@@ -676,7 +677,7 @@ async function refreshReport(
     error.value = "";
   } catch (e) {
     if (reqId !== reportRequestId) return;
-    if (!options.background) error.value = String(e);
+    if (!options.background) error.value = friendlyError(e);
   }
 }
 
@@ -722,7 +723,7 @@ async function onDeleteStatementMonth(key: string) {
   } catch (e) {
     await confirm({
       title: "Could not delete statement",
-      message: e instanceof Error ? e.message : String(e),
+      message: e instanceof Error ? e.message : friendlyError(e),
       confirmLabel: "OK",
       cancelLabel: "Close",
       tone: "danger",
@@ -860,7 +861,7 @@ async function loadMonths(options: { background?: boolean; force?: boolean } = {
       loading.value = false;
       void loadMonths({ background: true });
     } catch (e) {
-      error.value = String(e);
+      error.value = friendlyError(e);
     }
     return;
   }
@@ -874,7 +875,7 @@ async function loadMonths(options: { background?: boolean; force?: boolean } = {
     await applyFromBundle(bundle, { preserveSelection: options.background });
     if (!options.background) error.value = "";
   } catch (e) {
-    if (!options.background) error.value = String(e);
+    if (!options.background) error.value = friendlyError(e);
   } finally {
     if (!options.background) loading.value = false;
   }

@@ -25,32 +25,53 @@
     <div v-if="!segments.length" class="manual-empty">No budget periods configured yet.</div>
 
     <template v-else>
-      <component
-        :is="readonly ? 'article' : 'button'"
-        v-if="headlineSegment"
-        :type="readonly ? undefined : 'button'"
-        class="living-budget-current"
-        :class="{ 'row-tappable': !readonly }"
-        :disabled="!readonly && disabled"
-        :aria-label="readonly ? undefined : 'Edit current budget period'"
-        @click="!readonly && startEditSegment(headlineSegment.seg)"
-      >
-        <div class="living-budget-current__header">
-          <div>
-            <p class="living-budget-current__eyebrow">
-              {{ headlineSegmentIsActive ? "Current budget" : "Upcoming budget" }}
-            </p>
-            <div class="living-budget-current__total">{{ formatIls(segmentTotalCap(headlineSegment.seg)) }}</div>
-            <p class="living-budget-current__period">
-              {{ monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month) }}
-            </p>
-            <p v-if="segmentCapVaries(headlineSegment.seg)" class="living-budget-current__vary">
-              Total varies when Cibus or rent amounts change
-            </p>
-          </div>
-          <span v-if="!readonly" class="row-chevron" aria-hidden="true" />
-        </div>
-      </component>
+      <article v-if="headlineSegment" class="living-budget-current">
+        <p class="living-budget-current__eyebrow">
+          {{ headlineSegmentIsActive ? "Current budget" : "Upcoming budget" }}
+        </p>
+        <div class="living-budget-current__total">{{ formatIls(segmentTotalCap(headlineSegment.seg)) }}</div>
+        <p class="living-budget-current__period">
+          {{ monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month) }}
+        </p>
+
+        <ul class="budget-parts">
+          <li class="budget-parts__row">
+            <span class="budget-parts__label">Salary after tax</span>
+            <span class="budget-parts__value">{{ formatIls(headlineSegment.seg.amount) }}</span>
+            <button
+              v-if="!readonly"
+              type="button"
+              class="budget-edit-btn"
+              :disabled="disabled"
+              aria-label="Edit salary and dates of the current budget"
+              @click="startEditSegment(headlineSegment.seg)"
+            >
+              Edit
+            </button>
+          </li>
+          <li
+            v-for="addition in capAdditions(headlineSegment.seg)"
+            :key="`head-${addition.kind}-${addition.chargeId}-${addition.from_month}`"
+            class="budget-parts__row"
+          >
+            <span class="budget-parts__label">{{ addition.label }}</span>
+            <span class="budget-parts__value">+{{ formatIls(addition.amount) }}</span>
+            <button
+              v-if="!readonly"
+              type="button"
+              class="budget-edit-btn budget-edit-btn--quiet"
+              :disabled="disabled"
+              :aria-label="`Edit ${addition.label}`"
+              @click="editRecurringCharge(addition.chargeId, addition.from_month)"
+            >
+              Edit
+            </button>
+          </li>
+        </ul>
+        <p v-if="segmentCapVaries(headlineSegment.seg)" class="living-budget-current__vary">
+          Total varies when Cibus or rent amounts change
+        </p>
+      </article>
 
       <ul v-if="listedSegments.length" class="charge-compact-list living-budget-period-list">
         <li
@@ -59,14 +80,7 @@
           class="charge-compact-row-wrap"
         >
           <article class="living-budget-card">
-            <component
-              :is="readonly ? 'header' : 'button'"
-              :type="readonly ? undefined : 'button'"
-              class="living-budget-card__header"
-              :class="{ 'row-tappable living-budget-card__tap': !readonly }"
-              :disabled="!readonly && disabled"
-              @click="!readonly && startEditSegment(seg)"
-            >
+            <header class="living-budget-card__header">
               <div class="living-budget-card__summary">
                 <div class="living-budget-card__total">{{ formatIls(segmentTotalCap(seg)) }}</div>
                 <div class="living-budget-card__period">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</div>
@@ -81,14 +95,25 @@
                 >
                   {{ livingBudgetStatusLabel(seg) }}
                 </span>
-                <span v-if="!readonly" class="row-chevron" aria-hidden="true" />
               </div>
-            </component>
+            </header>
 
             <ul class="living-budget-breakdown">
               <li class="living-budget-breakdown__row">
                 <span class="living-budget-breakdown__label">Salary after tax</span>
-                <span class="living-budget-breakdown__value">{{ formatIls(seg.amount) }}</span>
+                <span class="living-budget-breakdown__value">
+                  {{ formatIls(seg.amount) }}
+                  <button
+                    v-if="!readonly"
+                    type="button"
+                    class="budget-edit-btn"
+                    :disabled="disabled"
+                    aria-label="Edit salary and dates of this budget period"
+                    @click="startEditSegment(seg)"
+                  >
+                    Edit
+                  </button>
+                </span>
               </li>
               <li
                 v-for="addition in capAdditions(seg)"
@@ -178,12 +203,21 @@
       </ul>
     </template>
 
-    <div v-if="sortedMonthTopups.length || !readonly" class="living-budget-topups-read">
+    <!-- Rarely used: a quiet link until there is at least one extra. -->
+    <button
+      v-if="!sortedMonthTopups.length && !readonly"
+      type="button"
+      class="living-budget-topups-add"
+      :disabled="disabled"
+      @click="addMonthTopup"
+    >
+      + Extra money for one month <span class="living-budget-topups-add__hint">trip, guests…</span>
+    </button>
+    <div v-if="sortedMonthTopups.length" class="living-budget-topups-read">
       <div class="living-budget-topups-header">
         <h4 class="living-budget-topups-title">Extra for specific months</h4>
         <IconButton v-if="!readonly" icon="plus" label="Add extra for month" :disabled="disabled" @click="addMonthTopup" />
       </div>
-      <p v-if="!readonly" class="living-budget-topups-lead">One-off boost to the cap for a single month — travel, hosting, etc.</p>
 
       <ul v-if="visibleMonthTopups.length" class="charge-compact-list">
         <li v-for="(topup, index) in visibleMonthTopups" :key="topupRowKey(topup, index)" class="charge-compact-row-wrap">
