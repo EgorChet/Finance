@@ -37,7 +37,7 @@
             <button
               type="button"
               class="btn excluded-card-restore"
-              :disabled="auth.isDemo || restoringKey === row.key"
+              :disabled="auth.readOnly || restoringKey === row.key"
               @click="restore(row)"
             >
               {{ restoringKey === row.key ? "Restoring…" : "Restore" }}
@@ -109,7 +109,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 }
 
 async function restore(row: ExcludedItem) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   restoringKey.value = row.key;
   status.value = "";
   try {

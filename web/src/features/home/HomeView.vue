@@ -5,7 +5,7 @@
       <button type="button" class="demo-banner-link" @click="goSignIn">Sign in for your real data</button>.
     </div>
     <h2 class="page-title">Home</h2>
-    <p class="page-lead home-lead">This cycle's spending and your investments at a glance.</p>
+    <p class="page-lead home-lead home-lead--desktop">This cycle's spending and your investments at a glance.</p>
 
     <section class="home-card home-spending-section">
       <header class="home-card-head">

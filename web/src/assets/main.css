@@ -5643,3 +5643,99 @@ table.rules select {
   text-decoration: none;
 }
 
+
+/* ===== Bottom tab bar (home-screen app on iPhone) ===== */
+.app-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 0.35rem max(0.5rem, env(safe-area-inset-right)) max(0.45rem, env(safe-area-inset-bottom))
+    max(0.5rem, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--sidebar) 92%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-top: 1px solid var(--border);
+}
+
+.app-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 48px;
+  border-radius: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-tab-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.app-tab--active {
+  color: var(--accent);
+}
+
+.app-tab:active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.main--with-tabbar {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+
+/* Header ticker: never push past the screen edge; truncate instead. */
+.app-kaspa-strip {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-kaspa-strip .app-kaspa-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 420px) {
+  /* The price is in the menu; keep the header to the portfolio value. */
+  .app-kaspa-strip .app-kaspa-item:not(.app-kaspa-portfolio),
+  .app-kaspa-strip .app-kaspa-sep {
+    display: none;
+  }
+}
+
+/* Read-only household member (Julia): view everything, change nothing. */
+.readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.app-layout--readonly .edit-only {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  /* On the phone the screen title says enough; skip the explanatory lead. */
+  .home-lead--desktop {
+    display: none;
+  }
+}

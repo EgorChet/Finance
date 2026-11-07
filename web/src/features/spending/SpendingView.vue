@@ -12,7 +12,7 @@
     @dismiss="error = ''"
   />
   <template v-else-if="report || reportLoading || overviewPeriod">
-    <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
+    <div v-if="auth.readOnly" class="demo-banner demo-banner-showcase">
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <header class="overview-page-header">
@@ -50,7 +50,7 @@
     <MonthPicker
       :model-value="overviewPeriod ? null : selectedMonth"
       :months="displayMonths"
-      :allow-delete="!auth.isDemo"
+      :allow-delete="!auth.readOnly"
       omit-all-months
       @update:model-value="onMonthSelected"
       @delete-month="onDeleteStatementMonth"
@@ -123,8 +123,8 @@
           title=""
           show-category
           :statement-billing="statementBilling"
-          :excludeable="!auth.isDemo"
-          :adjustable="!auth.isDemo"
+          :excludeable="!auth.readOnly"
+          :adjustable="!auth.readOnly"
           :excluding-key="excludingKey"
           :adjusting-key="adjustingKey"
           :show-sort="false"
@@ -142,8 +142,8 @@
       :transactions="report.transactions"
       :total-spent="report.total_spent"
       :statement-billing="selectedMonth ? statementBilling : null"
-      :excludeable="!auth.isDemo"
-      :adjustable="!auth.isDemo"
+      :excludeable="!auth.readOnly"
+      :adjustable="!auth.readOnly"
       :excluding-key="excludingKey"
       :adjusting-key="adjustingKey"
       :show-compare="partialStatementActive"
@@ -165,8 +165,8 @@
           show-category
           paginated
           :statement-billing="statementBilling"
-          :excludeable="!auth.isDemo"
-          :adjustable="!auth.isDemo"
+          :excludeable="!auth.readOnly"
+          :adjustable="!auth.readOnly"
           :excluding-key="excludingKey"
           :adjusting-key="adjustingKey"
           :default-limit="25"
@@ -541,7 +541,7 @@ async function afterSpendOverrideChange() {
 }
 
 async function excludeTransaction(tx: Transaction) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
   const ok = await confirm({
     title: "Exclude transaction?",
@@ -563,7 +563,7 @@ async function excludeTransaction(tx: Transaction) {
 }
 
 async function adjustTransaction(tx: Transaction) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   const result = await adjustCharge({
     transaction: tx,
     currentReimbursement: tx.reimbursement,
@@ -692,7 +692,7 @@ async function refreshConfiguredCharges() {
 }
 
 async function onDeleteStatementMonth(key: string) {
-  if (auth.isDemo || isCycleMonthKey(key)) return;
+  if (auth.readOnly || isCycleMonthKey(key)) return;
 
   const month = displayMonths.value.find((m) => m.key === key);
   const ok = await confirm({
@@ -820,7 +820,7 @@ function onPaceSettingsChange() {
 
 async function applyFromBundle(bundle: HomeDataBundle, opts: { preserveSelection?: boolean } = {}) {
   months.value = bundle.months;
-  if (auth.isDemo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
+  if (auth.readOnly && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
   seedMonthReportCache(bundle.scoped_reports);
   summary.value = mapSummaryRows(bundle.summary, bundle.months);
   configuredCharges.value = bundle.fixed_charges;

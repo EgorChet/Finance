@@ -19,8 +19,12 @@ const router = createRouter({
         { path: "household", name: "household", component: () => import("@/features/household/HouseholdView.vue") },
         { path: "recurring", redirect: { name: "household" } },
         { path: "excluded", redirect: { name: "household", hash: "#excluded" } },
+        { path: "spending", redirect: { name: "overview" } },
+        { path: ":pathMatch(.*)*", redirect: { name: "home" } },
       ],
     },
+    // Unknown addresses used to show a blank page; send them home instead.
+    { path: "/:pathMatch(.*)*", redirect: { name: "home" } },
   ],
 });
 

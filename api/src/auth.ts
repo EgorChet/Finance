@@ -97,8 +97,19 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
+  if (!userCanEdit(details.userId) && !READ_METHODS.has(req.method)) {
+    res.status(403).json({ error: "View-only account: only Egor can make changes." });
+    return;
+  }
   (req as AuthenticatedRequest).userId = details.userId;
   next();
+}
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Egor edits; Julia's login is view-only (reads everything, changes nothing). */
+export function userCanEdit(userId: HouseholdUserId): boolean {
+  return userId === "egor";
 }
 
 export function bearerToken(req: Request): string | undefined {

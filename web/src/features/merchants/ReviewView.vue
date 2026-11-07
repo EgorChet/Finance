@@ -1,6 +1,7 @@
 <template>
   <div class="review-page" :class="{ 'review-page--has-bar': !!current && !loading }">
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample queue only. Sign in to label your real charges.</div>
+    <div v-else-if="auth.readOnly" class="demo-banner">View only — Egor labels charges. You can browse the queue.</div>
 
     <h2 v-if="!embedded" class="page-title">Label merchants</h2>
     <p v-if="!current || loading" class="page-lead">
@@ -46,7 +47,7 @@
         </label>
         <div class="review-options-actions">
           <button type="button" class="btn btn-compact" @click="() => load({ force: true })">Refresh queue</button>
-          <button v-if="!auth.isDemo" type="button" class="btn btn-compact btn-ghost" @click="reset">
+          <button v-if="!auth.readOnly" type="button" class="btn btn-compact btn-ghost" @click="reset">
             Clear progress
           </button>
         </div>
@@ -469,7 +470,7 @@ function skip() {
 }
 
 async function confirm() {
-  if (!current.value || auth.isDemo) {
+  if (!current.value || auth.readOnly) {
     skip();
     return;
   }

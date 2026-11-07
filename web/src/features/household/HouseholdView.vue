@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="auth.isDemo" class="demo-banner">
+    <div v-if="auth.readOnly" class="demo-banner">
       Demo mode — household settings are read-only. Sign in to manage your budget and charges.
     </div>
     <div class="recurring-header">
@@ -34,7 +34,7 @@
         v-model:month-topups="livingBudgetMonthTopups"
         :configured-charges="charges"
         :reference-ym="referenceYm"
-        :readonly="auth.isDemo"
+        :readonly="auth.readOnly"
         :disabled="saving"
         @save="persistCharges"
         @edit-recurring-charge="editRecurringCharge"
@@ -48,7 +48,7 @@
           </div>
         </header>
 
-        <div v-if="!auth.isDemo" class="recurring-add-toolbar recurring-add-toolbar--inline">
+        <div v-if="!auth.readOnly" class="recurring-add-toolbar recurring-add-toolbar--inline">
           <button
             type="button"
             class="btn"
@@ -60,7 +60,7 @@
           </button>
         </div>
 
-        <section v-if="activeAddForm === 'recurring' && !auth.isDemo" class="recurring-add recurring-add--panel">
+        <section v-if="activeAddForm === 'recurring' && !auth.readOnly" class="recurring-add recurring-add--panel">
           <h3 class="recurring-add-title">New recurring bill</h3>
           <div class="recurring-add-fields">
             <div class="field-group">
@@ -108,7 +108,7 @@
           <section v-for="group in visibleRecurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
             <template v-if="singleVisibleSegment(group)">
               <div
-                v-if="auth.isDemo || !isEditingCharge(singleVisibleSegment(group)!)"
+                v-if="auth.readOnly || !isEditingCharge(singleVisibleSegment(group)!)"
                 class="list-row recurring-card-single"
               >
                 <div class="list-row__main">
@@ -122,7 +122,7 @@
                   {{ statusLabel(singleVisibleSegment(group)!) }}
                 </span>
                 <button
-                  v-if="!auth.isDemo"
+                  v-if="!auth.readOnly"
                   type="button"
                   class="btn btn-edit"
                   :disabled="saving"
@@ -184,7 +184,7 @@
                   <h3 class="recurring-card-title">{{ groupDisplayName(group) }}</h3>
                   <p class="recurring-card-sub">{{ group.category_en }}</p>
                 </div>
-                <div v-if="!auth.isDemo && isEditingGroup(group)" class="section-header-actions">
+                <div v-if="!auth.readOnly && isEditingGroup(group)" class="section-header-actions">
                   <IconButton icon="plus" label="Add period" :disabled="saving" @click="addSegment(group)" />
                 </div>
               </header>
@@ -195,7 +195,7 @@
                   :key="`${group.id}-${segIndex}`"
                   class="charge-compact-row-wrap"
                 >
-                  <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
+                  <div v-if="auth.readOnly || !isEditingCharge(seg)" class="list-row">
                     <div class="list-row__main">
                       <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
                       <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
@@ -207,7 +207,7 @@
                       {{ statusLabel(seg) }}
                     </span>
                     <button
-                      v-if="!auth.isDemo"
+                      v-if="!auth.readOnly"
                       type="button"
                       class="btn btn-edit"
                       :disabled="saving"
@@ -264,7 +264,7 @@
 
             <ul v-if="showEndedRecurring && endedGroupSegments(group).length" class="charge-compact-list household-ended-list">
               <li v-for="(seg, segIndex) in endedGroupSegments(group)" :key="`${group.id}-ended-${segIndex}`" class="charge-compact-row-wrap">
-                <div v-if="auth.isDemo || !isEditingCharge(seg)" class="list-row">
+                <div v-if="auth.readOnly || !isEditingCharge(seg)" class="list-row">
                   <div class="list-row__main">
                     <span class="list-row__amount">{{ formatIls(seg.amount) }}</span>
                     <span class="list-row__meta">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
@@ -276,7 +276,7 @@
                     {{ statusLabel(seg) }}
                   </span>
                   <button
-                    v-if="!auth.isDemo"
+                    v-if="!auth.readOnly"
                     type="button"
                     class="btn btn-edit"
                     :disabled="saving"
@@ -354,7 +354,7 @@
           </div>
         </header>
 
-        <div v-if="!auth.isDemo" class="recurring-add-toolbar recurring-add-toolbar--inline">
+        <div v-if="!auth.readOnly" class="recurring-add-toolbar recurring-add-toolbar--inline">
           <button
             type="button"
             class="btn"
@@ -366,7 +366,7 @@
           </button>
         </div>
 
-        <section v-if="activeAddForm === 'once' && !auth.isDemo" class="recurring-add recurring-add--panel">
+        <section v-if="activeAddForm === 'once' && !auth.readOnly" class="recurring-add recurring-add--panel">
           <h3 class="recurring-add-title">New one-time charge</h3>
           <div class="recurring-add-fields">
             <div class="field-group">
@@ -405,7 +405,7 @@
         <div v-if="visibleOneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
             <li v-for="charge in visibleOneTimeCharges" :key="charge.id" class="charge-compact-row-wrap">
-              <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
+              <div v-if="auth.readOnly || !isEditingCharge(charge)" class="list-row">
                 <div class="list-row__main">
                   <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
                   <span class="list-row__meta">
@@ -419,7 +419,7 @@
                   {{ oneTimeStatusLabel(charge.charge_date!) }}
                 </span>
                 <button
-                  v-if="!auth.isDemo"
+                  v-if="!auth.readOnly"
                   type="button"
                   class="btn btn-edit"
                   :disabled="saving"
@@ -486,7 +486,7 @@
 
         <ul v-if="showPastOneTime && pastOneTimeCharges.length" class="charge-compact-list household-ended-list">
           <li v-for="charge in pastOneTimeCharges" :key="`past-${charge.id}`" class="charge-compact-row-wrap">
-            <div v-if="auth.isDemo || !isEditingCharge(charge)" class="list-row">
+            <div v-if="auth.readOnly || !isEditingCharge(charge)" class="list-row">
               <div class="list-row__main">
                 <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
                 <span class="list-row__meta">
@@ -500,7 +500,7 @@
                 {{ oneTimeStatusLabel(charge.charge_date!) }}
               </span>
               <button
-                v-if="!auth.isDemo"
+                v-if="!auth.readOnly"
                 type="button"
                 class="btn btn-edit"
                 :disabled="saving"
@@ -703,7 +703,7 @@ function editRecurringCharge(chargeId: string, fromMonth: string) {
       (c) => c.id === chargeId && isMonthlyCharge(c) && c.from_month === fromMonth,
     ) ?? charges.value.find((c) => c.id === chargeId && isMonthlyCharge(c));
   document.getElementById("recurring")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (!charge || auth.isDemo) return;
+  if (!charge || auth.readOnly) return;
   startEditCharge(charge);
 }
 
@@ -773,7 +773,7 @@ function showSaveStatus(message: string, isError = false) {
 }
 
 async function persistCharges(): Promise<boolean> {
-  if (auth.isDemo) return true;
+  if (auth.readOnly) return true;
   if (!isDirty()) return true;
 
   saveChain = saveChain.then(() => runPersist());
@@ -1225,13 +1225,13 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 }
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (!auth.isDemo && hasUnsavedChanges.value) {
+  if (!auth.readOnly && hasUnsavedChanges.value) {
     e.preventDefault();
   }
 }
 
 onBeforeRouteLeave(async () => {
-  if (auth.isDemo || !isDirty()) return true;
+  if (auth.readOnly || !isDirty()) return true;
   await persistCharges();
   return true;
 });
