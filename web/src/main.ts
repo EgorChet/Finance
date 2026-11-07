@@ -3,6 +3,7 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
 import "./assets/main.css";
+import "./assets/theme.css";
 import { hydratePaceSettings } from "./shared/settings/paceSettingsSync";
 import { userIdFromToken } from "./shared/utils/users";
 

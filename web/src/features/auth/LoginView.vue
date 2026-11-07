@@ -1,57 +1,83 @@
 <template>
   <div class="login-page">
-    <div class="login-card">
-      <h1>Finance</h1>
-      <p class="login-lead">
-        Track Leumi Visa spending in English — categories, cycle pace, merchant rules, and monthly trends.
-      </p>
-
-      <template v-if="showPasswordForm">
-        <label for="login-username">Your name</label>
-        <input
-          id="login-username"
-          ref="usernameInput"
-          v-model="username"
-          class="input"
-          type="text"
-          placeholder="Your name"
-          autocomplete="username"
-          autocapitalize="none"
-          spellcheck="false"
-          @keyup.enter="focusPassword"
-        />
-
-        <label for="login-password">Password</label>
-        <input
-          id="login-password"
-          ref="passwordInput"
-          v-model="password"
-          class="input"
-          type="password"
-          placeholder="Enter password"
-          autocomplete="current-password"
-          @keyup.enter="doLogin"
-        />
-        <p v-if="auth.error" class="login-error">{{ auth.error }}</p>
-        <div class="login-actions">
-          <button class="btn btn-primary" :disabled="auth.loading" @click="doLogin">
-            {{ auth.loading ? "Signing in…" : "Sign in — my spending" }}
-          </button>
-          <button class="btn btn-ghost" type="button" @click="tryDemo">Try demo first</button>
+    <div class="login-glow" aria-hidden="true" />
+    <div class="login-shell">
+      <header class="login-brand">
+        <div class="login-logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <path
+              d="M9 24V9.5a1.5 1.5 0 0 1 1.5-1.5H15a5 5 0 0 1 5 5v5M23 8v14.5a1.5 1.5 0 0 1-1.5 1.5H17a5 5 0 0 1-5-5v-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+            />
+          </svg>
         </div>
-      </template>
+        <h1 class="login-title">Your money,<br />at a glance</h1>
+        <p class="login-lead">Leumi Visa spending in plain English: budget, pace and categories.</p>
+      </header>
 
-      <template v-else>
-        <div class="login-actions">
-          <button class="btn btn-primary" type="button" @click="tryDemo">Explore demo</button>
-          <button class="btn btn-ghost" type="button" @click="goApp">Open app</button>
-        </div>
-      </template>
+      <div class="login-card">
+        <template v-if="showPasswordForm">
+          <div class="login-field">
+            <label for="login-username">Name</label>
+            <input
+              id="login-username"
+              ref="usernameInput"
+              v-model="username"
+              class="input"
+              type="text"
+              placeholder="Your name"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              @keyup.enter="focusPassword"
+            />
+          </div>
+          <div class="login-field">
+            <label for="login-password">Password</label>
+            <input
+              id="login-password"
+              ref="passwordInput"
+              v-model="password"
+              class="input"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              @keyup.enter="doLogin"
+            />
+          </div>
+          <p v-if="auth.error" class="login-error" role="alert">{{ auth.error }}</p>
+          <div class="login-actions">
+            <button class="btn btn-primary login-submit" :disabled="auth.loading" @click="doLogin">
+              {{ auth.loading ? "Signing in…" : "Sign in" }}
+            </button>
+            <button class="btn btn-ghost" type="button" @click="tryDemo">Look around with demo data</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="login-actions">
+            <button class="btn btn-primary login-submit" type="button" @click="goApp">Open app</button>
+            <button class="btn btn-ghost" type="button" @click="tryDemo">Explore demo</button>
+          </div>
+        </template>
+      </div>
 
       <ul class="login-features">
-        <li>Hebrew statements → English categories</li>
-        <li>Cycle pace vs your usual spending</li>
-        <li>Partial mid-month snapshots</li>
+        <li>
+          <span class="login-feature-icon" aria-hidden="true">₪</span>
+          <span>Hebrew statements, English categories</span>
+        </li>
+        <li>
+          <span class="login-feature-icon" aria-hidden="true">↗</span>
+          <span>Pace vs your usual month</span>
+        </li>
+        <li>
+          <span class="login-feature-icon" aria-hidden="true">◔</span>
+          <span>Mid-cycle snapshots</span>
+        </li>
       </ul>
     </div>
   </div>

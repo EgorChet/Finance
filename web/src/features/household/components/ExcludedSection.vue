@@ -18,7 +18,7 @@
     <template v-else>
       <p v-if="error" class="recurring-form-error">{{ error }}</p>
       <p v-else-if="!entries.length" class="manual-empty">
-        No excluded charges yet. Use <strong>Exclude</strong> on Overview transactions.
+        No excluded charges yet. Tap any charge in Spending and choose <strong>Exclude</strong>.
       </p>
       <div v-else class="excluded-list">
         <article v-for="row in entries" :key="row.key" class="excluded-card">
