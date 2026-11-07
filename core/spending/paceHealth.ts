@@ -82,7 +82,7 @@ export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | 
     },
   );
 
-  return paceHealthTone(ctx, pace.projectedVsUsualDelta);
+  return paceHealthTone(ctx, pace.projectedVsUsualDelta, pace.vsAvgDelta ?? 0);
 }
 
 /** Single entry point for live-cycle pace coloring — keeps Home, Overview, and PaceCard in sync. */
