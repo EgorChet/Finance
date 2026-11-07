@@ -1775,39 +1775,12 @@ html.sheet-editor-open body {
   margin-left: 0.5rem;
 }
 
-/* Phones: a calm app bar. Logo on the left, one compact portfolio pill on the right
+/* Phones: menu button on the left, one compact portfolio pill on the right
    (asset switch, value, refresh). Prices and holdings are also on Home and in the menu. */
-.app-header-title {
-  display: none;
-}
-
 @media (max-width: 640px) {
-  .app-header-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    flex: 1;
-    min-width: 0;
-    font-family: var(--font-display);
-    font-size: 1.02rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  .app-header-logo {
-    flex: none;
-    width: 30px;
-    height: 30px;
-    border-radius: 10px;
-    display: grid;
-    place-items: center;
-    font-size: 0.85rem;
-    color: #fff;
-    background: var(--accent-gradient);
-  }
-
   .app-header-brand {
     flex: none;
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
@@ -1858,11 +1831,6 @@ html.sheet-editor-open body {
     padding: 0 0.15rem;
     border: 0;
     background: none;
-  }
-
-  .app-header-brand .app-kaspa-logo {
-    width: 16px;
-    height: 16px;
   }
 
   .app-header-brand .app-kaspa-portfolio {
@@ -1973,13 +1941,126 @@ html.sheet-editor-open body {
   transform: rotate(225deg) translateY(-2px);
 }
 
-/* Very narrow phones (SE, 320px): the portfolio pill gets the room, the logo steps aside. */
-@media (max-width: 359px) {
-  .app-header-title {
+/* Phones: Julia's "View only" badge shrinks to an eye icon so the header fits. */
+@media (max-width: 640px) {
+  .readonly-badge {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    min-height: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0;
+  }
+
+  .readonly-badge::before {
+    content: "👁";
+    font-size: 15px;
+    line-height: 1;
+  }
+}
+
+/* Small phones (iPhone SE, 320px): keep the switch and the value; refresh stays on Home. */
+@media (max-width: 374px) {
+  .app-header-brand .app-portfolio-refresh {
     display: none;
   }
 
   .app-header-brand {
-    margin-left: auto;
+    gap: 0.3rem;
+    padding-right: 0.55rem;
   }
+
+  .app-header-brand .app-portfolio-tab {
+    padding: 0 0.42rem;
+  }
+
+  .app-header {
+    gap: 0.4rem;
+  }
+}
+
+/* View-only (Julia) on phones: the eye badge needs room, refresh stays on the Home card. */
+@media (max-width: 640px) {
+  .app-layout--readonly .app-header-brand .app-portfolio-refresh {
+    display: none;
+  }
+
+  .app-layout--readonly .app-header-brand {
+    padding-right: 0.55rem;
+  }
+}
+
+/* Budget: Recurring and One-time fold away with a one-line summary; + adds without opening. */
+.fold-section__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fold-section__toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fold-section__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.fold-section__title {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fold-section__summary {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fold-section__body {
+  margin-top: 0.75rem;
+  animation: theme-fade-in 0.2s ease-out both;
+}
+
+.fold-section__body > .manual-section-lead {
+  margin: 0 0 0.75rem;
+}
+
+/* The KAS tab is the Kaspa logo itself; dimmed when the other asset is selected. */
+.app-portfolio-tab-logo {
+  display: block;
+  width: 18px;
+  height: 18px;
+  opacity: 0.45;
+  filter: grayscale(0.6);
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.app-portfolio-tab--active .app-portfolio-tab-logo {
+  opacity: 1;
+  filter: none;
+}
+
+.app-portfolio-tab:has(.app-portfolio-tab-logo) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

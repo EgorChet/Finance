@@ -39,9 +39,9 @@ export function formatUsdt(amount: number, decimals = 2): string {
   })} USDT`;
 }
 
-/** Spot KAS price — 6 decimal places to match MEXC ticker precision. */
+/** Spot KAS price — 4 decimal places below 1 USDT (e.g. 0.0294), 2 above. */
 export function formatKasUsdtPrice(price: number): string {
-  const decimals = price < 1 ? 6 : 2;
+  const decimals = price < 1 ? 4 : 2;
   return `${price.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,

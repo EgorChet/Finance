@@ -12,7 +12,6 @@
           <span /><span /><span />
         </span>
       </button>
-      <span class="app-header-title" aria-hidden="true"><span class="app-header-logo">₪</span></span>
       <div class="app-header-brand">
         <div class="app-portfolio-switch">
           <div class="app-portfolio-tabs" role="tablist" aria-label="Portfolio asset">
@@ -22,9 +21,10 @@
               :class="{ 'app-portfolio-tab--active': portfolioAsset === 'kas' }"
               role="tab"
               :aria-selected="portfolioAsset === 'kas'"
+              aria-label="Kaspa"
               @click="setPortfolioAsset('kas')"
             >
-              KAS
+              <img class="app-portfolio-tab-logo" :src="kaspaLogo" alt="" width="18" height="18" />
             </button>
             <button
               type="button"
@@ -57,7 +57,6 @@
           :class="{ 'app-kaspa-strip--stale': portfolioStale }"
           :title="portfolioTitle"
         >
-          <img v-if="portfolioAsset === 'kas'" class="app-kaspa-logo" :src="kaspaLogo" alt="" width="18" height="18" />
           <span class="app-kaspa-item">{{ portfolioPriceLabel }}</span>
           <span class="app-kaspa-sep" aria-hidden="true">·</span>
           <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>

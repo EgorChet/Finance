@@ -43,19 +43,32 @@
         @edit-recurring-charge="editRecurringCharge"
       />
 
-      <section id="recurring" class="manual-section">
-        <header class="manual-section-header">
-          <div>
-            <h3 class="manual-section-title">Recurring monthly</h3>
-            <p class="manual-section-lead">Rent, loans, subscriptions — same amount every month.</p>
-          </div>
-        </header>
-
-        <div v-if="!auth.readOnly" class="recurring-add-toolbar recurring-add-toolbar--inline">
-          <button type="button" class="btn sheet-add-btn" :disabled="saving" @click="openAddForm('recurring')">
-            + Add recurring bill
+      <section id="recurring" class="manual-section fold-section">
+        <div class="fold-section__head">
+          <button
+            type="button"
+            class="fold-section__toggle"
+            :aria-expanded="recurringOpen"
+            aria-controls="recurring-body"
+            @click="setFold('recurring', !recurringOpen)"
+          >
+            <span class="fold-section__text">
+              <span class="fold-section__title">Recurring monthly</span>
+              <span class="fold-section__summary">{{ recurringSummary }}</span>
+            </span>
+            <span class="minor-section__chevron" :class="{ 'is-open': recurringOpen }" aria-hidden="true" />
           </button>
+          <IconButton
+            v-if="!auth.readOnly"
+            icon="plus"
+            label="Add recurring bill"
+            :disabled="saving"
+            @click="openAddForm('recurring')"
+          />
         </div>
+
+        <div v-show="recurringOpen" id="recurring-body" class="fold-section__body">
+        <p class="manual-section-lead">Rent, loans, subscriptions — same amount every month.</p>
 
         <div v-if="visibleRecurringGroups.length" class="recurring-groups">
           <section v-for="group in visibleRecurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
@@ -167,23 +180,37 @@
         </button>
 
         <p v-if="!recurringGroups.length" class="manual-empty">No recurring bills yet.</p>
+        </div>
       </section>
 
-      <section class="manual-section">
-        <header class="manual-section-header">
-          <div>
-            <h3 class="manual-section-title">One-time charges</h3>
-            <p class="manual-section-lead">
-              Purchases on another card, cash, or anything that happens once — shown on the exact date in spending.
-            </p>
-          </div>
-        </header>
-
-        <div v-if="!auth.readOnly" class="recurring-add-toolbar recurring-add-toolbar--inline">
-          <button type="button" class="btn sheet-add-btn" :disabled="saving" @click="openAddForm('once')">
-            + Add one-time charge
+      <section id="one-time" class="manual-section fold-section">
+        <div class="fold-section__head">
+          <button
+            type="button"
+            class="fold-section__toggle"
+            :aria-expanded="oneTimeOpen"
+            aria-controls="one-time-body"
+            @click="setFold('oneTime', !oneTimeOpen)"
+          >
+            <span class="fold-section__text">
+              <span class="fold-section__title">One-time charges</span>
+              <span class="fold-section__summary">{{ oneTimeSummary }}</span>
+            </span>
+            <span class="minor-section__chevron" :class="{ 'is-open': oneTimeOpen }" aria-hidden="true" />
           </button>
+          <IconButton
+            v-if="!auth.readOnly"
+            icon="plus"
+            label="Add one-time charge"
+            :disabled="saving"
+            @click="openAddForm('once')"
+          />
         </div>
+
+        <div v-show="oneTimeOpen" id="one-time-body" class="fold-section__body">
+        <p class="manual-section-lead">
+          Purchases on another card, cash, or anything that happens once — shown on the exact date in spending.
+        </p>
 
         <div v-if="visibleOneTimeCharges.length" class="recurring-groups">
           <ul class="charge-compact-list">
@@ -255,6 +282,7 @@
         </ul>
 
         <p v-if="!oneTimeCharges.length" class="manual-empty">No one-time charges yet.</p>
+        </div>
       </section>
 
       <!-- Edit an existing recurring period -->
@@ -404,12 +432,13 @@
 <script setup lang="ts">
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRoute } from "vue-router";
 import { saveFixedCharges, saveLivingBudget } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
 import AdjustmentsSection from "@/features/household/components/AdjustmentsSection.vue";
 import ExcludedSection from "@/features/household/components/ExcludedSection.vue";
+import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
@@ -521,6 +550,52 @@ const pastOneTimeCharges = computed(() =>
 const endedRecurringCount = computed(() =>
   recurringGroups.value.reduce((sum, group) => sum + endedGroupSegments(group).length, 0),
 );
+// Recurring and one-time lists fold away by default; each viewer's choice is remembered.
+type FoldKey = "recurring" | "oneTime";
+const FOLD_STORAGE_KEY = "finance-budget-folds";
+const route = useRoute();
+function readFolds(): Partial<Record<FoldKey, boolean>> {
+  try {
+    return JSON.parse(localStorage.getItem(FOLD_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+const savedFolds = readFolds();
+const recurringOpen = ref(route.hash === "#recurring" || savedFolds.recurring === true);
+const oneTimeOpen = ref(route.hash === "#one-time" || savedFolds.oneTime === true);
+function setFold(key: FoldKey, open: boolean) {
+  if (key === "recurring") recurringOpen.value = open;
+  else oneTimeOpen.value = open;
+  try {
+    localStorage.setItem(
+      FOLD_STORAGE_KEY,
+      JSON.stringify({ recurring: recurringOpen.value, oneTime: oneTimeOpen.value }),
+    );
+  } catch {
+    /* storage unavailable: the choice just isn't remembered */
+  }
+}
+
+const recurringSummary = computed(() => {
+  const active = recurringGroups.value.flatMap((group) =>
+    group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month, referenceYm.value) === "active"),
+  );
+  if (!active.length) return recurringGroups.value.length ? "Nothing active this month" : "No bills yet";
+  const total = active.reduce((sum, seg) => sum + (Number(seg.amount) || 0), 0);
+  return `${active.length} ${active.length === 1 ? "bill" : "bills"} · ${formatIls(total)} a month`;
+});
+
+const oneTimeSummary = computed(() => {
+  const upcoming = visibleOneTimeCharges.value;
+  if (upcoming.length) {
+    const total = upcoming.reduce((sum, charge) => sum + (Number(charge.amount) || 0), 0);
+    return `${upcoming.length} upcoming · ${formatIls(total)}`;
+  }
+  if (pastOneTimeCharges.value.length) return `None upcoming · ${pastOneTimeCharges.value.length} past`;
+  return "None yet";
+});
+
 const hasUnsavedChanges = computed(() => hydrated.value && isDirty());
 
 function visibleGroupSegments(group: ChargeGroup) {
