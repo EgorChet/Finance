@@ -89,13 +89,13 @@ router.get("/health", async (req, res) => {
     res.json({ status: "ok" });
     return;
   }
-  const analyzer = await warmAnalyzer();
+  const analyzer = await warmAnalyzer({ maxAttempts: 2 });
   res.json({ status: "ok", analyzer, analyzer_url: process.env.ANALYZER_URL ? "set" : "missing" });
 });
 
-/** Block until analyzer is awake — call before upload on Render free tier. */
+/** Brief wake poll — clients should retry; do not block for a full cold start here. */
 router.get("/warm-analyzer", async (_req, res) => {
-  const ready = await warmAnalyzer();
+  const ready = await warmAnalyzer({ maxAttempts: Number(process.env.ANALYZER_WAKE_HTTP_ATTEMPTS || 3) });
   if (!ready) {
     res.status(503).json({ ready: false, error: "Analyzer not ready" });
     return;

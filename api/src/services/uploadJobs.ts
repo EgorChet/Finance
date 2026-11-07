@@ -65,19 +65,24 @@ async function patchJob(
   return job;
 }
 
+/** Brief warmup per poll — same pattern as Apps Script /api/ingest/wake. */
+const WAKE_POLL_ATTEMPTS = Number(process.env.ANALYZER_WAKE_HTTP_ATTEMPTS || 3);
+const WAKE_DEADLINE_MS = Number(process.env.UPLOAD_WAKE_DEADLINE_MS || 360_000);
+
 async function wakeWithRetries(jobId: string): Promise<void> {
   await patchJob(jobId, { status: "waking", message: "Waking analyzer…" });
-  const deadline = Date.now() + 120_000;
+  const deadline = Date.now() + WAKE_DEADLINE_MS;
   let attempt = 0;
   while (Date.now() < deadline) {
     attempt += 1;
-    const ready = await warmAnalyzer();
+    // Short budget each tick; outer loop covers free-tier cold starts (~6 min).
+    const ready = await warmAnalyzer({ maxAttempts: WAKE_POLL_ATTEMPTS });
     if (ready) return;
     await patchJob(jobId, {
       status: "waking",
       message: `Waking analyzer (attempt ${attempt})…`,
     });
-    await new Promise((r) => setTimeout(r, Math.min(4000 + attempt * 1000, 12_000)));
+    await new Promise((r) => setTimeout(r, Math.min(4000 + attempt * 500, 12_000)));
   }
   throw new Error("Analyzer did not wake in time (Render free tier). Try again in a minute.");
 }
