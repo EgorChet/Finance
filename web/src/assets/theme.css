@@ -1775,21 +1775,19 @@ html.sheet-editor-open body {
   margin-left: 0.5rem;
 }
 
-/* Phones: the header is a calm app bar. Portfolio quotes live on Home and in the menu. */
+/* Phones: a calm app bar. Logo on the left, one compact portfolio pill on the right
+   (asset switch, value, refresh). Prices and holdings are also on Home and in the menu. */
 .app-header-title {
   display: none;
 }
 
 @media (max-width: 640px) {
-  .app-header-brand {
-    display: none;
-  }
-
   .app-header-title {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
     flex: 1;
+    min-width: 0;
     font-family: var(--font-display);
     font-size: 1.02rem;
     font-weight: 700;
@@ -1797,14 +1795,101 @@ html.sheet-editor-open body {
   }
 
   .app-header-logo {
-    width: 26px;
-    height: 26px;
-    border-radius: 9px;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
     display: grid;
     place-items: center;
     font-size: 0.85rem;
     color: #fff;
     background: var(--accent-gradient);
+  }
+
+  .app-header-brand {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 40px;
+    padding: 0 0.3rem 0 0.25rem;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card), inset 0 0 0 1px var(--border);
+  }
+
+  /* Let the switch's children join the pill so they can be ordered: tabs, value, refresh. */
+  .app-header-brand .app-portfolio-switch {
+    display: contents;
+  }
+
+  .app-header-brand .app-portfolio-tabs {
+    order: 1;
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 999px;
+    background: var(--surface-alt);
+  }
+
+  .app-header-brand .app-portfolio-tab {
+    min-height: 28px;
+    padding: 0 0.55rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .app-header-brand .app-portfolio-tab--active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
+  .app-header-brand .app-kaspa-strip {
+    order: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0 0.15rem;
+    border: 0;
+    background: none;
+  }
+
+  .app-header-brand .app-kaspa-logo {
+    width: 16px;
+    height: 16px;
+  }
+
+  .app-header-brand .app-kaspa-portfolio {
+    font-size: 0.92rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .app-header-brand .app-portfolio-refresh {
+    order: 3;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    display: grid;
+    place-items: center;
+  }
+
+  .app-header-brand .app-portfolio-refresh-icon {
+    font-size: 0.95rem;
+    line-height: 1;
   }
 }
 
@@ -1886,4 +1971,15 @@ html.sheet-editor-open body {
 
 .review-options-panel[open] .review-options-summary::after {
   transform: rotate(225deg) translateY(-2px);
+}
+
+/* Very narrow phones (SE, 320px): the portfolio pill gets the room, the logo steps aside. */
+@media (max-width: 359px) {
+  .app-header-title {
+    display: none;
+  }
+
+  .app-header-brand {
+    margin-left: auto;
+  }
 }
