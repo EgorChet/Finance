@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@core": fileURLToPath(new URL("../core", import.meta.url)),
     },
   },
   define: {
@@ -43,6 +44,8 @@ export default defineConfig({
   base: process.env.GITHUB_PAGES === "true" ? pagesBase : "/",
   server: {
     port: 5173,
+    // Allow importing the shared core/ module that lives next to web/.
+    fs: { allow: [".."] },
     proxy: {
       "/api": { target: "http://127.0.0.1:3000", changeOrigin: true },
     },

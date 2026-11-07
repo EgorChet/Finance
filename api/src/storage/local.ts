@@ -25,6 +25,7 @@ const EXCLUSIONS_PATH = path.join(DATA_DIR, "user_exclusions.json");
 const ADJUSTMENTS_PATH = path.join(DATA_DIR, "user_adjustments.json");
 const FIXED_CHARGES_PATH = path.join(DATA_DIR, "user_fixed_charges.json");
 const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
+const PACE_SETTINGS_PATH = path.join(DATA_DIR, "user_pace_settings.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
@@ -256,3 +257,17 @@ export async function saveUploadedXlsx(filename: string, buffer: Buffer): Promis
 }
 
 export { DATA_DIR, STATEMENTS_PATH, RULES_PATH };
+
+/** Pace settings (cycle day, pace options, manual cycle spend). Raw JSON; normalized by the caller. */
+export async function readPaceSettings(): Promise<unknown> {
+  try {
+    return JSON.parse(await fs.readFile(PACE_SETTINGS_PATH, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+export async function writePaceSettings(data: Record<string, unknown>): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(PACE_SETTINGS_PATH, JSON.stringify(data, null, 2), "utf-8");
+}

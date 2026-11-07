@@ -70,6 +70,10 @@ import { getKaspaQuote } from "../services/kaspaPrice.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
 import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, MerchantRules } from "../types.js";
+import { readPaceSettings, writePaceSettings } from "../storage/index.js";
+import { normalizePaceSettings, withPaceSettings, type PaceSettings } from "../../../core/spending/paceSettings.js";
+import { computeSpendingSummary } from "../../../core/summary.js";
+import type { MonthItem as CoreMonthItem, SpendingReport as CoreSpendingReport } from "../../../core/types.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
@@ -168,6 +172,65 @@ router.get("/home-data", async (req, res) => {
     fixed_charges: loadFixedCharges(),
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
   });
+});
+
+/** Household pace settings (cycle day, pace options, manual cycle spend), shared by all devices. */
+async function loadPaceSettings(): Promise<PaceSettings> {
+  return normalizePaceSettings(await readPaceSettings());
+}
+
+router.get("/settings", async (_req, res) => {
+  res.json(await loadPaceSettings());
+});
+
+router.put("/settings", async (req, res) => {
+  const next = normalizePaceSettings({ ...(req.body as object), updated_at: new Date().toISOString() });
+  await writePaceSettings(next as unknown as Record<string, unknown>);
+  res.json(next);
+});
+
+/** "Now" as the wall clock in Israel, where the household and its billing cycle live. */
+function householdNow(): Date {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
+}
+
+/**
+ * The Home screen's numbers, computed with the same shared code as the app:
+ * budget cap, spent, money left, daily budget and pace for a month or the open cycle.
+ * Query: month=<month key or cycle:YYYY-MM-DD> (optional, defaults to what Home opens on).
+ */
+router.get("/summary", async (req, res) => {
+  const data = await loadStatementsRepaired();
+  const version = await getFinalizeVersion();
+  const months = monthCatalog(data).sort((a, b) => b.key.localeCompare(a.key)) as unknown as CoreMonthItem[];
+  const paceKeys = recentBillingKeys(data, DEFAULT_PACE_MONTHS);
+  const { report: paceReport, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
+  const settings = await loadPaceSettings();
+  const budget = loadLivingBudgetData();
+  const reports: Record<string, CoreSpendingReport | undefined> = {
+    ...(scopedReports as unknown as Record<string, CoreSpendingReport>),
+  };
+  // Load every partial snapshot and the requested month, in case they are outside the pace window.
+  const wanted = new Set<string>(months.filter((m) => m.partial).map((m) => m.key));
+  const monthKey = typeof req.query.month === "string" && req.query.month.trim() ? req.query.month.trim() : null;
+  if (monthKey && !monthKey.startsWith("cycle:")) wanted.add(monthKey);
+  for (const key of wanted) {
+    if (reports[key]) continue;
+    const r = await getCombinedReportAsync(data, [key], version);
+    if (r) reports[key] = r as unknown as CoreSpendingReport;
+  }
+  const summary = withPaceSettings(settings, () =>
+    computeSpendingSummary({
+      months,
+      paceReport: (paceReport ?? null) as unknown as CoreSpendingReport | null,
+      fixedCharges: loadFixedCharges() as unknown as Parameters<typeof computeSpendingSummary>[0]["fixedCharges"],
+      livingBudget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+      referenceDate: householdNow(),
+      monthKey,
+      reports,
+    }),
+  );
+  res.json({ ...summary, currency: "ILS", settings: { cycle_day: settings.cycle_day } });
 });
 
 async function loadStatementsRepaired(): Promise<Awaited<ReturnType<typeof readStatements>>> {

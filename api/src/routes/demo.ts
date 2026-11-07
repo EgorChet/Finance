@@ -13,6 +13,10 @@ import {
 import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
+import { defaultPaceSettings, withPaceSettings } from "../../../core/spending/paceSettings.js";
+import { computeSpendingSummary } from "../../../core/summary.js";
+import { parseReferenceDate } from "../../../core/utils/appDate.js";
+import type { MonthItem as CoreMonthItem, SpendingReport as CoreSpendingReport } from "../../../core/types.js";
 
 const router = Router();
 
@@ -83,10 +87,31 @@ router.get("/home-data", (req, res) => {
     pace_keys: paceKeys,
     pace_months: paceKeys.length,
     pace_months_requested: paceMonths,
-    fixed_charges: demoFixedCharges(),
+    fixed_charges: demoFixedCharges().charges,
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
     demo_as_of: DEMO_AS_OF,
   });
+});
+
+/** Same summary as /api/summary, on the demo household (its clock is frozen at DEMO_AS_OF). */
+router.get("/summary", (req, res) => {
+  const bundle = demoHomeBundle();
+  const catalog = bundle.months as unknown as CoreMonthItem[];
+  const reports: Record<string, CoreSpendingReport | undefined> = {};
+  for (const m of catalog) reports[m.key] = getDemoReport(m.key) as unknown as CoreSpendingReport;
+  const monthKey = typeof req.query.month === "string" && req.query.month ? req.query.month : null;
+  const summary = withPaceSettings(defaultPaceSettings(), () =>
+    computeSpendingSummary({
+      months: catalog,
+      paceReport: bundle.report as unknown as CoreSpendingReport | null,
+      fixedCharges: bundle.fixed_charges as unknown as Parameters<typeof computeSpendingSummary>[0]["fixedCharges"],
+      livingBudget: bundle.living_budget,
+      referenceDate: parseReferenceDate(DEMO_AS_OF),
+      monthKey,
+      reports,
+    }),
+  );
+  res.json({ ...summary, currency: "ILS", demo: true });
 });
 
 router.get("/report", (req, res) => {

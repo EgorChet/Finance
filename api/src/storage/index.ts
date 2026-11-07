@@ -42,3 +42,5 @@ export const readFxcnPriceCache = store.readFxcnPriceCache;
 export const writeFxcnPriceCache = store.writeFxcnPriceCache;
 export const readUploadJobs = store.readUploadJobs;
 export const writeUploadJobs = store.writeUploadJobs;
+export const readPaceSettings = store.readPaceSettings;
+export const writePaceSettings = store.writePaceSettings;

@@ -1,2 +1,2 @@
-/** Default billing keys loaded for pace baseline: current + 3 past months. */
-export const DEFAULT_PACE_MONTHS = 4;
+// Shared with the API: the logic lives in core/spending/paceMonths.ts
+export * from "@core/spending/paceMonths";
