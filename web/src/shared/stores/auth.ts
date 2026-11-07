@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { authStatus, fetchAuthMe, login as apiLogin } from "@/shared/api/client";
+import { hydratePaceSettings } from "@/shared/settings/paceSettingsSync";
 import type { HouseholdUserId } from "@/shared/types";
 import {
   DEFAULT_HOUSEHOLD_USERS,
@@ -52,6 +53,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
     isDemo.value = false;
     demoAsOf.value = null;
+    void hydratePaceSettings(token.value, false);
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
     userId.value = resolvedUser;
     userLabel.value = labelForUser(resolvedUser);

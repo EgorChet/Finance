@@ -336,3 +336,27 @@ export {
   fileHash,
   saveUploadedXlsx,
 } from "./local.js";
+
+export async function readPaceSettings(): Promise<unknown> {
+  if (!supabaseConfigured()) return local.readPaceSettings();
+  const res = await supabaseFetch("app_state?id=eq.pace_settings&select=data");
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { data: unknown }[];
+  return rows[0]?.data ?? null;
+}
+
+export async function writePaceSettings(data: Record<string, unknown>): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writePaceSettings(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "pace_settings", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}

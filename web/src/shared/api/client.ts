@@ -413,3 +413,14 @@ export async function upsertAdjustment(
 export async function removeAdjustment(key: string, token?: string) {
   return post<{ ok: boolean }>(`${prefix(false)}/adjustments/remove`, { key }, token);
 }
+
+export async function fetchPaceSettings(token?: string) {
+  return get<import("@core/spending/paceSettings").PaceSettings>(`${prefix(false)}/settings`, token);
+}
+
+export async function savePaceSettings(
+  settings: import("@core/spending/paceSettings").PaceSettings,
+  token?: string,
+) {
+  return put<import("@core/spending/paceSettings").PaceSettings>(`${prefix(false)}/settings`, settings, token);
+}

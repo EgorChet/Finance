@@ -34,6 +34,8 @@ const ALLOWED: Record<Method, RegExp[]> = {
     /^\/fxcn$/,
     /^\/market-snapshot$/,
     /^\/upload\/jobs\/[\w-]+$/,
+    /^\/settings$/,
+    /^\/summary$/,
   ],
   POST: [
     /^\/exclusions$/,
@@ -44,7 +46,7 @@ const ALLOWED: Record<Method, RegExp[]> = {
     /^\/review\/confirm$/,
     /^\/upload\/jobs$/,
   ],
-  PUT: [/^\/fixed-charges$/, /^\/living-budget$/, /^\/review\/progress$/],
+  PUT: [/^\/fixed-charges$/, /^\/living-budget$/, /^\/review\/progress$/, /^\/settings$/],
 };
 
 function assistantKey(): string | undefined {
