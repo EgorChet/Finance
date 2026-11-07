@@ -21,6 +21,8 @@ services:
         generateValue: true
       - key: INGEST_SECRET
         sync: false
+      - key: ASSISTANT_KEY
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: STORAGE
