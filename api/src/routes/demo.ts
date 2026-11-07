@@ -4,18 +4,15 @@ import {
   demoExclusions,
   demoFixedCharges,
   demoLivingBudget,
-  demoMerchants,
   demoMonthCatalog,
   demoReviewQueue,
   demoRules,
   demoSummaryRows,
-  demoCalendar,
   getDemoReport,
 } from "../data/demoData.js";
 import { combineReports } from "../services/reportService.js";
 import { getDemoFxcnQuote, getDemoKaspaQuote } from "../services/demoPortfolio.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
-import { chatAvailable, replyToDemoFinanceChat, streamDemoFinanceChat, parseChatRequest, chatErrorStatus, chatErrorMessage } from "../services/chatService.js";
 
 const router = Router();
 
@@ -147,10 +144,6 @@ router.put("/living-budget", (_req, res) => {
   res.status(403).json({ error: "Living budget disabled in demo mode" });
 });
 
-router.get("/merchants", (_req, res) => {
-  res.json(demoMerchants());
-});
-
 router.get("/review/queue", (_req, res) => {
   res.json(demoReviewQueue());
 });
@@ -206,60 +199,6 @@ router.post("/adjustments", (_req, res) => {
 
 router.post("/adjustments/remove", (_req, res) => {
   res.status(403).json({ error: "Adjustments disabled in demo mode" });
-});
-
-router.get("/calendar", (_req, res) => {
-  res.json(demoCalendar());
-});
-
-router.post("/calendar/events", (_req, res) => {
-  res.status(403).json({ error: "Calendar disabled in demo mode" });
-});
-
-router.put("/calendar/events/:id", (_req, res) => {
-  res.status(403).json({ error: "Calendar disabled in demo mode" });
-});
-
-router.delete("/calendar/events/:id", (_req, res) => {
-  res.status(403).json({ error: "Calendar disabled in demo mode" });
-});
-
-router.post("/calendar/regenerate-token", (_req, res) => {
-  res.status(403).json({ error: "Calendar disabled in demo mode" });
-});
-
-router.post("/chat", async (req, res) => {
-  if (!chatAvailable()) {
-    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
-    return;
-  }
-  try {
-    const { message, history } = parseChatRequest(req.body);
-    const reply = await replyToDemoFinanceChat(message, history, demoHomeBundle());
-    res.json({ reply, demo: true });
-  } catch (e) {
-    const messageText = chatErrorMessage(e);
-    res.status(chatErrorStatus(messageText)).json({ error: messageText });
-  }
-});
-
-router.post("/chat/stream", async (req, res) => {
-  if (!chatAvailable()) {
-    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
-    return;
-  }
-  try {
-    const { message, history } = parseChatRequest(req.body);
-    await streamDemoFinanceChat(res, message, history, demoHomeBundle());
-  } catch (e) {
-    const messageText = chatErrorMessage(e);
-    if (!res.headersSent) {
-      res.status(chatErrorStatus(messageText)).json({ error: messageText });
-      return;
-    }
-    res.write(`data: ${JSON.stringify({ error: messageText })}\n\n`);
-    res.end();
-  }
 });
 
 export default router;

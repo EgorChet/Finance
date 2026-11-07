@@ -29,7 +29,6 @@ const EMPTY = {
   fixed_charges: { charges: [], updated_at: null },
   exclusions: { entries: [], restored_keys: [], updated_at: null },
   adjustments: { entries: [], updated_at: null },
-  calendar: { events: [], updated_at: null },
 };
 
 const rows = [
@@ -40,7 +39,6 @@ const rows = [
   { id: "fixed_charges", file: "fixed_charges.json", alt: "user_fixed_charges.json" },
   { id: "exclusions", file: "excluded_transactions.json", alt: "user_exclusions.json" },
   { id: "adjustments", file: "user_adjustments.json" },
-  { id: "calendar", file: "user_calendar.json" },
 ];
 
 async function upsert(id, data) {

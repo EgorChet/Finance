@@ -204,32 +204,23 @@ export interface FxcnPriceCache {
   source?: string;
 }
 
-export type CalendarRecurrence = "none" | "weekly" | "monthly" | "yearly";
-
-/** How much time the event blocks — drives default duration. */
-export type CalendarImportance = "quick" | "normal" | "important" | "all_day";
-
 export type HouseholdUserId = "egor" | "julia";
 
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  /** First occurrence date (YYYY-MM-DD). */
-  date: string;
-  all_day?: boolean;
-  start_time?: string;
-  end_time?: string;
-  importance?: CalendarImportance;
-  description?: string;
-  recurrence?: CalendarRecurrence;
-  created_by?: HouseholdUserId;
-  created_at?: string;
-  updated_at?: string;
-}
+export type UploadJobStatus = "queued" | "waking" | "analyzing" | "done" | "error";
 
-export interface CalendarData {
-  events: CalendarEvent[];
-  /** Secret token for the public ICS subscription URL. */
-  feed_token?: string;
-  updated_at?: string | null;
-}
+/** Persisted upload-job status (no file buffer). */
+export type UploadJobPublic = {
+  jobId: string;
+  status: UploadJobStatus;
+  message: string;
+  filename: string;
+  statement_type: "partial" | "final";
+  created_at: string;
+  updated_at: string;
+  result?: unknown;
+  error?: string;
+};
+
+export type UploadJobsData = {
+  jobs: Record<string, UploadJobPublic>;
+};

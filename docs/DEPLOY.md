@@ -76,7 +76,7 @@ Re-run after big local changes if you want production to match.
 | `SUPABASE_SERVICE_KEY` | From Supabase |
 | `STORAGE` | `supabase` |
 | `ALLOWED_ORIGINS` | Your GitHub Pages origin only, e.g. `https://YOUR_USER.github.io` (no path, no trailing slash) |
-| `CAL_SESSION_ENCRYPTION_KEY` | Long random string (Render can auto-generate). Encrypts persisted Cal browser session in Supabase. **Keep stable** — changing it invalidates the saved session (one extra SMS login). |
+| `INGEST_SECRET` | Long random string for Google Drive auto-ingest (`openssl rand -hex 32`). Same value goes in Apps Script. Optional until you set up Drive. See [`tools/drive-ingest/README.md`](../tools/drive-ingest/README.md). |
 
 4. Wait for both services (API + analyzer) to go green.
 5. Copy the API URL, e.g. `https://finance-api-xxxx.onrender.com`.
@@ -186,6 +186,17 @@ AUTH_PASSWORDS=your-password,wife-password
 ```
 
 (`AUTH_PASSWORD` still works if you only need one.)
+
+---
+
+## Optional: Google Drive auto-ingest
+
+Drop Leumi `.xlsx` files into Drive folders (`Finance/statements/partial` or `…/final`) and let Apps Script wake the API and import them.
+
+1. Set `INGEST_SECRET` on finance-api (see table above).
+2. Follow **[`tools/drive-ingest/README.md`](../tools/drive-ingest/README.md)** for folder layout, script properties, and the 1-minute trigger.
+
+In-app **Import statement** remains available as a fallback.
 
 ---
 

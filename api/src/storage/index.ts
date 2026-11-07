@@ -40,5 +40,5 @@ export const readKaspaPriceCache = store.readKaspaPriceCache;
 export const writeKaspaPriceCache = store.writeKaspaPriceCache;
 export const readFxcnPriceCache = store.readFxcnPriceCache;
 export const writeFxcnPriceCache = store.writeFxcnPriceCache;
-export const readCalendar = store.readCalendar;
-export const writeCalendar = store.writeCalendar;
+export const readUploadJobs = store.readUploadJobs;
+export const writeUploadJobs = store.writeUploadJobs;

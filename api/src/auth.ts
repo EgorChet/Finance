@@ -109,3 +109,34 @@ export function bearerToken(req: Request): string | undefined {
 export function userIdFromRequest(req: Request): HouseholdUserId {
   return (req as AuthenticatedRequest).userId ?? "egor";
 }
+
+/** Machine auth for Google Drive / Apps Script ingest (not the household login password). */
+export function ingestSecret(): string | undefined {
+  const value = process.env.INGEST_SECRET?.trim();
+  return value || undefined;
+}
+
+export function ingestEnabled(): boolean {
+  return Boolean(ingestSecret());
+}
+
+function ingestKeyFromRequest(req: Request): string | undefined {
+  const header = req.headers["x-ingest-key"];
+  if (typeof header === "string" && header.trim()) return header.trim();
+  if (Array.isArray(header) && header[0]?.trim()) return header[0].trim();
+  return undefined;
+}
+
+export function requireIngestKey(req: Request, res: Response, next: NextFunction): void {
+  const expected = ingestSecret();
+  if (!expected) {
+    res.status(503).json({ error: "Ingest is not configured — set INGEST_SECRET on the API server" });
+    return;
+  }
+  const provided = ingestKeyFromRequest(req);
+  if (!provided || !safeEqual(provided, expected)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}

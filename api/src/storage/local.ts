@@ -8,13 +8,15 @@ import type {
   FxFallbackData,
   KaspaPriceCache,
   FxcnPriceCache,
-  CalendarData,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
   StatementsData,
+  UploadJobsData,
 } from "../types.js";
 import { DATA_DIR, STATEMENTS_DIR, useLocalFileStorage } from "./paths.js";
+
+export type { UploadJobsData };
 
 const STATEMENTS_PATH = path.join(DATA_DIR, "statements.json");
 const RULES_PATH = path.join(DATA_DIR, "merchant_rules.json");
@@ -26,7 +28,7 @@ const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
-const CALENDAR_PATH = path.join(DATA_DIR, "user_calendar.json");
+const UPLOAD_JOBS_PATH = path.join(DATA_DIR, "upload_jobs.json");
 const XLSX_DIRS = [STATEMENTS_DIR];
 
 export function fileHash(buffer: Buffer): string {
@@ -208,20 +210,19 @@ export async function writeFxcnPriceCache(data: FxcnPriceCache): Promise<void> {
   await fs.writeFile(FXCN_PRICE_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
-export async function readCalendar(): Promise<CalendarData> {
+export async function readUploadJobs(): Promise<UploadJobsData> {
   try {
-    const raw = await fs.readFile(CALENDAR_PATH, "utf-8");
-    const data = JSON.parse(raw) as CalendarData;
-    return { events: data.events || [], feed_token: data.feed_token, updated_at: data.updated_at ?? null };
+    const raw = await fs.readFile(UPLOAD_JOBS_PATH, "utf-8");
+    const data = JSON.parse(raw) as UploadJobsData;
+    return { jobs: data.jobs || {} };
   } catch {
-    return { events: [], updated_at: null };
+    return { jobs: {} };
   }
 }
 
-export async function writeCalendar(data: CalendarData): Promise<void> {
+export async function writeUploadJobs(data: UploadJobsData): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
-  data.updated_at = new Date().toISOString();
-  await fs.writeFile(CALENDAR_PATH, JSON.stringify(data, null, 2), "utf-8");
+  await fs.writeFile(UPLOAD_JOBS_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
 export async function discoverXlsxFiles(): Promise<string[]> {

@@ -19,6 +19,8 @@ services:
         sync: false
       - key: AUTH_SECRET
         generateValue: true
+      - key: INGEST_SECRET
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: STORAGE
@@ -27,10 +29,6 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: CAL_SYNC_ENABLED
-        value: "true"
-      - key: CAL_SESSION_ENCRYPTION_KEY
-        generateValue: true
 
   - type: web
     name: finance-analyzer

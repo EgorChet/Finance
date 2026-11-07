@@ -1,11 +1,11 @@
 <template>
   <div class="home-page">
     <div v-if="auth.isDemo" class="demo-banner">
-      Demo household — sample portfolio, calendar, and spending.
+      Demo household — sample portfolio and spending.
       <button type="button" class="demo-banner-link" @click="goSignIn">Sign in for your real data</button>.
     </div>
     <h2 class="page-title">Home</h2>
-    <p class="page-lead home-lead">This cycle's spending, what's coming up, and your investments at a glance.</p>
+    <p class="page-lead home-lead">This cycle's spending and your investments at a glance.</p>
 
     <section class="home-card home-spending-section">
       <header class="home-card-head">
@@ -33,13 +33,6 @@
       </template>
     </section>
 
-    <UpcomingEventsCard
-      :loading="calendarLoading"
-      :error="calendarError"
-      :events="calendarEvents"
-      :today="todayIso"
-    />
-
     <PortfolioSummaryCard
       :loading="portfolio.loading"
       :refreshing="portfolio.refreshing"
@@ -59,14 +52,12 @@ import { fetchReport } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import SummaryMetrics from "@/features/spending/components/SummaryMetrics.vue";
 import PortfolioSummaryCard from "@/features/home/components/PortfolioSummaryCard.vue";
-import UpcomingEventsCard from "@/features/home/components/UpcomingEventsCard.vue";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAuthStore } from "@/shared/stores/auth";
 import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/homeData";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
-import { useCalendarDataStore } from "@/shared/stores/viewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
-import type { CalendarEvent, MonthItem, SpendingReport, Transaction } from "@/shared/types";
+import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
@@ -102,13 +93,8 @@ import {
 
 const auth = useAuthStore();
 const homeData = useHomeDataStore();
-const calendarData = useCalendarDataStore();
 const portfolio = usePortfolioStore();
 const router = useRouter();
-
-const calendarLoading = ref(true);
-const calendarError = ref("");
-const calendarEvents = ref<CalendarEvent[]>([]);
 
 const spendingLoading = ref(true);
 const spendingError = ref("");
@@ -122,8 +108,6 @@ const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonth
 const cycleDay = ref(loadCycleDay());
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
-const todayIso = computed(() => refDate.value.toISOString().slice(0, 10));
-
 const displayMonths = computed(() => {
   const merged = mergeMonthsWithOpenCycles(months.value, cycleDay.value, refDate.value);
   return merged.map((m) => formatOverviewMonthLabel(m, months.value, cycleDay.value, refDate.value));
@@ -218,35 +202,6 @@ const overviewLink = computed(() => {
   if (!currentMonthKey.value) return { name: "overview" as const };
   return { name: "overview" as const, query: { month: currentMonthKey.value } };
 });
-
-async function loadCalendar(options: { background?: boolean; force?: boolean } = {}) {
-  const demo = auth.isDemo;
-  const token = auth.token || undefined;
-  const cached = !options.force && !options.background && calendarData.peek(demo, token);
-
-  if (cached) {
-    calendarEvents.value = cached.events;
-    calendarLoading.value = false;
-    void loadCalendar({ background: true });
-    return;
-  }
-
-  if (!options.background) {
-    calendarLoading.value = true;
-    calendarError.value = "";
-  }
-  try {
-    const data = await calendarData.load(demo, token, options);
-    calendarEvents.value = data.events;
-  } catch (e) {
-    if (!options.background) {
-      calendarError.value = String(e);
-      calendarEvents.value = [];
-    }
-  } finally {
-    if (!options.background) calendarLoading.value = false;
-  }
-}
 
 async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport> {
   const start = cycleStartFromMonthKey(monthKey);
@@ -365,7 +320,6 @@ let stopSpendingRefresh: (() => void) | undefined;
 
 onMounted(() => {
   void loadSpending();
-  void loadCalendar();
   stopSpendingRefresh = onSpendingRefresh(() => {
     void loadSpending({ force: true });
   });

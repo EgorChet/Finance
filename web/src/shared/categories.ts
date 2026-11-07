@@ -25,9 +25,6 @@ export const SPENDING_CATEGORIES = [
 /** Umbrella category for home, furniture, electronics, beauty, pets, and hookah. */
 export const HOME_LIVING = "Home & Living";
 
-/** @deprecated alias — rolled up to Home & Living */
-export const HOME_ELECTRONICS = HOME_LIVING;
-
 /** Fine-grained labels stored on transactions; rolled up to HOME_LIVING in charts. */
 export const HOME_SUBSECTIONS = new Set([
   HOME_LIVING,

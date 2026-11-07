@@ -17,7 +17,6 @@ services:
     environment:
       PORT: "3000"
       ANALYZER_URL: http://analyzer:8001
-      CAL_SYNC_ENABLED: ${CAL_SYNC_ENABLED:-true}
       # Default: Supabase when SUPABASE_* keys are set in .env
       STORAGE: ${STORAGE:-}
       SUPABASE_URL: ${SUPABASE_URL:-}

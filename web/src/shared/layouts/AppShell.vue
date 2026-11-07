@@ -207,50 +207,6 @@
                 </button>
 
                 <button
-                  v-if="showCalAutoSync"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="processing"
-                  @click="openCalAutoSync"
-                >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  Auto sync Cal
-                </button>
-
-                <button
-                  v-if="showCalClassicSync"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="processing"
-                  @click="openCalClassicSync"
-                >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm0 1.5a.75.75 0 0 1 .75.75v2.25H11a.75.75 0 0 1 0 1.5H8.75V11a.75.75 0 0 1-1.5 0V8.5H5a.75.75 0 0 1 0-1.5h2.25V4.75A.75.75 0 0 1 8 4Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  Sync Cal
-                </button>
-
-                <button
                   v-if="showLocalSync"
                   type="button"
                   class="mobile-nav-action btn"
@@ -335,49 +291,6 @@
       </div>
     </div>
 
-    <CalSyncDialog
-      :open="calSyncOpen"
-      :resume-job-id="calSyncResumeJobId"
-      @close="onCalSyncDialogClose"
-      @background="onCalSyncBackground"
-      @error="onCalSyncError"
-    />
-
-    <Teleport to="body">
-      <CalSyncFloating
-        v-if="calSyncFloat"
-        :state="calSyncFloat.state"
-        :message="calSyncFloat.message"
-        @dismiss="dismissCalSyncFloat"
-        @show-error="openCalSyncErrorModal"
-      />
-    </Teleport>
-
-    <div
-      v-if="calSyncErrorModal"
-      class="process-error-overlay"
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="cal-sync-error-title"
-    >
-      <div class="process-error-card cal-sync-error-card">
-        <h3 id="cal-sync-error-title">{{ calSyncErrorModal.title }}</h3>
-        <p class="cal-sync-error-summary">{{ calSyncErrorModal.summary }}</p>
-        <div v-if="calSyncErrorModal.logs.length" class="cal-sync-error-logs">
-          <p class="cal-sync-error-logs-title">What happened</p>
-          <ul>
-            <li v-for="(entry, i) in calSyncErrorModal.logs" :key="i">{{ entry.message }}</li>
-          </ul>
-        </div>
-        <div class="process-error-actions">
-          <button type="button" class="btn" @click="dismissCalSyncErrorModal">Dismiss</button>
-          <button type="button" class="btn btn-primary" @click="retryCalSyncFromError">
-            {{ calSyncErrorModal.retryLabel }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
       <div class="process-error-card upload-type-card">
         <h3>Statement type</h3>
@@ -386,6 +299,7 @@
           Exports around the <strong>10th–13th</strong> are often still incomplete — pick
           <strong>Partial</strong> unless this file is the full official bill for the cycle.
           <strong>Final</strong> closes the month (pace tab, projections) — use only when nothing is missing.
+          After you choose, processing continues in the background — you can keep using the app or leave.
         </p>
         <div class="process-error-actions upload-type-actions">
           <button type="button" class="btn" @click="cancelUploadPrompt">Cancel</button>
@@ -394,6 +308,17 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <UploadJobToast
+        v-if="uploadToast"
+        :state="uploadToast.state"
+        :message="uploadToast.message"
+        :can-retry="Boolean(uploadRetry)"
+        @dismiss="dismissUploadToast"
+        @retry="retryUploadJob"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -402,28 +327,20 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "@/shared/components/AppLoader.vue";
-import CalSyncDialog from "@/shared/components/CalSyncDialog.vue";
-import CalSyncFloating from "@/shared/components/CalSyncFloating.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
+import UploadJobToast from "@/shared/components/UploadJobToast.vue";
 import {
-  fetchAppConfig,
-  fetchCalJobStatus,
-  fetchCalStatus,
-  finishCalSync,
-  startCalSync,
-  type CalSyncMode,
+  fetchUploadJob,
+  startUploadJob,
   syncStatements,
-  uploadStatement,
-  warmAnalyzerService,
-  type CalJobStatusResponse,
+  type UploadJobResponse,
 } from "@/shared/api/client";
-import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
-import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "@/shared/utils/calSyncSession";
 import { goToSignIn } from "@/features/auth/utils/signIn";
+import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
 import kaspaLogo from "@/assets/kaspa.png";
 
@@ -439,14 +356,6 @@ function readPortfolioAsset(): PortfolioAsset {
   }
 }
 
-const UPLOAD_STEPS = [
-  "Connecting to server",
-  "Reading spreadsheet",
-  "Analysing expenses",
-  "Categorizing merchants",
-  "Saving statement",
-];
-
 const SYNC_STEPS = [
   "Scanning statements folder",
   "Reading spreadsheets",
@@ -458,8 +367,6 @@ const SYNC_STEPS = [
 const NAV_ITEMS = [
   { to: "/app/home", label: "Home" },
   { to: "/app/overview", label: "Spending" },
-  { to: "/app/chat", label: "Assistant" },
-  { to: "/app/calendar", label: "Calendar" },
   { to: "/app/browse", label: "Browse" },
   { to: "/app/merchants", label: "Merchants" },
   { to: "/app/household", label: "Household" },
@@ -488,31 +395,15 @@ const canRetry = ref(false);
 const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
 const uploadPromptFile = ref<File | null>(null);
-const calSyncOpen = ref(false);
-const calSyncResumeJobId = ref<string | null>(null);
-const calSyncEnabled = ref(false);
-const calSessionSaved = ref(false);
-const calSyncFloat = ref<{ message: string; state: "syncing" | "done" | "error" } | null>(null);
-const calSyncErrorModal = ref<{
-  title: string;
-  summary: string;
-  logs: { at: string; message: string }[];
-  retryLabel: string;
-  forceClassicRetry: boolean;
-} | null>(null);
-const calSyncLastError = ref<{
-  summary: string;
-  logs: { at: string; message: string }[];
-  forceClassicRetry: boolean;
-} | null>(null);
-
-let calSyncPollTimer: ReturnType<typeof setInterval> | null = null;
-let calSyncDoneTimer: ReturnType<typeof setTimeout> | null = null;
-let calSyncBgJobId: string | null = null;
-let calSyncBgMode: CalSyncMode | null = null;
+const uploadToast = ref<{ state: "syncing" | "done" | "error"; message: string } | null>(null);
+const uploadToastMuted = ref(false);
+const uploadRetry = ref<{ file: File; statementType: "partial" | "final" } | null>(null);
 const navOpen = ref(false);
 const portfolioAsset = ref<PortfolioAsset>(readPortfolioAsset());
 let stepTimer: ReturnType<typeof setInterval> | null = null;
+let uploadPollTimer: ReturnType<typeof setInterval> | null = null;
+let uploadDoneTimer: ReturnType<typeof setTimeout> | null = null;
+let activeUploadJobId: string | null = null;
 
 const accountInitial = computed(() => {
   const label = auth.userLabel?.trim();
@@ -632,300 +523,19 @@ watch(
 
 watch(navOpen, (open) => {
   document.body.style.overflow = open ? "hidden" : "";
-  if (open && calSyncEnabled.value) void refreshCalSyncStatus();
 });
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
-const showCalSync = computed(
-  () => Boolean(import.meta.env.VITE_API_URL) && !auth.isDemo && calSyncEnabled.value,
-);
-const showCalAutoSync = computed(() => showCalSync.value && calSessionSaved.value);
-const showCalClassicSync = computed(() => showCalSync.value && !calSessionSaved.value);
-
-async function refreshCalSyncStatus() {
-  if (!import.meta.env.VITE_API_URL || auth.isDemo) return;
-  try {
-    const status = await fetchCalStatus(auth.token || undefined);
-    calSessionSaved.value = status.session_saved === true;
-  } catch {
-    calSessionSaved.value = false;
-  }
-}
-
-async function loadCalSyncConfig() {
-  if (!import.meta.env.VITE_API_URL || auth.isDemo) return;
-  try {
-    const config = await fetchAppConfig(auth.token || undefined);
-    calSyncEnabled.value = config.cal_sync_enabled === true;
-    if (calSyncEnabled.value) await refreshCalSyncStatus();
-  } catch {
-    calSyncEnabled.value = false;
-    calSessionSaved.value = false;
-  }
-}
-
-function stopCalSyncBackground() {
-  if (calSyncPollTimer) {
-    clearInterval(calSyncPollTimer);
-    calSyncPollTimer = null;
-  }
-  calSyncBgJobId = null;
-  calSyncBgMode = null;
-  clearCalSyncJobId();
-}
-
-function dismissCalSyncFloat() {
-  if (calSyncDoneTimer) {
-    clearTimeout(calSyncDoneTimer);
-    calSyncDoneTimer = null;
-  }
-  calSyncFloat.value = null;
-  stopCalSyncBackground();
-}
-
-function formatCalSyncErrorSummary(status: Pick<CalJobStatusResponse, "error" | "message">): string {
-  return status.error?.trim() || status.message?.trim() || "Cal sync failed";
-}
-
-function calSyncRetryLabel(forceClassic: boolean): string {
-  if (forceClassic || !calSessionSaved.value) return "Sync Cal";
-  return "Try again";
-}
-
-function showCalSyncFailure(
-  summary: string,
-  logs: { at: string; message: string }[] = [],
-  options: { title?: string; forceClassicRetry?: boolean } = {},
-) {
-  const trimmed = summary.trim() || "Cal sync failed";
-  const forceClassicRetry = options.forceClassicRetry === true;
-  calSyncLastError.value = { summary: trimmed, logs, forceClassicRetry };
-  calSyncFloat.value = null;
-  calSyncErrorModal.value = {
-    title: options.title || "Cal sync failed",
-    summary: trimmed,
-    logs: logs.slice(-20),
-    retryLabel: calSyncRetryLabel(forceClassicRetry),
-    forceClassicRetry,
-  };
-}
-
-function openCalSyncErrorModal() {
-  if (!calSyncLastError.value) return;
-  const forceClassicRetry = calSyncLastError.value.forceClassicRetry;
-  calSyncErrorModal.value = {
-    title: "Cal sync failed",
-    summary: calSyncLastError.value.summary,
-    logs: calSyncLastError.value.logs.slice(-20),
-    retryLabel: calSyncRetryLabel(forceClassicRetry),
-    forceClassicRetry,
-  };
-}
-
-function dismissCalSyncErrorModal() {
-  calSyncErrorModal.value = null;
-}
-
-function retryCalSyncFromError() {
-  const forceClassic = calSyncErrorModal.value?.forceClassicRetry === true;
-  dismissCalSyncErrorModal();
-  calSyncLastError.value = null;
-  // After Auto sync fails the saved Cal website session is gone — always use Sync Cal (SMS).
-  // Never retry Auto sync from the error modal; that was a no-op loop.
-  if (forceClassic || !calSessionSaved.value) openCalClassicSync();
-  else void openCalAutoSync();
-}
-
-function onCalSyncStarting(message = "Starting Cal sync…") {
-  calSyncFloat.value = { message, state: "syncing" };
-}
-
-function refreshAfterCalSync() {
-  void refreshCalSyncStatus();
-  window.setTimeout(() => {
-    emitSpendingRefresh();
-  }, 2200);
-}
-
-async function pollCalSyncBackground(jobId: string) {
-  try {
-    const status = await fetchCalJobStatus(jobId, auth.token || undefined);
-    if (!calSyncFloat.value || calSyncBgJobId !== jobId) return;
-
-    if (status.status === "done") {
-      stopCalSyncBackground();
-      if (!status.saved) {
-        calSyncFloat.value = { message: "Saving statement…", state: "syncing" };
-        try {
-          await finishCalSync(jobId, auth.token || undefined);
-        } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          showCalSyncFailure(message.trim() || "Failed to save Cal statement", status.logs);
-          return;
-        }
-      }
-      calSyncLastError.value = null;
-      calSyncFloat.value = {
-        message: "Cal sync complete — statement saved",
-        state: "done",
-      };
-      calSyncDoneTimer = window.setTimeout(dismissCalSyncFloat, 6000);
-      refreshAfterCalSync();
-      return;
-    }
-
-    if (status.status === "otp_required") {
-      if (calSyncBgMode !== "auto") {
-        stopCalSyncBackground();
-        calSyncFloat.value = null;
-        calSyncResumeJobId.value = jobId;
-        calSyncOpen.value = true;
-        return;
-      }
-      calSyncFloat.value = {
-        message: status.message?.trim() || "Signing in with Cal…",
-        state: "syncing",
-      };
-      return;
-    }
-
-    if (status.status === "logging_in") {
-      calSyncFloat.value = {
-        message: status.message?.trim() || "Signing in with Cal…",
-        state: "syncing",
-      };
-      return;
-    }
-
-    if (status.status === "error") {
-      const isAuto = calSyncBgMode === "auto";
-      stopCalSyncBackground();
-      if (isAuto) {
-        calSessionSaved.value = false;
-        await refreshCalSyncStatus();
-      }
-      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs, {
-        title: isAuto ? "Auto sync failed" : undefined,
-        forceClassicRetry: isAuto,
-      });
-      return;
-    }
-
-    calSyncFloat.value = {
-      message: status.message?.trim() || "Syncing with Cal…",
-      state: "syncing",
-    };
-  } catch (e) {
-    const isAuto = calSyncBgMode === "auto";
-    stopCalSyncBackground();
-    if (isAuto) {
-      calSessionSaved.value = false;
-      await refreshCalSyncStatus();
-    }
-    const message = e instanceof Error ? e.message : String(e);
-    showCalSyncFailure(message.trim() || "Cal sync failed", [], {
-      title: isAuto ? "Auto sync failed" : undefined,
-      forceClassicRetry: isAuto,
-    });
-  }
-}
-
-function onCalSyncBackground(jobId: string, mode: CalSyncMode = "classic") {
-  calSyncOpen.value = false;
-  stopCalSyncBackground();
-  calSyncBgJobId = jobId;
-  calSyncBgMode = mode;
-  saveCalSyncJobId(jobId);
-  calSyncFloat.value = { message: "Syncing with Cal…", state: "syncing" };
-  void pollCalSyncBackground(jobId);
-  calSyncPollTimer = setInterval(() => {
-    void pollCalSyncBackground(jobId);
-  }, 1000);
-}
-
-async function resumeCalSyncIfNeeded() {
-  if (!calSyncEnabled.value || auth.isDemo) return;
-  const jobId = readCalSyncJobId();
-  if (!jobId || calSyncBgJobId) return;
-  try {
-    const status = await fetchCalJobStatus(jobId, auth.token || undefined);
-    if (status.status === "done") {
-      clearCalSyncJobId();
-      refreshAfterCalSync();
-      return;
-    }
-    if (status.status === "error") {
-      clearCalSyncJobId();
-      await refreshCalSyncStatus();
-      showCalSyncFailure(formatCalSyncErrorSummary(status), status.logs);
-      return;
-    }
-    onCalSyncBackground(jobId, status.mode === "auto" ? "auto" : "classic");
-  } catch {
-    clearCalSyncJobId();
-  }
-}
-
-function onCalSyncDialogClose() {
-  calSyncOpen.value = false;
-  calSyncResumeJobId.value = null;
-}
-
-function openCalClassicSync() {
-  closeNav();
-  if (!calSyncEnabled.value || auth.isDemo) return;
-  calSyncResumeJobId.value = null;
-  calSyncOpen.value = true;
-}
-
-async function openCalAutoSync() {
-  closeNav();
-  if (!calSyncEnabled.value || auth.isDemo) {
-    openCalClassicSync();
-    return;
-  }
-  onCalSyncStarting("Auto syncing with Cal…");
-  try {
-    const result = await startCalSync(auth.token || undefined, "auto");
-    if (result.mode !== "auto") {
-      throw new Error("Server started classic sync instead of auto sync — refresh the app and try again.");
-    }
-    const initial = await fetchCalJobStatus(result.jobId, auth.token || undefined);
-    if (initial.status === "error") {
-      calSessionSaved.value = false;
-      await refreshCalSyncStatus();
-      showCalSyncFailure(formatCalSyncErrorSummary(initial), initial.logs, {
-        title: "Auto sync failed",
-        forceClassicRetry: true,
-      });
-      return;
-    }
-    onCalSyncBackground(result.jobId, "auto");
-  } catch (e) {
-    calSessionSaved.value = false;
-    await refreshCalSyncStatus();
-    const message = e instanceof Error ? e.message : String(e);
-    showCalSyncFailure(message.trim() || "Auto sync could not start", [], {
-      title: "Auto sync failed",
-      forceClassicRetry: true,
-    });
-  }
-}
-
-function onCalSyncError(message: string) {
-  calSyncFloat.value = null;
-  showCalSyncFailure(message.trim() || "Cal sync failed");
-}
 
 onMounted(() => {
-  void loadCalSyncConfig().then(() => resumeCalSyncIfNeeded());
   portfolio.startPolling(auth.isDemo, auth.token || undefined);
+  void resumeUploadJobIfNeeded();
 });
 
 onUnmounted(() => {
   clearStepTimer();
-  stopCalSyncBackground();
-  dismissCalSyncFloat();
+  stopUploadPolling();
+  if (uploadDoneTimer) clearTimeout(uploadDoneTimer);
   portfolio.stopPolling();
   document.body.style.overflow = "";
 });
@@ -974,50 +584,117 @@ function retryProcess() {
   fn?.();
 }
 
+function stopUploadPolling() {
+  if (uploadPollTimer) {
+    clearInterval(uploadPollTimer);
+    uploadPollTimer = null;
+  }
+  activeUploadJobId = null;
+}
+
+function dismissUploadToast() {
+  if (uploadDoneTimer) {
+    clearTimeout(uploadDoneTimer);
+    uploadDoneTimer = null;
+  }
+  if (uploadToast.value?.state === "syncing" && activeUploadJobId) {
+    uploadToastMuted.value = true;
+    uploadToast.value = null;
+    return;
+  }
+  uploadToast.value = null;
+  uploadToastMuted.value = false;
+  if (!activeUploadJobId) clearUploadJobId();
+}
+
+function showUploadToast(state: "syncing" | "done" | "error", message: string) {
+  if (state === "syncing" && uploadToastMuted.value) {
+    return;
+  }
+  if (state === "done" || state === "error") {
+    uploadToastMuted.value = false;
+  }
+  uploadToast.value = { state, message };
+}
+
+function applyUploadJobStatus(job: UploadJobResponse) {
+  if (job.status === "done") {
+    stopUploadPolling();
+    clearUploadJobId();
+    uploadRetry.value = null;
+    const detail = job.message || "Statement saved";
+    showUploadToast("done", detail);
+    uploadDoneTimer = window.setTimeout(dismissUploadToast, 6000);
+    emitSpendingRefresh();
+    return;
+  }
+  if (job.status === "error") {
+    stopUploadPolling();
+    clearUploadJobId();
+    showUploadToast("error", job.error?.trim() || job.message || "Upload failed");
+    return;
+  }
+  showUploadToast("syncing", job.message || "Processing statement…");
+}
+
+async function pollUploadJob(jobId: string) {
+  try {
+    const job = await fetchUploadJob(jobId, auth.token || undefined);
+    if (activeUploadJobId !== jobId) return;
+    applyUploadJobStatus(job);
+  } catch (e) {
+    if (activeUploadJobId !== jobId) return;
+    const message = e instanceof Error ? e.message : String(e);
+    stopUploadPolling();
+    clearUploadJobId();
+    showUploadToast("error", message.trim() || "Could not check upload status");
+  }
+}
+
+function watchUploadJob(jobId: string) {
+  stopUploadPolling();
+  activeUploadJobId = jobId;
+  saveUploadJobId(jobId);
+  void pollUploadJob(jobId);
+  uploadPollTimer = setInterval(() => {
+    void pollUploadJob(jobId);
+  }, 1500);
+}
+
+async function resumeUploadJobIfNeeded() {
+  if (auth.isDemo) return;
+  const jobId = readUploadJobId();
+  if (!jobId || activeUploadJobId) return;
+  showUploadToast("syncing", "Checking upload…");
+  watchUploadJob(jobId);
+}
+
 async function runUpload(file: File, statementType: "partial" | "final") {
-  beginProcess(
-    "Processing statement",
-    statementType === "partial" ? `${file.name} · partial snapshot` : file.name,
-    UPLOAD_STEPS,
+  uploadRetry.value = { file, statementType };
+  uploadToastMuted.value = false;
+  showUploadToast(
+    "syncing",
+    statementType === "partial"
+      ? `Sending ${file.name} (partial)…`
+      : `Sending ${file.name}…`,
   );
   try {
-    processStep.value = 0;
-    if (import.meta.env.VITE_API_URL) {
-      processSubtitle.value = "Waking analyzer — first upload after idle can take 1–2 minutes…";
-      const config = await fetchAppConfig(auth.token || undefined);
-      const wakeUrl =
-        config.analyzer_wake_url ||
-        (import.meta.env.VITE_ANALYZER_URL as string | undefined)?.trim() ||
-        null;
-      if (wakeUrl) {
-        await wakeAnalyzerInBrowser(wakeUrl);
-      } else {
-        await warmAnalyzerService(auth.token || undefined);
-      }
+    const job = await startUploadJob(file, statementType, auth.token || undefined);
+    applyUploadJobStatus(job);
+    if (job.status !== "done" && job.status !== "error") {
+      watchUploadJob(job.jobId);
     }
-    startStepTimer(UPLOAD_STEPS.length - 2);
-    const result = await uploadStatement(file, statementType, auth.token || undefined);
-    clearStepTimer();
-    processStep.value = UPLOAD_STEPS.length - 1;
-    if (result.skipped) {
-      processSubtitle.value =
-        result.reason === "unchanged"
-          ? "Already uploaded — this month was not changed."
-          : "Upload skipped — nothing changed.";
-      await new Promise((r) => setTimeout(r, 1200));
-      processing.value = false;
-      return;
-    }
-    processSubtitle.value = result.upgraded
-      ? "Cycle closed — refreshing your data…"
-      : "Done — refreshing your data…";
-    await new Promise((r) => setTimeout(r, 500));
-    processing.value = false;
-    emitSpendingRefresh();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    failProcess("Upload failed", message, () => runUpload(file, statementType));
+    showUploadToast("error", message);
   }
+}
+
+function retryUploadJob() {
+  const pending = uploadRetry.value;
+  dismissUploadToast();
+  if (!pending) return;
+  void runUpload(pending.file, pending.statementType);
 }
 
 async function sync() {
@@ -1069,47 +746,3 @@ function goLogin() {
   void goToSignIn(router);
 }
 </script>
-
-<style scoped>
-.cal-sync-error-card {
-  width: min(100%, 28rem);
-  max-height: min(85vh, 32rem);
-  overflow: auto;
-}
-
-.cal-sync-error-summary {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.cal-sync-error-logs {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bg) 88%, var(--surface));
-  border: 1px solid var(--border);
-  max-height: 14rem;
-  overflow: auto;
-}
-
-.cal-sync-error-logs-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.cal-sync-error-logs ul {
-  margin: 0;
-  padding-left: 1.1rem;
-  font-size: 0.82rem;
-  line-height: 1.45;
-  color: var(--text);
-}
-
-.cal-sync-error-logs li + li {
-  margin-top: 0.35rem;
-}
-</style>

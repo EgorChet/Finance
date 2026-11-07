@@ -108,16 +108,3 @@ export function buildReviewQueue(
   }));
 }
 
-export function merchantCatalog(report: SpendingReport, rules: MerchantRules) {
-  const merchants = new Map<string, { Hebrew: string; English: string; Category: string }>();
-  for (const tx of report.transactions) {
-    if (merchants.has(tx.merchant_he)) continue;
-    const rule = getRule(rules, tx.merchant_he);
-    merchants.set(tx.merchant_he, {
-      Hebrew: tx.merchant_he,
-      English: rule?.english || tx.merchant_en || "",
-      Category: rule?.category || tx.category_en || "",
-    });
-  }
-  return [...merchants.values()].sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
-}

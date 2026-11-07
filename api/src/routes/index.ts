@@ -2,31 +2,32 @@ import { Router } from "express";
 import multer from "multer";
 import { promises as fs } from "fs";
 import path from "path";
-import { analyzeFileBuffer, analyzerUsesPublicUrl, isAnalyzerConnectivityError, isPublicRenderAnalyzerUrl, normalizeAnalyzerUrl, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
+import { analyzeFileBuffer, analyzerUsesPublicUrl, isPublicRenderAnalyzerUrl, normalizeAnalyzerUrl, reanalyzeAll, translateMerchant, warmAnalyzer } from "../services/analyzerClient.js";
 import {
   deleteStatementByKey,
   DEFAULT_PACE_MONTHS,
   finalizeStatementByKey,
   getCombinedReportAsync,
   getPaceBundleAsync,
-  findStatementByHash,
   isCachedFile,
   monthCatalog,
-  promoteStatementToFinal,
-  normalizeProvisionalChargesAsync,
-  repairMiskeyedStatements,
   rememberReport,
-  removeStatementByKeyIfHash,
+  repairMiskeyedStatements,
   isSafeStatementKey,
   applyMerchantRules,
   reprocessAllStatements,
   recentBillingKeys,
   summaryRows,
 } from "../services/reportService.js";
+import {
+  ingestStatementBuffer,
+  parseStatementType,
+  uploadErrorResponse,
+} from "../services/statementUpload.js";
+import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import {
   buildReviewQueue,
-  merchantCatalog,
   normalizeReviewKey,
   suggestEnglish,
   transactionKey as reviewTransactionKey,
@@ -38,7 +39,6 @@ import {
   readReviewProgress,
   readRules,
   readStatements,
-  saveUploadedXlsx,
   writeReviewProgress,
   writeRules,
   writeStatements,
@@ -69,23 +69,10 @@ import { ensureAuxCachesFresh } from "../middleware/auxCache.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
-import {
-  addCalendarEvent,
-  deleteCalendarEvent,
-  listCalendarEvents,
-  regenerateFeedToken,
-  updateCalendarEvent,
-} from "../services/calendarService.js";
 import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, MerchantRules } from "../types.js";
-import { userIdFromRequest } from "../auth.js";
-import { calSyncEnabled } from "../storage/calCredentials.js";
-import calRoutes from "./cal.js";
-import { chatAvailable, replyToFinanceChat, streamFinanceChat, parseChatRequest, chatErrorStatus, chatErrorMessage } from "../services/chatService.js";
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
-
-router.use("/cal", calRoutes);
 
 router.use(async (_req, _res, next) => {
   try {
@@ -121,43 +108,7 @@ router.get("/config", (_req, res) => {
   res.json({
     analyzer_wake_url: isPublicRenderAnalyzerUrl(url) ? url : null,
     analyzer_wake_from_browser: analyzerUsesPublicUrl(),
-    cal_sync_enabled: calSyncEnabled(),
-    chat_enabled: chatAvailable(),
   });
-});
-
-router.post("/chat", async (req, res) => {
-  if (!chatAvailable()) {
-    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
-    return;
-  }
-  try {
-    const { message, history } = parseChatRequest(req.body);
-    const reply = await replyToFinanceChat(message, history);
-    res.json({ reply });
-  } catch (e) {
-    const messageText = chatErrorMessage(e);
-    res.status(chatErrorStatus(messageText)).json({ error: messageText });
-  }
-});
-
-router.post("/chat/stream", async (req, res) => {
-  if (!chatAvailable()) {
-    res.status(503).json({ error: "Chat is not configured — set GEMINI_API_KEY on the API server" });
-    return;
-  }
-  try {
-    const { message, history } = parseChatRequest(req.body);
-    await streamFinanceChat(res, message, history);
-  } catch (e) {
-    const messageText = chatErrorMessage(e);
-    if (!res.headersSent) {
-      res.status(chatErrorStatus(messageText)).json({ error: messageText });
-      return;
-    }
-    res.write(`data: ${JSON.stringify({ error: messageText })}\n\n`);
-    res.end();
-  }
 });
 
 router.get("/kaspa", async (req, res) => {
@@ -189,11 +140,6 @@ router.get("/market-snapshot", async (req, res) => {
     res.status(502).json({ error: message });
   }
 });
-
-function sanitizeUploadFilename(name: string): string {
-  const base = path.basename(name).replace(/[^\w.\- ]+/g, "").trim() || "upload.xlsx";
-  return base.toLowerCase().endsWith(".xlsx") ? base : `${base}.xlsx`;
-}
 
 router.get("/months", async (_req, res) => {
   const data = await loadStatementsRepaired();
@@ -444,20 +390,6 @@ router.post("/rules/entry", async (req, res) => {
   }
 });
 
-router.get("/merchants", async (req, res) => {
-  const data = await readStatements();
-  const version = await getFinalizeVersion();
-  const rules = await readRules();
-  const month = req.query.month as string | undefined;
-  const keys = month ? [month] : null;
-  const report = await getCombinedReportAsync(data, keys, version);
-  if (!report) {
-    res.json([]);
-    return;
-  }
-  res.json(merchantCatalog(report, rules));
-});
-
 router.post("/sync", async (req, res) => {
   const autoTranslate = req.body?.auto_translate !== false;
   const data = await readStatements();
@@ -499,69 +431,72 @@ router.post("/statements/reprocess", async (_req, res) => {
   res.json({ ok: true, updated, total_months: Object.keys(data.statements).length });
 });
 
+/** Sync upload — kept for scripts / fallbacks. Prefer /upload/jobs for the app. */
 router.post("/upload", upload.single("file"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "No file uploaded" });
     return;
   }
-  const autoTranslate = req.body?.auto_translate !== "false";
-  const statementType = String(req.body?.statement_type || "").toLowerCase();
-  if (statementType !== "partial" && statementType !== "final") {
+  const statementType = parseStatementType(req.body?.statement_type);
+  if (!statementType) {
     res.status(400).json({ error: "statement_type must be partial or final" });
     return;
   }
-  const provisional = statementType === "partial";
-  const filename = sanitizeUploadFilename(req.file.originalname || "upload.xlsx");
-  const buffer = req.file.buffer;
-  const hash = fileHash(buffer);
-
+  const autoTranslate = req.body?.auto_translate !== "false";
   try {
-    const data = await readStatements();
-    if (!provisional) {
-      const existing = findStatementByHash(data, hash);
-      if (existing && existing.entry.provisional !== true) {
-        res.json({ skipped: true, reason: "unchanged" });
-        return;
-      }
-      if (existing && existing.entry.provisional === true) {
-        promoteStatementToFinal(existing.entry);
-        const rules = await readRules();
-        const version = await getFinalizeVersion();
-        await finalizeStatementByKey(data, existing.key, rules, version);
-        await writeStatements(data);
-        res.json({
-          key: existing.key,
-          provisional: false,
-          upgraded: true,
-          report: data.statements[existing.key]!.report,
-        });
-        return;
-      }
-    }
+    const result = await ingestStatementBuffer(
+      req.file.buffer,
+      req.file.originalname || "upload.xlsx",
+      statementType,
+      autoTranslate,
+    );
+    res.json(result);
+  } catch (e) {
+    const { status, error } = uploadErrorResponse(e);
+    console.error("Upload failed:", error);
+    res.status(status).json({ error });
+  }
+});
 
-    const rules = await readRules();
-    const report = await analyzeFileBuffer(buffer, filename, autoTranslate);
-    const storedReport = provisional ? await normalizeProvisionalChargesAsync(report) : report;
-    const savedPath = await saveUploadedXlsx(filename, buffer);
-    const key = rememberReport(data, storedReport, savedPath, filename, hash, provisional);
-    if (key !== "unknown") {
-      removeStatementByKeyIfHash(data, "unknown", hash);
-    }
-    const version = await getFinalizeVersion();
-    await finalizeStatementByKey(data, key, rules, version);
-    await writeStatements(data);
-    res.json({ key, provisional, report: data.statements[key]!.report });
+/** Background upload — returns immediately; poll GET /upload/jobs/:jobId */
+router.post("/upload/jobs", upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+  const statementType = parseStatementType(req.body?.statement_type);
+  if (!statementType) {
+    res.status(400).json({ error: "statement_type must be partial or final" });
+    return;
+  }
+  const autoTranslate = req.body?.auto_translate !== "false";
+  try {
+    const job = await createUploadJob({
+      buffer: req.file.buffer,
+      filename: req.file.originalname || "upload.xlsx",
+      statementType,
+      autoTranslate,
+    });
+    res.status(202).json(job);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    const waking = isAnalyzerConnectivityError(message);
-    console.error("Upload failed:", message);
-    res.status(waking ? 503 : 500).json({
-      error:
-        waking && !message.startsWith("Analyzer error")
-          ? "Analyzer is waking up (Render free tier). Wait ~30 seconds and try again."
-          : message,
-    });
+    console.error("Create upload job failed:", message);
+    res.status(500).json({ error: message });
   }
+});
+
+router.get("/upload/jobs/:jobId", async (req, res) => {
+  const jobId = req.params.jobId?.trim();
+  if (!jobId) {
+    res.status(400).json({ error: "jobId required" });
+    return;
+  }
+  const job = await getUploadJob(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json(job);
 });
 
 router.get("/review/progress", async (_req, res) => {
@@ -681,125 +616,6 @@ router.post("/review/confirm", async (req, res) => {
       console.error("Background reanalyze failed:", err);
     }
   })();
-});
-
-router.get("/calendar", async (_req, res) => {
-  try {
-    const data = await listCalendarEvents();
-    res.json(data);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Calendar unavailable";
-    res.status(500).json({ error: message });
-  }
-});
-
-router.post("/calendar/events", async (req, res) => {
-  const { title, date, all_day, start_time, end_time, importance, description, recurrence, created_by } = req.body as {
-    title?: string;
-    date?: string;
-    all_day?: boolean;
-    start_time?: string;
-    end_time?: string;
-    importance?: string;
-    description?: string;
-    recurrence?: string;
-    created_by?: string;
-  };
-  if (!title?.trim() || !date?.trim()) {
-    res.status(400).json({ error: "title and date required" });
-    return;
-  }
-  try {
-    const event = await addCalendarEvent(
-      {
-        title,
-        date,
-        all_day,
-        start_time,
-        end_time,
-        importance: importance as import("../types.js").CalendarImportance,
-        description,
-        recurrence: recurrence as import("../types.js").CalendarRecurrence,
-        created_by:
-          created_by === "julia" || created_by === "egor"
-            ? created_by
-            : undefined,
-      },
-      userIdFromRequest(req),
-    );
-    res.json({ ok: true, event });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not add event";
-    res.status(400).json({ error: message });
-  }
-});
-
-router.put("/calendar/events/:id", async (req, res) => {
-  const id = req.params.id?.trim();
-  if (!id) {
-    res.status(400).json({ error: "id required" });
-    return;
-  }
-  const { title, date, all_day, start_time, end_time, importance, description, recurrence, created_by } = req.body as {
-    title?: string;
-    date?: string;
-    all_day?: boolean;
-    start_time?: string;
-    end_time?: string;
-    importance?: string;
-    description?: string;
-    recurrence?: string;
-    created_by?: string;
-  };
-  if (!title?.trim() || !date?.trim()) {
-    res.status(400).json({ error: "title and date required" });
-    return;
-  }
-  try {
-    const event = await updateCalendarEvent(id, {
-      title,
-      date,
-      all_day,
-      start_time,
-      end_time,
-      importance: importance as import("../types.js").CalendarImportance,
-      description,
-      recurrence: recurrence as import("../types.js").CalendarRecurrence,
-      created_by: created_by === "julia" || created_by === "egor" ? created_by : undefined,
-    });
-    if (!event) {
-      res.status(404).json({ error: "Event not found" });
-      return;
-    }
-    res.json({ ok: true, event });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not update event";
-    res.status(400).json({ error: message });
-  }
-});
-
-router.delete("/calendar/events/:id", async (req, res) => {
-  const id = req.params.id?.trim();
-  if (!id) {
-    res.status(400).json({ error: "id required" });
-    return;
-  }
-  const removed = await deleteCalendarEvent(id);
-  if (!removed) {
-    res.status(404).json({ error: "Event not found" });
-    return;
-  }
-  res.json({ ok: true });
-});
-
-router.post("/calendar/regenerate-token", async (_req, res) => {
-  try {
-    const feed_token = await regenerateFeedToken();
-    res.json({ ok: true, feed_token });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not regenerate token";
-    res.status(500).json({ error: message });
-  }
 });
 
 export default router;

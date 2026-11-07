@@ -1,29 +1,9 @@
 export type HouseholdUserId = "egor" | "julia";
 
-export type UserFeatures = {
-  portfolio: boolean;
-  spending: boolean;
-  calendar: boolean;
-  upload: boolean;
-  recurring: boolean;
-};
-
 export type UserProfile = {
   id: HouseholdUserId;
   label: string;
-  features: UserFeatures;
 };
-
-const DEFAULT_FEATURES: UserFeatures = {
-  portfolio: true,
-  spending: true,
-  calendar: true,
-  upload: true,
-  recurring: true,
-};
-
-/** Everyone gets full access for now — flip individual flags later if needed. */
-export const ALL_FEATURES: UserFeatures = { ...DEFAULT_FEATURES };
 
 export const HOUSEHOLD_USER_IDS: HouseholdUserId[] = ["egor", "julia"];
 
@@ -51,7 +31,6 @@ export function userProfile(userId: HouseholdUserId): UserProfile {
   return {
     id: userId,
     label: uiDisplayName(userId),
-    features: ALL_FEATURES,
   };
 }
 
@@ -85,8 +64,4 @@ export function passwordForUser(userId: HouseholdUserId): string | undefined {
     return process.env.AUTH_USER_EGOR?.trim() || shared;
   }
   return process.env.AUTH_PASSWORD_JULIA?.trim() || shared;
-}
-
-export function defaultEventCreator(existing?: string | null): HouseholdUserId {
-  return parseUserId(existing) ?? "egor";
 }

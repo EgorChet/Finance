@@ -1,12 +1,11 @@
-FROM mcr.microsoft.com/playwright:v1.49.0-noble
+FROM node:22-slim
 WORKDIR /app
-COPY api/package.json ./
-RUN npm install
+COPY api/package.json api/package-lock.json ./
+RUN npm ci
 COPY api/tsconfig.json ./
 COPY api/src ./src
 RUN npm run build
 ENV DATA_DIR=/app/data
 ENV PORT=3000
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 EXPOSE 3000
 CMD ["node", "dist/index.js"]

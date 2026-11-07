@@ -1,7 +1,5 @@
-import { fetchAdjustments, fetchCalendar, fetchExclusions, fetchFixedCharges, fetchLivingBudget, fetchRules } from "@/shared/api/client";
+import { fetchAdjustments, fetchExclusions, fetchFixedCharges, fetchLivingBudget, fetchRules } from "@/shared/api/client";
 import { createCachedStore } from "@/shared/stores/createCachedStore";
-
-export const useCalendarDataStore = createCachedStore("calendarData", fetchCalendar);
 
 export const useRulesDataStore = createCachedStore("rulesData", fetchRules);
 

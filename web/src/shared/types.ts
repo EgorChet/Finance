@@ -97,23 +97,4 @@ export interface AdjustmentItem {
   can_remove: boolean;
 }
 
-export type CalendarRecurrence = "none" | "weekly" | "monthly" | "yearly";
-
-export type CalendarImportance = "quick" | "normal" | "important" | "all_day";
-
 export type HouseholdUserId = "egor" | "julia";
-
-export interface CalendarEvent {
-  id: string;
-  date: string;
-  title: string;
-  all_day?: boolean;
-  start_time?: string;
-  end_time?: string;
-  importance?: CalendarImportance;
-  description?: string;
-  recurrence?: CalendarRecurrence;
-  created_by?: HouseholdUserId;
-  created_at?: string;
-  updated_at?: string;
-}

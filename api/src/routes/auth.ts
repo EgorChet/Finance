@@ -33,7 +33,6 @@ router.post("/login", (req, res) => {
       auth_required: false,
       user: userId,
       label: profile.label,
-      features: profile.features,
       users: listAuthUsers(),
     });
     return;
@@ -48,7 +47,6 @@ router.post("/login", (req, res) => {
     auth_required: true,
     user: userId,
     label: profile.label,
-    features: profile.features,
     users: listAuthUsers(),
   });
 });
@@ -59,7 +57,6 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({
     user: profile.id,
     label: profile.label,
-    features: profile.features,
     users: listAuthUsers(),
   });
 });

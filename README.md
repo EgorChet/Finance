@@ -62,7 +62,7 @@ Full step-by-step: **[docs/DEPLOY.md](./docs/DEPLOY.md)**
 
 Summary:
 
-1. **Supabase** — statements, rules, budget, calendar (not in git)
+1. **Supabase** — statements, rules, budget (not in git)
 2. **Render** — API + analyzer; set `AUTH_PASSWORD`, `AUTH_SECRET`, Supabase keys
 3. **GitHub Pages** — Vue app; set repo variable `VITE_API_URL` to your Render API URL
 
@@ -70,11 +70,11 @@ Summary:
 
 ```
 web/                 Vue UI (features/ = menu pages, shared/ = common code)
-api/                 Product API (Node) — auth, Supabase, chat, calendar, portfolio
+api/                 Product API (Node) — auth, Supabase, portfolio
 analyzer/
   service/           HTTP wrapper (FastAPI) — parses uploaded statements
   engine/            Python library — parse XLSX, translate, categorize
-tools/               Deploy check + optional Supabase seed
+tools/               Deploy check, Supabase seed, Drive auto-ingest Apps Script
 docs/                Deploy guide
 supabase/            Database schema
 docker-compose.yml   Local full stack

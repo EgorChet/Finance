@@ -9,7 +9,6 @@ import type {
   FxFallbackData,
   KaspaPriceCache,
   FxcnPriceCache,
-  CalendarData,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
@@ -308,25 +307,23 @@ export async function writeFxcnPriceCache(data: FxcnPriceCache): Promise<void> {
   }
 }
 
-export async function readCalendar(): Promise<CalendarData> {
-  if (!supabaseConfigured()) return local.readCalendar();
-  const res = await supabaseFetch("app_state?id=eq.calendar&select=data");
-  if (!res.ok) return { events: [], updated_at: null };
-  const rows = (await res.json()) as { data: CalendarData }[];
-  const data = rows[0]?.data;
-  return { events: data?.events || [], feed_token: data?.feed_token, updated_at: data?.updated_at ?? null };
+export async function readUploadJobs(): Promise<local.UploadJobsData> {
+  if (!supabaseConfigured()) return local.readUploadJobs();
+  const res = await supabaseFetch("app_state?id=eq.upload_jobs&select=data");
+  if (!res.ok) return { jobs: {} };
+  const rows = (await res.json()) as { data: local.UploadJobsData }[];
+  return { jobs: rows[0]?.data?.jobs || {} };
 }
 
-export async function writeCalendar(data: CalendarData): Promise<void> {
+export async function writeUploadJobs(data: local.UploadJobsData): Promise<void> {
   if (!supabaseConfigured()) {
-    await local.writeCalendar(data);
+    await local.writeUploadJobs(data);
     return;
   }
-  data.updated_at = new Date().toISOString();
   const res = await supabaseFetch("app_state", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ id: "calendar", data }),
+    body: JSON.stringify({ id: "upload_jobs", data }),
   });
   if (!res.ok) {
     const text = await res.text();

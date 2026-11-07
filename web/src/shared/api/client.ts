@@ -1,7 +1,6 @@
 import type {
   ExcludedItem,
   MerchantRules,
-  MerchantRow,
   MonthItem,
   ReviewQueueItem,
   SpendingReport,
@@ -74,7 +73,6 @@ export async function fetchAuthMe(token?: string) {
   return get<{
     user: import("@/shared/types").HouseholdUserId;
     label: string;
-    features: import("@/shared/utils/users").UserFeatures;
     users?: AuthUser[];
   }>(`${BASE}/api/auth/me`, token);
 }
@@ -85,7 +83,6 @@ export async function login(password: string, username: string) {
     auth_required: boolean;
     user: import("@/shared/types").HouseholdUserId;
     label: string;
-    features: import("@/shared/utils/users").UserFeatures;
     users?: AuthUser[];
   }>(`${BASE}/api/auth/login`, { password, username });
 }
@@ -198,11 +195,6 @@ export async function saveRuleEntry(
   return post<{ ok: boolean }>(`${prefix(false)}/rules/entry`, body, token);
 }
 
-export async function fetchMerchants(demo: boolean, month: string | null, token?: string) {
-  const q = month ? `?month=${encodeURIComponent(month)}` : "";
-  return get<MerchantRow[]>(`${prefix(demo)}/merchants${q}`, token);
-}
-
 export async function syncStatements(token?: string, autoTranslate = true) {
   return post<{ synced: string[]; total_months: number }>(
     `${prefix(false)}/sync`,
@@ -211,77 +203,11 @@ export async function syncStatements(token?: string, autoTranslate = true) {
   );
 }
 
-export async function warmApi(token?: string) {
-  return get<{ status: string; analyzer?: boolean }>(`${prefix(false)}/health?deep=1`, token);
-}
-
 export async function fetchAppConfig(token?: string) {
   return get<{
     analyzer_wake_url: string | null;
     analyzer_wake_from_browser: boolean;
-    cal_sync_enabled?: boolean;
-    chat_enabled?: boolean;
   }>(`${prefix(false)}/config`, token);
-}
-
-export type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
-
-export async function sendFinanceChat(
-  message: string,
-  history: ChatMessage[],
-  demo: boolean,
-  token?: string,
-) {
-  return post<{ reply: string }>(`${prefix(demo)}/chat`, { message, history }, token);
-}
-
-export async function streamFinanceChat(
-  message: string,
-  history: ChatMessage[],
-  demo: boolean,
-  onChunk: (text: string) => void,
-  token?: string,
-): Promise<void> {
-  const res = await fetch(`${prefix(demo)}/chat/stream`, {
-    method: "POST",
-    headers: headers(token),
-    body: JSON.stringify({ message, history }),
-  });
-
-  if (!res.ok) throw new Error(await readApiError(res));
-  if (!res.body) throw new Error("No response stream");
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() || "";
-
-    for (const event of events) {
-      for (const line of event.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (!data) continue;
-
-        let payload: { text?: string; error?: string; done?: boolean };
-        try {
-          payload = JSON.parse(data) as typeof payload;
-        } catch {
-          continue;
-        }
-
-        if (payload.error) throw new Error(payload.error);
-        if (payload.text) onChunk(payload.text);
-        if (payload.done) return;
-      }
-    }
-  }
 }
 
 export type KaspaQuote = {
@@ -337,76 +263,6 @@ export async function warmAnalyzerService(token?: string) {
   return res.json() as Promise<{ ready: boolean }>;
 }
 
-export type CalSyncStatus = {
-  enabled: boolean;
-  configured: boolean;
-  national_id_masked: string | null;
-  card_last4_masked: string | null;
-  session_saved?: boolean;
-  session_saved_at?: string | null;
-  session_age_minutes?: number | null;
-};
-
-export async function fetchCalStatus(token?: string) {
-  return get<CalSyncStatus>(`${prefix(false)}/cal/status`, token);
-}
-
-export async function saveCalCredentials(nationalId: string, cardLast4: string, token?: string) {
-  return put<{ ok: boolean; configured: boolean }>(
-    `${prefix(false)}/cal/credentials`,
-    { national_id: nationalId, card_last4: cardLast4 },
-    token,
-  );
-}
-
-export type CalJobStatusResponse = {
-  jobId: string;
-  status: string;
-  mode?: CalSyncMode;
-  message: string | null;
-  error: string | null;
-  logs: { at: string; message: string }[];
-  saved?: boolean;
-  statementKey?: string | null;
-};
-
-export type CalSyncMode = "auto" | "classic";
-
-export async function startCalSync(token?: string, mode: CalSyncMode = "classic") {
-  return post<{ jobId: string; status: string; mode: CalSyncMode }>(
-    `${prefix(false)}/cal/sync/start`,
-    { mode },
-    token,
-  );
-}
-
-export async function fetchCalJobStatus(jobId: string, token?: string) {
-  return get<CalJobStatusResponse>(
-    `${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}/status`,
-    token,
-  );
-}
-
-export async function finishCalSync(jobId: string, token?: string) {
-  return post<{ ok: boolean; status: string; key?: string }>(
-    `${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}/finish`,
-    {},
-    token,
-  );
-}
-
-export async function submitCalOtp(jobId: string, code: string, token?: string) {
-  return post<{ ok: boolean; jobId: string }>(
-    `${prefix(false)}/cal/sync/otp`,
-    { jobId, code },
-    token,
-  );
-}
-
-export async function cancelCalSync(jobId: string, token?: string) {
-  return del<{ ok: boolean }>(`${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}`, token);
-}
-
 export interface UploadStatementResult {
   key?: string;
   provisional?: boolean;
@@ -414,6 +270,51 @@ export interface UploadStatementResult {
   upgraded?: boolean;
   reason?: string;
   report?: SpendingReport;
+}
+
+export type UploadJobStatus = "queued" | "waking" | "analyzing" | "done" | "error";
+
+export type UploadJobResponse = {
+  jobId: string;
+  status: UploadJobStatus;
+  message: string;
+  filename: string;
+  statement_type: "partial" | "final";
+  created_at: string;
+  updated_at: string;
+  result?: UploadStatementResult;
+  error?: string;
+};
+
+/** Background upload — returns as soon as the server has the file. */
+export async function startUploadJob(
+  file: File,
+  statementType: "partial" | "final",
+  token?: string,
+  autoTranslate = true,
+): Promise<UploadJobResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("auto_translate", String(autoTranslate));
+  form.append("statement_type", statementType);
+  let res: Response;
+  try {
+    res = await fetch(`${prefix(false)}/upload/jobs`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+  } catch {
+    throw new Error(
+      "Could not reach the API. If you just opened the app, wait ~30 seconds for Render to wake up and try again.",
+    );
+  }
+  if (!res.ok) throw new Error(await readApiError(res));
+  return res.json();
+}
+
+export async function fetchUploadJob(jobId: string, token?: string): Promise<UploadJobResponse> {
+  return get<UploadJobResponse>(`${prefix(false)}/upload/jobs/${encodeURIComponent(jobId)}`, token);
 }
 
 export async function uploadStatement(
@@ -511,74 +412,4 @@ export async function upsertAdjustment(
 
 export async function removeAdjustment(key: string, token?: string) {
   return post<{ ok: boolean }>(`${prefix(false)}/adjustments/remove`, { key }, token);
-}
-
-export type CalendarEvent = import("@/shared/types").CalendarEvent;
-
-export type CalendarResponse = {
-  events: CalendarEvent[];
-  feed_token: string | null;
-  updated_at?: string | null;
-  demo?: boolean;
-};
-
-export function calendarFeedUrl(feedToken: string): string {
-  const base = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-  return `${base}/calendar/feed.ics?token=${encodeURIComponent(feedToken)}`;
-}
-
-export async function fetchCalendar(demo: boolean, token?: string) {
-  return get<CalendarResponse>(`${prefix(demo)}/calendar`, token);
-}
-
-export async function addCalendarEvent(
-  body: {
-    title: string;
-    date: string;
-    all_day?: boolean;
-    start_time?: string;
-    end_time?: string;
-    importance?: import("@/shared/types").CalendarImportance;
-    description?: string;
-    recurrence?: import("@/shared/types").CalendarRecurrence;
-    created_by?: import("@/shared/types").HouseholdUserId;
-  },
-  token?: string,
-) {
-  return post<{ ok: boolean; event: CalendarEvent }>(`${prefix(false)}/calendar/events`, body, token);
-}
-
-export async function updateCalendarEvent(
-  id: string,
-  body: {
-    title: string;
-    date: string;
-    all_day?: boolean;
-    start_time?: string;
-    end_time?: string;
-    importance?: import("@/shared/types").CalendarImportance;
-    description?: string;
-    recurrence?: import("@/shared/types").CalendarRecurrence;
-    created_by?: import("@/shared/types").HouseholdUserId;
-  },
-  token?: string,
-) {
-  return put<{ ok: boolean; event: CalendarEvent }>(
-    `${prefix(false)}/calendar/events/${encodeURIComponent(id)}`,
-    body,
-    token,
-  );
-}
-
-export async function deleteCalendarEvent(id: string, token?: string) {
-  const res = await fetch(`${prefix(false)}/calendar/events/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) throw new Error(await readApiError(res));
-  return res.json() as Promise<{ ok: boolean }>;
-}
-
-export async function regenerateCalendarFeedToken(token?: string) {
-  return post<{ ok: boolean; feed_token: string }>(`${prefix(false)}/calendar/regenerate-token`, {}, token);
 }

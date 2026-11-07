@@ -3,14 +3,12 @@ import { ref, computed } from "vue";
 import { authStatus, fetchAuthMe, login as apiLogin } from "@/shared/api/client";
 import type { HouseholdUserId } from "@/shared/types";
 import {
-  ALL_FEATURES,
   DEFAULT_HOUSEHOLD_USERS,
   DEMO_USER_LABELS,
   UI_USER_LABELS,
   householdUsersForUi,
   userIdFromToken,
   userLabel as labelForUser,
-  type UserFeatures,
 } from "@/shared/utils/users";
 
 const TOKEN_KEY = "finance_auth_token";
@@ -25,7 +23,6 @@ export const useAuthStore = defineStore("auth", () => {
   const userId = ref<HouseholdUserId | null>(token.value ? userIdFromToken(token.value) : null);
   const householdUsers = ref(DEFAULT_HOUSEHOLD_USERS);
   const userLabel = ref(userId.value ? labelForUser(userId.value) : "");
-  const features = ref<UserFeatures>({ ...ALL_FEATURES });
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
 
@@ -39,7 +36,6 @@ export const useAuthStore = defineStore("auth", () => {
   function applySession(next: {
     token?: string | null;
     user?: HouseholdUserId;
-    features?: UserFeatures;
     demo?: boolean;
   }) {
     if (next.demo) {
@@ -47,7 +43,6 @@ export const useAuthStore = defineStore("auth", () => {
       isDemo.value = true;
       userId.value = "egor";
       userLabel.value = labelForUser("egor", DEMO_USER_LABELS);
-      features.value = { ...ALL_FEATURES };
       localStorage.removeItem(TOKEN_KEY);
       return;
     }
@@ -60,7 +55,6 @@ export const useAuthStore = defineStore("auth", () => {
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
     userId.value = resolvedUser;
     userLabel.value = labelForUser(resolvedUser);
-    features.value = next.features ?? { ...ALL_FEATURES };
     syncUiUsers();
   }
 
@@ -78,7 +72,6 @@ export const useAuthStore = defineStore("auth", () => {
       const me = await fetchAuthMe(token.value);
       userId.value = me.user;
       userLabel.value = labelForUser(me.user);
-      features.value = me.features;
       syncUiUsers();
     } catch {
       const fromToken = userIdFromToken(token.value);
@@ -97,7 +90,6 @@ export const useAuthStore = defineStore("auth", () => {
       applySession({
         token: res.token,
         user: res.user,
-        features: res.features,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -133,10 +125,6 @@ export const useAuthStore = defineStore("auth", () => {
     ).map(([id, label]) => ({ id, label }));
   }
 
-  function can(_feature: keyof UserFeatures): boolean {
-    return true;
-  }
-
   function labelFor(id: HouseholdUserId | null | undefined): string {
     return labelForUser(id, isDemo.value ? DEMO_USER_LABELS : UI_USER_LABELS);
   }
@@ -151,14 +139,12 @@ export const useAuthStore = defineStore("auth", () => {
     userId,
     userLabel,
     householdUsers,
-    features,
     isAuthenticated,
     checkStatus,
     refreshMe,
     login,
     enterDemo,
     logout,
-    can,
     labelFor,
   };
 });

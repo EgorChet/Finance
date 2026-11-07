@@ -1,28 +1,5 @@
 import type { HouseholdUserId } from "@/shared/types";
 
-export type UserFeatures = {
-  portfolio: boolean;
-  spending: boolean;
-  calendar: boolean;
-  upload: boolean;
-  recurring: boolean;
-};
-
-/** Everyone gets full access for now. */
-export const ALL_FEATURES: UserFeatures = {
-  portfolio: true,
-  spending: true,
-  calendar: true,
-  upload: true,
-  recurring: true,
-};
-
-export type UserProfile = {
-  id: HouseholdUserId;
-  label: string;
-  features: UserFeatures;
-};
-
 /** In-app names — internal ids only; login names stay on the server. */
 export const UI_USER_LABELS: Record<HouseholdUserId, string> = {
   egor: "egor",
@@ -48,10 +25,6 @@ export function userLabel(
 ): string {
   if (!userId) return "";
   return directory[userId] ?? UI_USER_LABELS[userId] ?? userId;
-}
-
-export function creatorClass(userId: HouseholdUserId | undefined): string {
-  return userId ? `calendar-creator-dot--${userId}` : "calendar-creator-dot--unknown";
 }
 
 /** Decode user id from auth token payload (client-side, UI only). */
