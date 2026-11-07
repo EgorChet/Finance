@@ -40,7 +40,7 @@
             <button
               type="button"
               class="btn excluded-card-restore"
-              :disabled="auth.isDemo || removingKey === row.key"
+              :disabled="auth.readOnly || removingKey === row.key"
               @click="remove(row)"
             >
               {{ removingKey === row.key ? "Removing…" : "Remove split" }}
@@ -112,7 +112,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 }
 
 async function remove(row: AdjustmentItem) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   removingKey.value = row.key;
   status.value = "";
   try {

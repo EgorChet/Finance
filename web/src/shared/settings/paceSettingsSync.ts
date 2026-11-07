@@ -125,18 +125,28 @@ setPaceSettingsSource({
  * Load settings from the server. Call before mounting and after sign-in.
  * Never blocks for long: a sleeping free-tier server falls back to the cached copy.
  */
-export async function hydratePaceSettings(authToken: string | null | undefined, demo: boolean): Promise<void> {
+export async function hydratePaceSettings(
+  authToken: string | null | undefined,
+  demo: boolean,
+  canEdit = true,
+): Promise<void> {
   if (demo || !authToken) {
     syncEnabled = false;
     return;
   }
   token = authToken;
-  syncEnabled = true;
+  // View-only members read the household settings but never write them.
+  syncEnabled = canEdit;
   const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HYDRATE_TIMEOUT_MS));
   const request = fetchPaceSettings(token).catch(() => null);
   const apply = (server: PaceSettings | null) => {
     if (!server) return;
     const remote = normalizePaceSettings(server);
+    if (!canEdit) {
+      current = remote;
+      writeCache(current);
+      return;
+    }
     if (!remote.updated_at) {
       // Server has never stored settings: seed it from this device.
       if (hasUnsyncedLegacy || current.updated_at) scheduleUpload();

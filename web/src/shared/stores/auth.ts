@@ -26,6 +26,10 @@ export const useAuthStore = defineStore("auth", () => {
   const userLabel = ref(userId.value ? labelForUser(userId.value) : "");
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
+  /** Egor edits; Julia's account is view-only (the API enforces this too). */
+  const canEdit = computed(() => !isDemo.value && userId.value !== "julia");
+  /** Hide or disable every edit control: demo data, or a view-only household member. */
+  const readOnly = computed(() => isDemo.value || !canEdit.value);
 
   function syncUiUsers() {
     householdUsers.value = householdUsersForUi();
@@ -53,8 +57,8 @@ export const useAuthStore = defineStore("auth", () => {
     }
     isDemo.value = false;
     demoAsOf.value = null;
-    void hydratePaceSettings(token.value, false);
     const resolvedUser = next.user ?? userIdFromToken(next.token ?? null) ?? "egor";
+    void hydratePaceSettings(token.value, false, resolvedUser !== "julia");
     userId.value = resolvedUser;
     userLabel.value = labelForUser(resolvedUser);
     syncUiUsers();
@@ -132,6 +136,8 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   return {
+    canEdit,
+    readOnly,
     token,
     isDemo,
     demoAsOf,

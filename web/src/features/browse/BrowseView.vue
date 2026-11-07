@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample transactions only.</div>
+    <div v-if="auth.readOnly" class="demo-banner">Demo mode — sample transactions only.</div>
     <h2 class="page-title">Browse transactions</h2>
     <p class="page-lead">
       Search all charges by merchant, category, amount, or billing month.
@@ -108,8 +108,8 @@
           title=""
           show-category
           :default-limit="100"
-          :excludeable="!auth.isDemo"
-          :adjustable="!auth.isDemo"
+          :excludeable="!auth.readOnly"
+          :adjustable="!auth.readOnly"
           :excluding-key="excludingKey"
           :adjusting-key="adjustingKey"
           @exclude="excludeTransaction"
@@ -295,7 +295,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 }
 
 async function excludeTransaction(tx: Transaction) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
   const ok = await confirm({
     title: "Exclude transaction?",
@@ -319,7 +319,7 @@ async function excludeTransaction(tx: Transaction) {
 }
 
 async function adjustTransaction(tx: Transaction) {
-  if (auth.isDemo) return;
+  if (auth.readOnly) return;
   const result = await adjustCharge({
     transaction: tx,
     currentReimbursement: tx.reimbursement,

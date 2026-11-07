@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
+    <div v-if="auth.readOnly" class="demo-banner">Demo mode — rules are read-only.</div>
     <h2 v-if="!embedded" class="page-title">Merchant mappings</h2>
     <AppLoader
       v-if="loading"
@@ -20,7 +20,7 @@
             placeholder="Search Hebrew, English, or category"
             autocomplete="off"
           />
-          <template v-if="!auth.isDemo">
+          <template v-if="!auth.readOnly">
             <button type="button" class="btn" @click="exportJson">Export</button>
             <button type="button" class="btn" :disabled="importing" @click="importInput?.click()">
               {{ importing ? "Importing…" : "Import" }}
@@ -44,7 +44,7 @@
               <span v-if="row.Category" class="mappings-category-tag">{{ row.Category }}</span>
             </div>
             <button
-              v-if="!auth.isDemo"
+              v-if="!auth.readOnly"
               type="button"
               class="btn btn-edit"
               :disabled="!!savingHebrew"
@@ -151,7 +151,7 @@ function refreshSearchMatches() {
 watch(searchQuery, refreshSearchMatches);
 
 function isEditing(row: MerchantRow): boolean {
-  return !auth.isDemo && editingHebrew.value === row.Hebrew;
+  return !auth.readOnly && editingHebrew.value === row.Hebrew;
 }
 
 const filteredRows = computed(() => {
@@ -241,7 +241,7 @@ function setStatus(message: string, isError = false) {
 
 async function persistRow(hebrew: string): Promise<boolean> {
   const row = rows.value.find((r) => r.Hebrew === hebrew);
-  if (!row || auth.isDemo) return true;
+  if (!row || auth.readOnly) return true;
   if (!rowIsDirty(hebrew)) return true;
 
   const token = auth.token || undefined;
@@ -332,7 +332,7 @@ async function importJson(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (!file || auth.isDemo) return;
+  if (!file || auth.readOnly) return;
 
   importing.value = true;
   editingHebrew.value = null;
