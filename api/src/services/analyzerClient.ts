@@ -90,6 +90,13 @@ async function quickHealthCheck(): Promise<boolean> {
   }
 }
 
+export type WarmAnalyzerResult = {
+  ready: boolean;
+  error?: string;
+  attempts: number;
+  analyzerUrl: string;
+};
+
 /** Fast path when already awake; full wake loop if not. */
 export async function ensureAnalyzerReady(): Promise<boolean> {
   if (await quickHealthCheck()) return true;
@@ -97,8 +104,20 @@ export async function ensureAnalyzerReady(): Promise<boolean> {
 }
 
 /** Wake the Python analyzer (Render free tier sleeps both services). */
-export async function warmAnalyzer(): Promise<boolean> {
+export async function warmAnalyzer(options?: { maxAttempts?: number }): Promise<boolean> {
+  const result = await warmAnalyzerDetailed(options);
+  return result.ready;
+}
+
+/**
+ * Same as warmAnalyzer, but returns the last error for /wake diagnostics.
+ * Pass a small maxAttempts for HTTP poll endpoints (Apps Script retries outside).
+ */
+export async function warmAnalyzerDetailed(options?: {
+  maxAttempts?: number;
+}): Promise<WarmAnalyzerResult> {
   let lastError = "";
+  const maxAttempts = Math.max(1, options?.maxAttempts ?? ANALYZER_WARMUP_ATTEMPTS);
 
   if (ANALYZER_USES_PUBLIC_URL) {
     console.log("Pinging analyzer base URL to wake Render instance…");
@@ -106,7 +125,7 @@ export async function warmAnalyzer(): Promise<boolean> {
     await new Promise((r) => setTimeout(r, ANALYZER_WAKE_PAUSE_MS));
   }
 
-  for (let attempt = 0; attempt < ANALYZER_WARMUP_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (ANALYZER_USES_PUBLIC_URL && attempt > 0 && attempt % 4 === 0) {
       await pingAnalyzerBase();
     }
@@ -116,7 +135,7 @@ export async function warmAnalyzer(): Promise<boolean> {
         if (attempt > 0 || ANALYZER_USES_PUBLIC_URL) {
           console.log(`Analyzer ready after ${attempt + 1} warmup attempt(s)`);
         }
-        return true;
+        return { ready: true, attempts: attempt + 1, analyzerUrl: ANALYZER_URL };
       }
       lastError = `HTTP ${res.status}`;
       if (!isWarmingHttpStatus(res.status)) {
@@ -125,14 +144,19 @@ export async function warmAnalyzer(): Promise<boolean> {
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
     }
-    if (attempt < ANALYZER_WARMUP_ATTEMPTS - 1) {
+    if (attempt < maxAttempts - 1) {
       await new Promise((r) => setTimeout(r, ANALYZER_WARMUP_DELAY_MS));
     }
   }
   if (lastError) {
-    console.error(`Analyzer warmup failed after ${ANALYZER_WARMUP_ATTEMPTS} attempts: ${lastError}`);
+    console.error(`Analyzer warmup failed after ${maxAttempts} attempts: ${lastError}`);
   }
-  return false;
+  return {
+    ready: false,
+    error: lastError || "Analyzer not ready",
+    attempts: maxAttempts,
+    analyzerUrl: ANALYZER_URL,
+  };
 }
 
 const ANALYZE_RETRY_ATTEMPTS = Number(process.env.ANALYZER_ANALYZE_ATTEMPTS || 3);

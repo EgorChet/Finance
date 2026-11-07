@@ -2,6 +2,12 @@
 
 Drop a Leumi Visa `.xlsx` into Drive; Apps Script wakes the Render API/analyzer and imports it. In-app **Import statement** still works as a fallback.
 
+## Why a timer (not “react to new file”)?
+
+Personal Google Apps Script **does not** get a reliable push trigger for “file added to this Drive folder.” Google’s Drive change APIs are for Workspace add-ons / limited cases, not a simple folder watcher you can paste into a script.
+
+So the script **polls** `partial/` and `final/` on a timer. That is intentional. Empty polls exit immediately (no wake). A **script lock** skips overlapping runs so free Render is not hammered by many cold starts at once.
+
 ## Drive folders
 
 Create this tree in Google Drive (names can differ; IDs matter):
@@ -14,7 +20,7 @@ Finance/
     imported/
       partial/            # moved here after success
       final/
-      failed/             # quarantine after hard failure
+      failed/             # quarantine after hard failure (bad file / auth)
 ```
 
 Open each folder → copy the ID from the URL (`…/folders/<ID>`).
@@ -49,18 +55,37 @@ Public (no key): `GET /health?deep=1` — used first to wake a sleeping Render s
 | `FOLDER_IMPORTED_FAILED` | Drive folder ID |
 
 4. Run `runOnce` once from the editor → authorize **Drive** + **external URL** (UrlFetch) when prompted
-5. Run `installTriggers` → installs a **1-minute** timer that scans `partial/` and `final/`
+5. Run `installTriggers` → installs a **5-minute** timer that scans `partial/` and `final/`
 
-Drive has no reliable “file created in folder” trigger for personal scripts, so polling every minute is intentional. After a successful import the file leaves the inbox folder, so the next tick is a no-op.
+After a successful import the file leaves the inbox folder, so the next tick is a no-op.
 
 ## First test
 
-1. Confirm API is up: `curl "https://YOUR_API.onrender.com/health"`
+1. Confirm API is up: open `https://YOUR_API.onrender.com/health?deep=1` in a browser and wait until JSON looks healthy (wakes free Render)
 2. Drop a small `.xlsx` into `Finance/statements/partial`
-3. Within ~1–2 minutes (plus Render cold start) the file should move to `imported/partial`
-4. Open the app → spending for that cycle should update
+3. Run `runOnce` **once** (or wait for the timer) — do **not** click Run repeatedly while one is still going
+4. File should move to `imported/partial` (or stay in inbox if Render is still cold — next tick retries)
+5. Open the app → spending for that cycle should update
 
-If the file lands in `imported/failed`, open **Executions** in the Apps Script project for the error (wrong secret, wake timeout, bad file, etc.).
+If the file lands in `imported/failed`, open **Executions** for a hard error (wrong secret, bad file, etc.). Wake timeouts are **not** moved to failed anymore.
+
+### `Timed out waking… Analyzer not ready`
+
+The API woke, but **finance-analyzer** did not become healthy in time (common on Render free tier).
+
+1. In Render: confirm **finance-analyzer** is not suspended / crashed
+2. On **finance-api**, `ANALYZER_URL` must be the analyzer’s **public** `https://….onrender.com` URL (free services cannot use private networking)
+3. Re-deploy API if you just changed wake code; paste latest `Code.gs` (polls ~6 min, shallow `/health` only)
+4. Run `runOnce` once and watch Executions — new logs include `analyzer_url` on failed wake attempts
+
+## If too many executions / wake timeouts
+
+1. Run **`removeTriggers`** so nothing new starts
+2. Wait until all Executions finish
+3. Paste the latest `Code.gs` (lock + longer wake)
+4. Move any good `.xlsx` from `imported/failed` back into `partial/` or `final/` if it failed only because of cold start
+5. Wake the API in a browser: `/health?deep=1`
+6. Run **`runOnce` once**, then **`installTriggers`** once
 
 ## Ops tips
 

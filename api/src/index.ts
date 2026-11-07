@@ -37,7 +37,8 @@ app.get("/health", async (req, res) => {
     res.json({ status: "ok" });
     return;
   }
-  const analyzer = await warmAnalyzer();
+  // Brief check only — full cold-start waits belong on /api/ingest/wake + client retries.
+  const analyzer = await warmAnalyzer({ maxAttempts: 2 });
   res.json({
     status: "ok",
     analyzer,

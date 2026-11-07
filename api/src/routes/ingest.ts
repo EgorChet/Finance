@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { warmAnalyzer } from "../services/analyzerClient.js";
+import { warmAnalyzerDetailed } from "../services/analyzerClient.js";
 import {
   ingestStatementBuffer,
   parseStatementType,
@@ -10,14 +10,22 @@ import {
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
+/** Brief warmup budget per HTTP call — Apps Script polls this on free-tier cold starts. */
+const WAKE_HTTP_ATTEMPTS = Number(process.env.ANALYZER_WAKE_HTTP_ATTEMPTS || 3);
+
 /** Wake analyzer before uploading — Apps Script should call this with retries on free tier. */
 router.get("/wake", async (_req, res) => {
-  const ready = await warmAnalyzer();
-  if (!ready) {
-    res.status(503).json({ ready: false, error: "Analyzer not ready" });
+  const result = await warmAnalyzerDetailed({ maxAttempts: WAKE_HTTP_ATTEMPTS });
+  if (!result.ready) {
+    res.status(503).json({
+      ready: false,
+      error: result.error || "Analyzer not ready",
+      attempts: result.attempts,
+      analyzer_url: result.analyzerUrl,
+    });
     return;
   }
-  res.json({ ready: true });
+  res.json({ ready: true, attempts: result.attempts, analyzer_url: result.analyzerUrl });
 });
 
 /**
