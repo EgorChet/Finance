@@ -17,12 +17,21 @@
     </div>
 
     <div class="tx-row-mobile">
-      <div v-for="row in visibleRows" :key="row.key" class="tx-row">
+      <component
+        :is="hasActions ? 'button' : 'div'"
+        v-for="row in visibleRows"
+        :key="row.key"
+        :type="hasActions ? 'button' : undefined"
+        class="tx-row"
+        :class="{ 'tx-row--tappable': hasActions, 'tx-row--busy': actingKey === row.key }"
+        :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
+        @click="hasActions && openSheet(row)"
+      >
         <div class="tx-row-top">
           <div class="tx-row-merchant">{{ row.merchant }}</div>
           <div class="tx-row-amount-col">
             <div class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">
-              {{ formatChargeAmount(row.tx) }}
+              {{ actingKey === row.key ? "…" : formatChargeAmount(row.tx) }}
             </div>
             <div v-if="row.reimbursementLabel" class="tx-row-reimbursement">{{ row.reimbursementLabel }}</div>
           </div>
@@ -32,29 +41,41 @@
             {{ row.dateLabel }}
             <span v-if="showCategory && row.category"> · {{ row.category }}</span>
           </span>
-          <div v-if="excludeable || adjustable" class="tx-row-actions">
-            <button
-              v-if="adjustable"
-              type="button"
-              class="tx-exclude-btn"
-              :disabled="actingKey === row.key"
-              @click="emitAdjust(row.tx)"
-            >
-              {{ actingKey === row.key ? "…" : row.adjustLabel }}
-            </button>
-            <button
-              v-if="excludeable"
-              type="button"
-              class="tx-exclude-btn"
-              :disabled="actingKey === row.key"
-              @click="emitExclude(row.tx)"
-            >
-              {{ actingKey === row.key ? "…" : "Exclude" }}
-            </button>
+        </div>
+      </component>
+    </div>
+
+    <!-- Rarely used actions live in a sheet that opens on tap, not on every row. -->
+    <Teleport to="body">
+      <Transition name="tx-sheet">
+        <div v-if="sheetRow" class="tx-sheet-backdrop" @click.self="closeSheet">
+          <div class="tx-sheet" role="dialog" aria-modal="true" :aria-label="sheetRow.merchant">
+            <div class="tx-sheet-grabber" aria-hidden="true" />
+            <div class="tx-sheet-head">
+              <div class="tx-sheet-merchant">{{ sheetRow.merchant }}</div>
+              <div class="tx-sheet-amount" :class="{ 'tx-row-amount--refund': sheetRow.tx.charge_amount < 0 }">
+                {{ formatChargeAmount(sheetRow.tx) }}
+              </div>
+              <div class="tx-sheet-meta">
+                {{ sheetRow.dateLabel }}<span v-if="sheetRow.category"> · {{ sheetRow.category }}</span>
+              </div>
+              <div v-if="sheetRow.reimbursementLabel" class="tx-sheet-note">{{ sheetRow.reimbursementLabel }}</div>
+            </div>
+            <div class="tx-sheet-actions">
+              <button v-if="adjustable" type="button" class="tx-sheet-action" @click="runSheet('adjust')">
+                <span class="tx-sheet-action-title">{{ sheetRow.adjustLabel }}</span>
+                <span class="tx-sheet-action-hint">Someone paid you back for part of it</span>
+              </button>
+              <button v-if="excludeable" type="button" class="tx-sheet-action" @click="runSheet('exclude')">
+                <span class="tx-sheet-action-title">Exclude from spending</span>
+                <span class="tx-sheet-action-hint">Not a real expense, e.g. a transfer or a refund pair</span>
+              </button>
+            </div>
+            <button type="button" class="btn tx-sheet-cancel" @click="closeSheet">Cancel</button>
           </div>
         </div>
-      </div>
-    </div>
+      </Transition>
+    </Teleport>
 
     <nav
       v-if="paginated && totalPages > 1"
@@ -240,6 +261,28 @@ function emitExclude(tx: Transaction) {
 
 function emitAdjust(tx: Transaction) {
   emit("adjust", tx);
+}
+
+type TxRow = (typeof visibleRows.value)[number];
+
+const hasActions = computed(() => props.excludeable || props.adjustable);
+const sheetRow = ref<TxRow | null>(null);
+
+function openSheet(row: TxRow) {
+  if (actingKey.value === row.key) return;
+  sheetRow.value = row;
+}
+
+function closeSheet() {
+  sheetRow.value = null;
+}
+
+function runSheet(action: "adjust" | "exclude") {
+  const row = sheetRow.value;
+  closeSheet();
+  if (!row) return;
+  if (action === "adjust") emitAdjust(row.tx);
+  else emitExclude(row.tx);
 }
 
 function formatChargeDate(tx: Transaction): string {

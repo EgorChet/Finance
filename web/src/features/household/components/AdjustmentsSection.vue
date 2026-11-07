@@ -18,7 +18,7 @@
     <template v-else>
       <p v-if="error" class="recurring-form-error">{{ error }}</p>
       <p v-else-if="!entries.length" class="manual-empty">
-        No split charges yet. Use <strong>Split</strong> on Overview transactions.
+        No split charges yet. Tap any charge in Spending and choose <strong>Split</strong>.
       </p>
       <div v-else class="excluded-list">
         <article v-for="row in entries" :key="row.key" class="excluded-card">
