@@ -1,7 +1,8 @@
 import cors from "cors";
 import express from "express";
 import { warmAnalyzer, normalizeAnalyzerUrl, analyzerUsesPublicUrl } from "./services/analyzerClient.js";
-import { requireAuth, requireIngestKey } from "./auth.js";
+import { requireIngestKey } from "./auth.js";
+import { requireAuthOrAssistant } from "./assistantAuth.js";
 import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
 import ingestRoutes from "./routes/ingest.js";
@@ -53,7 +54,8 @@ app.use("/api/demo", demoRoutes);
 /** Drive / Apps Script machine ingest — X-Ingest-Key, not household Bearer token. */
 app.use("/api/ingest", requireIngestKey, ingestRoutes);
 
-app.use("/api", requireAuth, apiRoutes);
+/** Household Bearer token, or X-Assistant-Key for the Telegram assistant (route allowlist). */
+app.use("/api", requireAuthOrAssistant, apiRoutes);
 
 app.listen(PORT, () => {
   console.log(`Finance API listening on http://127.0.0.1:${PORT}`);
