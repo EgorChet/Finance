@@ -23,6 +23,12 @@ services:
         sync: false
       - key: ASSISTANT_KEY
         sync: false
+      - key: CAL_USERNAME
+        sync: false
+      - key: CAL_PASSWORD
+        sync: false
+      - key: CAL_CARD_LAST4
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: STORAGE

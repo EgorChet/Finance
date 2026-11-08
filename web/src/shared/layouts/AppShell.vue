@@ -209,6 +209,34 @@
                 </button>
 
                 <button
+                  v-if="auth.canEdit && !auth.isDemo"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  :disabled="calBusy"
+                  @click="syncCal"
+                >
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path
+                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Sync Cal
+                </button>
+
+                <button
                   v-if="showLocalSync && (auth.isDemo || auth.canEdit)"
                   type="button"
                   class="mobile-nav-action btn"
@@ -354,11 +382,15 @@ import AppLoader from "@/shared/components/AppLoader.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import UploadJobToast from "@/shared/components/UploadJobToast.vue";
 import {
+  fetchCalSyncJob,
   fetchUploadJob,
+  startCalSync,
   startUploadJob,
   syncStatements,
+  type CalSyncJob,
   type UploadJobResponse,
 } from "@/shared/api/client";
+import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "@/shared/utils/calSyncSession";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
@@ -445,6 +477,9 @@ let stepTimer: ReturnType<typeof setInterval> | null = null;
 let uploadPollTimer: ReturnType<typeof setInterval> | null = null;
 let uploadDoneTimer: ReturnType<typeof setTimeout> | null = null;
 let activeUploadJobId: string | null = null;
+const calBusy = ref(false);
+let calPollTimer: ReturnType<typeof setInterval> | null = null;
+let activeCalJobId: string | null = null;
 
 const accountInitial = computed(() => {
   const label = auth.userLabel?.trim();
@@ -571,11 +606,13 @@ const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 onMounted(() => {
   portfolio.startPolling(auth.isDemo, auth.token || undefined);
   void resumeUploadJobIfNeeded();
+  void resumeCalSyncIfNeeded();
 });
 
 onUnmounted(() => {
   clearStepTimer();
   stopUploadPolling();
+  stopCalPolling();
   if (uploadDoneTimer) clearTimeout(uploadDoneTimer);
   portfolio.stopPolling();
   document.body.style.overflow = "";
@@ -736,6 +773,86 @@ function retryUploadJob() {
   dismissUploadToast();
   if (!pending) return;
   void runUpload(pending.file, pending.statementType);
+}
+
+function stopCalPolling() {
+  if (calPollTimer) {
+    clearInterval(calPollTimer);
+    calPollTimer = null;
+  }
+}
+
+function applyCalJobStatus(job: CalSyncJob) {
+  if (job.status === "done") {
+    stopCalPolling();
+    clearCalSyncJobId();
+    activeCalJobId = null;
+    calBusy.value = false;
+    showUploadToast("done", job.message || "Statement saved");
+    uploadDoneTimer = window.setTimeout(dismissUploadToast, 6000);
+    emitSpendingRefresh();
+    return;
+  }
+  if (job.status === "error") {
+    stopCalPolling();
+    clearCalSyncJobId();
+    activeCalJobId = null;
+    calBusy.value = false;
+    showUploadToast("error", job.error?.trim() || job.message || "Cal sync failed");
+    return;
+  }
+  showUploadToast("syncing", job.message || "Syncing Cal…");
+}
+
+async function pollCalJob(jobId: string) {
+  try {
+    const job = await fetchCalSyncJob(jobId, auth.token || undefined);
+    if (activeCalJobId !== jobId) return;
+    applyCalJobStatus(job);
+  } catch (e) {
+    if (activeCalJobId !== jobId) return;
+    stopCalPolling();
+    clearCalSyncJobId();
+    activeCalJobId = null;
+    calBusy.value = false;
+    const message = e instanceof Error ? e.message : String(e);
+    showUploadToast("error", message.trim() || "Could not check Cal sync");
+  }
+}
+
+function watchCalJob(jobId: string) {
+  stopCalPolling();
+  activeCalJobId = jobId;
+  calBusy.value = true;
+  saveCalSyncJobId(jobId);
+  void pollCalJob(jobId);
+  calPollTimer = setInterval(() => {
+    void pollCalJob(jobId);
+  }, 2000);
+}
+
+async function resumeCalSyncIfNeeded() {
+  if (auth.isDemo || !auth.canEdit) return;
+  const jobId = readCalSyncJobId();
+  if (!jobId || activeCalJobId) return;
+  showUploadToast("syncing", "Checking Cal sync…");
+  watchCalJob(jobId);
+}
+
+async function syncCal() {
+  closeNav();
+  calBusy.value = true;
+  uploadToastMuted.value = false;
+  showUploadToast("syncing", "Starting Cal sync…");
+  try {
+    const job = await startCalSync(auth.token || undefined);
+    applyCalJobStatus(job);
+    if (job.status !== "done" && job.status !== "error") watchCalJob(job.jobId);
+  } catch (err) {
+    calBusy.value = false;
+    const message = err instanceof Error ? err.message : String(err);
+    showUploadToast("error", message.trim() || "Cal sync failed");
+  }
 }
 
 async function sync() {
