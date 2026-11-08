@@ -11,6 +11,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, basename } from "path";
 import { chromium, type Frame, type Page } from "playwright";
+import { warmAnalyzerDetailed } from "./analyzerClient.js";
 import { ingestStatementBuffer } from "./statementUpload.js";
 
 const LOGIN_URL = "https://digital-web.cal-online.co.il/login";
@@ -22,7 +23,7 @@ const DASHBOARD_SELECTORS =
 const TRANSACTIONS_VIEW_SELECTORS =
   ".cardInDeatailsTransactions, app-card-in-deatails-transactions, .transactions-table, .export, button[aria-label*='אקסל'], button[aria-label*='ייצוא'], button[aria-label*='יצוא']";
 
-type CalSyncStatus = "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
+type CalSyncStatus = "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
 
 export type CalSyncJobPublic = {
   jobId: string;
@@ -38,6 +39,35 @@ const jobs = new Map<string, Job>();
 let activeJobId: string | null = null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const WAKE_HTTP_ATTEMPTS = Number(process.env.ANALYZER_WAKE_HTTP_ATTEMPTS || 3);
+const WAKE_DEADLINE_MS = 4 * 60_000;
+const WAKE_RETRY_MS = 10_000;
+
+/**
+ * Same order as the Mac sync, before Chrome starts:
+ * 1. GET /health?deep=1 — short ping, starts a sleeping analyzer.
+ * 2. GET /api/ingest/wake — 200 ready, or 503 still waking.
+ * 3. On 503, wait 10 seconds and repeat, for up to 4 minutes.
+ * Called in-process (this job is already inside the API). Cal is not opened if this throws.
+ */
+async function wakeAnalyzerFirst(job: Job): Promise<void> {
+  patch(job, { status: "waking", message: "Waking analyzer…" });
+  const deadline = Date.now() + WAKE_DEADLINE_MS;
+  let attempt = 0;
+  while (Date.now() < deadline) {
+    attempt += 1;
+    await warmAnalyzerDetailed({ maxAttempts: 2 }).catch(() => null);
+    const wake = await warmAnalyzerDetailed({ maxAttempts: WAKE_HTTP_ATTEMPTS });
+    if (wake.ready) return;
+    patch(job, {
+      status: "waking",
+      message: `Analyzer still waking (try ${attempt}). Waiting 10 seconds…`,
+    });
+    await sleep(WAKE_RETRY_MS);
+  }
+  throw new Error("Analyzer did not wake within 4 minutes. Cal was not opened.");
+}
 
 /** Playwright's default headless binary is chrome-headless-shell, which Cal rejects. Use full Chrome. */
 function fullChromeExecutable(): string {
@@ -250,6 +280,7 @@ async function run(job: Job, password: string): Promise<void> {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
     const { username, cardLast4 } = credentials();
+    await wakeAnalyzerFirst(job);
     browser = await chromium.launch({
       headless: true,
       executablePath: fullChromeExecutable(),
@@ -336,8 +367,8 @@ export function startCalSync(): CalSyncJobPublic {
   const { password } = credentials();
   const job: Job = {
     jobId: randomUUID(),
-    status: "starting",
-    message: "Starting Cal sync…",
+    status: "waking",
+    message: "Waking analyzer…",
   };
   jobs.set(job.jobId, job);
   activeJobId = job.jobId;

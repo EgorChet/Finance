@@ -205,7 +205,7 @@ export async function syncStatements(token?: string, autoTranslate = true) {
 
 export type CalSyncJob = {
   jobId: string;
-  status: "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
+  status: "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
   message: string;
   error?: string;
   result?: { key?: string; provisional?: boolean; skipped?: boolean };
