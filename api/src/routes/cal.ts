@@ -1,8 +1,36 @@
-import { Router } from "express";
+import { timingSafeEqual } from "crypto";
+import { Router, type Request, type Response } from "express";
 import { userCanEdit, userIdFromRequest } from "../auth.js";
 import { getCalSyncJob, startCalSync } from "../services/calSyncService.js";
 
 const router = Router();
+
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
+
+/** Totoshka calls this once an hour. Same ASSISTANT_KEY, but not on the assistant allowlist. */
+export function handleCalCron(req: Request, res: Response): void {
+  const raw = req.headers["x-assistant-key"];
+  const provided = (Array.isArray(raw) ? raw[0] : raw)?.trim() || "";
+  const expected = process.env.ASSISTANT_KEY?.trim() || "";
+  if (!expected) {
+    res.status(503).json({ error: "Set ASSISTANT_KEY on the API server" });
+    return;
+  }
+  if (!provided || !safeEqual(provided, expected)) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    res.status(202).json(startCalSync());
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.status(/CAL_USERNAME|CAL_PASSWORD/.test(message) ? 503 : 500).json({ error: message });
+  }
+}
 
 /** Phone button: start the server-side Cal sync. Returns immediately; poll GET /sync/:jobId. */
 router.post("/sync", (req, res) => {
