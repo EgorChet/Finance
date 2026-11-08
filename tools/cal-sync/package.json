@@ -1,0 +1,14 @@
+{
+  "name": "finance-cal-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scheduled Cal statement download on the Mac (visible Chrome), uploaded to the Finance API.",
+  "scripts": {
+    "sync": "node cal-sync.mjs",
+    "check": "node cal-sync.mjs --check"
+  },
+  "dependencies": {
+    "playwright-core": "1.48.2"
+  }
+}
