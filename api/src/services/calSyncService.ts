@@ -7,7 +7,7 @@
  * environment (CAL_USERNAME, CAL_PASSWORD), never from the request.
  */
 import { randomUUID } from "crypto";
-import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, basename } from "path";
 import { chromium, type Frame, type Page } from "playwright";
@@ -38,6 +38,15 @@ const jobs = new Map<string, Job>();
 let activeJobId: string | null = null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Playwright's default headless binary is chrome-headless-shell, which Cal rejects. Use full Chrome. */
+function fullChromeExecutable(): string {
+  const shell = chromium.executablePath();
+  const full = shell.replaceAll("chromium_headless_shell", "chromium").replaceAll("chrome-headless-shell", "chrome");
+  if (full !== shell && existsSync(full)) return full;
+  if (existsSync(shell) && !shell.includes("headless")) return shell;
+  throw new Error("Full Chrome is not installed in this image");
+}
 
 function credentials(): { username: string; password: string; cardLast4: string } {
   const username = process.env.CAL_USERNAME?.trim() || "";
@@ -243,6 +252,7 @@ async function run(job: Job, password: string): Promise<void> {
     const { username, cardLast4 } = credentials();
     browser = await chromium.launch({
       headless: true,
+      executablePath: fullChromeExecutable(),
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -258,6 +268,32 @@ async function run(job: Job, password: string): Promise<void> {
       acceptDownloads: true,
     });
     const page = await context.newPage();
+    const client = await context.newCDPSession(page);
+    await client.send("Network.setUserAgentOverride", {
+      userAgent: USER_AGENT,
+      acceptLanguage: "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+      platform: "MacIntel",
+      userAgentMetadata: {
+        brands: [
+          { brand: "Chromium", version: "142" },
+          { brand: "Google Chrome", version: "142" },
+          { brand: "Not_A Brand", version: "24" },
+        ],
+        fullVersionList: [
+          { brand: "Chromium", version: "142.0.0.0" },
+          { brand: "Google Chrome", version: "142.0.0.0" },
+          { brand: "Not_A Brand", version: "24.0.0.0" },
+        ],
+        fullVersion: "142.0.0.0",
+        platform: "macOS",
+        platformVersion: "10.15.7",
+        architecture: "x86",
+        model: "",
+        mobile: false,
+        bitness: "64",
+        wow64: false,
+      },
+    });
     patch(job, { status: "logging_in", message: "Signing in to Cal…" });
     await openLogin(page);
     await signInWithPassword(page, username, password);
