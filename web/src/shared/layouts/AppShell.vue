@@ -213,27 +213,18 @@
                   type="button"
                   class="mobile-nav-action btn"
                   :disabled="calBusy"
-                  @click="syncCal"
+                  @click="syncCal('render')"
                 >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  Sync Cal
+                  Sync Cal on Render
+                </button>
+                <button
+                  v-if="auth.canEdit && !auth.isDemo"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  :disabled="calBusy"
+                  @click="syncCal('server')"
+                >
+                  Sync Cal on server
                 </button>
 
                 <button
@@ -839,13 +830,13 @@ async function resumeCalSyncIfNeeded() {
   watchCalJob(jobId);
 }
 
-async function syncCal() {
+async function syncCal(target: "render" | "server") {
   closeNav();
   calBusy.value = true;
   uploadToastMuted.value = false;
-  showUploadToast("syncing", "Starting Cal sync…");
+  showUploadToast("syncing", target === "server" ? "Asking the server…" : "Starting on Render…");
   try {
-    const job = await startCalSync(auth.token || undefined);
+    const job = await startCalSync(target, auth.token || undefined);
     applyCalJobStatus(job);
     if (job.status !== "done" && job.status !== "error") watchCalJob(job.jobId);
   } catch (err) {

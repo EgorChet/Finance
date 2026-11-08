@@ -203,16 +203,19 @@ export async function syncStatements(token?: string, autoTranslate = true) {
   );
 }
 
+export type CalSyncTarget = "render" | "server";
+
 export type CalSyncJob = {
   jobId: string;
-  status: "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
+  target?: CalSyncTarget;
+  status: "queued" | "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
   message: string;
   error?: string;
   result?: { key?: string; provisional?: boolean; skipped?: boolean };
 };
 
-export async function startCalSync(token?: string) {
-  return post<CalSyncJob>(`${prefix(false)}/cal/sync`, {}, token);
+export async function startCalSync(target: CalSyncTarget, token?: string) {
+  return post<CalSyncJob>(`${prefix(false)}/cal/sync`, { target }, token);
 }
 
 export async function fetchCalSyncJob(jobId: string, token?: string) {

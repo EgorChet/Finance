@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { userCanEdit, userIdFromRequest } from "../auth.js";
-import { getCalSyncJob, startCalSync } from "../services/calSyncService.js";
+import { getCalSyncJob, startCalSync, type CalSyncTarget } from "../services/calSyncService.js";
 
 const router = Router();
 
@@ -10,11 +10,12 @@ router.post("/sync", (req, res) => {
     res.status(403).json({ error: "Only Egor can sync Cal." });
     return;
   }
+  const target: CalSyncTarget = req.body?.target === "server" ? "server" : "render";
   try {
-    res.status(202).json(startCalSync());
+    res.status(202).json(startCalSync(target));
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    res.status(/CAL_USERNAME|CAL_PASSWORD/.test(message) ? 503 : 500).json({ error: message });
+    res.status(/CAL_USERNAME|CAL_PASSWORD|CAL_WORKER_SECRET/.test(message) ? 503 : 500).json({ error: message });
   }
 });
 

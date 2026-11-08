@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
 import ingestRoutes from "./routes/ingest.js";
 import calRoutes from "./routes/cal.js";
+import calWorkerRoutes from "./routes/calWorker.js";
 import apiRoutes from "./routes/index.js";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -54,6 +55,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/demo", demoRoutes);
 /** Drive / Apps Script machine ingest — X-Ingest-Key, not household Bearer token. */
 app.use("/api/ingest", requireIngestKey, ingestRoutes);
+
+/** Totoshka pulls jobs. Not the household login, and not the assistant allowlist. */
+app.use("/api/cal/worker", calWorkerRoutes);
 
 /** Egor's phone button. Not on the assistant allowlist. */
 app.use("/api/cal", requireAuth, calRoutes);

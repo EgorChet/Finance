@@ -23,10 +23,12 @@ const DASHBOARD_SELECTORS =
 const TRANSACTIONS_VIEW_SELECTORS =
   ".cardInDeatailsTransactions, app-card-in-deatails-transactions, .transactions-table, .export, button[aria-label*='אקסל'], button[aria-label*='ייצוא'], button[aria-label*='יצוא']";
 
-type CalSyncStatus = "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
+type CalSyncStatus = "queued" | "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
+export type CalSyncTarget = "render" | "server";
 
 export type CalSyncJobPublic = {
   jobId: string;
+  target: CalSyncTarget;
   status: CalSyncStatus;
   message: string;
   error?: string;
@@ -37,6 +39,7 @@ type Job = CalSyncJobPublic;
 
 const jobs = new Map<string, Job>();
 let activeJobId: string | null = null;
+let serverJobId: string | null = null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -91,6 +94,7 @@ function credentials(): { username: string; password: string; cardLast4: string 
 function publicJob(job: Job): CalSyncJobPublic {
   return {
     jobId: job.jobId,
+    target: job.target,
     status: job.status,
     message: job.message,
     error: job.error,
@@ -358,8 +362,55 @@ export function getCalSyncJob(jobId: string): CalSyncJobPublic | null {
   return job ? publicJob(job) : null;
 }
 
-/** Start a background sync, or return the one already running. */
-export function startCalSync(): CalSyncJobPublic {
+function runningJob(jobId: string | null): Job | null {
+  if (!jobId) return null;
+  const job = jobs.get(jobId);
+  if (!job || job.status === "done" || job.status === "error") return null;
+  return job;
+}
+
+/** Totoshka pulls this. The phone never calls that machine directly. */
+export function claimServerJob(): CalSyncJobPublic | null {
+  const job = runningJob(serverJobId);
+  if (!job || job.status !== "queued") return null;
+  patch(job, { status: "waking", message: "Server picked up the sync. Waking analyzer…" });
+  return publicJob(job);
+}
+
+export function updateServerJob(
+  jobId: string,
+  update: Partial<Pick<Job, "status" | "message" | "error" | "result">>,
+): CalSyncJobPublic | null {
+  const job = jobs.get(jobId);
+  if (!job || job.target !== "server") return null;
+  patch(job, update);
+  if (job.status === "done" || job.status === "error") {
+    if (serverJobId === job.jobId) serverJobId = null;
+  }
+  return publicJob(job);
+}
+
+function startServerJob(): CalSyncJobPublic {
+  if (!process.env.CAL_WORKER_SECRET?.trim()) {
+    throw new Error("Set CAL_WORKER_SECRET on the API server and on Totoshka");
+  }
+  const running = runningJob(serverJobId);
+  if (running) return publicJob(running);
+  const job: Job = {
+    jobId: randomUUID(),
+    target: "server",
+    status: "queued",
+    message: "Waiting for the server…",
+  };
+  jobs.set(job.jobId, job);
+  serverJobId = job.jobId;
+  console.log(`Cal sync ${job.jobId}: queued for the server`);
+  return publicJob(job);
+}
+
+/** Start a background sync, or return the one already running on that machine. */
+export function startCalSync(target: CalSyncTarget = "render"): CalSyncJobPublic {
+  if (target === "server") return startServerJob();
   if (activeJobId) {
     const running = jobs.get(activeJobId);
     if (running && running.status !== "done" && running.status !== "error") return publicJob(running);
@@ -367,6 +418,7 @@ export function startCalSync(): CalSyncJobPublic {
   const { password } = credentials();
   const job: Job = {
     jobId: randomUUID(),
+    target: "render",
     status: "waking",
     message: "Waking analyzer…",
   };
