@@ -71,6 +71,30 @@ router.get("/otp", (req, res) => {
 });
 
 /**
+ * TEMPORARY: can this server reach Cal at all? Plain request, no browser, no login.
+ * Cal answers data-center addresses with 403; a home connection gets 200.
+ */
+router.get("/cal-reachability", async (_req, res) => {
+  const targets = ["https://digital-web.cal-online.co.il/login", "https://www.cal-online.co.il/"];
+  const results = [];
+  for (const url of targets) {
+    try {
+      const r = await fetch(url, {
+        headers: { "Accept-Language": "he-IL,he;q=0.9,en;q=0.8", Accept: "text/html" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const body = await r.text();
+      const title = body.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim() || "";
+      results.push({ url, status: r.status, title: title.slice(0, 80) });
+    } catch (e) {
+      results.push({ url, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  res.json({ results });
+});
+
+/**
  * Machine ingest for Drive automation.
  * multipart: file + statement_type=partial|final (+ optional auto_translate)
  */
