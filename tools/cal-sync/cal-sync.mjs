@@ -262,8 +262,43 @@ async function finishLogin(page, cfg, key, sinceMs) {
   throw new Error(`Cal dashboard did not load after sign-in (${page.url()})`);
 }
 
+/** Cal sometimes shows announcement popups over the dashboard; close them before clicking. */
+async function dismissPopups(page) {
+  for (let round = 0; round < 4; round++) {
+    let found = false;
+    for (const ctx of page.frames()) {
+      try {
+        const dialog = ctx.locator(".rc-popup-wrapper.show, [role='dialog'][aria-modal='true']").first();
+        if (!(await dialog.count()) || !(await dialog.isVisible())) continue;
+        found = true;
+        const title = (await dialog.locator("#dialog1Title, h1, h2, h3").first().innerText().catch(() => "")).trim();
+        log(`Closing Cal popup${title ? `: "${title.slice(0, 80)}"` : ""}`);
+        const close = dialog
+          .locator(
+            "button[aria-label*='סגור'], button[aria-label*='סגירה'], button[aria-label*='close' i], .close, .btn-close, button[class*='close'], [class*='close-btn']",
+          )
+          .first();
+        if ((await close.count()) && (await close.isVisible())) {
+          await close.click({ timeout: 5000 });
+        } else {
+          const later = dialog.locator("button").filter({ hasText: /סגור|סגירה|לא עכשיו|אחר כך|הבנתי|המשך|דלג/ }).first();
+          if (await later.count()) await later.click({ timeout: 5000 });
+          else await page.keyboard.press("Escape");
+        }
+        await sleep(800);
+      } catch {
+        await page.keyboard.press("Escape").catch(() => null);
+        await sleep(500);
+      }
+    }
+    if (!found) return;
+  }
+}
+
 async function openCardTransactions(page, cardLast4) {
   const ctx = await waitForContext(page, ".cardDebitsTransactions-main", 60_000, "Card list");
+  await sleep(1500);
+  await dismissPopups(page);
   const cards = ctx.locator(".cardDebitsTransactions-main");
   const target = cardLast4 ? cards.filter({ hasText: cardLast4 }).first() : cards.first();
   await ((await target.count()) ? target : cards.first()).click();
@@ -272,7 +307,8 @@ async function openCardTransactions(page, cardLast4) {
 }
 
 async function clickExport(page) {
-  const deadline = Date.now() + 45_000;
+  // Cal renders the export button only after the transactions finish loading (seen: 40–55 s).
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     for (const ctx of page.frames()) {
       try {
@@ -305,11 +341,42 @@ async function clickExport(page) {
     }
     await sleep(700);
   }
+  await saveDiagnostics(page, "export-button");
   throw new Error("Export button (יצוא / ייצוא לאקסל) not found");
+}
+
+/** When a step can't find its button: list the clickable labels and save a screenshot (local only). */
+async function saveDiagnostics(page, step) {
+  try {
+    const labels = [];
+    for (const ctx of page.frames()) {
+      const found = await ctx
+        .evaluate(() =>
+          [...document.querySelectorAll("button, a, [role='button'], [tabindex='0']")]
+            .filter((el) => el.offsetParent !== null)
+            .map((el) => {
+              const text = (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40);
+              const aria = el.getAttribute("aria-label") || "";
+              const title = el.getAttribute("title") || "";
+              const cls = (el.getAttribute("class") || "").split(" ").slice(0, 2).join(".");
+              return `${el.tagName.toLowerCase()}${cls ? "." + cls : ""} text="${text}" aria="${aria}" title="${title}"`;
+            }),
+        )
+        .catch(() => []);
+      labels.push(...found);
+    }
+    const shot = join(homedir(), "Library", "Logs", `finance-cal-sync-${step}.png`);
+    await page.screenshot({ path: shot, fullPage: false }).catch(() => null);
+    log(`Diagnostics (${step}): ${labels.length} clickable elements; screenshot ${shot}`);
+    for (const l of labels.slice(0, 80)) log(`  ${l}`);
+  } catch {
+    /* diagnostics are best effort */
+  }
 }
 
 async function exportExcel(page, cardLast4) {
   await openCardTransactions(page, cardLast4);
+  await dismissPopups(page);
   const downloadPromise = page.waitForEvent("download", { timeout: 90_000 });
   await clickExport(page);
   const download = await downloadPromise;
