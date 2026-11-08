@@ -11,25 +11,45 @@ function safeEqual(a: string, b: string): boolean {
   return ba.length === bb.length && timingSafeEqual(ba, bb);
 }
 
-/** Totoshka calls this once an hour. Same ASSISTANT_KEY, but not on the assistant allowlist. */
-export function handleCalCron(req: Request, res: Response): void {
+/** True when the response was already sent. */
+function cronAuthorized(req: Request, res: Response): boolean {
   const raw = req.headers["x-assistant-key"];
   const provided = (Array.isArray(raw) ? raw[0] : raw)?.trim() || "";
   const expected = process.env.ASSISTANT_KEY?.trim() || "";
   if (!expected) {
     res.status(503).json({ error: "Set ASSISTANT_KEY on the API server" });
-    return;
+    return false;
   }
   if (!provided || !safeEqual(provided, expected)) {
     res.status(401).json({ error: "Unauthorized" });
-    return;
+    return false;
   }
+  return true;
+}
+
+/**
+ * Totoshka starts the hourly sync. Returns immediately with a job id.
+ * The work continues in the background. Poll handleCalCronStatus until done or error.
+ */
+export function handleCalCron(req: Request, res: Response): void {
+  if (!cronAuthorized(req, res)) return;
   try {
     res.status(202).json(startCalSync());
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     res.status(/CAL_USERNAME|CAL_PASSWORD/.test(message) ? 503 : 500).json({ error: message });
   }
+}
+
+/** Same key as handleCalCron. 200 with the job, including status done or error. */
+export function handleCalCronStatus(req: Request, res: Response): void {
+  if (!cronAuthorized(req, res)) return;
+  const job = getCalSyncJob(String(req.params.jobId || ""));
+  if (!job) {
+    res.status(404).json({ error: "Cal sync job not found. The server may have restarted." });
+    return;
+  }
+  res.json(job);
 }
 
 /** Phone button: start the server-side Cal sync. Returns immediately; poll GET /sync/:jobId. */

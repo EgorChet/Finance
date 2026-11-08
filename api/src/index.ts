@@ -6,7 +6,7 @@ import { requireAuthOrAssistant } from "./assistantAuth.js";
 import authRoutes from "./routes/auth.js";
 import demoRoutes from "./routes/demo.js";
 import ingestRoutes from "./routes/ingest.js";
-import calRoutes, { handleCalCron } from "./routes/cal.js";
+import calRoutes, { handleCalCron, handleCalCronStatus } from "./routes/cal.js";
 import apiRoutes from "./routes/index.js";
 
 const PORT = Number(process.env.PORT || 3000);
@@ -55,8 +55,9 @@ app.use("/api/demo", demoRoutes);
 /** Drive / Apps Script machine ingest — X-Ingest-Key, not household Bearer token. */
 app.use("/api/ingest", requireIngestKey, ingestRoutes);
 
-/** Totoshka hourly trigger. Not the phone, and not an allowlisted assistant route. */
+/** Totoshka hourly trigger. POST starts the job and returns its id. GET polls that id. */
 app.post("/api/cal/cron", handleCalCron);
+app.get("/api/cal/cron/:jobId", handleCalCronStatus);
 
 /** Egor's phone button. Not on the assistant allowlist. */
 app.use("/api/cal", requireAuth, calRoutes);
