@@ -213,18 +213,9 @@
                   type="button"
                   class="mobile-nav-action btn"
                   :disabled="calBusy"
-                  @click="syncCal('render')"
+                  @click="syncCal()"
                 >
-                  Sync Cal on Render
-                </button>
-                <button
-                  v-if="auth.canEdit && !auth.isDemo"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="calBusy"
-                  @click="syncCal('server')"
-                >
-                  Sync Cal on server
+                  Sync Cal
                 </button>
 
                 <button
@@ -830,13 +821,13 @@ async function resumeCalSyncIfNeeded() {
   watchCalJob(jobId);
 }
 
-async function syncCal(target: "render" | "server") {
+async function syncCal() {
   closeNav();
   calBusy.value = true;
   uploadToastMuted.value = false;
-  showUploadToast("syncing", target === "server" ? "Asking the server…" : "Starting on Render…");
+  showUploadToast("syncing", "Starting Cal sync…");
   try {
-    const job = await startCalSync(target, auth.token || undefined);
+    const job = await startCalSync(auth.token || undefined);
     applyCalJobStatus(job);
     if (job.status !== "done" && job.status !== "error") watchCalJob(job.jobId);
   } catch (err) {

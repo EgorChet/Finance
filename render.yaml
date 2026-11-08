@@ -29,8 +29,6 @@ services:
         sync: false
       - key: CAL_CARD_LAST4
         sync: false
-      - key: CAL_WORKER_SECRET
-        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: STORAGE
