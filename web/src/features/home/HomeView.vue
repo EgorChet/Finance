@@ -107,7 +107,6 @@ import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/ho
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
-import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
@@ -198,9 +197,8 @@ const livingBudgetAmount = computed(() =>
 
 const showPaceHealth = computed(() => {
   if (!spendingReport.value || !currentMonthKey.value) return false;
-  if (isPartialCycle.value) {
-    return everydaySpendingTotal(spendingReport.value.transactions) > 0;
-  }
+  // The open cycle always gets the budget card, even on day 1 before any charge (same as Spending).
+  if (isPartialCycle.value) return true;
   if (!isCycleMonthKey(currentMonthKey.value)) return false;
   const start = cycleStartFromMonthKey(currentMonthKey.value);
   return cycleNeedsOpenTab(start, cycleDay.value, months.value);
