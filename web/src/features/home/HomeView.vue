@@ -107,7 +107,6 @@ import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/ho
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
-import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
