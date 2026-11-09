@@ -3,7 +3,6 @@
     <BudgetHero
       v-if="plan && !hideLivingBudget"
       :plan="plan"
-      :bills="heroBills"
       :everyday-enabled="everydayBreakdownEnabled"
       @everyday="openEverydayBreakdown"
     />
@@ -249,12 +248,6 @@ const daysLeftInCycle = computed(() => {
   const { dayIndex, cycleLength } = getBillingCycle(props.referenceDate, props.cycleDay);
   return cycleLength - dayIndex + 1;
 });
-
-const heroBills = computed(() => [
-  { label: "Flat rent", amount: budgetRent.value },
-  { label: "Car loan", amount: budgetCarLoan.value },
-  { label: "Dev Institute", amount: budgetDevInstitute.value },
-]);
 
 const dailyBudgetDisplay = computed(() => {
   if (budgetLeft.value === null || daysLeftInCycle.value === null || daysLeftInCycle.value <= 0) {

@@ -161,10 +161,12 @@ router.get("/home-data", async (req, res) => {
   const paceKeys = recentBillingKeys(data, paceMonths);
   const { report, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
   const budget = loadLivingBudgetData();
+  // lean=1: the client rebuilds the combined history from scoped_reports (halves the payload).
+  const lean = req.query.lean === "1";
   res.json({
     months,
     summary: summaryRows(data, version),
-    report: report ?? null,
+    report: lean ? null : report ?? null,
     scoped_reports: scopedReports,
     pace_keys: paceKeys,
     pace_months: paceKeys.length,

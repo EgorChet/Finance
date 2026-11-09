@@ -6,6 +6,7 @@ import {
 } from "@/shared/categories";
 import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 import { effectiveSpend } from "@/shared/utils/transaction";
+import { isInstallmentTransaction } from "@/features/spending/utils/budgetPlan";
 import { billingCycleProgress, getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "@/features/spending/utils/pace";
 import { subscriptionSubsectionLabel } from "@/features/spending/utils/subscriptionSections";
 
@@ -227,6 +228,8 @@ function sumScope(
   for (const tx of transactions) {
     if (!transactionMatchesScope(tx, scope)) continue;
     if (start && dayIndex != null) {
+      // Installments carry the original purchase date, which puts them in the wrong cycle.
+      if (isInstallmentTransaction(tx)) continue;
       const day = daysBetween(start, parseIsoDate(tx.date)) + 1;
       if (day > dayIndex) continue;
     }

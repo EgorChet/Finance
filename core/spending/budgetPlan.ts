@@ -1,9 +1,11 @@
 /**
  * "Am I on track?" — one rule, anchored to the living budget, shaped by your own habits.
  *
- * 1. Budget − lumpy known bills (rent, car loan, Dev Institute, vaad bayit — reserved
- *    until it posts) = flexible money for the cycle. Different every month, so the plan
- *    scales with it automatically.
+ * 1. Budget − committed charges = flexible money for the cycle. Committed = what you
+ *    can't steer day to day: rent, car loan, Dev Institute, vaad bayit (reserved until it
+ *    posts), standing orders (utilities, insurance, subscriptions), installment payments,
+ *    charges dated before the cycle, and arnona. On real statements these were 1–6k a
+ *    month and posted early, which used to paint whole months red.
  * 2. Spending curve: from your last completed cycles the app learns what share of the
  *    flexible spending is usually gone by each point of the cycle (e.g. 45% by day 10).
  *    Without enough history it falls back to an even split.
@@ -17,7 +19,9 @@ import type { Transaction } from "../types.js";
 import {
   budgetSpendBreakdown,
   hasVaadBayitCharge,
-  isMonthlyBillTransaction,
+  isCarLoanTransaction,
+  isDevInstituteTransaction,
+  isRentTransaction,
   isVaadBayitTransaction,
   VAAD_BAYIT_RESERVE,
 } from "../household/householdBudget.js";
@@ -53,7 +57,10 @@ export interface BudgetPlan {
   /** "On track", "Slow down a little", "Slow down", "Over budget", "Finished within budget". */
   status: string;
   budget: number;
+  /** Committed charges posted so far + vaad reserve. */
   bills: number;
+  /** Committed charges by kind, for the details sheet (vaad reserve included). */
+  committedRows: { kind: CommittedKind; label: string; amount: number }[];
   vaadReserve: number;
   flexBudget: number;
   flexSpent: number;
@@ -90,9 +97,43 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-/** Everything on the cap except rent, car loan, Dev Institute and vaad bayit. */
-export function isFlexibleTransaction(tx: Transaction): boolean {
-  return !isMonthlyBillTransaction(tx) && !isVaadBayitTransaction(tx);
+const STANDING_ORDER = "הוראת קבע";
+const INSTALLMENT_TYPES = new Set(["תשלומים", "רכישה בקרדיט"]);
+const ARNONA_RE = /עיריית|ארנונה|arnona|municipality/i;
+
+export type CommittedKind = "rent" | "carLoan" | "devInstitute" | "vaad" | "standingOrder" | "installment" | "arnona" | "earlier";
+
+export const COMMITTED_LABELS: Record<CommittedKind, string> = {
+  rent: "Flat rent",
+  carLoan: "Car loan",
+  devInstitute: "Dev Institute",
+  vaad: "Vaad bayit",
+  standingOrder: "Standing orders",
+  installment: "Installments",
+  arnona: "Arnona",
+  earlier: "Charges from earlier dates",
+};
+
+export function isInstallmentTransaction(tx: Transaction): boolean {
+  return INSTALLMENT_TYPES.has(tx.transaction_type_he ?? "");
+}
+
+/** Why a charge is committed (not day-to-day spending), or null when it's flexible. */
+export function committedKind(tx: Transaction, cycleStart?: string): CommittedKind | null {
+  if (isRentTransaction(tx)) return "rent";
+  if (isCarLoanTransaction(tx)) return "carLoan";
+  if (isDevInstituteTransaction(tx)) return "devInstitute";
+  if (isVaadBayitTransaction(tx)) return "vaad";
+  if (isInstallmentTransaction(tx)) return "installment";
+  if (tx.transaction_type_he === STANDING_ORDER) return "standingOrder";
+  if (ARNONA_RE.test(`${tx.merchant_he ?? ""} ${tx.merchant_en ?? ""}`)) return "arnona";
+  if (cycleStart && tx.date.slice(0, 10) < cycleStart && !tx.notes?.startsWith("fixed_charge:")) return "earlier";
+  return null;
+}
+
+/** Day-to-day spending: everything on the cap that isn't committed. */
+export function isFlexibleTransaction(tx: Transaction, cycleStart?: string): boolean {
+  return committedKind(tx, cycleStart) === null;
 }
 
 function median(values: number[]): number {
@@ -207,16 +248,23 @@ export function computeBudgetPlan(
   const daysLeft = Math.max(0, cycleLength - dayIndex + 1);
 
   const breakdown = budgetSpendBreakdown(cycleTransactions);
-  const vaadSpent = roundMoney(
-    cycleTransactions.filter(isVaadBayitTransaction).reduce((s, tx) => s + effectiveSpend(tx), 0),
-  );
+  const byKind = new Map<CommittedKind, number>();
+  for (const tx of cycleTransactions) {
+    const kind = committedKind(tx, start);
+    if (kind) byKind.set(kind, (byKind.get(kind) ?? 0) + effectiveSpend(tx));
+  }
+  const committedPosted = roundMoney([...byKind.values()].reduce((s, v) => s + v, 0));
   const vaadReserve = hasVaadBayitCharge(cycleTransactions) ? 0 : VAAD_BAYIT_RESERVE;
-  const fixedBills = roundMoney(breakdown.rent + breakdown.carLoan + breakdown.devInstitute);
-  const bills = roundMoney(fixedBills + vaadSpent + vaadReserve);
+  if (vaadReserve > 0) byKind.set("vaad", (byKind.get("vaad") ?? 0) + vaadReserve);
+  const bills = roundMoney(committedPosted + vaadReserve);
+  const committedRows = [...byKind.entries()]
+    .map(([kind, amount]) => ({ kind, label: COMMITTED_LABELS[kind], amount: roundMoney(amount) }))
+    .filter((r) => r.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 
   const moneyLeft = roundMoney(budget - breakdown.spent);
   const flexBudget = roundMoney(Math.max(0, budget - bills));
-  const flexSpent = roundMoney(Math.max(0, breakdown.spent - fixedBills - vaadSpent));
+  const flexSpent = roundMoney(Math.max(0, breakdown.spent - committedPosted));
   const flexLeft = roundMoney(flexBudget - flexSpent);
 
   const curve = cycle.history?.length
@@ -255,7 +303,7 @@ export function computeBudgetPlan(
   const startDate = parseIsoDate(start);
   const perDay = new Array(cycleLength).fill(0);
   for (const tx of cycleTransactions) {
-    if (!isFlexibleTransaction(tx)) continue;
+    if (!isFlexibleTransaction(tx, start)) continue;
     const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
     if (day < 1 || day > dayIndex) continue;
     perDay[day - 1] += effectiveSpend(tx);
@@ -279,6 +327,7 @@ export function computeBudgetPlan(
     status,
     budget,
     bills,
+    committedRows,
     vaadReserve,
     flexBudget,
     flexSpent,

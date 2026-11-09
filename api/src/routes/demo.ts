@@ -61,7 +61,7 @@ router.get("/months", (_req, res) => {
 
 router.get("/home-data", (req, res) => {
   const budget = demoLivingBudget();
-  const paceMonths = Math.max(1, Number(req.query.pace_months ?? 4));
+  const paceMonths = Math.max(1, Number(req.query.pace_months ?? 7));
   const catalog = demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key));
   const paceKeys = catalog.slice(0, paceMonths).map((m) => m.key);
   const scopedReports = Object.fromEntries(
@@ -82,7 +82,7 @@ router.get("/home-data", (req, res) => {
   res.json({
     months: catalog,
     summary: demoSummaryRows(),
-    report,
+    report: req.query.lean === "1" ? null : report,
     scoped_reports: scopedReports,
     pace_keys: paceKeys,
     pace_months: paceKeys.length,

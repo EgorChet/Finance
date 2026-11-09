@@ -1,3 +1,4 @@
+import { combineScopedReports } from "@core/spending/combineScoped";
 import type {
   ExcludedItem,
   MerchantRules,
@@ -96,8 +97,8 @@ export async function fetchMonths(demo: boolean, token?: string) {
 }
 
 export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 4) {
-  const q = paceMonths > 0 ? `?pace_months=${paceMonths}` : "";
-  return get<{
+  const q = `?lean=1${paceMonths > 0 ? `&pace_months=${paceMonths}` : ""}`;
+  const bundle = await get<{
     months: MonthItem[];
     summary: { month: string; billing_date: string; total: number; transactions: number }[];
     report: SpendingReport | null;
@@ -112,6 +113,10 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
     };
     demo_as_of?: string;
   }>(`${prefix(demo)}/home-data${q}`, token);
+  if (!bundle.report && bundle.scoped_reports) {
+    bundle.report = combineScopedReports(Object.values(bundle.scoped_reports));
+  }
+  return bundle;
 }
 
 /** Remove one uploaded statement (billing key YYYY-MM-DD or legacy bucket like `unknown`). */

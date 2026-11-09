@@ -35,7 +35,6 @@
           <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
         </linearGradient>
       </defs>
-      <line x1="0" :y1="y(plan.flexBudget)" x2="300" :y2="y(plan.flexBudget)" class="bh-chart-cap" />
       <path :d="planPath" class="bh-chart-plan" />
       <path v-if="actualArea" :d="actualArea" :fill="`url(#${gradId})`" />
       <path v-if="actualPath" :d="actualPath" class="bh-chart-actual" />
@@ -76,7 +75,7 @@
           <li v-for="bill in billRows" :key="bill.label" class="bh-rows-sub">
             <span>− {{ bill.label }}</span><span>{{ whole(bill.amount) }}</span>
           </li>
-          <li class="bh-rows-total"><span>Flexible money</span><strong>{{ whole(plan.flexBudget) }}</strong></li>
+          <li class="bh-rows-total"><span>Left for everyday</span><strong>{{ whole(plan.flexBudget) }}</strong></li>
         </ul>
 
         <ul class="bh-rows">
@@ -114,8 +113,6 @@ import { formatIlsWhole } from "@/shared/utils/format";
 
 const props = defineProps<{
   plan: BudgetPlan;
-  /** Rent, car loan, etc. as shown in the sheet. */
-  bills: { label: string; amount: number }[];
   everydayEnabled?: boolean;
 }>();
 
@@ -140,11 +137,12 @@ const subline = computed(() => {
   return `${whole(Math.abs(p.buffer))} ${p.buffer > 0 ? "under" : "over"} plan · ${days}`;
 });
 
-const billRows = computed(() => {
-  const rows = props.bills.filter((b) => b.amount > 0);
-  if (props.plan.vaadReserve > 0) rows.push({ label: "Vaad bayit (set aside)", amount: props.plan.vaadReserve });
-  return rows;
-});
+const billRows = computed(() =>
+  props.plan.committedRows.map((r) => ({
+    label: r.kind === "vaad" && props.plan.vaadReserve > 0 ? `${r.label} (set aside)` : r.label,
+    amount: r.amount,
+  })),
+);
 
 const explanation = computed(() => {
   const p = props.plan;
