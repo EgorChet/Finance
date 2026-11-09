@@ -387,6 +387,37 @@ export async function fetchReviewSuggestion(hebrew: string, token?: string): Pro
   return data.english || "";
 }
 
+export interface LabelHints {
+  translation: string;
+  bank_category: string | null;
+  bank_category_he: string | null;
+  same_day: { merchant: string; category: string; amount: number }[];
+  history: { date: string; amount: number }[];
+  ai: { english_name: string; category: string; confidence: "low" | "medium" | "high"; reason: string } | null;
+  ai_status: "ok" | "off" | "error";
+}
+
+/** Translation, same-day charges, history and Claude's guess for one merchant in Review. */
+export async function fetchLabelHints(
+  demo: boolean,
+  transaction: Pick<Transaction, "merchant_he" | "date" | "charge_amount" | "category_he" | "category_en">,
+  token?: string,
+) {
+  return post<LabelHints>(
+    `${prefix(demo)}/review/hints`,
+    {
+      transaction: {
+        merchant_he: transaction.merchant_he,
+        date: transaction.date,
+        charge_amount: transaction.charge_amount,
+        category_he: transaction.category_he,
+        category_en: transaction.category_en,
+      },
+    },
+    token,
+  );
+}
+
 export async function confirmReview(
   body: { hebrew: string; english: string; category?: string; mark_all_merchant?: boolean; keys?: string[] },
   token?: string,

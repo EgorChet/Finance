@@ -1,3 +1,4 @@
+import { buildLabelHints } from "../services/labelHints.js";
 import { Router } from "express";
 import {
   DEMO_AS_OF,
@@ -196,6 +197,17 @@ router.delete("/statements/:key", (_req, res) => {
 
 router.put("/rules", (_req, res) => {
   res.status(403).json({ error: "Saving rules disabled in demo mode" });
+});
+
+/** Demo: same hints from the sample statements, without the Claude call. */
+router.post("/review/hints", async (req, res) => {
+  const tx = (req.body as { transaction?: { merchant_he: string; date: string; charge_amount: number; category_en?: string } }).transaction;
+  if (!tx?.merchant_he) {
+    res.status(400).json({ error: "transaction required" });
+    return;
+  }
+  const all = demoMonthCatalog().flatMap((m) => getDemoReport(m.key).transactions);
+  res.json(await buildLabelHints(all, tx, { ai: false }));
 });
 
 router.post("/review/confirm", (_req, res) => {

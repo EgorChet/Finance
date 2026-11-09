@@ -328,6 +328,7 @@ function rowMeta(t: Transaction): string {
   if (props.showCategory) parts.push(t.category_en || "Uncategorized");
   const billMonth = t.billing_month || props.statementBilling;
   if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(`billed ${billMonth}`);
+  if (props.adjustable && !t.category_override && isBitTransfer(t)) parts.push("tap to say what it was for");
   return parts.join(" · ");
 }
 

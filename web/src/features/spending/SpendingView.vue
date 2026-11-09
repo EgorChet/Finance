@@ -131,6 +131,7 @@
       </section>
     </template>
     <template v-if="showCategoryExplorer">
+    <BitSortCard v-if="!auth.readOnly" :transactions="report.transactions" />
     <CategoryAccordion
       v-model:expanded-keys="expandedCategoryKeys"
       :categories="displayCategories"
@@ -180,6 +181,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import CategoryAccordion from "@/features/spending/components/CategoryAccordion.vue";
+import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import TransactionPeriodPicker from "@/shared/components/TransactionPeriodPicker.vue";
 import AppLoader from "@/shared/components/AppLoader.vue";

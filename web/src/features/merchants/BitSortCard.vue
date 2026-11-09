@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import { useAuthStore } from "@/shared/stores/auth";
@@ -54,6 +54,11 @@ import type { Transaction } from "@/shared/types";
 import { formatIls, formatIlsWhole, formatTransactionDate } from "@/shared/utils/format";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { transactionKey } from "@/shared/utils/transactionKey";
+
+const props = defineProps<{
+  /** Charges to look in (e.g. the month shown on Spending); omitted → the last 7 months. */
+  transactions?: Transaction[];
+}>();
 
 /** Everything except BIT itself — the point is to say what the transfer was for. */
 const BIT_OPTIONS = CATEGORY_PICKLIST.filter((c) => c !== "BIT" && c !== "Uncategorized");
@@ -78,6 +83,10 @@ const unsortedTotal = computed(() => unsorted.value.reduce((s, t) => s + t.charg
 const position = computed(() => (current.value ? unsorted.value.findIndex((t) => transactionKey(t) === transactionKey(current.value!)) + 1 : 0));
 
 async function load() {
+  if (props.transactions) {
+    transactions.value = props.transactions;
+    return;
+  }
   try {
     const bundle = await homeData.load(auth.isDemo, auth.token || undefined);
     transactions.value = bundle.report?.transactions ?? [];
@@ -122,10 +131,17 @@ async function pick(category: string) {
   }
 }
 
+watch(
+  () => props.transactions,
+  () => {
+    if (props.transactions) transactions.value = props.transactions;
+  },
+);
+
 let stop: (() => void) | undefined;
 onMounted(() => {
   void load();
-  stop = onSpendingRefresh(() => void load());
+  if (!props.transactions) stop = onSpendingRefresh(() => void load());
 });
 onUnmounted(() => stop?.());
 </script>

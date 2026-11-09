@@ -3117,3 +3117,144 @@ html.sheet-editor-open body {
   font-weight: 750;
   letter-spacing: -0.03em;
 }
+
+/* ── Review: translated names and labelling hints ── */
+.rv-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.rv-row-meta {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.rv-row-meta .rv-row-he {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.rv-sheet-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.rv-sheet-he-small {
+  margin: 0.1rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.rv-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.rv-ai {
+  padding: 0.75rem 0.9rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-alt));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.rv-ai--loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rv-ai--loading {
+    animation: rv-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rv-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.rv-ai-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rv-ai-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.rv-ai-use {
+  min-height: 32px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rv-ai-guess {
+  margin: 0.35rem 0 0;
+  font-weight: 700;
+}
+
+.rv-ai-reason {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.rv-hint-line {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.rv-hint-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.rv-hint-line .rv-hint-label {
+  margin-right: 0.35rem;
+}
+
+.rv-hint-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.rv-hint-chip {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  font-size: 0.78rem;
+}
+
+.rv-hint-chip b {
+  margin-left: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}

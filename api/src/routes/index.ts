@@ -26,6 +26,7 @@ import {
 } from "../services/statementUpload.js";
 import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
+import { buildLabelHints } from "../services/labelHints.js";
 import {
   buildReviewQueue,
   normalizeReviewKey,
@@ -644,6 +645,21 @@ router.get("/review/suggest", async (req, res) => {
   }
   const english = await translateMerchant(hebrew);
   res.json({ english });
+});
+
+/** Translation, context and (with ANTHROPIC_API_KEY) Claude's guess for labelling one merchant. */
+router.post("/review/hints", async (req, res) => {
+  const { transaction } = req.body as {
+    transaction?: { merchant_he: string; date: string; charge_amount: number; category_he?: string | null; category_en?: string };
+  };
+  if (!transaction?.merchant_he?.trim() || !transaction.date) {
+    res.status(400).json({ error: "transaction with merchant_he and date required" });
+    return;
+  }
+  const data = await loadStatementsRepaired();
+  const version = await getFinalizeVersion();
+  const all = await getCombinedReportAsync(data, null, version);
+  res.json(await buildLabelHints(all?.transactions ?? [], transaction));
 });
 
 router.post("/review/confirm", async (req, res) => {

@@ -43,12 +43,12 @@
           <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(item.transaction.category_en || "Uncategorized") }}</span>
           <span class="rv-row-body">
             <span class="rv-row-top">
-              <span class="rv-row-he" dir="rtl" lang="he">{{ item.transaction.merchant_he }}</span>
+              <span class="rv-row-name">{{ rowTitle(item) }}</span>
               <span class="rv-row-amount">{{ formatIls(item.transaction.charge_amount) }}</span>
             </span>
             <span class="rv-row-meta">
-              <span v-if="englishFor(item)" class="rv-row-en">{{ englishFor(item) }} · </span>
-              {{ item.occurrence_count > 1 ? `${item.occurrence_count} charges` : formatTransactionDate(item.transaction.date) }}
+              <span v-if="rowTitle(item) !== item.transaction.merchant_he" class="rv-row-he" dir="rtl" lang="he">{{ item.transaction.merchant_he }}</span>
+              <span>{{ item.occurrence_count > 1 ? `${item.occurrence_count} charges` : formatTransactionDate(item.transaction.date) }}</span>
             </span>
           </span>
         </button>
@@ -60,7 +60,8 @@
       <template #head>
         <div v-if="current" class="rv-sheet-head">
           <p class="rv-sheet-step">{{ index + 1 }} of {{ queue.length }}</p>
-          <p class="rv-sheet-he" dir="rtl" lang="he">{{ current.transaction.merchant_he }}</p>
+          <p class="rv-sheet-title">{{ hints?.translation || rowTitle(current) }}</p>
+          <p class="rv-sheet-he-small" dir="rtl" lang="he">{{ current.transaction.merchant_he }}</p>
           <p class="rv-sheet-meta">
             {{ formatIls(current.transaction.charge_amount) }} · {{ formatTransactionDate(current.transaction.date) }}
             <template v-if="current.occurrence_count > 1"> · {{ current.occurrence_count }} charges<template v-if="onePerMerchant">, all get this label</template></template>
@@ -68,19 +69,63 @@
         </div>
       </template>
 
+      <section v-if="current" class="rv-hints" aria-live="polite">
+        <div v-if="hintsLoading" class="rv-ai rv-ai--loading">
+          <span class="rv-ai-badge">✦ Claude</span>
+          <span>Looking at this merchant…</span>
+        </div>
+        <div v-else-if="hints?.ai" class="rv-ai">
+          <div class="rv-ai-top">
+            <span class="rv-ai-badge">✦ Claude's guess<template v-if="hints.ai.confidence !== 'high'"> · {{ hints.ai.confidence }} confidence</template></span>
+            <button
+              v-if="english !== hints.ai.english_name || category !== hints.ai.category"
+              type="button"
+              class="rv-ai-use"
+              @click="useAiGuess"
+            >
+              Use
+            </button>
+          </div>
+          <p class="rv-ai-guess">{{ categoryIcon(hints.ai.category) }} {{ hints.ai.english_name }} · {{ hints.ai.category }}</p>
+          <p class="rv-ai-reason">{{ hints.ai.reason }}</p>
+        </div>
+        <p v-else-if="hints?.ai_status === 'error'" class="rv-hint-line">Claude couldn't make a guess this time.</p>
+
+        <p v-if="hints?.bank_category" class="rv-hint-line">
+          <span class="rv-hint-label">Bank calls it</span> {{ categoryIcon(hints.bank_category) }} {{ hints.bank_category }}
+        </p>
+        <div v-if="hints?.same_day.length" class="rv-hint-block">
+          <p class="rv-hint-label">Same day you also paid</p>
+          <div class="rv-hint-chips">
+            <span v-for="(d, i) in hints.same_day" :key="i" class="rv-hint-chip">
+              {{ categoryIcon(d.category) }} {{ d.merchant }} <b>{{ formatIlsWhole(d.amount) }}</b>
+            </span>
+          </div>
+        </div>
+        <div v-if="hints && hints.history.length > 1" class="rv-hint-block">
+          <p class="rv-hint-label">
+            Every charge here
+            <template v-if="historyPattern"> — {{ historyPattern }}</template>
+          </p>
+          <div class="rv-hint-chips">
+            <span v-for="(h, i) in hints.history" :key="i" class="rv-hint-chip">{{ formatTransactionDate(h.date) }} <b>{{ formatIlsWhole(h.amount) }}</b></span>
+          </div>
+        </div>
+      </section>
+
       <label v-if="current" class="rv-field">
         <span class="rv-field-label">
           English name
-          <span v-if="suggesting" class="rv-field-hint">translating…</span>
-          <span v-else-if="englishSuggestion && english === englishSuggestion" class="rv-field-hint">suggested</span>
+          <span v-if="hintsLoading && !english" class="rv-field-hint">translating…</span>
         </span>
         <input
           v-model="english"
           class="input"
+          @input="englishTouched = true"
           autocomplete="off"
           autocapitalize="words"
           enterkeyhint="done"
-          :placeholder="suggesting ? 'Translating…' : 'e.g. Shufersal, Wolt, Arcaffe'"
+          :placeholder="hintsLoading ? 'Translating…' : 'e.g. Shufersal, Wolt, Arcaffe'"
         />
       </label>
 
@@ -92,7 +137,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          :disabled="suggesting || confirming || !english.trim()"
+          :disabled="confirming || !english.trim()"
           @click="save"
         >
           {{ confirming ? "Saving…" : queue.length > 1 ? "Save & next" : "Save" }}
@@ -104,7 +149,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { confirmReview, fetchReviewSuggestion, resetReviewProgress } from "@/shared/api/client";
+import { confirmReview, fetchLabelHints, fetchReviewSuggestion, resetReviewProgress, type LabelHints } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
@@ -115,7 +160,7 @@ import { useReviewDataStore, type ReviewQueueBundle } from "@/features/merchants
 import { confirm as askConfirm } from "@/shared/composables/useConfirm";
 import type { ReviewQueueItem } from "@/shared/types";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
-import { formatIls, formatTransactionDate } from "@/shared/utils/format";
+import { formatIls, formatIlsWhole, formatTransactionDate } from "@/shared/utils/format";
 import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });
@@ -126,7 +171,6 @@ const queue = ref<ReviewQueueItem[]>([]);
 const reviewedCount = ref(0);
 const savedThisSession = ref(0);
 const loading = ref(false);
-const suggesting = ref(false);
 const confirming = ref(false);
 const index = ref(0);
 const sheetOpen = ref(false);
@@ -154,8 +198,60 @@ function englishFor(item: ReviewQueueItem): string {
   return suggestionCache.get(item.transaction.merchant_he.trim()) ?? "";
 }
 
+const hints = ref<LabelHints | null>(null);
+const hintsLoading = ref(false);
+const englishTouched = ref(false);
+/** Translations for the list rows, filled in the background. */
+const rowEnglish = ref<Record<string, string>>({});
+
+function rowTitle(item: ReviewQueueItem): string {
+  const hebrew = item.transaction.merchant_he.trim();
+  return englishFor(item) || rowEnglish.value[hebrew] || hebrew;
+}
+
+/** Translate list rows a few at a time so the list reads in English. */
+async function translateRows() {
+  if (auth.isDemo) return;
+  const todo = [...new Set(
+    queue.value
+      .filter((item) => !englishFor(item) && looksHebrew(item.transaction.merchant_he))
+      .map((item) => item.transaction.merchant_he.trim())
+      .filter((h) => !(h in rowEnglish.value)),
+  )];
+  const worker = async () => {
+    for (let h = todo.shift(); h; h = todo.shift()) {
+      try {
+        const en = await fetchReviewSuggestion(h, auth.token || undefined);
+        rowEnglish.value = { ...rowEnglish.value, [h]: en };
+        if (en) suggestionCache.set(h, en);
+      } catch {
+        rowEnglish.value = { ...rowEnglish.value, [h]: "" };
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+}
+
+const historyPattern = computed(() => {
+  const h = hints.value?.history ?? [];
+  if (h.length < 3) return "";
+  const amounts = h.map((x) => x.amount);
+  const same = amounts.every((a) => Math.abs(a - amounts[0]) < 1);
+  return same ? "same amount every time, looks like a subscription or regular bill" : "";
+});
+
+function useAiGuess() {
+  const ai = hints.value?.ai;
+  if (!ai) return;
+  english.value = ai.english_name;
+  category.value = ai.category;
+  englishTouched.value = true;
+}
+
 async function loadSuggestionForCurrent() {
   const item = current.value;
+  hints.value = null;
+  englishTouched.value = false;
   if (!item) {
     englishSuggestion.value = "";
     return;
@@ -163,23 +259,26 @@ async function loadSuggestionForCurrent() {
   category.value = item.transaction.category_en && item.transaction.category_en !== "Uncategorized" ? item.transaction.category_en : "";
   const hebrew = item.transaction.merchant_he.trim();
   const known = englishFor(item);
-  if (known || auth.isDemo || !looksHebrew(hebrew)) {
-    englishSuggestion.value = known || hebrew;
-    english.value = englishSuggestion.value;
-    return;
-  }
-  suggesting.value = true;
-  englishSuggestion.value = "";
-  english.value = "";
+  englishSuggestion.value = known;
+  english.value = known;
+
+  hintsLoading.value = true;
   try {
-    const translated = await fetchReviewSuggestion(hebrew, auth.token || undefined);
-    suggestionCache.set(hebrew, translated);
-    if (current.value?.transaction.merchant_he.trim() === hebrew) {
-      englishSuggestion.value = translated;
-      english.value = translated;
+    const res = await fetchLabelHints(auth.isDemo, item.transaction, auth.token || undefined);
+    if (current.value?.key !== item.key) return;
+    hints.value = res;
+    if (res.translation) suggestionCache.set(hebrew, res.translation);
+    if (!englishTouched.value && !known) {
+      english.value = res.ai?.english_name || res.translation || (looksHebrew(hebrew) ? "" : hebrew);
+      englishSuggestion.value = english.value;
     }
+    if (res.ai && res.ai.confidence !== "low" && (!category.value || !item.transaction.merchant_known)) {
+      category.value = res.ai.category;
+    }
+  } catch {
+    if (!english.value && !looksHebrew(hebrew)) english.value = hebrew;
   } finally {
-    suggesting.value = false;
+    if (current.value?.key === item.key) hintsLoading.value = false;
   }
 }
 
@@ -201,6 +300,7 @@ function applyQueue(res: ReviewQueueBundle) {
   queue.value = res.queue;
   reviewedCount.value = res.reviewed_count;
   if (index.value >= queue.value.length) index.value = 0;
+  void translateRows();
 }
 
 async function load(options: { background?: boolean; force?: boolean } = {}) {

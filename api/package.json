@@ -9,6 +9,7 @@
     "start": "node dist/api/src/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@types/compression": "^1.8.1",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
