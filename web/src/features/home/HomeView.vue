@@ -4,43 +4,80 @@
       Demo household — sample portfolio and spending.
       <button type="button" class="demo-banner-link" @click="goSignIn">Sign in for your real data</button>.
     </div>
-    <h2 class="page-title">Home</h2>
-    <p class="page-lead home-lead home-lead--desktop">This cycle's spending and your investments at a glance.</p>
+    <header class="today-head">
+      <h2 class="page-title">Today</h2>
+      <span class="today-date">{{ todayLabel }}<template v-if="cycleLabel"> · {{ cycleLabel }}</template></span>
+    </header>
 
-    <section class="home-card home-spending-section">
-      <header class="home-card-head">
-        <h3 class="home-card-title">Spending</h3>
-        <span v-if="cycleLabel" class="home-card-meta">{{ cycleLabel }}</span>
-      </header>
-      <AppLoader v-if="spendingLoading" variant="hero" title="Loading spending" />
-      <template v-else>
-        <p v-if="spendingError" class="home-card-error">{{ spendingError }}</p>
-        <template v-else-if="spendingReport">
-          <SummaryMetrics
-            compact
-            :report="spendingReport"
-            :living-budget="livingBudgetAmount"
-            :plan="summaryPlan"
-            :cycle-day="cycleDay"
-            :reference-date="refDate"
-          />
-          <div class="home-card-actions">
-            <RouterLink class="btn btn-primary" :to="overviewLink">View full spending →</RouterLink>
+    <AppLoader v-if="spendingLoading" variant="hero" title="Loading spending" />
+    <template v-else>
+      <p v-if="spendingError" class="home-card-error">{{ spendingError }}</p>
+      <template v-else-if="spendingReport">
+        <SummaryMetrics
+          compact
+          :report="spendingReport"
+          :living-budget="livingBudgetAmount"
+          :plan="summaryPlan"
+          :cycle-day="cycleDay"
+          :reference-date="refDate"
+        />
+
+        <section v-if="todoItems.length || hasBitToSort" class="today-section">
+          <h3 class="today-title">Needs you</h3>
+          <div class="bx-list">
+            <RouterLink v-for="item in todoItems" :key="item.key" :to="item.to" class="bx-row today-link">
+              <span class="tx-row-icon" aria-hidden="true">{{ item.icon }}</span>
+              <span class="bx-row-body">
+                <span class="bx-row-top">
+                  <span class="bx-row-name">{{ item.title }}</span>
+                  <span v-if="item.amount" class="bx-row-amount">{{ item.amount }}</span>
+                </span>
+                <span class="bx-row-meta"><span>{{ item.sub }}</span></span>
+              </span>
+              <span class="bx-chevron" aria-hidden="true">›</span>
+            </RouterLink>
           </div>
-        </template>
-        <p v-else class="home-card-empty">Upload a statement to see spending for this cycle.</p>
-      </template>
-    </section>
+          <BitSortCard v-if="!auth.readOnly" :transactions="spendingReport.transactions" />
+        </section>
 
-    <PortfolioSummaryCard
-      :loading="portfolio.loading"
-      :refreshing="portfolio.refreshing"
-      :demo="auth.isDemo"
-      :kaspa="portfolio.kaspaQuote"
-      :fxcn="portfolio.fxcnQuote"
-      :market="portfolio.marketSnapshot"
-      @refresh="portfolio.refresh(auth.isDemo, auth.token || undefined, true)"
-    />
+        <section v-if="topCategories.length" class="today-section">
+          <div class="bx-list-head today-list-head">
+            <h3 class="today-title">This cycle</h3>
+            <RouterLink class="today-more" :to="overviewLink">All categories ›</RouterLink>
+          </div>
+          <div class="bx-list">
+            <RouterLink v-for="c in topCategories" :key="c.name" :to="overviewLink" class="bx-row today-link">
+              <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(c.name) }}</span>
+              <span class="bx-row-body">
+                <span class="bx-row-top">
+                  <span class="bx-row-name">{{ c.name }}</span>
+                  <span class="bx-row-amount">{{ formatIlsWhole(c.total) }}</span>
+                </span>
+                <span class="bx-row-meta">
+                  <span :class="`cat-row-compare cat-row-compare--${c.tone}`">{{ c.line || `${c.count} ${c.count === 1 ? "charge" : "charges"}` }}</span>
+                </span>
+              </span>
+            </RouterLink>
+          </div>
+        </section>
+
+        <section v-if="spendingReport.transactions.length" class="today-section">
+          <div class="bx-list-head today-list-head">
+            <h3 class="today-title">Latest charges</h3>
+            <RouterLink class="today-more" :to="{ name: 'browse' }">All transactions ›</RouterLink>
+          </div>
+          <TransactionList
+            class="find-list"
+            :transactions="spendingReport.transactions"
+            title=""
+            show-category
+            :show-sort="false"
+            :default-limit="5"
+          />
+        </section>
+      </template>
+      <p v-else class="home-card-empty">Upload a statement to see spending for this cycle.</p>
+    </template>
   </div>
 </template>
 
@@ -51,11 +88,22 @@ import { useRouter } from "vue-router";
 import { fetchReport } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import SummaryMetrics from "@/features/spending/components/SummaryMetrics.vue";
-import PortfolioSummaryCard from "@/features/home/components/PortfolioSummaryCard.vue";
+import TransactionList from "@/shared/components/TransactionList.vue";
+import BitSortCard from "@/features/merchants/BitSortCard.vue";
+import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import { formatIlsWhole } from "@/shared/utils/format";
+import { isBitTransfer } from "@/shared/composables/useChargeCategory";
+import {
+  buildCategoryCompareContext,
+  categoryCompareLine,
+  categoryCompareTone,
+  computeCategoryCompareFromContext,
+} from "@/features/spending/utils/categoryCompare";
+import { rollupCategoriesForDisplay } from "@/shared/categories";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAuthStore } from "@/shared/stores/auth";
 import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/homeData";
-import { usePortfolioStore } from "@/shared/stores/portfolio";
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
@@ -89,7 +137,8 @@ import {
 
 const auth = useAuthStore();
 const homeData = useHomeDataStore();
-const portfolio = usePortfolioStore();
+const reviewData = useReviewDataStore();
+const toLabelCount = ref(0);
 const router = useRouter();
 
 const spendingLoading = ref(true);
@@ -166,8 +215,85 @@ const summaryPlan = computed(() => {
     referenceDate: refDate.value,
     livingBudget: livingBudgetAmount.value,
     history: paceReport.value?.transactions,
+    configuredCharges: configuredCharges.value,
   });
 });
+
+const todayLabel = computed(() =>
+  refDate.value.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+);
+
+const hasBitToSort = computed(
+  () => !!spendingReport.value?.transactions.some((t) => isBitTransfer(t) && !t.category_override && t.charge_amount > 0),
+);
+
+/** Things to act on: merchants to label and charges coming up this cycle. */
+const todoItems = computed(() => {
+  const items: { key: string; icon: string; title: string; sub: string; amount?: string; to: string | object }[] = [];
+  if (toLabelCount.value > 0) {
+    items.push({
+      key: "label",
+      icon: "🏷️",
+      title: `${toLabelCount.value} ${toLabelCount.value === 1 ? "merchant needs" : "merchants need"} a name`,
+      sub: "Label them so categories stay right",
+      to: { name: "browse", query: { view: "merchants" } },
+    });
+  }
+  for (const row of summaryPlan.value?.committedRows ?? []) {
+    // Only one-off charges are news; monthly bills come every month.
+    if (row.kind !== "upcoming" || !row.oneTimeDate) continue;
+    items.push({
+      key: `up-${row.label}`,
+      icon: "⏳",
+      title: row.label,
+      sub: "Coming up this cycle · already set aside",
+      amount: formatIlsWhole(row.amount),
+      to: { name: "household", hash: "#one-time" },
+    });
+  }
+  return items;
+});
+
+/** Top categories of the open cycle with the same "vs usual" line as Spending. */
+const topCategories = computed(() => {
+  const report = spendingReport.value;
+  if (!report) return [];
+  const rows = rollupCategoriesForDisplay(report.by_category).slice(0, 4);
+  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
+  const ctx = showPaceHealth.value
+    ? buildCategoryCompareContext(paceReport.value?.transactions ?? [], {
+        cycleDay: cycleDay.value,
+        cycleStart: start,
+        referenceDate: refDate.value,
+      })
+    : null;
+  return rows.map((c) => {
+    const result = ctx
+      ? computeCategoryCompareFromContext(ctx, report.transactions, { kind: "rollup", category: c.category_en }, c.category_en)
+      : null;
+    return {
+      name: c.category_en,
+      total: c.total,
+      count: c.count,
+      line: categoryCompareLine(result),
+      tone: categoryCompareTone(result),
+    };
+  });
+});
+
+async function loadToLabel() {
+  if (auth.readOnly && !auth.isDemo) return;
+  try {
+    const res = await reviewData.load(auth.isDemo, auth.token || undefined, {
+      includeReviewed: false,
+      includeLabeled: false,
+      onePerMerchant: true,
+    });
+    toLabelCount.value = res.queue.length;
+  } catch {
+    toLabelCount.value = 0;
+  }
+}
 
 const overviewLink = computed(() => {
   if (!currentMonthKey.value) return { name: "overview" as const };
@@ -291,6 +417,7 @@ let stopSpendingRefresh: (() => void) | undefined;
 
 onMounted(() => {
   void loadSpending();
+  void loadToLabel();
   stopSpendingRefresh = onSpendingRefresh(() => {
     void loadSpending({ force: true });
   });

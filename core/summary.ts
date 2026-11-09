@@ -173,6 +173,7 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
       referenceDate: refDate,
       livingBudget: cap,
       history: input.paceReport?.transactions,
+      configuredCharges: input.fixedCharges,
     });
   }
 

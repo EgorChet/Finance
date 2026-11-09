@@ -1,4 +1,5 @@
 import type { Transaction } from "../types.js";
+import type { ConfiguredCharge } from "../household/fixedCharges.js";
 import { computeBudgetPlan, type BudgetPlan, type BudgetPlanTone } from "./budgetPlan.js";
 
 export type PaceHealthTone = BudgetPlanTone;
@@ -13,6 +14,8 @@ export interface LivePaceHealthInput {
   livingBudget: number | null;
   /** Past transactions — the plan learns your usual spending curve from them. */
   history?: Transaction[];
+  /** Charges entered under Budget — set aside before they post. */
+  configuredCharges?: ConfiguredCharge[];
 }
 
 export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | null {
@@ -21,6 +24,7 @@ export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | 
     cycleDay: input.cycleDay,
     referenceDate: input.referenceDate,
     history: input.history,
+    configuredCharges: input.configuredCharges,
   });
 }
 

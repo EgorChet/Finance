@@ -2,8 +2,19 @@
   <div class="find">
     <div v-if="auth.readOnly" class="demo-banner">Demo mode — sample transactions only.</div>
     <h2 class="page-title">Transactions</h2>
+    <div class="seg" role="tablist" aria-label="Transactions view">
+      <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'charges' }" :aria-selected="view === 'charges'" @click="setView('charges')">
+        Charges
+      </button>
+      <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'merchants' }" :aria-selected="view === 'merchants'" @click="setView('merchants')">
+        Merchants
+        <span v-if="merchantsWaiting > 0" class="seg-badge">{{ merchantsWaiting }}</span>
+      </button>
+    </div>
 
-    <AppLoader v-if="loading" title="Loading transactions" subtitle="Fetching your statement history" />
+    <MerchantsView v-if="view === 'merchants'" />
+
+    <AppLoader v-else-if="loading" title="Loading transactions" subtitle="Fetching your statement history" />
     <template v-else>
       <p v-if="error" class="browse-error">{{ error }}</p>
       <template v-else>
@@ -129,6 +140,9 @@
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
+import { useRoute, useRouter } from "vue-router";
+import MerchantsView from "@/features/merchants/MerchantsView.vue";
+import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
@@ -159,6 +173,18 @@ const amountPresets: AmountPreset[] = [
 ];
 
 const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
+const reviewData = useReviewDataStore();
+
+/** Charges (search everything) or Merchants (label new ones, edit saved names). */
+const view = computed<"charges" | "merchants">(() => (route.query.view === "merchants" ? "merchants" : "charges"));
+const merchantsWaiting = computed(() => (auth.readOnly && !auth.isDemo ? 0 : reviewData.data?.queue.length ?? 0));
+
+function setView(next: "charges" | "merchants") {
+  if (next === view.value) return;
+  void router.replace({ name: "browse", query: next === "merchants" ? { view: "merchants" } : {} });
+}
 const homeData = useHomeDataStore();
 const loading = ref(true);
 const error = ref("");

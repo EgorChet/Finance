@@ -3,23 +3,16 @@
     <div v-if="auth.readOnly" class="demo-banner">
       Demo mode — household settings are read-only. Sign in to manage your budget and charges.
     </div>
-    <div class="recurring-header">
-      <div class="recurring-header-top">
-        <div>
-          <h2 class="page-title">Budget</h2>
-          <p class="page-lead" style="margin-bottom: 0">
-            Living budget, recurring bills, one-time charges, exclusions, and splits.
-          </p>
-        </div>
-        <p
-          v-if="!loading && saveStatus"
-          class="recurring-save-status"
-          :class="{ 'recurring-save-status--error': saveError }"
-        >
-          {{ saveStatus }}
-        </p>
-      </div>
-    </div>
+    <header class="bx-page-head">
+      <h2 class="page-title">Budget</h2>
+      <p
+        v-if="!loading && saveStatus"
+        class="recurring-save-status"
+        :class="{ 'recurring-save-status--error': saveError }"
+      >
+        {{ saveStatus }}
+      </p>
+    </header>
 
     <AppLoader
       v-if="loading"
@@ -43,246 +36,108 @@
         @edit-recurring-charge="editRecurringCharge"
       />
 
-      <section id="recurring" class="manual-section fold-section">
-        <div class="fold-section__head">
-          <button
-            type="button"
-            class="fold-section__toggle"
-            :aria-expanded="recurringOpen"
-            aria-controls="recurring-body"
-            @click="setFold('recurring', !recurringOpen)"
-          >
-            <span class="fold-section__text">
-              <span class="fold-section__title">Recurring monthly</span>
-              <span class="fold-section__summary">{{ recurringSummary }}</span>
-            </span>
-            <span class="minor-section__chevron" :class="{ 'is-open': recurringOpen }" aria-hidden="true" />
-          </button>
-          <IconButton
-            v-if="!auth.readOnly"
-            icon="plus"
-            label="Add recurring bill"
-            :disabled="saving"
-            @click="openAddForm('recurring')"
-          />
+      <section id="recurring" class="bx-section">
+        <div class="bx-list-head">
+          <h3>Recurring bills <span v-if="activeMonthlyTotal > 0" class="bx-list-total">{{ formatIlsWhole(activeMonthlyTotal) }}/mo</span></h3>
+          <button v-if="!auth.readOnly" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('recurring')">+ Add</button>
         </div>
-
-        <div v-show="recurringOpen" id="recurring-body" class="fold-section__body">
-        <p class="manual-section-lead">Rent, loans, subscriptions — same amount every month.</p>
-
-        <div v-if="visibleRecurringGroups.length" class="recurring-groups">
-          <section v-for="group in visibleRecurringGroups" :key="group.id" class="recurring-card recurring-card--compact">
-            <template v-if="singleVisibleSegment(group)">
+        <div v-if="visibleRecurringGroups.length" class="bx-list">
+          <template v-for="group in visibleRecurringGroups" :key="group.id">
+            <component
+              :is="auth.readOnly && singleVisibleSegment(group) ? 'div' : 'button'"
+              :type="auth.readOnly && singleVisibleSegment(group) ? undefined : 'button'"
+              class="bx-row"
+              :disabled="!auth.readOnly && saving"
+              @click="onGroupTap(group)"
+            >
+              <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(group.category_en) }}</span>
+              <span class="bx-row-body">
+                <span class="bx-row-top">
+                  <span class="bx-row-name">{{ groupDisplayName(group) }}</span>
+                  <span class="bx-row-amount">{{ formatIlsWhole(groupCurrentAmount(group)) }}<small>/mo</small></span>
+                </span>
+                <span class="bx-row-meta">
+                  <span>{{ groupMeta(group) }}</span>
+                  <span v-if="groupStatus(group)" class="bx-status" :class="`bx-status--${groupStatus(group)!.cls}`">{{ groupStatus(group)!.label }}</span>
+                </span>
+              </span>
+              <span v-if="!singleVisibleSegment(group)" class="bx-chevron" :class="{ 'is-open': expandedGroups.has(group.id) }" aria-hidden="true">›</span>
+            </component>
+            <div v-if="!singleVisibleSegment(group) && expandedGroups.has(group.id)" class="bx-sub">
               <component
                 :is="auth.readOnly ? 'div' : 'button'"
+                v-for="(seg, segIndex) in [...visibleGroupSegments(group), ...(showEndedRecurring ? endedGroupSegments(group) : [])]"
+                :key="`${group.id}-${segIndex}`"
                 :type="auth.readOnly ? undefined : 'button'"
-                class="list-row recurring-card-single"
-                :class="{ 'row-tappable': !auth.readOnly }"
+                class="bx-sub-row"
                 :disabled="!auth.readOnly && saving"
-                @click="!auth.readOnly && startEditCharge(singleVisibleSegment(group)!)"
+                @click="!auth.readOnly && startEditCharge(seg)"
               >
-                <div class="list-row__main">
-                  <strong class="list-row__label">{{ groupDisplayName(group) }}</strong>
-                  <span class="list-row__meta">{{ group.category_en }} · {{ monthRangeLabel(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month) }}</span>
-                </div>
-                <span class="row-aside">
-                  <span class="row-aside__amount">{{ formatIls(singleVisibleSegment(group)!.amount) }}</span>
-                  <span
-                    v-if="statusLabel(singleVisibleSegment(group)!) !== 'Active'"
-                    class="row-aside__status recurring-status"
-                    :class="'recurring-status-' + segmentStatus(singleVisibleSegment(group)!.from_month, singleVisibleSegment(group)!.through_month, referenceYm)"
-                  >
-                    {{ statusLabel(singleVisibleSegment(group)!) }}
-                  </span>
+                <span>{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                <span class="bx-sub-right">
+                  <span v-if="statusLabel(seg) !== 'Active'" class="bx-status" :class="`bx-status--${segmentStatus(seg.from_month, seg.through_month, referenceYm)}`">{{ statusLabel(seg) }}</span>
+                  <b>{{ formatIlsWhole(seg.amount) }}</b>
                 </span>
-                <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
               </component>
-            </template>
-
-            <template v-else>
-              <header class="recurring-card-header">
-                <div>
-                  <h3 class="recurring-card-title">{{ groupDisplayName(group) }}</h3>
-                  <p class="recurring-card-sub">{{ group.category_en }}</p>
-                </div>
-              </header>
-
-              <ul class="charge-compact-list">
-                <li
-                  v-for="(seg, segIndex) in visibleGroupSegments(group)"
-                  :key="`${group.id}-${segIndex}`"
-                  class="charge-compact-row-wrap"
-                >
-                  <component
-                    :is="auth.readOnly ? 'div' : 'button'"
-                    :type="auth.readOnly ? undefined : 'button'"
-                    class="list-row"
-                    :class="{ 'row-tappable': !auth.readOnly }"
-                    :disabled="!auth.readOnly && saving"
-                    @click="!auth.readOnly && startEditCharge(seg)"
-                  >
-                    <div class="list-row__main">
-                      <span class="list-row__label">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
-                    </div>
-                    <span class="row-aside">
-                      <span class="row-aside__amount">{{ formatIls(seg.amount) }}</span>
-                      <span
-                        v-if="statusLabel(seg) !== 'Active'"
-                        class="row-aside__status recurring-status"
-                        :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
-                      >
-                        {{ statusLabel(seg) }}
-                      </span>
-                    </span>
-                    <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
-                  </component>
-                </li>
-              </ul>
-            </template>
-
-            <ul v-if="showEndedRecurring && endedGroupSegments(group).length" class="charge-compact-list household-ended-list">
-              <li v-for="(seg, segIndex) in endedGroupSegments(group)" :key="`${group.id}-ended-${segIndex}`" class="charge-compact-row-wrap">
-                <component
-                    :is="auth.readOnly ? 'div' : 'button'"
-                    :type="auth.readOnly ? undefined : 'button'"
-                    class="list-row"
-                    :class="{ 'row-tappable': !auth.readOnly }"
-                    :disabled="!auth.readOnly && saving"
-                    @click="!auth.readOnly && startEditCharge(seg)"
-                  >
-                    <div class="list-row__main">
-                      <span class="list-row__label">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
-                    </div>
-                    <span class="row-aside">
-                      <span class="row-aside__amount">{{ formatIls(seg.amount) }}</span>
-                      <span
-                        v-if="statusLabel(seg) !== 'Active'"
-                        class="row-aside__status recurring-status"
-                        :class="'recurring-status-' + segmentStatus(seg.from_month, seg.through_month, referenceYm)"
-                      >
-                        {{ statusLabel(seg) }}
-                      </span>
-                    </span>
-                    <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
-                  </component>
-              </li>
-            </ul>
-          </section>
+            </div>
+          </template>
+          <button
+            v-if="endedRecurringCount"
+            type="button"
+            class="bx-row bx-row--more"
+            @click="showEndedRecurring = !showEndedRecurring"
+          >
+            {{ showEndedRecurring ? "Hide" : "Show" }} ended periods ({{ endedRecurringCount }})
+          </button>
         </div>
-
-        <button
-          v-if="endedRecurringCount"
-          type="button"
-          class="btn btn-ghost household-show-more"
-          @click="showEndedRecurring = !showEndedRecurring"
-        >
-          {{ showEndedRecurring ? "Hide" : "Show" }} ended recurring periods ({{ endedRecurringCount }})
-        </button>
-
-        <p v-if="!recurringGroups.length" class="manual-empty">No recurring bills yet.</p>
-        </div>
+        <p v-else class="bx-empty-line">No recurring bills yet. Rent, loans and subscriptions go here.</p>
       </section>
 
-      <section id="one-time" class="manual-section fold-section">
-        <div class="fold-section__head">
-          <button
-            type="button"
-            class="fold-section__toggle"
-            :aria-expanded="oneTimeOpen"
-            aria-controls="one-time-body"
-            @click="setFold('oneTime', !oneTimeOpen)"
+      <section id="one-time" class="bx-section">
+        <div class="bx-list-head">
+          <h3>One-time charges</h3>
+          <button v-if="!auth.readOnly" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('once')">+ Add</button>
+        </div>
+        <div v-if="visibleOneTimeCharges.length || pastOneTimeCharges.length" class="bx-list">
+          <component
+            :is="auth.readOnly ? 'div' : 'button'"
+            v-for="charge in [...visibleOneTimeCharges, ...(showPastOneTime ? pastOneTimeCharges : [])]"
+            :key="charge.id"
+            :type="auth.readOnly ? undefined : 'button'"
+            class="bx-row"
+            :disabled="!auth.readOnly && saving"
+            @click="!auth.readOnly && startEditCharge(charge)"
           >
-            <span class="fold-section__text">
-              <span class="fold-section__title">One-time charges</span>
-              <span class="fold-section__summary">{{ oneTimeSummary }}</span>
+            <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(charge.category_en) }}</span>
+            <span class="bx-row-body">
+              <span class="bx-row-top">
+                <span class="bx-row-name">{{ chargeDisplayName(charge) }}</span>
+                <span class="bx-row-amount">{{ formatIlsWhole(charge.amount) }}</span>
+              </span>
+              <span class="bx-row-meta">
+                <span>{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
+                <span
+                  v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
+                  class="bx-status"
+                  :class="`bx-status--${oneTimeStatusClass(charge.charge_date!)}`"
+                >
+                  {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Coming up' }}
+                </span>
+              </span>
             </span>
-            <span class="minor-section__chevron" :class="{ 'is-open': oneTimeOpen }" aria-hidden="true" />
+          </component>
+          <button
+            v-if="pastOneTimeCharges.length"
+            type="button"
+            class="bx-row bx-row--more"
+            @click="showPastOneTime = !showPastOneTime"
+          >
+            {{ showPastOneTime ? "Hide" : "Show" }} past charges ({{ pastOneTimeCharges.length }})
           </button>
-          <IconButton
-            v-if="!auth.readOnly"
-            icon="plus"
-            label="Add one-time charge"
-            :disabled="saving"
-            @click="openAddForm('once')"
-          />
         </div>
-
-        <div v-show="oneTimeOpen" id="one-time-body" class="fold-section__body">
-        <p class="manual-section-lead">
-          Purchases on another card, cash, or anything that happens once — shown on the exact date in spending.
+        <p v-else class="bx-empty-line">
+          Nothing planned. Add purchases on another card, cash, or a big one-off you know is coming — it's set aside in your budget.
         </p>
-
-        <div v-if="visibleOneTimeCharges.length" class="recurring-groups">
-          <ul class="charge-compact-list">
-            <li v-for="charge in visibleOneTimeCharges" :key="charge.id" class="charge-compact-row-wrap">
-              <component
-                :is="auth.readOnly ? 'div' : 'button'"
-                :type="auth.readOnly ? undefined : 'button'"
-                class="list-row"
-                :class="{ 'row-tappable': !auth.readOnly }"
-                :disabled="!auth.readOnly && saving"
-                @click="!auth.readOnly && startEditCharge(charge)"
-              >
-                <div class="list-row__main">
-                  <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
-                  <span class="list-row__meta">{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
-                </div>
-                <span class="row-aside">
-                  <span class="row-aside__amount">{{ formatIls(charge.amount) }}</span>
-                  <span
-                    v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
-                    class="row-aside__status recurring-status"
-                    :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
-                  >
-                    {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Scheduled' }}
-                  </span>
-                </span>
-                <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
-              </component>
-            </li>
-          </ul>
-        </div>
-
-        <button
-          v-if="pastOneTimeCharges.length"
-          type="button"
-          class="btn btn-ghost household-show-more"
-          @click="showPastOneTime = !showPastOneTime"
-        >
-          {{ showPastOneTime ? "Hide" : "Show" }} past one-time charges ({{ pastOneTimeCharges.length }})
-        </button>
-
-        <ul v-if="showPastOneTime && pastOneTimeCharges.length" class="charge-compact-list household-ended-list">
-          <li v-for="charge in pastOneTimeCharges" :key="`past-${charge.id}`" class="charge-compact-row-wrap">
-            <component
-                :is="auth.readOnly ? 'div' : 'button'"
-                :type="auth.readOnly ? undefined : 'button'"
-                class="list-row"
-                :class="{ 'row-tappable': !auth.readOnly }"
-                :disabled="!auth.readOnly && saving"
-                @click="!auth.readOnly && startEditCharge(charge)"
-              >
-                <div class="list-row__main">
-                  <strong class="list-row__label">{{ chargeDisplayName(charge) }}</strong>
-                  <span class="list-row__meta">{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
-                </div>
-                <span class="row-aside">
-                  <span class="row-aside__amount">{{ formatIls(charge.amount) }}</span>
-                  <span
-                    v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
-                    class="row-aside__status recurring-status"
-                    :class="'recurring-status-' + oneTimeStatusClass(charge.charge_date!)"
-                  >
-                    {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Scheduled' }}
-                  </span>
-                </span>
-                <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
-              </component>
-          </li>
-        </ul>
-
-        <p v-if="!oneTimeCharges.length" class="manual-empty">No one-time charges yet.</p>
-        </div>
       </section>
 
       <!-- Edit an existing recurring period -->
@@ -451,7 +306,8 @@ import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { type HouseholdBundle, useHouseholdDataStore } from "@/shared/stores/viewData";
 import { confirm } from "@/shared/composables/useConfirm";
 import { referenceDate, yearMonthForDate } from "@/shared/utils/appDate";
-import { formatIls } from "@/shared/utils/format";
+import { formatIls, formatIlsWhole } from "@/shared/utils/format";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { isoDateLocal } from "@/shared/utils/transactionPeriod";
 import {
   type ChargeGroup,
@@ -870,6 +726,52 @@ function cancelEditCharge(charge: ConfiguredCharge) {
 function throughLabel(throughMonth: string): string {
   return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
 }
+
+const expandedGroups = ref(new Set<string>());
+
+function onGroupTap(group: ChargeGroup) {
+  const single = singleVisibleSegment(group);
+  if (single) {
+    if (!auth.readOnly) startEditCharge(single);
+    return;
+  }
+  const next = new Set(expandedGroups.value);
+  if (next.has(group.id)) next.delete(group.id);
+  else next.add(group.id);
+  expandedGroups.value = next;
+}
+
+/** The amount in force this month (or the next one to start). */
+function groupCurrentSegment(group: ChargeGroup): ConfiguredCharge | null {
+  const segs = visibleGroupSegments(group);
+  return segs.find((s) => s.from_month <= referenceYm.value && referenceYm.value <= s.through_month) ?? segs[0] ?? null;
+}
+
+function groupCurrentAmount(group: ChargeGroup): number {
+  return groupCurrentSegment(group)?.amount ?? 0;
+}
+
+function groupMeta(group: ChargeGroup): string {
+  const seg = groupCurrentSegment(group);
+  const periods = visibleGroupSegments(group).length;
+  const range = seg ? monthRangeLabel(seg.from_month, seg.through_month) : "";
+  return periods > 1 ? `${group.category_en} · ${periods} periods` : `${group.category_en} · ${range}`;
+}
+
+function groupStatus(group: ChargeGroup): { label: string; cls: string } | null {
+  const seg = groupCurrentSegment(group);
+  if (!seg) return null;
+  const label = statusLabel(seg);
+  if (label === "Active") return null;
+  return { label, cls: segmentStatus(seg.from_month, seg.through_month, referenceYm.value) };
+}
+
+const activeMonthlyTotal = computed(() =>
+  recurringGroups.value.reduce((sum, g) => {
+    const seg = g.segments.find((s) => s.from_month <= referenceYm.value && referenceYm.value <= s.through_month);
+    return sum + (seg?.amount ?? 0);
+  }, 0),
+);
 
 function singleVisibleSegment(group: ChargeGroup): ConfiguredCharge | null {
   const visible = visibleGroupSegments(group);

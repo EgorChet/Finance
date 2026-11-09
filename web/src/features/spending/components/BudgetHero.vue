@@ -47,14 +47,18 @@
 
     <div class="bh-stats">
       <div>
-        <span>Left</span>
-        <strong>{{ whole(Math.max(0, plan.moneyLeft)) }}</strong>
+        <span>Free to spend</span>
+        <strong>{{ whole(Math.max(0, plan.flexLeft)) }}</strong>
       </div>
       <div>
         <span>Spent</span>
         <strong>{{ whole(plan.spentOnCap) }}</strong>
       </div>
-      <div>
+      <div v-if="reserved > 0">
+        <span>Set aside</span>
+        <strong>{{ whole(reserved) }}</strong>
+      </div>
+      <div v-else>
         <span>Budget</span>
         <strong>{{ whole(plan.budget) }}</strong>
       </div>
@@ -109,7 +113,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { BudgetPlan } from "@/features/spending/utils/budgetPlan";
-import { formatIlsWhole } from "@/shared/utils/format";
+import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 
 const props = defineProps<{
   plan: BudgetPlan;
@@ -139,10 +143,18 @@ const subline = computed(() => {
 
 const billRows = computed(() =>
   props.plan.committedRows.map((r) => ({
-    label: r.kind === "vaad" && props.plan.vaadReserve > 0 ? `${r.label} (set aside)` : r.label,
+    label:
+      r.kind === "upcoming"
+        ? `${r.label} · set aside, not charged yet`
+        : r.kind === "vaad" && props.plan.vaadReserve > 0
+          ? `${r.label} (set aside)`
+          : r.label,
     amount: r.amount,
   })),
 );
+
+/** Money already promised to charges that haven't gone through yet. */
+const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
 
 const explanation = computed(() => {
   const p = props.plan;

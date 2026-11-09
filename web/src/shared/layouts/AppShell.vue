@@ -1,17 +1,6 @@
 <template>
   <div class="app-layout" :class="{ 'app-layout--readonly': auth.readOnly && !auth.isDemo }">
     <header class="app-header">
-      <button
-        type="button"
-        class="btn btn-icon mobile-nav-toggle"
-        aria-label="Open menu"
-        :aria-expanded="navOpen"
-        @click="navOpen = !navOpen"
-      >
-        <span class="hamburger-icon" :class="{ 'hamburger-icon--open': navOpen }">
-          <span /><span /><span />
-        </span>
-      </button>
       <div class="app-header-brand">
         <div class="app-portfolio-switch">
           <div class="app-portfolio-tabs" role="tablist" aria-label="Portfolio asset">
@@ -63,6 +52,15 @@
         </div>
       </div>
       <span v-if="auth.readOnly && !auth.isDemo" class="readonly-badge" title="Only Egor can make changes">View only</span>
+      <button
+        type="button"
+        class="app-account-btn"
+        aria-label="Account, portfolio and add data"
+        :aria-expanded="navOpen"
+        @click="navOpen = !navOpen"
+      >
+        {{ auth.isDemo ? "👤" : accountInitial || "👤" }}
+      </button>
     </header>
 
     <Teleport to="body">
@@ -70,21 +68,10 @@
         <div class="mobile-nav-backdrop" aria-hidden="true" @click="closeNav" />
         <nav class="mobile-nav-drawer" aria-label="Main navigation">
           <div class="mobile-nav-drawer-head">
-            <span class="mobile-nav-drawer-title">Menu</span>
-            <button type="button" class="btn btn-icon mobile-nav-close" aria-label="Close menu" @click="closeNav">
+            <span class="mobile-nav-drawer-title">Account</span>
+            <button type="button" class="btn btn-icon mobile-nav-close" aria-label="Close" @click="closeNav">
               ×
             </button>
-          </div>
-          <div class="mobile-nav-links">
-            <RouterLink
-              v-for="item in navItems"
-              :key="item.to"
-              class="mobile-nav-link"
-              :to="item.to"
-              @click="closeNav"
-            >
-              {{ item.label }}
-            </RouterLink>
           </div>
           <div class="mobile-nav-bottom">
             <div v-if="sideMenuPortfolioVisible" class="mobile-nav-portfolio">
@@ -302,6 +289,11 @@
           />
         </svg>
         <span class="app-tab-label">{{ item.label }}</span>
+        <span
+          v-if="item === TRANSACTIONS_TAB && merchantsWaiting > 0"
+          class="app-tab-badge"
+          :aria-label="`${merchantsWaiting} merchants need a name`"
+        >{{ merchantsWaiting > 9 ? "9+" : merchantsWaiting }}</span>
       </RouterLink>
     </nav>
 
@@ -377,6 +369,7 @@ import { emitSpendingRefresh } from "@/features/spending/composables/useSpending
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
+import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
@@ -402,28 +395,19 @@ const SYNC_STEPS = [
   "Saving updates",
 ];
 
-const NAV_ITEMS = [
-  { to: "/app/home", label: "Home" },
-  { to: "/app/overview", label: "Spending" },
-  { to: "/app/browse", label: "Browse" },
-  { to: "/app/merchants", label: "Merchants" },
-  { to: "/app/household", label: "Household" },
-] as const;
 
-const navItems = NAV_ITEMS;
 
 /** Bottom tab bar: the four screens used most, one thumb-tap away. Everything else stays in the menu. */
-const HOME_TAB = { to: "/app/home", label: "Home", icon: "M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" };
+const HOME_TAB = { to: "/app/home", label: "Today", icon: "M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" };
 const SPENDING_TAB = { to: "/app/overview", label: "Spending", icon: "M4 19V11M10 19V5M16 19v-6M22 19H2" };
-const REVIEW_TAB = { to: "/app/merchants", label: "Review", icon: "M5 12.5 9.5 17 19 7" };
-const BROWSE_TAB = { to: "/app/browse", label: "Browse", icon: "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" };
+const TRANSACTIONS_TAB = { to: "/app/browse", label: "Transactions", icon: "M4 6h16M4 12h16M4 18h10" };
 const BUDGET_TAB = { to: "/app/household", label: "Budget", icon: "M4 7h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 7l2-3h12l2 3M15 13h2" };
-// View-only members get Browse instead of Review (labelling charges is an edit).
-const tabItems = computed(() =>
-  auth.readOnly && !auth.isDemo
-    ? [HOME_TAB, SPENDING_TAB, BROWSE_TAB, BUDGET_TAB]
-    : [HOME_TAB, SPENDING_TAB, REVIEW_TAB, BUDGET_TAB],
-);
+// Labelling merchants lives inside Transactions (Merchants view); Today flags it.
+const tabItems = computed(() => [HOME_TAB, SPENDING_TAB, TRANSACTIONS_TAB, BUDGET_TAB]);
+
+const reviewData = useReviewDataStore();
+/** Red dot on Transactions while merchants are waiting for a name. */
+const merchantsWaiting = computed(() => (auth.readOnly && !auth.isDemo ? 0 : reviewData.data?.queue.length ?? 0));
 
 function isTabActive(to: string): boolean {
   return route.path === to || route.path.startsWith(`${to}/`);
