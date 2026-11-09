@@ -13,9 +13,14 @@ const router = createRouter({
         { path: "home", name: "home", component: () => import("@/features/home/HomeView.vue") },
         { path: "overview", name: "overview", component: () => import("@/features/spending/SpendingView.vue") },
         { path: "browse", name: "browse", component: () => import("@/features/browse/BrowseView.vue") },
-        { path: "merchants", name: "merchants", component: () => import("@/features/merchants/MerchantsView.vue") },
-        { path: "review", redirect: { name: "merchants" } },
-        { path: "mappings", redirect: { name: "merchants", query: { tab: "mappings" } } },
+        // Review and saved merchant names live inside Transactions (the Merchants view).
+        {
+          path: "merchants",
+          name: "merchants",
+          redirect: (to) => ({ name: "browse", query: { view: "merchants", ...(to.query.tab ? { tab: to.query.tab } : {}) } }),
+        },
+        { path: "review", redirect: { name: "browse", query: { view: "merchants" } } },
+        { path: "mappings", redirect: { name: "browse", query: { view: "merchants", tab: "mappings" } } },
         { path: "household", name: "household", component: () => import("@/features/household/HouseholdView.vue") },
         { path: "recurring", redirect: { name: "household" } },
         { path: "excluded", redirect: { name: "household", hash: "#excluded" } },

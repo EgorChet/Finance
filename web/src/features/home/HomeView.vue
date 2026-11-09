@@ -236,7 +236,7 @@ const todoItems = computed(() => {
       icon: "🏷️",
       title: `${toLabelCount.value} ${toLabelCount.value === 1 ? "merchant needs" : "merchants need"} a name`,
       sub: "Label them so categories stay right",
-      to: { name: "merchants" },
+      to: { name: "browse", query: { view: "merchants" } },
     });
   }
   for (const row of summaryPlan.value?.committedRows ?? []) {

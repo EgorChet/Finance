@@ -1,6 +1,5 @@
 <template>
   <div class="merchants-page">
-    <h2 class="page-title">Review</h2>
     <div class="merchants-tabs" role="tablist" aria-label="Merchants">
       <button
         type="button"
@@ -10,7 +9,7 @@
         :aria-selected="tab === 'label'"
         @click="setTab('label')"
       >
-        Label
+        To label
       </button>
       <button
         type="button"
@@ -20,7 +19,7 @@
         :aria-selected="tab === 'mappings'"
         @click="setTab('mappings')"
       >
-        Mappings
+        Saved names
       </button>
     </div>
     <ReviewView v-if="tab === 'label'" embedded />
@@ -44,8 +43,8 @@ const tab = computed<MerchantsTab>(() => (route.query.tab === "mappings" ? "mapp
 function setTab(next: MerchantsTab) {
   if (next === tab.value) return;
   router.replace({
-    name: "merchants",
-    query: next === "mappings" ? { tab: "mappings" } : {},
+    name: "browse",
+    query: next === "mappings" ? { view: "merchants", tab: "mappings" } : { view: "merchants" },
   });
 }
 </script>

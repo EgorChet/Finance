@@ -3613,3 +3613,143 @@ button.bx-row {
 .today-section .bit-card {
   margin-top: 0.6rem;
 }
+
+/* ── Account button (replaces the ☰ menu) ── */
+.app-account-btn {
+  flex: none;
+  order: 99;
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -6px var(--glow-1);
+}
+
+/* The account panel slides in from the right, next to its button. */
+.mobile-nav-drawer {
+  left: auto !important;
+  right: 0 !important;
+}
+
+/* ── Tab badge ── */
+.app-tab {
+  position: relative;
+}
+
+.app-tab-badge {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 6px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ── Segmented switch (Transactions: Charges / Merchants) ── */
+.seg {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 0.9rem;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.seg-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.seg-btn--on {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.seg-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 18px;
+}
+
+/* Header: portfolio on the left, account button on the right. */
+.app-header .app-header-brand {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* Account panel content starts at the top now that it has no nav links. */
+.mobile-nav-drawer .mobile-nav-bottom {
+  margin-top: 0;
+}
+
+.mobile-nav-drawer .mobile-nav-portfolio {
+  border-top: 0;
+  padding-top: 0.25rem;
+}
+
+/* To label / Saved names: a smaller version of the segmented switch. */
+.merchants-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 0.9rem;
+  padding: 3px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.merchants-tab {
+  flex: 1;
+  min-height: 34px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+}
+
+.merchants-tab--active {
+  background: var(--surface-alt);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.app-header .app-portfolio-switch {
+  flex: 0 0 auto;
+}
+
+.mobile-nav-drawer .mobile-nav-footer {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
