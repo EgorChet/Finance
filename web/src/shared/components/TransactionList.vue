@@ -17,32 +17,36 @@
     </div>
 
     <div class="tx-row-mobile">
-      <component
-        :is="hasActions ? 'button' : 'div'"
-        v-for="row in visibleRows"
-        :key="row.key"
-        :type="hasActions ? 'button' : undefined"
-        class="tx-row"
-        :class="{ 'tx-row--tappable': hasActions, 'tx-row--busy': actingKey === row.key }"
-        :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
-        @click="hasActions && openSheet(row)"
-      >
-        <div class="tx-row-top">
-          <div class="tx-row-merchant">{{ row.merchant }}</div>
-          <div class="tx-row-amount-col">
-            <div class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">
-              {{ actingKey === row.key ? "…" : formatChargeAmount(row.tx) }}
-            </div>
-            <div v-if="row.reimbursementLabel" class="tx-row-reimbursement">{{ row.reimbursementLabel }}</div>
-          </div>
-        </div>
-        <div class="tx-row-meta">
-          <span class="tx-row-meta-text">
-            {{ row.dateLabel }}
-            <span v-if="showCategory && row.category"> · {{ row.category }}</span>
+      <section v-for="group in groups" :key="group.key" class="tx-group">
+        <header v-if="group.label" class="tx-group-head">
+          <span>{{ group.label }}</span>
+          <span class="tx-group-total">{{ formatIlsWhole(group.total) }}</span>
+        </header>
+        <component
+          :is="hasActions ? 'button' : 'div'"
+          v-for="row in group.rows"
+          :key="row.key"
+          :type="hasActions ? 'button' : undefined"
+          class="tx-row"
+          :class="{ 'tx-row--tappable': hasActions, 'tx-row--busy': actingKey === row.key }"
+          :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
+          @click="hasActions && openSheet(row)"
+        >
+          <span class="tx-row-icon" aria-hidden="true">{{ row.icon }}</span>
+          <span class="tx-row-body">
+            <span class="tx-row-top">
+              <span class="tx-row-merchant">{{ row.merchant }}</span>
+              <span class="tx-row-amount" :class="{ 'tx-row-amount--refund': row.tx.charge_amount < 0 }">
+                {{ actingKey === row.key ? "…" : formatChargeAmount(row.tx) }}
+              </span>
+            </span>
+            <span class="tx-row-meta">
+              <span class="tx-row-meta-text">{{ row.metaLabel }}</span>
+              <span v-if="row.reimbursementLabel" class="tx-row-reimbursement">{{ row.reimbursementLabel }}</span>
+            </span>
           </span>
-        </div>
-      </component>
+        </component>
+      </section>
     </div>
 
     <!-- Rarely used actions live in a sheet that opens on tap, not on every row. -->
@@ -135,7 +139,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
-import { formatChargeAmount, formatIls, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
+import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import { effectiveSpend } from "@/shared/utils/transaction";
 import { transactionRowKey } from "@/shared/utils/transaction";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
@@ -247,6 +253,8 @@ const visibleRows = computed(() => {
     dateLabel: formatChargeDate(t),
     merchant: t.merchant_en || t.merchant_he,
     category: t.category_en || "Uncategorized",
+    icon: categoryIcon(t.category_en || "Uncategorized"),
+    metaLabel: rowMeta(t),
     amount: t.effective_amount ?? t.charge_amount,
     adjustLabel: t.reimbursement ? "Edit split" : "Split",
     reimbursementLabel: t.reimbursement
@@ -254,6 +262,47 @@ const visibleRows = computed(() => {
       : null,
   }));
 });
+
+/** Grouped by day when sorted by date; one flat group otherwise. */
+const groups = computed(() => {
+  const rows = visibleRows.value;
+  if (sortKey.value !== "date") return [{ key: "all", label: "", total: 0, rows }];
+  const out: { key: string; label: string; total: number; rows: typeof rows }[] = [];
+  for (const row of rows) {
+    const day = row.tx.date.slice(0, 10);
+    let g = out[out.length - 1];
+    if (!g || g.key !== day) {
+      g = { key: day, label: dayLabel(day), total: 0, rows: [] };
+      out.push(g);
+    }
+    g.rows.push(row);
+    g.total += effectiveSpend(row.tx);
+  }
+  return out;
+});
+
+function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+/** Under the merchant: category (when shown) and billing month when it differs; the day is in the header. */
+function rowMeta(t: Transaction): string {
+  const parts: string[] = [];
+  if (sortKey.value !== "date") parts.push(formatTransactionDate(t.date));
+  if (props.showCategory) parts.push(t.category_en || "Uncategorized");
+  const billMonth = t.billing_month || props.statementBilling;
+  if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(`billed ${billMonth}`);
+  return parts.join(" · ");
+}
 
 function emitExclude(tx: Transaction) {
   emit("exclude", tx);
