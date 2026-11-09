@@ -1,6 +1,6 @@
 import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
-import { useHouseholdDataStore, useRulesDataStore } from "@/shared/stores/viewData";
+import { useAdjustmentsDataStore, useHouseholdDataStore, useRulesDataStore } from "@/shared/stores/viewData";
 
 /** Invalidate caches that change after statement sync or upload. */
 export function invalidateSpendingDataCaches() {
@@ -17,4 +17,13 @@ export function invalidateHouseholdDataCaches() {
 export function invalidateRulesDataCaches() {
   useRulesDataStore().invalidate();
   useReviewDataStore().invalidate();
+}
+
+/** Pull-to-refresh: forget every cached screen so the next load comes from the server. */
+export function invalidateAllDataCaches() {
+  useHomeDataStore().invalidate();
+  useReviewDataStore().invalidate();
+  useHouseholdDataStore().invalidate();
+  useRulesDataStore().invalidate();
+  useAdjustmentsDataStore().invalidate();
 }

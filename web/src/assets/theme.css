@@ -3759,3 +3759,50 @@ button.bx-row {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* ── Pull to refresh ── */
+.ptr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: -0.5rem;
+  transition: height 0.2s ease;
+}
+
+.ptr--dragging {
+  transition: none;
+}
+
+.ptr-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.4);
+}
+
+.ptr--ready .ptr-icon {
+  color: var(--accent);
+}
+
+.ptr--busy .ptr-icon {
+  color: var(--accent);
+  animation: ptr-spin 0.8s linear infinite;
+}
+
+@keyframes ptr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Native rubber-band would fight the custom pull at the top of the page. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
