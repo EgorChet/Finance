@@ -426,13 +426,25 @@ const activeLivingBudgetPeriodLabel = computed(() => {
   return monthRangeLabel(seg.from_month, seg.through_month);
 });
 
+/**
+ * A closed cycle waiting for its statement only holds the charges you added under Budget;
+ * showing "under budget" from those alone is misleading. Show numbers once there is real
+ * card data (a statement / Cal snapshot) or a total entered by hand.
+ */
+const pendingHasCardData = computed(() => {
+  const r = report.value;
+  if (!r) return false;
+  const configured = r.transactions.filter((t) => t.notes?.startsWith("fixed_charge:"));
+  if (r.transactions.length > configured.length) return true;
+  const configuredTotal = configured.reduce((sum, t) => sum + (t.effective_amount ?? t.charge_amount), 0);
+  return r.total_spent > configuredTotal + 0.5; // manual "spent so far" entry
+});
+
 const showSummaryMetrics = computed(() => {
   if (!report.value) return false;
+  if (report.value.metadata?.pending_statement) return pendingHasCardData.value;
   if (isPartialForOpenCycle.value) return report.value.total_spent > 0;
   if (!isInProgressCycle.value) return true;
-  if (report.value.metadata?.pending_statement) {
-    return report.value.total_spent > 0;
-  }
   return showCategoryExplorer.value;
 });
 
