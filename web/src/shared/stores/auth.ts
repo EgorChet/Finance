@@ -26,10 +26,12 @@ export const useAuthStore = defineStore("auth", () => {
   const userLabel = ref(userId.value ? labelForUser(userId.value) : "");
 
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
-  /** Egor edits; Julia's account is view-only (the API enforces this too). */
-  const canEdit = computed(() => !isDemo.value && userId.value !== "julia");
-  /** Hide or disable every edit control: demo data, or a view-only household member. */
-  const readOnly = computed(() => isDemo.value || !canEdit.value);
+  /** Both household members can label, split, exclude, upload and sync. */
+  const canEdit = computed(() => !isDemo.value);
+  /** The budget (periods, recurring and one-time charges) is Egor's; the API enforces this too. */
+  const canEditBudget = computed(() => !isDemo.value && userId.value !== "julia");
+  /** Hide or disable every edit control: demo data only. */
+  const readOnly = computed(() => !canEdit.value);
 
   function syncUiUsers() {
     householdUsers.value = householdUsersForUi();
@@ -137,6 +139,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   return {
     canEdit,
+    canEditBudget,
     readOnly,
     token,
     isDemo,

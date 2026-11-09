@@ -12,7 +12,7 @@
     @dismiss="error = ''"
   />
   <template v-else-if="report || reportLoading || overviewPeriod">
-    <div v-if="auth.readOnly" class="demo-banner demo-banner-showcase">
+    <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
       <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
     </div>
     <header class="overview-page-header">

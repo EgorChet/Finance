@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" :class="{ 'app-layout--readonly': auth.readOnly && !auth.isDemo }">
+  <div class="app-layout">
     <header class="app-header">
       <div class="app-header-brand">
         <div class="app-portfolio-switch">
@@ -51,7 +51,6 @@
           <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
         </div>
       </div>
-      <span v-if="auth.readOnly && !auth.isDemo" class="readonly-badge" title="Only Egor can make changes">View only</span>
       <button
         type="button"
         class="app-account-btn"
@@ -360,12 +359,14 @@ import {
   fetchUploadJob,
   startCalSync,
   startUploadJob,
+  fetchAppConfig,
   syncStatements,
   type CalSyncJob,
   type UploadJobResponse,
 } from "@/shared/api/client";
 import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "@/shared/utils/calSyncSession";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
+import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
@@ -713,7 +714,25 @@ async function resumeUploadJobIfNeeded() {
   watchUploadJob(jobId);
 }
 
+/**
+ * Render's free tier wakes a sleeping service for outside traffic, but often not for the
+ * API's server-to-server pings. Nudge the analyzer from this browser while the server waits
+ * for it; failures are ignored because the server-side wake still runs.
+ */
+async function wakeAnalyzerFromHere() {
+  if (auth.isDemo) return;
+  try {
+    const config = await fetchAppConfig(auth.token || undefined);
+    if (config.analyzer_wake_from_browser && config.analyzer_wake_url) {
+      await wakeAnalyzerInBrowser(config.analyzer_wake_url);
+    }
+  } catch {
+    /* the server keeps trying on its own */
+  }
+}
+
 async function runUpload(file: File, statementType: "partial" | "final") {
+  void wakeAnalyzerFromHere();
   uploadRetry.value = { file, statementType };
   uploadToastMuted.value = false;
   showUploadToast(
@@ -807,6 +826,7 @@ async function resumeCalSyncIfNeeded() {
 
 async function syncCal() {
   closeNav();
+  void wakeAnalyzerFromHere();
   calBusy.value = true;
   uploadToastMuted.value = false;
   showUploadToast("syncing", "Starting Cal sync…");

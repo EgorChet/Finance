@@ -97,8 +97,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  if (!userCanEdit(details.userId) && !READ_METHODS.has(req.method)) {
-    res.status(403).json({ error: "View-only account: only Egor can make changes." });
+  if (!READ_METHODS.has(req.method) && isBudgetWrite(req.path) && !userCanEditBudget(details.userId)) {
+    res.status(403).json({ error: "Only Egor can change the budget." });
     return;
   }
   (req as AuthenticatedRequest).userId = details.userId;
@@ -107,9 +107,21 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/** Egor edits; Julia's login is view-only (reads everything, changes nothing). */
-export function userCanEdit(userId: HouseholdUserId): boolean {
+/** Both household members see everything and can label, split, exclude, upload and sync. */
+export function userCanEdit(_userId: HouseholdUserId): boolean {
+  return true;
+}
+
+/** The budget itself (budget periods, recurring and one-time charges) is Egor's. */
+export function userCanEditBudget(userId: HouseholdUserId): boolean {
   return userId === "egor";
+}
+
+/** Writes that change the budget. Paths are relative to the /api mount. */
+const BUDGET_WRITE_PATHS = [/^\/living-budget\/?$/, /^\/fixed-charges\/?$/];
+
+function isBudgetWrite(path: string): boolean {
+  return BUDGET_WRITE_PATHS.some((re) => re.test(path));
 }
 
 export function bearerToken(req: Request): string | undefined {

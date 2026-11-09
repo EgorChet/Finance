@@ -3753,3 +3753,9 @@ button.bx-row {
   margin-top: 0;
   padding-top: 0;
 }
+
+.bx-locked {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

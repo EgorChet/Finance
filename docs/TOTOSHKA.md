@@ -82,3 +82,22 @@ The response says how many were saved and why any were skipped:
 | `POST /api/review/hints` `{ transaction: { merchant_he, date, charge_amount } }` | Same hints the app shows for one merchant |
 | `POST /api/review/confirm` | Save a label directly, if Egor tells Totoshka what a merchant is |
 | `POST /api/adjustments/category` `{ transaction: { date, merchant_he, charge_amount }, category }` | Set the category of one charge, e.g. a BIT transfer Egor explains in chat |
+
+## Waking the analyzer before an upload or a Cal sync
+
+The analyzer runs on Render's free tier and sleeps after ~15 minutes without traffic. Render
+often does **not** wake it for server-to-server requests, so `GET /api/ingest/wake` (the API
+pinging the analyzer) can fail for minutes even though the analyzer is healthy. The web app
+avoids this by waking it from the browser; Totoshka should do the same:
+
+1. `GET https://finance-analyzer-jsoq.onrender.com/health` directly (no key needed). Retry every
+   10 seconds for up to 3 minutes until it returns `200 {"status":"ok"}`. A cold start usually
+   takes 20–60 seconds.
+2. Then start the work as usual — an upload (`POST /api/ingest`) or the hourly Cal sync
+   (`POST /api/cal/cron`). The analyzer stays awake for ~15 minutes after the last request.
+
+Do this before **every** upload and **every** Cal sync. The API also tries to wake the
+analyzer itself, but on the free tier that alone is not reliable.
+
+Only if step 1 never succeeds is the analyzer actually down; then it needs a Restart or Manual
+Deploy in the Render dashboard.

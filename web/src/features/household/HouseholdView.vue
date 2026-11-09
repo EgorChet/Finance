@@ -1,10 +1,11 @@
 <template>
   <div>
-    <div v-if="auth.readOnly" class="demo-banner">
+    <div v-if="auth.isDemo" class="demo-banner">
       Demo mode — household settings are read-only. Sign in to manage your budget and charges.
     </div>
     <header class="bx-page-head">
       <h2 class="page-title">Budget</h2>
+      <p v-if="!auth.isDemo && !auth.canEditBudget" class="bx-locked">🔒 Only Egor can change the budget</p>
       <p
         v-if="!loading && saveStatus"
         class="recurring-save-status"
@@ -28,7 +29,7 @@
         v-model:month-topups="livingBudgetMonthTopups"
         :configured-charges="charges"
         :reference-ym="referenceYm"
-        :readonly="auth.readOnly"
+        :readonly="budgetLocked"
         :disabled="saving"
         :persist="persistCharges"
         :save-error="status"
@@ -39,15 +40,15 @@
       <section id="recurring" class="bx-section">
         <div class="bx-list-head">
           <h3>Recurring bills <span v-if="activeMonthlyTotal > 0" class="bx-list-total">{{ formatIlsWhole(activeMonthlyTotal) }}/mo</span></h3>
-          <button v-if="!auth.readOnly" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('recurring')">+ Add</button>
+          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('recurring')">+ Add</button>
         </div>
         <div v-if="visibleRecurringGroups.length" class="bx-list">
           <template v-for="group in visibleRecurringGroups" :key="group.id">
             <component
-              :is="auth.readOnly && singleVisibleSegment(group) ? 'div' : 'button'"
-              :type="auth.readOnly && singleVisibleSegment(group) ? undefined : 'button'"
+              :is="budgetLocked && singleVisibleSegment(group) ? 'div' : 'button'"
+              :type="budgetLocked && singleVisibleSegment(group) ? undefined : 'button'"
               class="bx-row"
-              :disabled="!auth.readOnly && saving"
+              :disabled="!budgetLocked && saving"
               @click="onGroupTap(group)"
             >
               <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(group.category_en) }}</span>
@@ -65,13 +66,13 @@
             </component>
             <div v-if="!singleVisibleSegment(group) && expandedGroups.has(group.id)" class="bx-sub">
               <component
-                :is="auth.readOnly ? 'div' : 'button'"
+                :is="budgetLocked ? 'div' : 'button'"
                 v-for="(seg, segIndex) in [...visibleGroupSegments(group), ...(showEndedRecurring ? endedGroupSegments(group) : [])]"
                 :key="`${group.id}-${segIndex}`"
-                :type="auth.readOnly ? undefined : 'button'"
+                :type="budgetLocked ? undefined : 'button'"
                 class="bx-sub-row"
-                :disabled="!auth.readOnly && saving"
-                @click="!auth.readOnly && startEditCharge(seg)"
+                :disabled="!budgetLocked && saving"
+                @click="!budgetLocked && startEditCharge(seg)"
               >
                 <span>{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
                 <span class="bx-sub-right">
@@ -96,17 +97,17 @@
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
           <h3>One-time charges</h3>
-          <button v-if="!auth.readOnly" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('once')">+ Add</button>
+          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('once')">+ Add</button>
         </div>
         <div v-if="visibleOneTimeCharges.length || pastOneTimeCharges.length" class="bx-list">
           <component
-            :is="auth.readOnly ? 'div' : 'button'"
+            :is="budgetLocked ? 'div' : 'button'"
             v-for="charge in [...visibleOneTimeCharges, ...(showPastOneTime ? pastOneTimeCharges : [])]"
             :key="charge.id"
-            :type="auth.readOnly ? undefined : 'button'"
+            :type="budgetLocked ? undefined : 'button'"
             class="bx-row"
-            :disabled="!auth.readOnly && saving"
-            @click="!auth.readOnly && startEditCharge(charge)"
+            :disabled="!budgetLocked && saving"
+            @click="!budgetLocked && startEditCharge(charge)"
           >
             <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(charge.category_en) }}</span>
             <span class="bx-row-body">
@@ -142,7 +143,7 @@
 
       <!-- Edit an existing recurring period -->
       <SheetEditor
-        :open="!auth.readOnly && !!editingCharge && isMonthlyCharge(editingCharge)"
+        :open="!budgetLocked && !!editingCharge && isMonthlyCharge(editingCharge)"
         :title="editingGroup ? groupDisplayName(editingGroup) : 'Recurring bill'"
         :subtitle="editingIsNewSegment ? 'New period from a price change' : editingGroupSegmentCount > 1 ? `Billing period · ${editingGroup?.category_en ?? ''}` : `Monthly · ${editingGroup?.category_en ?? ''}`"
         :save-label="editingIsNewSegment ? 'Add period' : 'Save'"
@@ -185,7 +186,7 @@
 
       <!-- Edit an existing one-time charge -->
       <SheetEditor
-        :open="!auth.readOnly && !!editingCharge && isOneTimeCharge(editingCharge)"
+        :open="!budgetLocked && !!editingCharge && isOneTimeCharge(editingCharge)"
         title="Edit one-time charge"
         delete-label="Delete charge"
         deletable
@@ -219,7 +220,7 @@
 
       <!-- Add a recurring bill -->
       <SheetEditor
-        :open="!auth.readOnly && activeAddForm === 'recurring'"
+        :open="!budgetLocked && activeAddForm === 'recurring'"
         title="New recurring bill"
         save-label="Add bill"
         :busy="saving"
@@ -252,7 +253,7 @@
 
       <!-- Add a one-time charge -->
       <SheetEditor
-        :open="!auth.readOnly && activeAddForm === 'once'"
+        :open="!budgetLocked && activeAddForm === 'once'"
         title="New one-time charge"
         save-label="Add charge"
         :busy="saving"
@@ -341,6 +342,8 @@ import {
 
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
+/** Demo, or a household member who isn't allowed to change the budget. */
+const budgetLocked = computed(() => auth.readOnly || !auth.canEditBudget);
 const homeData = useHomeDataStore();
 const householdData = useHouseholdDataStore();
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
@@ -471,7 +474,7 @@ function editRecurringCharge(chargeId: string, fromMonth: string) {
     charges.value.find(
       (c) => c.id === chargeId && isMonthlyCharge(c) && c.from_month === fromMonth,
     ) ?? charges.value.find((c) => c.id === chargeId && isMonthlyCharge(c));
-  if (!charge || auth.readOnly) {
+  if (!charge || budgetLocked.value) {
     document.getElementById("recurring")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
@@ -549,7 +552,7 @@ function showSaveStatus(message: string, isError = false) {
 }
 
 async function persistCharges(): Promise<boolean> {
-  if (auth.readOnly) return true;
+  if (budgetLocked.value) return true;
   if (!isDirty()) return true;
 
   saveChain = saveChain.then(() => runPersist());
@@ -732,7 +735,7 @@ const expandedGroups = ref(new Set<string>());
 function onGroupTap(group: ChargeGroup) {
   const single = singleVisibleSegment(group);
   if (single) {
-    if (!auth.readOnly) startEditCharge(single);
+    if (!budgetLocked.value) startEditCharge(single);
     return;
   }
   const next = new Set(expandedGroups.value);
@@ -1084,13 +1087,13 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 }
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (!auth.readOnly && hasUnsavedChanges.value) {
+  if (!budgetLocked.value && hasUnsavedChanges.value) {
     e.preventDefault();
   }
 }
 
 onBeforeRouteLeave(async () => {
-  if (auth.readOnly || !isDirty()) return true;
+  if (budgetLocked.value || !isDirty()) return true;
   await persistCharges();
   return true;
 });

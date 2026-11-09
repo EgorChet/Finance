@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div v-if="auth.readOnly" class="demo-banner">Demo mode — rules are read-only.</div>
+    <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
     <h2 v-if="!embedded" class="page-title">Merchant mappings</h2>
     <AppLoader
       v-if="loading"
