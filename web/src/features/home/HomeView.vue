@@ -20,8 +20,7 @@
             compact
             :report="spendingReport"
             :living-budget="livingBudgetAmount"
-            :pace-tone="summaryPaceTone"
-            :pace-colored="showPaceHealth"
+            :status="budgetStatus"
             :cycle-day="cycleDay"
             :reference-date="refDate"
           />
@@ -61,7 +60,7 @@ import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
-import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
+import { computeBudgetStatus } from "@/features/spending/utils/budgetStatus";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
@@ -171,31 +170,15 @@ const showPaceHealth = computed(() => {
   return cycleNeedsOpenTab(start, cycleDay.value, months.value);
 });
 
-const summaryPaceTone = computed(() => {
+const budgetStatus = computed(() => {
   if (!showPaceHealth.value || !spendingReport.value) return null;
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
-  const partial = findPartialMonth(months.value, start, cycleDay.value);
-  const statementAt = partial?.saved_at ?? null;
-  const hasStatementSpend = everydaySpendingTotal(spendingReport.value.transactions) > 0;
-  return computeLivePaceHealth({
-    transactions: paceReport.value?.transactions ?? spendingReport.value.transactions,
+  return computeBudgetStatus({
+    livingBudget: livingBudgetAmount.value,
     cycleTransactions: spendingReport.value.transactions,
+    historyTransactions: paceReport.value?.transactions ?? [],
+    cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     cycleDay: cycleDay.value,
     referenceDate: refDate.value,
-    livingBudget: livingBudgetAmount.value,
-    livingBudgetBase: livingBudgetBaseAmount.value,
-    livingBudgetTopup: livingBudgetTopupExtra.value,
-    budgetSegments: livingBudgetSegments.value,
-    budgetMonthTopups: livingBudgetMonthTopups.value,
-    latestBillingDate: getLatestFinalBillingDate(months.value),
-    configuredCharges: configuredCharges.value,
-    cycleStart: start,
-    statementSavedAt: statementAt,
-    hasStatementSpend,
-    partialStatementActive: isPartialCycle.value,
-    cycleEverydaySpend: hasStatementSpend
-      ? everydaySpendingTotal(spendingReport.value.transactions)
-      : null,
   });
 });
 

@@ -44,7 +44,7 @@ import {
   loadCycleDay,
   loadPaceIncludeFixed,
 } from "./spending/paceSettings.js";
-import { computeLivePaceHealth } from "./spending/paceHealth.js";
+import { computeBudgetStatus, type BudgetStatus } from "./spending/budgetStatus.js";
 import type { PaceHealthTone } from "./spending/paceBudget.js";
 import { roundMoney } from "./utils/format.js";
 
@@ -87,6 +87,19 @@ export interface SpendingSummary {
   daily_budget_left: number | null;
   /** good = on pace, warn = over pace but covered by the rent cushion, bad = over pace. */
   pace: PaceHealthTone | null;
+  /** Live cycle: the same green / yellow / red status the app shows. */
+  status: {
+    tone: PaceHealthTone;
+    title: string;
+    message: string;
+    allowance_per_day: number;
+    planned_per_day: number;
+    everyday_budget: number;
+    everyday_spent: number;
+    everyday_left: number;
+    ahead_of_plan: number;
+    bills: { name: string; amount: number; charged: boolean }[];
+  } | null;
   transaction_count: number;
   manual_spend_used: number | null;
 }
@@ -157,30 +170,18 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     if (cycleStart) cycleEnd = getCycleRangeForStart(cycleStart, cycleDay).end;
   }
 
-  let pace: PaceHealthTone | null = null;
+  let status: BudgetStatus | null = null;
   if (openCycle && cap !== null) {
-    const start = cycleStart ?? cycleStartForDate(refDate, cycleDay);
-    const partial = findPartialMonth(months, start, cycleDay);
-    const hasStatementSpend = everydaySpendingTotal(report.transactions) > 0;
-    pace = computeLivePaceHealth({
-      transactions: input.paceReport?.transactions ?? report.transactions,
+    status = computeBudgetStatus({
+      livingBudget: cap,
       cycleTransactions: report.transactions,
+      historyTransactions: input.paceReport?.transactions ?? [],
+      cycleStart: cycleStart ?? cycleStartForDate(refDate, cycleDay),
       cycleDay,
       referenceDate: refDate,
-      livingBudget: cap,
-      livingBudgetBase: base,
-      livingBudgetTopup: topUp,
-      budgetSegments: segments,
-      budgetMonthTopups: topups,
-      latestBillingDate: latestFinalBillingDate(months),
-      configuredCharges: input.fixedCharges,
-      cycleStart: start,
-      statementSavedAt: partial?.saved_at ?? null,
-      hasStatementSpend,
-      partialStatementActive: partialSnapshot,
-      cycleEverydaySpend: hasStatementSpend ? everydaySpendingTotal(report.transactions) : null,
     });
   }
+  const pace: PaceHealthTone | null = status?.tone ?? null;
 
   const labels = mergeMonthsWithOpenCycles(months, cycleDay, refDate).map((m) =>
     formatOverviewMonthLabel(m, months, cycleDay, refDate),
@@ -204,8 +205,22 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     },
     money_left: left,
     over_budget: left !== null && left < 0,
-    daily_budget_left: left !== null && daysLeft ? dailyBudgetLeft(left, report.transactions, daysLeft) : null,
+    daily_budget_left: status ? status.allowanceToday : left !== null && daysLeft ? dailyBudgetLeft(left, report.transactions, daysLeft) : null,
     pace,
+    status: status
+      ? {
+          tone: status.tone,
+          title: status.title,
+          message: status.message,
+          allowance_per_day: status.allowanceToday,
+          planned_per_day: status.plannedDaily,
+          everyday_budget: status.everydayBudget,
+          everyday_spent: status.everydaySpent,
+          everyday_left: status.everydayLeft,
+          ahead_of_plan: status.aheadOfPlan,
+          bills: status.bills.map((b) => ({ name: b.label, amount: b.amount, charged: b.charged })),
+        }
+      : null,
     transaction_count: report.transaction_count,
     manual_spend_used: manualUsed,
   };

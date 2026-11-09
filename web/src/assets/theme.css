@@ -2062,3 +2062,154 @@ html.sheet-editor-open body {
   align-items: center;
   justify-content: center;
 }
+
+/* ---------- Budget status: one rule, one colour ---------- */
+
+.budget-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  --tone: var(--text);
+}
+.budget-status--good { background: var(--hero-good) !important; --tone: var(--success); }
+.budget-status--warn { background: var(--hero-warn) !important; --tone: var(--warning); }
+.budget-status--bad  { background: var(--hero-bad) !important;  --tone: var(--danger); }
+
+.budget-status__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+.budget-status__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  color: var(--tone);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.budget-status__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tone);
+}
+.budget-status__day {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.budget-status .metric-value {
+  color: var(--tone) !important;
+}
+.budget-status__unit {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+.budget-status__sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.budget-status__bar {
+  position: relative;
+  height: 8px;
+  margin: 0.95rem 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+.budget-status__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tone);
+  transition: width 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.budget-status__plan {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.75;
+}
+.budget-status__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.budget-status__msg {
+  margin: 0.7rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.budget-status__how {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+}
+.budget-status__how summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.budget-status__table {
+  width: 100%;
+  margin-top: 0.55rem;
+  border-collapse: collapse;
+}
+.budget-status__table td {
+  padding: 0.28rem 0;
+}
+.budget-status__table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.budget-status__bill td:first-child { color: var(--text-muted); }
+.budget-status__gap-row td { padding-top: 0.7rem; }
+.budget-status__total td {
+  border-top: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  font-weight: 700;
+}
+.budget-status__total.is-over td:last-child { color: var(--danger); }
+.budget-status__total.is-under td:last-child { color: var(--success); }
+.budget-status__tag {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  font-size: 0.7rem;
+}
+.budget-status__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.budget-status__note {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* "vs usual" card is information, not a verdict: no traffic-light colour. */
+.pace-verdict--info {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}

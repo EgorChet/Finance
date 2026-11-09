@@ -79,8 +79,7 @@
       :living-budget="monthLivingBudget"
       :hide-living-budget="selectedMonth === null"
       :retrospective="budgetRetrospective"
-      :pace-tone="summaryPaceTone"
-      :pace-colored="showPaceCard"
+      :status="budgetStatus"
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
@@ -103,7 +102,6 @@
       :living-budget-topup="livingBudgetTopupExtra"
       :living-budget-segments="livingBudgetSegments"
       :living-budget-month-topups="livingBudgetMonthTopups"
-      :pace-tone="summaryPaceTone"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -206,7 +204,7 @@ import {
   rollupCategoriesForDisplay,
 } from "@/shared/categories";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
-import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
+import { computeBudgetStatus } from "@/features/spending/utils/budgetStatus";
 import {
   buildCycleReport,
   cycleStartForDate,
@@ -469,27 +467,15 @@ const cycleEverydaySpend = computed(() => {
   return total > 0 ? total : null;
 });
 
-const summaryPaceTone = computed(() => {
+const budgetStatus = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
-  const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
-  return computeLivePaceHealth({
-    transactions: paceTransactions.value,
+  return computeBudgetStatus({
+    livingBudget: resolvedLivingBudget.value,
     cycleTransactions: report.value.transactions,
+    historyTransactions: paceTransactions.value,
+    cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     cycleDay: cycleDay.value,
     referenceDate: refDate.value,
-    livingBudget: resolvedLivingBudget.value,
-    livingBudgetBase: livingBudgetBaseAmount.value,
-    livingBudgetTopup: livingBudgetTopupExtra.value,
-    budgetSegments: livingBudgetSegments.value,
-    budgetMonthTopups: livingBudgetMonthTopups.value,
-    latestBillingDate: latestFinalBillingDate.value,
-    configuredCharges: configuredCharges.value,
-    cycleStart: start,
-    statementSavedAt: statementSavedAt.value,
-    hasStatementSpend,
-    partialStatementActive: partialStatementActive.value,
-    cycleEverydaySpend: cycleEverydaySpend.value,
   });
 });
 

@@ -2,7 +2,7 @@
   <div class="pace-card">
     <header class="pace-header">
       <div class="pace-header-title">
-        <h3 class="pace-card-title">Am I overspending?</h3>
+        <h3 class="pace-card-title">Compared with usual months</h3>
         <p class="pace-card-sub">{{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}</p>
       </div>
       <div class="pace-progress-wrap">
@@ -52,25 +52,9 @@
         <section class="pace-panel pace-panel-metrics">
           <div class="pace-simple">
             <template v-if="displaySpend > 0 && paceCompareAvg > 0">
-              <div class="pace-verdict" :class="injectionCushionVerdict ? 'pace-verdict--injection' : verdictToneClass">
-                <template v-if="injectionCushionVerdict">
-                  <p class="pace-verdict-injection-title">{{ injectionCushionVerdict.status }}</p>
-                  <p v-if="injectionCushionVerdict.spentVsUsual" class="pace-verdict-injection-line">
-                    Spent <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than usual at this point
-                  </p>
-                  <p v-else class="pace-verdict-injection-line">
-                    Spending <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> faster than usual at month-end
-                  </p>
-                  <p class="pace-verdict-injection-line">
-                    Money left is <span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than usual
-                  </p>
-                  <p class="pace-verdict-injection-reason">{{ injectionCushionVerdict.reason }}</p>
-                </template>
-                <template v-else>
-                  <p class="pace-verdict-status">{{ verdictStatus }}</p>
-                  <p class="pace-verdict-delta">{{ verdictDelta }}</p>
-                </template>
-                <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
+              <div class="pace-verdict pace-verdict--info">
+                <p class="pace-verdict-status">{{ verdictStatus }}</p>
+                <p class="pace-verdict-delta">{{ verdictDelta }}</p>
               </div>
 
               <details class="pace-simple-details">
@@ -178,9 +162,8 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
 import { formatIls, formatAboutIls } from "@/shared/utils/format";
 import { everydaySpendingComposition } from "@/features/household/utils/householdBudget";
-import { computePaceBudgetContext, paceBudgetNote, paceHealthTone, paceHealthVerdictClass, paceInjectionCushionVerdict } from "@/features/spending/utils/paceBudget";
+import { computePaceBudgetContext } from "@/features/spending/utils/paceBudget";
 import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "@/features/household/utils/livingBudget";
-import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
   billingCycleProgress,
@@ -220,8 +203,6 @@ const props = defineProps<{
   livingBudgetTopup?: number;
   livingBudgetSegments?: LivingBudgetSegment[];
   livingBudgetMonthTopups?: LivingBudgetMonthTopup[];
-  /** When set (e.g. from Overview), keeps verdict color in sync with the money-left card. */
-  paceTone?: PaceHealthTone | null;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -364,21 +345,6 @@ const budgetContext = computed(() => {
 
 const showHistoricalBudgetCompare = computed(() => budgetContext.value?.lastCycleMoneyLeftAtDay != null);
 
-const injectionCushionVerdict = computed(() =>
-  budgetContext.value ? paceInjectionCushionVerdict(budgetContext.value) : null,
-);
-
-const paceTone = computed(
-  () =>
-    props.paceTone ??
-    paceHealthTone(budgetContext.value, projectedVsUsualDelta.value, pace.value?.vsAvgDelta ?? 0),
-);
-
-const budgetNote = computed(() => {
-  if (!budgetContext.value || injectionCushionVerdict.value) return "";
-  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
-});
-
 const moneyLeftVsUsualTableClass = computed(() => {
   const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
   if (d > 0) return "pace-delta-good";
@@ -393,52 +359,22 @@ const projectedDeltaClass = computed(() => {
   return "";
 });
 
-const overBudgetNow = computed(() => (budgetContext.value?.moneyLeft ?? 0) < 0);
-
+// Information only: how this cycle compares with usual months by the same day.
+// Whether you're OK is the budget status card's job, so no colour here.
 const verdictStatus = computed(() => {
-  if (overBudgetNow.value) return "Over budget";
-  if (injectionCushionVerdict.value) return injectionCushionVerdict.value.status;
-  if (!projectionReliable.value) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "Early in the cycle";
-    if (nowGap > 0) return "Above usual so far";
-    return "Below usual so far";
-  }
-  if (paceTone.value === "bad" || paceTone.value === "warn") return "Overspending";
-
-  const monthGap = projectedVsUsualDelta.value;
-  if (Math.abs(monthGap) < 50) return "Doing fine";
-  if (monthGap > 0) return "Overspending";
-  return "Doing fine";
+  const nowGap = pace.value?.vsAvgDelta ?? 0;
+  if (Math.abs(nowGap) < 100) return "About the same as usual";
+  return nowGap > 0 ? "More than usual so far" : "Less than usual so far";
 });
 
 const verdictDelta = computed(() => {
-  if (overBudgetNow.value && budgetContext.value) {
-    const over = `${formatIls(Math.abs(budgetContext.value.moneyLeft))} over this cycle's budget`;
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    return nowGap > 50 ? `${over} · ~${formatAboutIls(nowGap)} above usual so far` : over;
-  }
-  if (injectionCushionVerdict.value) return "";
-
-  if (!projectionReliable.value) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "Not enough of the cycle has passed for a month-end forecast";
-    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
-    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
-  }
-
-  const monthGap = projectedVsUsualDelta.value;
-  if (Math.abs(monthGap) < 50) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "About the same as your usual month";
-    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
-    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
-  }
-  if (monthGap > 0) return `~${formatAboutIls(monthGap)} above your usual month`;
-  return `~${formatAboutIls(Math.abs(monthGap))} below your usual month`;
+  const nowGap = pace.value?.vsAvgDelta ?? 0;
+  const day = cycleInfo.value.dayIndex;
+  const usual = `by day ${day} of a usual month (${formatIls(paceCompareAvg.value)})`;
+  if (Math.abs(nowGap) < 100) return `You've spent about what you usually spend ${usual}.`;
+  if (nowGap > 0) return `~${formatAboutIls(nowGap)} more than ${usual}.`;
+  return `~${formatAboutIls(Math.abs(nowGap))} less than ${usual}.`;
 });
-
-const verdictToneClass = computed(() => paceHealthVerdictClass(paceTone.value));
 
 function formatMoneyLeft(amount: number): string {
   if (amount < 0) return `${formatIls(Math.abs(amount))} over`;

@@ -1,7 +1,14 @@
 <template>
   <div class="summary-metrics">
     <div class="metric-grid">
-      <div v-if="!hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
+      <BudgetStatusCard
+        v-if="!hideLivingBudget && status"
+        :status="status"
+        :period-label="livingBudgetPeriodLabel"
+        :everyday-clickable="everydayBreakdownEnabled"
+        @everyday="openEverydayBreakdown"
+      />
+      <div v-else-if="!hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
           <div v-if="dailyBudgetDisplay" class="metric-budget-top">
             <div class="metric-budget-main">
@@ -181,8 +188,8 @@ import {
   monthlyBillsTotal,
   moneyLeft,
 } from "@/features/household/utils/householdBudget";
-import { paceHealthBudgetClass } from "@/features/spending/utils/paceBudget";
-import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
+import BudgetStatusCard from "@/features/spending/components/BudgetStatusCard.vue";
+import type { BudgetStatus } from "@/features/spending/utils/budgetStatus";
 import { getBillingCycle } from "@/features/spending/utils/pace";
 
 const props = withDefaults(
@@ -192,10 +199,8 @@ const props = withDefaults(
     hideLivingBudget?: boolean;
     retrospective?: boolean;
     compact?: boolean;
-    /** Live-cycle pace tone — green / yellow / red money-left card. */
-    paceTone?: PaceHealthTone | null;
-    /** When true, use pace tone instead of raw budget-left coloring. */
-    paceColored?: boolean;
+    /** Live cycle: the green / yellow / red status replaces the plain money-left card. */
+    status?: BudgetStatus | null;
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
@@ -203,8 +208,7 @@ const props = withDefaults(
   {
     retrospective: false,
     compact: false,
-    paceTone: null,
-    paceColored: false,
+    status: null,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
   },
@@ -276,9 +280,6 @@ const budgetFormula = computed(() => {
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
-  if (props.paceColored) {
-    return props.paceTone ? paceHealthBudgetClass(props.paceTone) : "";
-  }
   if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";
