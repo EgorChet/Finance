@@ -1,3 +1,4 @@
+import { buildLabelHints } from "../services/labelHints.js";
 import { Router } from "express";
 import {
   DEMO_AS_OF,
@@ -61,7 +62,7 @@ router.get("/months", (_req, res) => {
 
 router.get("/home-data", (req, res) => {
   const budget = demoLivingBudget();
-  const paceMonths = Math.max(1, Number(req.query.pace_months ?? 4));
+  const paceMonths = Math.max(1, Number(req.query.pace_months ?? 7));
   const catalog = demoMonthCatalog().sort((a, b) => b.key.localeCompare(a.key));
   const paceKeys = catalog.slice(0, paceMonths).map((m) => m.key);
   const scopedReports = Object.fromEntries(
@@ -82,7 +83,7 @@ router.get("/home-data", (req, res) => {
   res.json({
     months: catalog,
     summary: demoSummaryRows(),
-    report,
+    report: req.query.lean === "1" ? null : report,
     scoped_reports: scopedReports,
     pace_keys: paceKeys,
     pace_months: paceKeys.length,
@@ -196,6 +197,17 @@ router.delete("/statements/:key", (_req, res) => {
 
 router.put("/rules", (_req, res) => {
   res.status(403).json({ error: "Saving rules disabled in demo mode" });
+});
+
+/** Demo: same hints from the sample statements, with no Totoshka guesses. */
+router.post("/review/hints", async (req, res) => {
+  const tx = (req.body as { transaction?: { merchant_he: string; date: string; charge_amount: number; category_en?: string } }).transaction;
+  if (!tx?.merchant_he) {
+    res.status(400).json({ error: "transaction required" });
+    return;
+  }
+  const all = demoMonthCatalog().flatMap((m) => getDemoReport(m.key).transactions);
+  res.json(await buildLabelHints(all, tx, { suggestions: {} }));
 });
 
 router.post("/review/confirm", (_req, res) => {

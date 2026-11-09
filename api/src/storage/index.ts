@@ -44,3 +44,5 @@ export const readUploadJobs = store.readUploadJobs;
 export const writeUploadJobs = store.writeUploadJobs;
 export const readPaceSettings = store.readPaceSettings;
 export const writePaceSettings = store.writePaceSettings;
+export const readLabelSuggestions = store.readLabelSuggestions;
+export const writeLabelSuggestions = store.writeLabelSuggestions;

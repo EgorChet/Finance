@@ -1,3 +1,4 @@
+import { combineScopedReports } from "@core/spending/combineScoped";
 import type {
   ExcludedItem,
   MerchantRules,
@@ -96,8 +97,8 @@ export async function fetchMonths(demo: boolean, token?: string) {
 }
 
 export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 4) {
-  const q = paceMonths > 0 ? `?pace_months=${paceMonths}` : "";
-  return get<{
+  const q = `?lean=1${paceMonths > 0 ? `&pace_months=${paceMonths}` : ""}`;
+  const bundle = await get<{
     months: MonthItem[];
     summary: { month: string; billing_date: string; total: number; transactions: number }[];
     report: SpendingReport | null;
@@ -112,6 +113,10 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
     };
     demo_as_of?: string;
   }>(`${prefix(demo)}/home-data${q}`, token);
+  if (!bundle.report && bundle.scoped_reports) {
+    bundle.report = combineScopedReports(Object.values(bundle.scoped_reports));
+  }
+  return bundle;
 }
 
 /** Remove one uploaded statement (billing key YYYY-MM-DD or legacy bucket like `unknown`). */
@@ -382,6 +387,38 @@ export async function fetchReviewSuggestion(hebrew: string, token?: string): Pro
   return data.english || "";
 }
 
+export interface LabelHints {
+  translation: string;
+  bank_category: string | null;
+  bank_category_he: string | null;
+  same_day: { merchant: string; category: string; amount: number }[];
+  history: { date: string; amount: number }[];
+  /** Totoshka's guess, when it has made one. */
+  ai: { english_name: string; category: string; confidence: "low" | "medium" | "high"; reason: string; at?: string } | null;
+  ai_status: "ok" | "waiting";
+}
+
+/** Translation, same-day charges, history and Claude's guess for one merchant in Review. */
+export async function fetchLabelHints(
+  demo: boolean,
+  transaction: Pick<Transaction, "merchant_he" | "date" | "charge_amount" | "category_he" | "category_en">,
+  token?: string,
+) {
+  return post<LabelHints>(
+    `${prefix(demo)}/review/hints`,
+    {
+      transaction: {
+        merchant_he: transaction.merchant_he,
+        date: transaction.date,
+        charge_amount: transaction.charge_amount,
+        category_he: transaction.category_he,
+        category_en: transaction.category_en,
+      },
+    },
+    token,
+  );
+}
+
 export async function confirmReview(
   body: { hebrew: string; english: string; category?: string; mark_all_merchant?: boolean; keys?: string[] },
   token?: string,
@@ -422,6 +459,19 @@ export async function upsertAdjustment(
   return post<{ ok: boolean; entry: import("@/shared/types").AdjustmentItem }>(
     `${prefix(false)}/adjustments`,
     body,
+    token,
+  );
+}
+
+/** Category for one charge (e.g. what a BIT transfer was for); null restores the merchant's category. */
+export async function setChargeCategory(
+  transaction: Pick<Transaction, "date" | "merchant_he" | "charge_amount">,
+  category: string | null,
+  token?: string,
+) {
+  return post<{ ok: boolean; key: string; category: string | null }>(
+    `${prefix(false)}/adjustments/category`,
+    { transaction: { date: transaction.date, merchant_he: transaction.merchant_he, charge_amount: transaction.charge_amount }, category },
     token,
   );
 }

@@ -79,8 +79,7 @@
       :living-budget="monthLivingBudget"
       :hide-living-budget="selectedMonth === null"
       :retrospective="budgetRetrospective"
-      :pace-tone="summaryPaceTone"
-      :pace-colored="showPaceCard"
+      :plan="summaryPlan"
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
@@ -99,11 +98,7 @@
       :cycle-day="cycleDay"
       :cycle-start="activeCycleStart"
       :living-budget="resolvedLivingBudget"
-      :living-budget-base="livingBudgetBaseAmount"
-      :living-budget-topup="livingBudgetTopupExtra"
-      :living-budget-segments="livingBudgetSegments"
-      :living-budget-month-topups="livingBudgetMonthTopups"
-      :pace-tone="summaryPaceTone"
+      :plan="summaryPlan"
       @settings-change="onPaceSettingsChange"
     />
     <PendingCycleCard
@@ -136,6 +131,7 @@
       </section>
     </template>
     <template v-if="showCategoryExplorer">
+    <BitSortCard v-if="!auth.readOnly" :transactions="report.transactions" />
     <CategoryAccordion
       v-model:expanded-keys="expandedCategoryKeys"
       :categories="displayCategories"
@@ -146,11 +142,8 @@
       :adjustable="!auth.readOnly"
       :excluding-key="excludingKey"
       :adjusting-key="adjustingKey"
-      :show-compare="partialStatementActive"
-      :all-transactions="paceTransactions"
-      :cycle-day="cycleDay"
-      :cycle-start="activeCycleStart ?? undefined"
-      :reference-date="refDate"
+      :compare-context="categoryCompareContext"
+      :current-label="categoryCurrentLabel"
       @exclude="excludeTransaction"
       @adjust="adjustTransaction"
     />
@@ -184,10 +177,11 @@
 
 <script setup lang="ts">
 import { friendlyError } from "@/shared/utils/friendlyError";
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import CategoryAccordion from "@/features/spending/components/CategoryAccordion.vue";
+import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import TransactionPeriodPicker from "@/shared/components/TransactionPeriodPicker.vue";
 import AppLoader from "@/shared/components/AppLoader.vue";
@@ -206,7 +200,12 @@ import {
   rollupCategoriesForDisplay,
 } from "@/shared/categories";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
-import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
+import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
+import {
+  buildCategoryCompareContext,
+  buildStatementCompareContext,
+  type CategoryCompareContext,
+} from "@/features/spending/utils/categoryCompare";
 import {
   buildCycleReport,
   cycleStartForDate,
@@ -239,10 +238,8 @@ import {
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
   cycleMonthYmForOverview,
-  livingBudgetBaseForMonth,
   livingBudgetSegmentForMonth,
   monthRangeLabel,
-  monthTopupExtraForMonth,
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
@@ -417,13 +414,7 @@ const livingBudgetCycleYm = computed(() =>
   cycleMonthYmForOverview(selectedMonth.value, report.value, cycleDay.value),
 );
 
-const livingBudgetTopupExtra = computed(() =>
-  monthTopupExtraForMonth(livingBudgetCycleYm.value, livingBudgetMonthTopups.value),
-);
 
-const livingBudgetBaseAmount = computed(() =>
-  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value, configuredCharges.value),
-);
 
 const activeLivingBudgetSegment = computed(() =>
   livingBudgetSegmentForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value),
@@ -469,27 +460,15 @@ const cycleEverydaySpend = computed(() => {
   return total > 0 ? total : null;
 });
 
-const summaryPaceTone = computed(() => {
+const summaryPlan = computed(() => {
   if (!showPaceCard.value || !report.value) return null;
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
-  const hasStatementSpend = cycleEverydaySpend.value != null && cycleEverydaySpend.value > 0;
-  return computeLivePaceHealth({
-    transactions: paceTransactions.value,
+  return computeLiveBudgetPlan({
     cycleTransactions: report.value.transactions,
     cycleDay: cycleDay.value,
+    cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     referenceDate: refDate.value,
     livingBudget: resolvedLivingBudget.value,
-    livingBudgetBase: livingBudgetBaseAmount.value,
-    livingBudgetTopup: livingBudgetTopupExtra.value,
-    budgetSegments: livingBudgetSegments.value,
-    budgetMonthTopups: livingBudgetMonthTopups.value,
-    latestBillingDate: latestFinalBillingDate.value,
-    configuredCharges: configuredCharges.value,
-    cycleStart: start,
-    statementSavedAt: statementSavedAt.value,
-    hasStatementSpend,
-    partialStatementActive: partialStatementActive.value,
-    cycleEverydaySpend: cycleEverydaySpend.value,
+    history: paceTransactions.value,
   });
 });
 
@@ -523,6 +502,73 @@ function seedMonthReportCache(scopedReports?: Record<string, SpendingReport>) {
     monthReportCache.value.set(key, scoped);
   }
 }
+
+/** Closed statement month: the up-to-3 final statements before it, most recent first. */
+const previousStatementMonths = computed((): MonthItem[] => {
+  const key = selectedMonth.value;
+  if (!key || isCycleMonthKey(key)) return [];
+  const month = months.value.find((m) => m.key === key);
+  if (!month || month.partial) return [];
+  return months.value
+    .filter((m) => !m.partial && m.billing_date < month.billing_date)
+    .sort((a, b) => b.billing_date.localeCompare(a.billing_date))
+    .slice(0, 3);
+});
+
+const statementCompare = ref<{ key: string; ctx: CategoryCompareContext | null } | null>(null);
+
+watch(
+  previousStatementMonths,
+  async (prev) => {
+    const key = selectedMonth.value;
+    if (!key || !prev.length) {
+      statementCompare.value = null;
+      return;
+    }
+    if (statementCompare.value?.key === key) return;
+    const demo = auth.isDemo;
+    const token = auth.token || undefined;
+    try {
+      const reports = await Promise.all(
+        prev.map(async (m) => {
+          const cached = cachedMonthReport(m.key);
+          if (cached) return cached;
+          const r = await fetchReport(demo, m.key, token);
+          monthReportCache.value.set(m.key, r);
+          return r;
+        }),
+      );
+      if (selectedMonth.value !== key) return;
+      statementCompare.value = {
+        key,
+        ctx: buildStatementCompareContext(
+          prev.map((m, i) => ({ label: m.label, txs: reports[i].transactions })),
+        ),
+      };
+    } catch {
+      if (selectedMonth.value === key) statementCompare.value = { key, ctx: null };
+    }
+  },
+  { immediate: true },
+);
+
+/** Open cycle: vs previous cycles by the same day. Closed month: vs previous statements. */
+const categoryCompareContext = computed((): CategoryCompareContext | null => {
+  if (showPaceCard.value) {
+    return buildCategoryCompareContext(paceTransactions.value, {
+      cycleDay: cycleDay.value,
+      cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
+      referenceDate: refDate.value,
+    });
+  }
+  const sc = statementCompare.value;
+  return sc && sc.key === selectedMonth.value ? sc.ctx : null;
+});
+
+const categoryCurrentLabel = computed(() => {
+  if (showPaceCard.value) return "This cycle";
+  return displayMonths.value.find((m) => m.key === selectedMonth.value)?.label ?? "This month";
+});
 
 function cachedMonthReport(key: string): SpendingReport | null {
   return monthReportCache.value.get(key) ?? null;

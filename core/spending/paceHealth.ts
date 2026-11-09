@@ -1,136 +1,29 @@
 import type { Transaction } from "../types.js";
-import type { ConfiguredCharge } from "../household/fixedCharges.js";
-import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "../household/livingBudget.js";
-import {
-  billingCycleProgress,
-  computePace,
-  cycleStartForDate,
-  effectiveManualCycleSpend,
-  loadPaceAvgCycles,
-  type PaceAvgCycles,
-} from "./pace.js";
-import {
-  computePaceBudgetContext,
-  paceHealthTone,
-  type PaceHealthTone,
-} from "./paceBudget.js";
+import { computeBudgetPlan, type BudgetPlan, type BudgetPlanTone } from "./budgetPlan.js";
 
-export interface PaceHealthOptions {
-  transactions: Transaction[];
-  cycleTransactions: Transaction[];
-  cycleDay: number;
-  referenceDate: Date;
-  livingBudget: number | null;
-  livingBudgetBase?: number | null;
-  livingBudgetTopup?: number;
-  budgetSegments?: LivingBudgetSegment[];
-  budgetMonthTopups?: LivingBudgetMonthTopup[];
-  latestBillingDate?: string | null;
-  configuredCharges?: ConfiguredCharge[];
-  manualSpend?: number | null;
-  cycleEverydaySpend?: number | null;
-  cycleStart?: string;
-  /** Match PaceCard — defaults to 3 (same as loadPaceAvgCycles). */
-  avgCycles?: PaceAvgCycles;
-}
+export type PaceHealthTone = BudgetPlanTone;
 
-export function computePaceHealth(options: PaceHealthOptions): PaceHealthTone | null {
-  const { livingBudget, transactions, cycleTransactions, cycleDay, referenceDate } = options;
-  if (livingBudget == null || livingBudget <= 0) return null;
-
-  const norm = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
-  const cycleStart = options.cycleStart ?? cycleStartForDate(norm, cycleDay);
-  const progress = billingCycleProgress(cycleStart, cycleDay, referenceDate);
-
-  const statementOverride =
-    options.cycleEverydaySpend != null && options.cycleEverydaySpend > 0
-      ? options.cycleEverydaySpend
-      : undefined;
-
-  const pace = computePace(transactions, {
-    cycleDay,
-    includeFixed: false,
-    latestBillingDate: options.latestBillingDate ?? null,
-    manualSpend: options.manualSpend ?? null,
-    avgCycles: options.avgCycles ?? 3,
-    configuredCharges: options.configuredCharges ?? [],
-    cycleTransactions,
-    statementSpendOverride: statementOverride,
-    statementVariableOverride: statementOverride,
-    today: referenceDate,
-    cycleStart,
-  });
-
-  if (!pace || pace.historicalAvgAtDay <= 0 || pace.currentSpend <= 0) return null;
-
-  const ctx = computePaceBudgetContext(
-    cycleTransactions,
-    livingBudget,
-    pace.projectedTotal,
-    pace.projectedAtUsualPaceForecast,
-    {
-      baseBudget: options.livingBudgetBase,
-      topupExtra: options.livingBudgetTopup ?? 0,
-      allTransactions: transactions,
-      cycleStart,
-      cycleDay,
-      dayIndex: progress.dayIndex,
-      budgetSegments: options.budgetSegments ?? [],
-      budgetMonthTopups: options.budgetMonthTopups ?? [],
-      configuredCharges: options.configuredCharges ?? [],
-      avgCycles: options.avgCycles ?? 3,
-    },
-  );
-
-  return paceHealthTone(ctx, pace.projectedVsUsualDelta, pace.vsAvgDelta ?? 0);
-}
-
-/** Single entry point for live-cycle pace coloring — keeps Home, Overview, and PaceCard in sync. */
+/** Single entry point for live-cycle coloring — keeps Home, Overview, PaceCard and the API in sync. */
 export interface LivePaceHealthInput {
-  transactions: Transaction[];
+  /** Transactions of the open cycle (incl. merged fixed charges / manual entry) — same list as Money left. */
   cycleTransactions: Transaction[];
   cycleDay: number;
+  cycleStart: string;
   referenceDate: Date;
   livingBudget: number | null;
-  livingBudgetBase?: number | null;
-  livingBudgetTopup?: number;
-  budgetSegments?: LivingBudgetSegment[];
-  budgetMonthTopups?: LivingBudgetMonthTopup[];
-  latestBillingDate?: string | null;
-  configuredCharges?: ConfiguredCharge[];
-  cycleStart: string;
-  statementSavedAt?: string | null;
-  hasStatementSpend: boolean;
-  partialStatementActive: boolean;
-  cycleEverydaySpend?: number | null;
-  avgCycles?: PaceAvgCycles;
+  /** Past transactions — the plan learns your usual spending curve from them. */
+  history?: Transaction[];
+}
+
+export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | null {
+  return computeBudgetPlan(input.cycleTransactions, input.livingBudget, {
+    cycleStart: input.cycleStart,
+    cycleDay: input.cycleDay,
+    referenceDate: input.referenceDate,
+    history: input.history,
+  });
 }
 
 export function computeLivePaceHealth(input: LivePaceHealthInput): PaceHealthTone | null {
-  if (input.livingBudget == null || input.livingBudget <= 0) return null;
-
-  return computePaceHealth({
-    transactions: input.transactions,
-    cycleTransactions: input.cycleTransactions,
-    cycleDay: input.cycleDay,
-    referenceDate: input.referenceDate,
-    livingBudget: input.livingBudget,
-    livingBudgetBase: input.livingBudgetBase,
-    livingBudgetTopup: input.livingBudgetTopup,
-    budgetSegments: input.budgetSegments,
-    budgetMonthTopups: input.budgetMonthTopups,
-    latestBillingDate: input.latestBillingDate,
-    configuredCharges: input.configuredCharges,
-    avgCycles: input.avgCycles ?? loadPaceAvgCycles(),
-    cycleStart: input.cycleStart,
-    cycleEverydaySpend: input.cycleEverydaySpend,
-    manualSpend: input.partialStatementActive
-      ? null
-      : effectiveManualCycleSpend(input.cycleStart, {
-          statementSavedAt: input.statementSavedAt ?? null,
-          hasStatementSpend: input.hasStatementSpend,
-        }),
-  });
+  return computeLiveBudgetPlan(input)?.tone ?? null;
 }
-
-export type { PaceHealthTone };

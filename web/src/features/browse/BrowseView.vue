@@ -1,109 +1,68 @@
 <template>
-  <div>
+  <div class="find">
     <div v-if="auth.readOnly" class="demo-banner">Demo mode — sample transactions only.</div>
-    <h2 class="page-title">Browse transactions</h2>
-    <p class="page-lead">
-      Search all charges by merchant, category, amount, or billing month.
-    </p>
+    <h2 class="page-title">Transactions</h2>
 
-    <AppLoader
-      v-if="loading"
-      title="Loading transactions"
-      subtitle="Fetching your statement history"
-    />
+    <AppLoader v-if="loading" title="Loading transactions" subtitle="Fetching your statement history" />
     <template v-else>
       <p v-if="error" class="browse-error">{{ error }}</p>
       <template v-else>
-        <div class="browse-filters">
-          <input
-            v-model="searchQuery"
-            class="input browse-search"
-            type="search"
-            placeholder="Merchant — e.g. Arc Cafe, OpenAI"
-            autocomplete="off"
-          />
-
-          <div class="browse-month-recurring-row">
-            <label class="field-group browse-field browse-month-field">
-              <span class="field-label">Month</span>
-              <select v-model="selectedMonth" class="input select-field browse-month-select">
-                <option value="">All months</option>
-                <option v-for="m in months" :key="m.key" :value="m.key">{{ m.label }}</option>
-              </select>
-            </label>
-            <label class="browse-recurring-toggle">
-              <ToggleSwitch v-model="includeRecurring" />
-              <span class="browse-recurring-toggle-text">Recurring</span>
-            </label>
-          </div>
-
-          <div class="browse-filter-row browse-filter-row--single">
-            <label class="field-group browse-field">
-              <span class="field-label">Category</span>
-              <CategorySelect
-                v-model="categoryFilter"
-                :options="categoryOptions"
-                allow-empty
-                empty-label="Any category"
-              />
-            </label>
-          </div>
-
-          <div class="browse-amount">
-            <span class="field-label">Amount (₪)</span>
-            <div class="browse-amount-chips">
-              <button
-                v-for="chip in amountPresets"
-                :key="chip.label"
-                type="button"
-                class="browse-chip"
-                :class="{ active: activePreset === chip.id }"
-                @click="applyPreset(chip)"
-              >
-                {{ chip.label }}
-              </button>
-            </div>
-            <div class="browse-amount-inputs">
-              <input
-                :value="minAmount"
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="Min"
-                inputmode="decimal"
-                @input="minAmount = ($event.target as HTMLInputElement).value"
-              />
-              <span class="browse-amount-sep">–</span>
-              <input
-                :value="maxAmount"
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="Max"
-                inputmode="decimal"
-                @input="maxAmount = ($event.target as HTMLInputElement).value"
-              />
-            </div>
-          </div>
-
-          <div v-if="hasActiveFilters" class="browse-filter-actions">
-            <button type="button" class="btn btn-ghost browse-clear" @click="clearFilters">Clear filters</button>
+        <div class="find-top">
+          <label class="find-search">
+            <span class="find-search-icon" aria-hidden="true">⌕</span>
+            <input
+              v-model="searchQuery"
+              type="search"
+              placeholder="Search merchants"
+              autocomplete="off"
+              enterkeyhint="search"
+              aria-label="Search merchants"
+            />
+          </label>
+          <div class="find-chips" role="toolbar" aria-label="Filters">
+            <button type="button" class="find-chip" :class="{ 'find-chip--on': !!selectedMonth }" @click="sheet = 'month'">
+              {{ monthChipLabel }} <span aria-hidden="true">▾</span>
+            </button>
+            <button type="button" class="find-chip" :class="{ 'find-chip--on': !!categoryFilter }" @click="sheet = 'category'">
+              <template v-if="categoryFilter">{{ categoryIcon(categoryFilter) }} {{ categoryFilter }}</template>
+              <template v-else>Category</template>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <button type="button" class="find-chip" :class="{ 'find-chip--on': amountActive }" @click="openAmount">
+              {{ amountChipLabel }} <span aria-hidden="true">▾</span>
+            </button>
+            <button
+              type="button"
+              class="find-chip"
+              :class="{ 'find-chip--on': includeRecurring }"
+              :aria-pressed="includeRecurring"
+              @click="includeRecurring = !includeRecurring"
+            >
+              {{ includeRecurring ? "✓ " : "" }}Fixed bills
+            </button>
+            <button v-if="hasActiveFilters" type="button" class="find-chip find-chip--clear" @click="clearFilters">
+              Clear
+            </button>
           </div>
         </div>
 
-        <p v-if="filteredTransactions.length" class="browse-summary">
-          {{ filteredTransactions.length }} charge{{ filteredTransactions.length === 1 ? "" : "s" }}
-          · {{ formatIls(filteredTotal) }}
-        </p>
+        <section v-if="allTransactions.length" class="find-summary">
+          <p class="find-summary-label">{{ summaryLabel }}</p>
+          <p class="find-summary-total">{{ formatIlsWhole(filteredTotal) }}</p>
+          <p class="find-summary-meta">
+            {{ filteredTransactions.length.toLocaleString() }} charge{{ filteredTransactions.length === 1 ? "" : "s" }}
+            <template v-if="filteredTransactions.length > 1"> · avg {{ formatIlsWhole(filteredTotal / filteredTransactions.length) }}</template>
+          </p>
+        </section>
 
-        <p v-if="!allTransactions.length" class="browse-empty">
-          No transactions yet. Upload a statement from the menu.
-        </p>
-        <p v-else-if="!filteredTransactions.length" class="browse-empty">No charges match your filters.</p>
+        <p v-if="!allTransactions.length" class="browse-empty">No transactions yet. Upload a statement from the menu.</p>
+        <div v-else-if="!filteredTransactions.length" class="find-empty">
+          <p>No charges match.</p>
+          <button type="button" class="btn" @click="clearFilters">Clear filters</button>
+        </div>
         <TransactionList
           v-else
+          class="find-list"
           :transactions="filteredTransactions"
           title=""
           show-category
@@ -117,16 +76,63 @@
         />
       </template>
     </template>
+
+    <BottomSheet :open="sheet === 'month'" title="Month" @close="sheet = null">
+      <div class="find-options">
+        <button type="button" class="find-option" :class="{ 'find-option--on': !selectedMonth }" @click="pickMonth('')">
+          All months
+        </button>
+        <button
+          v-for="m in months"
+          :key="m.key"
+          type="button"
+          class="find-option"
+          :class="{ 'find-option--on': selectedMonth === m.key }"
+          @click="pickMonth(m.key)"
+        >
+          {{ m.label }}
+        </button>
+      </div>
+    </BottomSheet>
+
+    <BottomSheet :open="sheet === 'category'" title="Category" @close="sheet = null">
+      <CategoryGrid v-model="categoryFilter" :options="categoryOptions" empty-label="Any" @pick="sheet = null" />
+    </BottomSheet>
+
+    <BottomSheet :open="sheet === 'amount'" title="Amount" @close="sheet = null">
+      <div class="find-presets">
+        <button
+          v-for="chip in amountPresets"
+          :key="chip.id"
+          type="button"
+          class="find-chip"
+          :class="{ 'find-chip--on': draftPreset === chip.id }"
+          @click="applyDraftPreset(chip)"
+        >
+          {{ chip.label }}
+        </button>
+      </div>
+      <div class="find-range">
+        <input v-model="draftMin" class="input" type="number" min="0" inputmode="decimal" placeholder="Min ₪" aria-label="Minimum amount" />
+        <span aria-hidden="true">–</span>
+        <input v-model="draftMax" class="input" type="number" min="0" inputmode="decimal" placeholder="Max ₪" aria-label="Maximum amount" />
+      </div>
+      <template #footer>
+        <button type="button" class="btn" @click="resetAmount">Any amount</button>
+        <button type="button" class="btn btn-primary" @click="applyAmount">Show results</button>
+      </template>
+    </BottomSheet>
   </div>
 </template>
 
 <script setup lang="ts">
 import { friendlyError } from "@/shared/utils/friendlyError";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
-import CategorySelect from "@/shared/components/CategorySelect.vue";
-import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
+import BottomSheet from "@/shared/components/BottomSheet.vue";
+import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { useHomeDataStore } from "@/features/home/stores/homeData";
@@ -134,7 +140,8 @@ import { confirm } from "@/shared/composables/useConfirm";
 import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, Transaction } from "@/shared/types";
 import { CATEGORY_PICKLIST, rollupCategory } from "@/shared/categories";
-import { formatIls } from "@/shared/utils/format";
+import { formatIls, formatIlsWhole } from "@/shared/utils/format";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { loadBrowseIncludeRecurring, saveBrowseIncludeRecurring } from "@/features/browse/utils/browsePreferences";
 import { isSystemRecurringTransaction } from "@/features/household/utils/householdBudget";
 import { effectiveSpend } from "@/shared/utils/transaction";
@@ -145,10 +152,10 @@ import { useAdjustmentsDataStore } from "@/shared/stores/viewData";
 type AmountPreset = { id: string; label: string; min: number | null; max: number | null };
 
 const amountPresets: AmountPreset[] = [
-  { id: "gt100", label: "Above ₪100", min: 100, max: null },
-  { id: "gt200", label: "Above ₪200", min: 200, max: null },
-  { id: "lt200", label: "Below ₪200", min: null, max: 200 },
-  { id: "lt50", label: "Below ₪50", min: null, max: 50 },
+  { id: "lt50", label: "Under ₪50", min: null, max: 50 },
+  { id: "50-200", label: "₪50–200", min: 50, max: 200 },
+  { id: "gt200", label: "Over ₪200", min: 200, max: null },
+  { id: "gt1000", label: "Over ₪1,000", min: 1000, max: null },
 ];
 
 const auth = useAuthStore();
@@ -172,15 +179,6 @@ watch(includeRecurring, (value) => {
 });
 
 const categoryOptions = CATEGORY_PICKLIST;
-
-const activePreset = computed(() => {
-  const min = parseAmount(minAmount.value);
-  const max = parseAmount(maxAmount.value);
-  for (const chip of amountPresets) {
-    if (chip.min === min && chip.max === max) return chip.id;
-  }
-  return "";
-});
 
 const hasActiveFilters = computed(
   () =>
@@ -226,14 +224,66 @@ function parseAmount(raw: string | number): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function applyPreset(chip: AmountPreset) {
-  if (activePreset.value === chip.id) {
-    minAmount.value = "";
-    maxAmount.value = "";
-    return;
-  }
-  minAmount.value = chip.min != null ? String(chip.min) : "";
-  maxAmount.value = chip.max != null ? String(chip.max) : "";
+const sheet = ref<"month" | "category" | "amount" | null>(null);
+const draftMin = ref("");
+const draftMax = ref("");
+
+const monthChipLabel = computed(
+  () => months.value.find((m) => m.key === selectedMonth.value)?.label ?? "All months",
+);
+
+const amountActive = computed(() => !!minAmount.value || !!maxAmount.value);
+
+const amountChipLabel = computed(() => {
+  const min = parseAmount(minAmount.value);
+  const max = parseAmount(maxAmount.value);
+  if (min != null && max != null) return `₪${min}–${max}`;
+  if (min != null) return `Over ₪${min}`;
+  if (max != null) return `Under ₪${max}`;
+  return "Amount";
+});
+
+const summaryLabel = computed(() => {
+  const parts: string[] = [];
+  if (categoryFilter.value) parts.push(categoryFilter.value);
+  if (searchQuery.value.trim()) parts.push(`“${searchQuery.value.trim()}”`);
+  const where = selectedMonth.value ? monthChipLabel.value : "All months";
+  return parts.length ? `${parts.join(" · ")} — ${where}` : `Spent — ${where}`;
+});
+
+const draftPreset = computed(() => {
+  const min = parseAmount(draftMin.value);
+  const max = parseAmount(draftMax.value);
+  return amountPresets.find((c) => c.min === min && c.max === max)?.id ?? "";
+});
+
+function pickMonth(key: string) {
+  selectedMonth.value = key;
+  sheet.value = null;
+}
+
+function openAmount() {
+  draftMin.value = String(minAmount.value ?? "");
+  draftMax.value = String(maxAmount.value ?? "");
+  sheet.value = "amount";
+}
+
+function applyDraftPreset(chip: AmountPreset) {
+  draftMin.value = chip.min != null ? String(chip.min) : "";
+  draftMax.value = chip.max != null ? String(chip.max) : "";
+  applyAmount();
+}
+
+function applyAmount() {
+  minAmount.value = String(draftMin.value ?? "").trim();
+  maxAmount.value = String(draftMax.value ?? "").trim();
+  sheet.value = null;
+}
+
+function resetAmount() {
+  draftMin.value = "";
+  draftMax.value = "";
+  applyAmount();
 }
 
 function clearFilters() {
@@ -349,5 +399,11 @@ watch(selectedMonth, () => {
   void loadTransactions();
 });
 
-onMounted(load);
+let stopRefresh: (() => void) | undefined;
+onMounted(() => {
+  void load();
+  // A category change or split elsewhere (e.g. from the charge sheet) reloads the list.
+  stopRefresh = onSpendingRefresh(() => void loadTransactions());
+});
+onUnmounted(() => stopRefresh?.());
 </script>

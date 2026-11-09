@@ -26,6 +26,7 @@ import {
 } from "../services/statementUpload.js";
 import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
+import { buildGuessQueue, buildLabelHints, saveLabelSuggestions } from "../services/labelHints.js";
 import {
   buildReviewQueue,
   normalizeReviewKey,
@@ -52,6 +53,7 @@ import {
 import {
   listAdjustments,
   removeAdjustment,
+  setChargeCategory,
   upsertAdjustment,
 } from "../services/adjustments.js";
 import {
@@ -161,10 +163,12 @@ router.get("/home-data", async (req, res) => {
   const paceKeys = recentBillingKeys(data, paceMonths);
   const { report, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
   const budget = loadLivingBudgetData();
+  // lean=1: the client rebuilds the combined history from scoped_reports (halves the payload).
+  const lean = req.query.lean === "1";
   res.json({
     months,
     summary: summaryRows(data, version),
-    report: report ?? null,
+    report: lean ? null : report ?? null,
     scoped_reports: scopedReports,
     pace_keys: paceKeys,
     pace_months: paceKeys.length,
@@ -389,6 +393,27 @@ router.post("/adjustments", async (req, res) => {
   }
   const entry = await upsertAdjustment(resolvedKey, Number(reimbursement), note);
   res.json({ ok: true, entry });
+});
+
+/** Category for one charge (e.g. what a BIT transfer was for). category: null clears it. */
+router.post("/adjustments/category", async (req, res) => {
+  const { key, category, transaction } = req.body as {
+    key?: string;
+    category?: string | null;
+    transaction?: { date: string; merchant_he: string; charge_amount: number };
+  };
+  const resolvedKey =
+    key?.trim() || (transaction ? transactionKey(transaction as import("../types.js").Transaction) : "");
+  if (!resolvedKey) {
+    res.status(400).json({ error: "key or transaction required" });
+    return;
+  }
+  try {
+    await setChargeCategory(resolvedKey, category ?? null);
+    res.json({ ok: true, key: resolvedKey, category: category ?? null });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Could not save category" });
+  }
 });
 
 router.post("/adjustments/remove", async (req, res) => {
@@ -620,6 +645,54 @@ router.get("/review/suggest", async (req, res) => {
   }
   const english = await translateMerchant(hebrew);
   res.json({ english });
+});
+
+/** Translation, context and Totoshka's guess (if it has made one) for labelling one merchant. */
+router.post("/review/hints", async (req, res) => {
+  const { transaction } = req.body as {
+    transaction?: { merchant_he: string; date: string; charge_amount: number; category_he?: string | null; category_en?: string };
+  };
+  if (!transaction?.merchant_he?.trim() || !transaction.date) {
+    res.status(400).json({ error: "transaction with merchant_he and date required" });
+    return;
+  }
+  const data = await loadStatementsRepaired();
+  const version = await getFinalizeVersion();
+  const all = await getCombinedReportAsync(data, null, version);
+  res.json(await buildLabelHints(all?.transactions ?? [], transaction));
+});
+
+/** For Totoshka: merchants waiting in Review that it hasn't guessed yet, with context. ?limit=20 */
+router.get("/review/to-guess", async (req, res) => {
+  const data = await loadStatementsRepaired();
+  const version = await getFinalizeVersion();
+  const rules = await readRules();
+  const progress = await readReviewProgress();
+  const reviewed = new Set(progress.reviewed_transactions.map(normalizeReviewKey));
+  const report = await getCombinedReportAsync(data, null, version);
+  if (!report) {
+    res.json({ categories: [], merchants: [] });
+    return;
+  }
+  const queue = buildReviewQueue(report, rules, reviewed, {
+    includeReviewed: false,
+    includeLabeled: false,
+    onePerMerchant: true,
+    reviewedMerchants: new Set(progress.reviewed_merchants || []),
+  });
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+  res.json(await buildGuessQueue(report.transactions, queue, limit));
+});
+
+/** For Totoshka: store guesses [{merchant_he, english_name, category, confidence, reason}]. */
+router.post("/review/suggestions", async (req, res) => {
+  const body = req.body as { suggestions?: unknown } | unknown[];
+  const list = Array.isArray(body) ? body : (body as { suggestions?: unknown }).suggestions;
+  if (!Array.isArray(list)) {
+    res.status(400).json({ error: "send { suggestions: [...] }" });
+    return;
+  }
+  res.json(await saveLabelSuggestions(list));
 });
 
 router.post("/review/confirm", async (req, res) => {

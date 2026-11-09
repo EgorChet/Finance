@@ -360,3 +360,28 @@ export async function writePaceSettings(data: Record<string, unknown>): Promise<
     throw new Error(`Supabase write failed (${res.status}): ${text}`);
   }
 }
+
+/** Totoshka's guesses for merchants waiting in Review (app_state id "label_suggestions"). */
+export async function readLabelSuggestions(): Promise<unknown> {
+  if (!supabaseConfigured()) return local.readLabelSuggestions();
+  const res = await supabaseFetch("app_state?id=eq.label_suggestions&select=data");
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { data: unknown }[];
+  return rows[0]?.data ?? null;
+}
+
+export async function writeLabelSuggestions(data: Record<string, unknown>): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeLabelSuggestions(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "label_suggestions", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}

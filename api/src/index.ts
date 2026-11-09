@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import { warmAnalyzer, normalizeAnalyzerUrl, analyzerUsesPublicUrl } from "./services/analyzerClient.js";
@@ -31,6 +32,8 @@ app.use(
     },
   }),
 );
+// gzip JSON: the home bundle is ~700 KB raw, ~35 KB compressed.
+app.use(compression());
 app.use(express.json({ limit: "50mb" }));
 
 app.get("/health", async (req, res) => {

@@ -1,7 +1,13 @@
 <template>
   <div class="summary-metrics">
-    <div class="metric-grid">
-      <div v-if="!hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
+    <BudgetHero
+      v-if="plan && !hideLivingBudget"
+      :plan="plan"
+      :everyday-enabled="everydayBreakdownEnabled"
+      @everyday="openEverydayBreakdown"
+    />
+    <div v-if="!compact || !plan" class="metric-grid">
+      <div v-if="!plan && !hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
           <div v-if="dailyBudgetDisplay" class="metric-budget-top">
             <div class="metric-budget-main">
@@ -10,7 +16,7 @@
             </div>
             <div class="metric-budget-daily">
               <div class="metric-budget-daily-value">{{ dailyBudgetDisplay.perDay }}</div>
-              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.daysLeft }} days left</div>
+              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.meta }}</div>
             </div>
           </div>
           <template v-else>
@@ -39,19 +45,19 @@
                 Everyday ›
               </button>
               <span v-else>Everyday</span>
-              <span>{{ formatIls(budgetEveryday) }}</span>
+              <span>{{ formatIlsWhole(budgetEveryday) }}</span>
             </li>
             <li v-if="budgetRent > 0">
               <span>Flat rent</span>
-              <span>{{ formatIls(budgetRent) }}</span>
+              <span>{{ formatIlsWhole(budgetRent) }}</span>
             </li>
             <li v-if="budgetDevInstitute > 0">
               <span>Dev Institute</span>
-              <span>{{ formatIls(budgetDevInstitute) }}</span>
+              <span>{{ formatIlsWhole(budgetDevInstitute) }}</span>
             </li>
             <li v-if="budgetCarLoan > 0">
               <span>Car loan</span>
-              <span>{{ formatIls(budgetCarLoan) }}</span>
+              <span>{{ formatIlsWhole(budgetCarLoan) }}</span>
             </li>
           </ul>
         </template>
@@ -70,7 +76,7 @@
       </div>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Total spent</div>
-        <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(report.total_spent) }}</div>
         <div class="metric-sub">{{ everydayPct }}% everyday · {{ monthlyBillsPct }}% bills</div>
       </div>
       <component
@@ -83,12 +89,12 @@
         @click="openEverydayBreakdown"
       >
         <div class="metric-label">Everyday spending</div>
-        <div class="metric-value">{{ formatIls(everydayTotal) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(everydayTotal) }}</div>
         <div class="metric-sub">{{ everydayPct }}% of total</div>
       </component>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Monthly bills</div>
-        <div class="metric-value">{{ formatIls(monthlyBills) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(monthlyBills) }}</div>
         <div class="metric-sub">{{ monthlyBillsPct }}% · rent, car loan, Dev Institute</div>
       </div>
       <div v-if="!compact" class="metric-card">
@@ -172,7 +178,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "@/shared/types";
-import { formatAboutIls, formatIls } from "@/shared/utils/format";
+import { formatAboutIls, formatIls, formatIlsWhole } from "@/shared/utils/format";
 import {
   budgetSpendBreakdown,
   dailyBudgetLeft,
@@ -181,8 +187,8 @@ import {
   monthlyBillsTotal,
   moneyLeft,
 } from "@/features/household/utils/householdBudget";
-import { paceHealthBudgetClass } from "@/features/spending/utils/paceBudget";
-import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
+import { budgetPlanToneClass, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import BudgetHero from "@/features/spending/components/BudgetHero.vue";
 import { getBillingCycle } from "@/features/spending/utils/pace";
 
 const props = withDefaults(
@@ -192,10 +198,8 @@ const props = withDefaults(
     hideLivingBudget?: boolean;
     retrospective?: boolean;
     compact?: boolean;
-    /** Live-cycle pace tone — green / yellow / red money-left card. */
-    paceTone?: PaceHealthTone | null;
-    /** When true, use pace tone instead of raw budget-left coloring. */
-    paceColored?: boolean;
+    /** Live-cycle plan — drives the green / yellow / red card, the per-day figure and the bar marker. */
+    plan?: BudgetPlan | null;
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
@@ -203,8 +207,7 @@ const props = withDefaults(
   {
     retrospective: false,
     compact: false,
-    paceTone: null,
-    paceColored: false,
+    plan: null,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
   },
@@ -237,7 +240,7 @@ const budgetLabel = computed(() => {
 
 const budgetDisplayValue = computed(() => {
   if (budgetLeft.value === null) return "—";
-  return isOverBudget.value ? formatIls(overAmount.value) : formatIls(budgetLeft.value);
+  return isOverBudget.value ? formatIlsWhole(overAmount.value) : formatIlsWhole(budgetLeft.value);
 });
 
 const daysLeftInCycle = computed(() => {
@@ -256,29 +259,27 @@ const dailyBudgetDisplay = computed(() => {
     daysLeftInCycle.value,
   );
   if (perDay === null) return null;
-  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `~${formatAboutIls(perDay)}/day`;
+  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `${formatIlsWhole(perDay)}/day`;
   return {
     perDay: perDayLabel,
-    daysLeft: daysLeftInCycle.value,
+    meta: `${daysLeftInCycle.value} days left`,
   };
 });
 
 const budgetFormula = computed(() => {
   if (props.livingBudget === null || budgetLeft.value === null) return "";
-  const budget = formatIls(props.livingBudget);
-  const spent = formatIls(budgetSpent.value);
+  const budget = formatIlsWhole(props.livingBudget);
+  const spent = formatIlsWhole(budgetSpent.value);
   if (isOverBudget.value) {
-    return `${budget} living budget − ${spent} used = ${formatIls(overAmount.value)} over`;
+    return `${budget} living budget − ${spent} used = ${formatIlsWhole(overAmount.value)} over`;
   }
   if (props.retrospective) {
-    return `${budget} living budget − ${spent} used = ${formatIls(budgetLeft.value)} left`;
+    return `${budget} living budget − ${spent} used = ${formatIlsWhole(budgetLeft.value)} left`;
   }
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
-  if (props.paceColored) {
-    return props.paceTone ? paceHealthBudgetClass(props.paceTone) : "";
-  }
+  if (props.plan) return budgetPlanToneClass(props.plan.tone);
   if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";
