@@ -4554,17 +4554,6 @@ table.rules select {
   gap: 0.45rem;
 }
 
-.home-card-demo-tag {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  padding: 0.12rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-
 .home-card-meta {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -4591,81 +4580,6 @@ table.rules select {
 
 .home-card-error {
   color: var(--danger);
-}
-
-.home-portfolio-hero {
-  margin: 0 0 0.75rem;
-  font-size: 1.45rem;
-  font-weight: 700;
-}
-
-.home-portfolio-hero-sub {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.home-portfolio-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.home-portfolio-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
-  font-size: 0.9rem;
-}
-
-.home-portfolio-row-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.home-portfolio-row--stale {
-  opacity: 0.75;
-}
-
-.home-portfolio-logo {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.home-portfolio-label {
-  font-weight: 600;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.home-portfolio-value {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.home-portfolio-meta {
-  color: var(--text-faint);
-  font-size: 0.78rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.home-market-strip {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--text-muted);
 }
 
 .home-spending-section .summary-metrics {

@@ -61,7 +61,7 @@ export interface BudgetPlan {
   /** Committed charges posted so far + vaad reserve. */
   bills: number;
   /** Committed charges by kind, for the details sheet (vaad reserve included). */
-  committedRows: { kind: CommittedKind; label: string; amount: number }[];
+  committedRows: { kind: CommittedKind; label: string; amount: number; oneTimeDate?: string }[];
   vaadReserve: number;
   /** Charges added under Budget that are due later this cycle (set aside, not charged yet). */
   upcomingReserve: number;
@@ -268,9 +268,9 @@ export function computeBudgetPlan(
 
   const breakdown = budgetSpendBreakdown(cycleTransactions);
   // Rows keyed by label: charges you added are listed one by one, by name.
-  const rows = new Map<string, { kind: CommittedKind; label: string; amount: number }>();
-  const addRow = (kind: CommittedKind, label: string, amount: number) => {
-    const cur = rows.get(label) ?? { kind, label, amount: 0 };
+  const rows = new Map<string, { kind: CommittedKind; label: string; amount: number; oneTimeDate?: string }>();
+  const addRow = (kind: CommittedKind, label: string, amount: number, oneTimeDate?: string) => {
+    const cur = rows.get(label) ?? { kind, label, amount: 0, ...(oneTimeDate ? { oneTimeDate } : {}) };
     cur.amount += amount;
     rows.set(label, cur);
   };
@@ -292,7 +292,12 @@ export function computeBudgetPlan(
     if (postedChargeIds.has(charge.id) || !(charge.amount > 0)) continue;
     upcomingReserve += charge.amount;
     const when = charge.charge_date ? ` (${charge.charge_date.slice(8, 10)}/${charge.charge_date.slice(5, 7)})` : "";
-    addRow("upcoming", `${charge.name_en}${when}`, charge.amount);
+    addRow(
+      "upcoming",
+      `${charge.name_en}${when}`,
+      charge.amount,
+      charge.schedule === "once" ? charge.charge_date?.slice(0, 10) : undefined,
+    );
   }
   upcomingReserve = roundMoney(upcomingReserve);
 
