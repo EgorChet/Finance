@@ -21,7 +21,7 @@ import { prefetchRatesForPending } from "../utils/fxRates.js";
 import { getFinalizeVersion } from "./finalizeVersion.js";
 
 /** Default billing keys for pace baseline: current + 3 past months. */
-export const DEFAULT_PACE_MONTHS = 4;
+export const DEFAULT_PACE_MONTHS = 7;
 
 /** Retired categories merged into another for display and totals. */
 const CATEGORY_ALIASES: Record<string, string> = {

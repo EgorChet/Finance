@@ -172,6 +172,7 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
       cycleStart: cycleStart ?? cycleStartForDate(refDate, cycleDay),
       referenceDate: refDate,
       livingBudget: cap,
+      history: input.paceReport?.transactions,
     });
   }
 

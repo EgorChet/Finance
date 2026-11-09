@@ -176,7 +176,8 @@ export function computeCategoryCompareFromContext(
 ): CategoryCompareResult {
   const samples = ctx.historical.map((row) => sumScope(row.txs, row.start, ctx.dayIndex, scope));
   const samplesUsed = samples.length;
-  const usual = samplesUsed > 0 ? roundMoney(samples.reduce((s, v) => s + v, 0) / samplesUsed) : null;
+  // Median, not mean: one freak month (a yearly purchase) must not redefine "usual".
+  const usual = samplesUsed > 0 ? roundMoney(median(samples)) : null;
   const current = sumScope(currentTransactions, ctx.currentStart, ctx.dayIndex, scope);
   return {
     label,
@@ -186,6 +187,12 @@ export function computeCategoryCompareFromContext(
     delta: usual != null ? roundMoney(current - usual) : null,
     samplesUsed,
   };
+}
+
+function median(values: number[]): number {
+  const v = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
 }
 
 function transactionMatchesScope(tx: Transaction, scope: CategoryCompareScope): boolean {

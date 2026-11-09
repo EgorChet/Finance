@@ -11,6 +11,8 @@ export interface LivePaceHealthInput {
   cycleStart: string;
   referenceDate: Date;
   livingBudget: number | null;
+  /** Past transactions — the plan learns your usual spending curve from them. */
+  history?: Transaction[];
 }
 
 export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | null {
@@ -18,6 +20,7 @@ export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | 
     cycleStart: input.cycleStart,
     cycleDay: input.cycleDay,
     referenceDate: input.referenceDate,
+    history: input.history,
   });
 }
 

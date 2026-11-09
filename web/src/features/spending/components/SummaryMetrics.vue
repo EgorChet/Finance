@@ -1,7 +1,14 @@
 <template>
   <div class="summary-metrics">
-    <div class="metric-grid">
-      <div v-if="!hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
+    <BudgetHero
+      v-if="plan && !hideLivingBudget"
+      :plan="plan"
+      :bills="heroBills"
+      :everyday-enabled="everydayBreakdownEnabled"
+      @everyday="openEverydayBreakdown"
+    />
+    <div v-if="!compact || !plan" class="metric-grid">
+      <div v-if="!plan && !hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
         <template v-if="livingBudget !== null">
           <div v-if="dailyBudgetDisplay" class="metric-budget-top">
             <div class="metric-budget-main">
@@ -17,7 +24,6 @@
             <div class="metric-label">{{ budgetLabel }}</div>
             <div class="metric-value">{{ budgetDisplayValue }}</div>
           </template>
-          <p v-if="planStatusLine" class="metric-budget-status">{{ planStatusLine }}</p>
           <div
             class="metric-budget-progress"
             role="progressbar"
@@ -27,16 +33,7 @@
             :aria-label="`${budgetUsedPct}% of the living budget used`"
           >
             <span class="metric-budget-progress__fill" :style="{ width: `${budgetUsedPct}%` }" />
-            <span
-              v-if="plan"
-              class="metric-budget-progress__plan"
-              :style="{ left: `${plan.planMarkerPct}%` }"
-              title="Where the plan says you should be today"
-            />
           </div>
-          <p v-if="plan" class="metric-budget-legend">
-            Bar = used so far · line = plan for today
-          </p>
           <p class="metric-budget-formula">{{ budgetFormula }}</p>
           <ul class="metric-budget-breakdown">
             <li>
@@ -49,19 +46,19 @@
                 Everyday ›
               </button>
               <span v-else>Everyday</span>
-              <span>{{ formatIls(budgetEveryday) }}</span>
+              <span>{{ formatIlsWhole(budgetEveryday) }}</span>
             </li>
             <li v-if="budgetRent > 0">
               <span>Flat rent</span>
-              <span>{{ formatIls(budgetRent) }}</span>
+              <span>{{ formatIlsWhole(budgetRent) }}</span>
             </li>
             <li v-if="budgetDevInstitute > 0">
               <span>Dev Institute</span>
-              <span>{{ formatIls(budgetDevInstitute) }}</span>
+              <span>{{ formatIlsWhole(budgetDevInstitute) }}</span>
             </li>
             <li v-if="budgetCarLoan > 0">
               <span>Car loan</span>
-              <span>{{ formatIls(budgetCarLoan) }}</span>
+              <span>{{ formatIlsWhole(budgetCarLoan) }}</span>
             </li>
           </ul>
         </template>
@@ -80,7 +77,7 @@
       </div>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Total spent</div>
-        <div class="metric-value">{{ formatIls(report.total_spent) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(report.total_spent) }}</div>
         <div class="metric-sub">{{ everydayPct }}% everyday · {{ monthlyBillsPct }}% bills</div>
       </div>
       <component
@@ -93,12 +90,12 @@
         @click="openEverydayBreakdown"
       >
         <div class="metric-label">Everyday spending</div>
-        <div class="metric-value">{{ formatIls(everydayTotal) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(everydayTotal) }}</div>
         <div class="metric-sub">{{ everydayPct }}% of total</div>
       </component>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Monthly bills</div>
-        <div class="metric-value">{{ formatIls(monthlyBills) }}</div>
+        <div class="metric-value">{{ formatIlsWhole(monthlyBills) }}</div>
         <div class="metric-sub">{{ monthlyBillsPct }}% · rent, car loan, Dev Institute</div>
       </div>
       <div v-if="!compact" class="metric-card">
@@ -191,11 +188,8 @@ import {
   monthlyBillsTotal,
   moneyLeft,
 } from "@/features/household/utils/householdBudget";
-import {
-  budgetPlanBufferLabel,
-  budgetPlanToneClass,
-  type BudgetPlan,
-} from "@/features/spending/utils/budgetPlan";
+import { budgetPlanToneClass, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import BudgetHero from "@/features/spending/components/BudgetHero.vue";
 import { getBillingCycle } from "@/features/spending/utils/pace";
 
 const props = withDefaults(
@@ -247,7 +241,7 @@ const budgetLabel = computed(() => {
 
 const budgetDisplayValue = computed(() => {
   if (budgetLeft.value === null) return "—";
-  return isOverBudget.value ? formatIls(overAmount.value) : formatIls(budgetLeft.value);
+  return isOverBudget.value ? formatIlsWhole(overAmount.value) : formatIlsWhole(budgetLeft.value);
 });
 
 const daysLeftInCycle = computed(() => {
@@ -256,21 +250,13 @@ const daysLeftInCycle = computed(() => {
   return cycleLength - dayIndex + 1;
 });
 
-const planStatusLine = computed(() => {
-  const plan = props.plan;
-  if (!plan) return "";
-  if (plan.tone === "bad" && plan.moneyLeft < 0) return plan.status;
-  return `${plan.status} · ${budgetPlanBufferLabel(plan, formatIlsWhole)}`;
-});
+const heroBills = computed(() => [
+  { label: "Flat rent", amount: budgetRent.value },
+  { label: "Car loan", amount: budgetCarLoan.value },
+  { label: "Dev Institute", amount: budgetDevInstitute.value },
+]);
 
 const dailyBudgetDisplay = computed(() => {
-  const plan = props.plan;
-  if (plan && plan.daysLeft > 0) {
-    return {
-      perDay: plan.perDayLeft <= 0 ? "₪0/day" : `${formatIlsWhole(plan.perDayLeft)}/day`,
-      meta: `plan ${formatIlsWhole(plan.planPerDay)}/day · ${plan.daysLeft} days left`,
-    };
-  }
   if (budgetLeft.value === null || daysLeftInCycle.value === null || daysLeftInCycle.value <= 0) {
     return null;
   }
@@ -280,7 +266,7 @@ const dailyBudgetDisplay = computed(() => {
     daysLeftInCycle.value,
   );
   if (perDay === null) return null;
-  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `~${formatAboutIls(perDay)}/day`;
+  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `${formatIlsWhole(perDay)}/day`;
   return {
     perDay: perDayLabel,
     meta: `${daysLeftInCycle.value} days left`,
@@ -289,13 +275,13 @@ const dailyBudgetDisplay = computed(() => {
 
 const budgetFormula = computed(() => {
   if (props.livingBudget === null || budgetLeft.value === null) return "";
-  const budget = formatIls(props.livingBudget);
-  const spent = formatIls(budgetSpent.value);
+  const budget = formatIlsWhole(props.livingBudget);
+  const spent = formatIlsWhole(budgetSpent.value);
   if (isOverBudget.value) {
-    return `${budget} living budget − ${spent} used = ${formatIls(overAmount.value)} over`;
+    return `${budget} living budget − ${spent} used = ${formatIlsWhole(overAmount.value)} over`;
   }
   if (props.retrospective) {
-    return `${budget} living budget − ${spent} used = ${formatIls(budgetLeft.value)} left`;
+    return `${budget} living budget − ${spent} used = ${formatIlsWhole(budgetLeft.value)} left`;
   }
   return `${budget} living budget − ${spent} used`;
 });

@@ -33,6 +33,7 @@
         :amount="item.value"
         :pct="item.pct"
         :color="colors[idx % colors.length]"
+        :icon="item.kind === 'other' ? categoryIcon('Other') : categoryIcon(item.key)"
         :count="countFor(item)"
         :open="isOpen(item.key)"
         :result="resultFor(scopeForItem(item))"
@@ -45,6 +46,7 @@
             :key="row.category_en"
             nested
             :name="homeSubsectionLabel(row.category_en)"
+            :icon="categoryIcon(row.category_en)"
             :amount="row.total"
             :pct="sharePct(row.total, homeTotal)"
             :count="txsForHomeSub(row.category_en).length"
@@ -63,6 +65,7 @@
             :key="row.name"
             nested
             :name="row.name"
+            :icon="categoryIcon(row.name)"
             :amount="row.total"
             :pct="sharePct(row.total, subscriptionTotal)"
             :count="txsForSubscriptionSub(row.name).length"
@@ -81,6 +84,7 @@
             :key="row.category_en"
             nested
             :name="row.category_en"
+            :icon="categoryIcon(row.category_en)"
             :amount="row.total"
             :pct="sharePct(row.total, otherTotal)"
             :count="txsForOtherSub(row.category_en).length"
@@ -123,6 +127,7 @@ import {
   type CategoryCompareScope,
 } from "@/features/spending/utils/categoryCompare";
 import { CHART_COLORS, formatIlsWhole, roundMoney } from "@/shared/utils/format";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { subscriptionSubsectionLabel, subscriptionSubsectionTotals } from "@/features/spending/utils/subscriptionSections";
 
 const props = defineProps<{

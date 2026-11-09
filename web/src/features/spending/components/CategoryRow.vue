@@ -7,11 +7,15 @@
       :aria-expanded="open"
       @click="emit('toggle')"
     >
+      <span
+        v-if="icon"
+        class="cat-row-icon"
+        :style="{ background: `color-mix(in srgb, ${color || 'var(--accent)'} 22%, transparent)` }"
+        aria-hidden="true"
+      >{{ icon }}</span>
+      <span class="cat-row-text">
       <span class="cat-row-line">
-        <span class="cat-row-name">
-          <span v-if="color" class="swatch" :style="{ background: color }" />
-          {{ name }}
-        </span>
+        <span class="cat-row-name">{{ name }}</span>
         <span class="cat-row-amount">{{ formatIlsWhole(amount) }}</span>
       </span>
       <span class="cat-row-line cat-row-line--sub">
@@ -21,8 +25,6 @@
         <span v-else class="cat-row-compare cat-row-compare--unknown">{{ countLabel }}</span>
         <span class="cat-row-pct">{{ pct }}%</span>
       </span>
-      <span class="cat-row-share" aria-hidden="true">
-        <span :style="{ width: `${Math.max(2, pct)}%`, background: color || 'var(--accent)' }" />
       </span>
     </button>
 
@@ -57,6 +59,7 @@ const props = withDefaults(
     /** Share of the parent total, 0–100. */
     pct: number;
     color?: string;
+    icon?: string;
     count?: number;
     open: boolean;
     nested?: boolean;
@@ -91,7 +94,7 @@ const bars = computed(() => {
     { label: props.currentLabel, value: r.current, current: true },
     ...(r.last != null ? [{ label: `${props.lastLabel}${suffix}`, value: r.last, current: false }] : []),
     {
-      label: `Usual${suffix}${r.samplesUsed > 1 ? ` (avg of ${r.samplesUsed})` : ""}`,
+      label: `Usual${suffix}`,
       value: r.usual,
       current: false,
     },

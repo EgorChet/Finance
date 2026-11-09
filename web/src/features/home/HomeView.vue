@@ -165,6 +165,7 @@ const summaryPlan = computed(() => {
     cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     referenceDate: refDate.value,
     livingBudget: livingBudgetAmount.value,
+    history: paceReport.value?.transactions,
   });
 });
 

@@ -1,8 +1,8 @@
 <template>
-  <div class="pace-card">
+  <div v-if="cardNeeded" class="pace-card">
     <header class="pace-header">
       <div class="pace-header-title">
-        <h3 class="pace-card-title">How am I doing?</h3>
+        <h3 class="pace-card-title">{{ plan ? "Spent so far" : "This cycle" }}</h3>
         <p class="pace-card-sub">{{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}</p>
       </div>
       <div class="pace-progress-wrap">
@@ -48,89 +48,7 @@
         </div>
       </section>
 
-      <section v-if="plan && (displaySpend > 0 || plan.flexSpent > 0)" class="pace-panel pace-panel-metrics">
-        <div class="pace-simple">
-          <div class="pace-verdict" :class="verdictToneClass">
-            <p class="pace-verdict-status">{{ plan.status }}</p>
-            <p class="pace-verdict-delta">{{ verdictLine }}</p>
-            <p v-if="perDayLine" class="pace-budget-note">{{ perDayLine }}</p>
-          </div>
-
-          <details class="pace-simple-details">
-            <summary>How this is worked out</summary>
-            <p class="pace-simple-details-note">
-              Your budget minus the fixed bills is spread evenly over the cycle. That daily
-              amount never changes this cycle — only your buffer does.
-            </p>
-            <div class="pace-simple-table-wrap">
-              <table class="pace-simple-table">
-                <tbody>
-                  <tr class="pace-simple-table-group">
-                    <td colspan="2">The plan</td>
-                  </tr>
-                  <tr>
-                    <td>Living budget</td>
-                    <td>{{ formatIlsWhole(plan.budget) }}</td>
-                  </tr>
-                  <tr class="pace-simple-table-sub">
-                    <td>− Rent, car loan, Dev Institute, vaad bayit{{ plan.vaadReserve > 0 ? " (reserved)" : "" }}</td>
-                    <td>{{ formatIlsWhole(plan.bills) }}</td>
-                  </tr>
-                  <tr>
-                    <td>= Flexible money</td>
-                    <td>{{ formatIlsWhole(plan.flexBudget) }}</td>
-                  </tr>
-                  <tr>
-                    <td>÷ {{ plan.cycleLength }} days</td>
-                    <td>{{ formatIlsWhole(plan.planPerDay) }}/day</td>
-                  </tr>
-                  <tr class="pace-simple-table-group">
-                    <td colspan="2">So far (day {{ plan.dayIndex }})</td>
-                  </tr>
-                  <tr>
-                    <td>Plan through yesterday</td>
-                    <td>{{ formatIlsWhole(plan.plannedSoFar) }}</td>
-                  </tr>
-                  <tr>
-                    <td>Flexible spending</td>
-                    <td>{{ formatIlsWhole(plan.flexSpent) }}</td>
-                  </tr>
-                  <tr class="pace-simple-table-gap" :class="plan.buffer >= 0 ? 'pace-delta-good' : 'pace-delta-bad'">
-                    <td>Buffer</td>
-                    <td>{{ formatSigned(plan.buffer) }}</td>
-                  </tr>
-                  <tr class="pace-simple-table-group">
-                    <td colspan="2">Rest of the cycle</td>
-                  </tr>
-                  <tr>
-                    <td>Flexible money left</td>
-                    <td>{{ formatIlsWhole(plan.flexLeft) }}</td>
-                  </tr>
-                  <tr>
-                    <td>÷ {{ plan.daysLeft }} days (incl. today)</td>
-                    <td>{{ formatIlsWhole(plan.perDayLeft) }}/day</td>
-                  </tr>
-                  <template v-if="usualGap !== null">
-                    <tr class="pace-simple-table-group">
-                      <td colspan="2">For context — not used for the colour</td>
-                    </tr>
-                    <tr>
-                      <td>Everyday vs your usual by day {{ plan.dayIndex }}</td>
-                      <td>{{ formatSigned(-usualGap) }}</td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-            <p class="pace-simple-details-note">
-              Green: you can keep spending {{ formatIlsWhole(plan.planPerDay) }}/day. Yellow: you need
-              to trim a little (75–90% of that). Red: under 75%, or the budget is gone.
-            </p>
-          </details>
-        </div>
-      </section>
-
-      <section v-else-if="displaySpend > 0" class="pace-panel pace-panel-metrics">
+      <section v-if="!plan && displaySpend > 0" class="pace-panel pace-panel-metrics">
         <div class="pace-simple">
           <div class="pace-simple-fallback">
             <p class="pace-simple-fallback-value">{{ formatIls(displaySpend) }}</p>
@@ -145,9 +63,6 @@
         </div>
       </section>
 
-      <p v-else-if="!showEntryPanel" class="pace-simple-meta pace-simple-meta-muted pace-panel-wide">
-        Enter spending from your bank app, or upload a partial statement.
-      </p>
 
       <p v-if="pace?.dataStale && !resolvedManualSpend" class="pace-warning pace-panel-wide">
         Upload your latest bill or enter current spending above — this cycle isn't on your statements yet.
@@ -160,7 +75,7 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
-import { budgetPlanBufferLabel, computeBudgetPlan, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import { computeBudgetPlan, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
   billingCycleProgress,
@@ -303,25 +218,14 @@ const plan = computed((): BudgetPlan | null => {
     cycleStart: cycleStart.value,
     cycleDay: cycleDay.value,
     referenceDate: props.referenceDate ?? new Date(),
+    history: props.transactions,
   });
 });
 
-const verdictToneClass = computed(() => `pace-verdict--${plan.value?.tone ?? "good"}`);
-
-const verdictLine = computed(() => {
-  const p = plan.value;
-  if (!p) return "";
-  if (p.moneyLeft < 0) return `${formatIlsWhole(Math.abs(p.moneyLeft))} over this cycle's budget`;
-  return budgetPlanBufferLabel(p, formatIlsWhole);
-});
-
-const perDayLine = computed(() => {
-  const p = plan.value;
-  if (!p || p.daysLeft <= 0) return "";
-  if (p.flexLeft <= 0) return "No flexible money left for the rest of the cycle.";
-  const days = p.daysLeft === 1 ? "today" : `each of the next ${p.daysLeft} days`;
-  return `You can spend ${formatIlsWhole(p.perDayLeft)} ${days} (plan: ${formatIlsWhole(p.planPerDay)}/day).`;
-});
+/** With a budget the hero card says everything; this card is only for manual entry or stale data. */
+const cardNeeded = computed(
+  () => showEntryPanel.value || (!!pace.value?.dataStale && !resolvedManualSpend.value) || !plan.value,
+);
 
 /** Everyday spend so far minus usual at this day — context only. */
 const usualGap = computed((): number | null => {
@@ -338,11 +242,6 @@ const usualGapLine = computed(() => {
     ? `${formatIlsWhole(gap)} more than usual by this day.`
     : `${formatIlsWhole(Math.abs(gap))} less than usual by this day.`;
 });
-
-function formatSigned(delta: number): string {
-  if (Math.abs(delta) < 1) return "₪0";
-  return delta > 0 ? `+${formatIlsWhole(delta)}` : `−${formatIlsWhole(Math.abs(delta))}`;
-}
 
 function formatCycleRange(start: string, end: string): string {
   const s = new Date(start + "T12:00:00");
