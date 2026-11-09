@@ -1,7 +1,6 @@
 <template>
   <div class="rv">
     <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample queue only. Sign in to label your real charges.</div>
-    <div v-else-if="auth.readOnly" class="demo-banner">View only — Egor labels charges. You can browse the queue.</div>
 
     <AppLoader v-if="loading" variant="card" title="Loading queue" subtitle="Finding charges that still need a label" />
 

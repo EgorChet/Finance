@@ -1,6 +1,6 @@
 <template>
   <div class="find">
-    <div v-if="auth.readOnly" class="demo-banner">Demo mode — sample transactions only.</div>
+    <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample transactions only.</div>
     <h2 class="page-title">Transactions</h2>
     <div class="seg" role="tablist" aria-label="Transactions view">
       <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'charges' }" :aria-selected="view === 'charges'" @click="setView('charges')">

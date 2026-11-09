@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" :class="{ 'app-layout--readonly': auth.readOnly && !auth.isDemo }">
+  <div class="app-layout">
     <header class="app-header">
       <div class="app-header-brand">
         <div class="app-portfolio-switch">
@@ -51,7 +51,6 @@
           <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
         </div>
       </div>
-      <span v-if="auth.readOnly && !auth.isDemo" class="readonly-badge" title="Only Egor can make changes">View only</span>
       <button
         type="button"
         class="app-account-btn"
