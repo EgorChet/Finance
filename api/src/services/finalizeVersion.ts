@@ -19,7 +19,10 @@ export async function getFinalizeVersion(): Promise<string> {
   const fixed = loadFixedCharges();
   const budget = loadLivingBudgetData();
   const exclusions = [...loadExcludedKeys()].sort();
-  const adjustments = [...loadAdjustments().keys()].sort();
+  // Full entries, not just keys: changing a split amount or category must re-finalize.
+  const adjustments = [...loadAdjustments().values()]
+    .map((e) => `${e.key}|${e.reimbursement}|${e.category ?? ""}|${e.note ?? ""}`)
+    .sort();
   const payload = JSON.stringify({
     rules,
     fixed,

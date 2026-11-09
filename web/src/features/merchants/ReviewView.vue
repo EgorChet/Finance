@@ -22,6 +22,8 @@
         <p v-if="savedThisSession > 0" class="rv-hero-sub">{{ savedThisSession }} saved just now · {{ reviewedCount }} in total</p>
       </section>
 
+      <BitSortCard />
+
       <div class="find-chips rv-filters" role="toolbar" aria-label="What to show">
         <button type="button" class="find-chip" :class="{ 'find-chip--on': onePerMerchant }" :aria-pressed="onePerMerchant" @click="onePerMerchant = !onePerMerchant">
           {{ onePerMerchant ? "✓ " : "" }}One per store
@@ -104,6 +106,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { confirmReview, fetchReviewSuggestion, resetReviewProgress } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
+import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import { useAuthStore } from "@/shared/stores/auth";

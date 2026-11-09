@@ -431,6 +431,19 @@ export async function upsertAdjustment(
   );
 }
 
+/** Category for one charge (e.g. what a BIT transfer was for); null restores the merchant's category. */
+export async function setChargeCategory(
+  transaction: Pick<Transaction, "date" | "merchant_he" | "charge_amount">,
+  category: string | null,
+  token?: string,
+) {
+  return post<{ ok: boolean; key: string; category: string | null }>(
+    `${prefix(false)}/adjustments/category`,
+    { transaction: { date: transaction.date, merchant_he: transaction.merchant_he, charge_amount: transaction.charge_amount }, category },
+    token,
+  );
+}
+
 export async function removeAdjustment(key: string, token?: string) {
   return post<{ ok: boolean }>(`${prefix(false)}/adjustments/remove`, { key }, token);
 }

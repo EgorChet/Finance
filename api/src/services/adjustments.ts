@@ -18,11 +18,13 @@ function mergeAdjustments(user: AdjustmentsData): AdjustmentEntry[] {
   const byKey = new Map<string, AdjustmentEntry>();
   for (const entry of user.entries || []) {
     const key = normalizeReviewKey(entry.key.trim());
-    const reimbursement = roundMoney(Number(entry.reimbursement));
-    if (!key || reimbursement <= 0) continue;
+    const reimbursement = Math.max(0, roundMoney(Number(entry.reimbursement) || 0));
+    const category = entry.category?.trim() || undefined;
+    if (!key || (reimbursement <= 0 && !category)) continue;
     byKey.set(key, {
       key,
       reimbursement,
+      ...(category ? { category } : {}),
       note: entry.note?.trim() || undefined,
       added_at: entry.added_at,
     });
@@ -48,43 +50,52 @@ export function loadAdjustments(): Map<string, AdjustmentEntry> {
   return cachedByKey!;
 }
 
+/** Strip any previous adjustment, then apply `entry` (split and/or category). Returns tx unchanged if nothing differs. */
+function applyEntry(tx: Transaction, entry: AdjustmentEntry | undefined): Transaction {
+  const {
+    reimbursement: _r,
+    effective_amount: _e,
+    reimbursement_note: _n,
+    category_override: _co,
+    category_original: originalCategory,
+    ...base
+  } = tx;
+  const clean: Transaction = { ...base, category_en: originalCategory ?? tx.category_en };
+  let next = clean;
+  if (entry && entry.reimbursement > 0) {
+    const reimbursement = Math.min(roundMoney(entry.reimbursement), roundMoney(tx.charge_amount));
+    next = {
+      ...next,
+      reimbursement,
+      effective_amount: roundMoney(Math.max(0, tx.charge_amount - reimbursement)),
+      reimbursement_note: entry.note,
+    };
+  }
+  if (entry?.category && entry.category !== clean.category_en) {
+    next = { ...next, category_en: entry.category, category_override: entry.category, category_original: clean.category_en };
+  }
+  const same =
+    next.category_en === tx.category_en &&
+    next.category_override === tx.category_override &&
+    next.category_original === tx.category_original &&
+    next.reimbursement === tx.reimbursement &&
+    next.effective_amount === tx.effective_amount &&
+    (next.reimbursement_note ?? undefined) === (tx.reimbursement_note ?? undefined);
+  return same ? tx : next;
+}
+
 export function applyAdjustments(report: SpendingReport): SpendingReport {
   const adjustments = loadAdjustments();
-  if (!adjustments.size) return report;
+  if (!adjustments.size && !report.transactions.some((t) => t.category_original || t.reimbursement != null)) {
+    return report;
+  }
 
   let changed = false;
   const transactions = report.transactions.map((tx) => {
     const entry = adjustments.get(transactionKey(tx));
-    if (!entry) {
-      if (tx.reimbursement != null || tx.effective_amount != null) {
-        changed = true;
-        const {
-          reimbursement: _r,
-          effective_amount: _e,
-          reimbursement_note: _n,
-          ...rest
-        } = tx;
-        return rest;
-      }
-      return tx;
-    }
-
-    const reimbursement = Math.min(roundMoney(entry.reimbursement), roundMoney(tx.charge_amount));
-    const effective = roundMoney(Math.max(0, tx.charge_amount - reimbursement));
-    if (
-      tx.reimbursement === reimbursement
-      && tx.effective_amount === effective
-      && (tx.reimbursement_note ?? undefined) === entry.note
-    ) {
-      return tx;
-    }
-    changed = true;
-    return {
-      ...tx,
-      reimbursement,
-      effective_amount: effective,
-      reimbursement_note: entry.note,
-    };
+    const next = applyEntry(tx, entry);
+    if (next !== tx) changed = true;
+    return next;
   });
 
   if (!changed) return report;
@@ -151,10 +162,12 @@ export async function upsertAdjustment(
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("Reimbursement must be greater than zero");
 
   const user = await readAdjustments();
+  const previous = (user.entries || []).find((e) => normalizeReviewKey(e.key) === normalized);
   const entries = (user.entries || []).filter((e) => normalizeReviewKey(e.key) !== normalized);
   entries.push({
     key: normalized,
     reimbursement: amount,
+    ...(previous?.category ? { category: previous.category } : {}),
     note: note?.trim() || undefined,
     added_at: new Date().toISOString(),
   });
@@ -169,6 +182,30 @@ export async function upsertAdjustment(
     ctx.rules,
     ctx.fixedChargeNames,
   );
+}
+
+/** Set (or clear with null) the category of one charge, keeping any split on it. */
+export async function setChargeCategory(key: string, category: string | null): Promise<void> {
+  const normalized = normalizeReviewKey(key.trim());
+  if (!normalized) throw new Error("Invalid adjustment key");
+  const cat = category?.trim() || "";
+  if (cat.length > 60) throw new Error("Category name too long");
+
+  const user = await readAdjustments();
+  const previous = (user.entries || []).find((e) => normalizeReviewKey(e.key) === normalized);
+  const entries = (user.entries || []).filter((e) => normalizeReviewKey(e.key) !== normalized);
+  const reimbursement = previous?.reimbursement ?? 0;
+  if (cat || reimbursement > 0) {
+    entries.push({
+      key: normalized,
+      reimbursement,
+      ...(cat ? { category: cat } : {}),
+      note: previous?.note,
+      added_at: previous?.added_at ?? new Date().toISOString(),
+    });
+  }
+  await writeAdjustments({ ...user, entries });
+  await refreshAdjustmentsCache();
 }
 
 export async function removeAdjustment(key: string): Promise<void> {

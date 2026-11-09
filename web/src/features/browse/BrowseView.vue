@@ -127,7 +127,8 @@
 
 <script setup lang="ts">
 import { friendlyError } from "@/shared/utils/friendlyError";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
@@ -398,5 +399,11 @@ watch(selectedMonth, () => {
   void loadTransactions();
 });
 
-onMounted(load);
+let stopRefresh: (() => void) | undefined;
+onMounted(() => {
+  void load();
+  // A category change or split elsewhere (e.g. from the charge sheet) reloads the list.
+  stopRefresh = onSpendingRefresh(() => void loadTransactions());
+});
+onUnmounted(() => stopRefresh?.());
 </script>

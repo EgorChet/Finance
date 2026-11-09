@@ -20,6 +20,10 @@ export interface Transaction {
   effective_amount?: number;
   /** Optional note for the reimbursement (e.g. "Friends paid back"). */
   reimbursement_note?: string;
+  /** Category picked for this one charge (e.g. a BIT transfer); category_en already holds it. */
+  category_override?: string;
+  /** Category before the per-charge override, so removing it can restore it. */
+  category_original?: string;
 }
 
 export interface CategorySummary {
@@ -128,7 +132,10 @@ export interface ExcludedItemView extends ExcludedEntry {
 
 export interface AdjustmentEntry {
   key: string;
+  /** 0 when the entry only sets a category. */
   reimbursement: number;
+  /** Category for this one charge, overriding the merchant rule. */
+  category?: string;
   note?: string;
   added_at?: string;
 }

@@ -52,6 +52,7 @@ import {
 import {
   listAdjustments,
   removeAdjustment,
+  setChargeCategory,
   upsertAdjustment,
 } from "../services/adjustments.js";
 import {
@@ -391,6 +392,27 @@ router.post("/adjustments", async (req, res) => {
   }
   const entry = await upsertAdjustment(resolvedKey, Number(reimbursement), note);
   res.json({ ok: true, entry });
+});
+
+/** Category for one charge (e.g. what a BIT transfer was for). category: null clears it. */
+router.post("/adjustments/category", async (req, res) => {
+  const { key, category, transaction } = req.body as {
+    key?: string;
+    category?: string | null;
+    transaction?: { date: string; merchant_he: string; charge_amount: number };
+  };
+  const resolvedKey =
+    key?.trim() || (transaction ? transactionKey(transaction as import("../types.js").Transaction) : "");
+  if (!resolvedKey) {
+    res.status(400).json({ error: "key or transaction required" });
+    return;
+  }
+  try {
+    await setChargeCategory(resolvedKey, category ?? null);
+    res.json({ ok: true, key: resolvedKey, category: category ?? null });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Could not save category" });
+  }
 });
 
 router.post("/adjustments/remove", async (req, res) => {

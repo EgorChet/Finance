@@ -99,7 +99,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
   const cached = !options.force && !options.background && adjustmentsData.peek(demo, token);
 
   if (cached) {
-    entries.value = cached;
+    entries.value = cached.filter((e) => e.reimbursement > 0);
     loading.value = false;
     void load({ background: true });
     return;
@@ -111,7 +111,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
     status.value = "";
   }
   try {
-    entries.value = await adjustmentsData.load(demo, token, options);
+    entries.value = (await adjustmentsData.load(demo, token, options)).filter((e) => e.reimbursement > 0);
   } catch (e) {
     if (!options.background) {
       error.value = friendlyError(e);

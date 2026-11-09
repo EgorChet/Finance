@@ -66,6 +66,12 @@
               <div v-if="sheetRow.reimbursementLabel" class="tx-sheet-note">{{ sheetRow.reimbursementLabel }}</div>
             </div>
             <div class="tx-sheet-actions">
+              <button v-if="adjustable" type="button" class="tx-sheet-action" @click="openCategory">
+                <span class="tx-sheet-action-title">{{ categoryIcon(sheetRow.category) }} {{ sheetRow.tx.category_override ? "Category: " + sheetRow.category : "Change category" }}</span>
+                <span class="tx-sheet-action-hint">
+                  {{ isBitTransfer(sheetRow.tx) ? "What was this BIT transfer for? Only this charge changes" : "Only this charge — other charges from this store stay as they are" }}
+                </span>
+              </button>
               <button v-if="adjustable" type="button" class="tx-sheet-action" @click="runSheet('adjust')">
                 <span class="tx-sheet-action-title">{{ sheetRow.adjustLabel }}</span>
                 <span class="tx-sheet-action-hint">Someone paid you back for part of it</span>
@@ -80,6 +86,22 @@
         </div>
       </Transition>
     </Teleport>
+
+    <BottomSheet :open="!!categoryRow" :title="categoryRow ? categoryRow.merchant : ''" @close="categoryRow = null">
+      <template v-if="categoryRow">
+        <p class="tx-cat-meta">
+          {{ formatChargeAmount(categoryRow.tx) }} · {{ formatTransactionDate(categoryRow.tx.date) }}
+          <template v-if="isBitTransfer(categoryRow.tx)"> · e.g. paying someone back for dinner → Eating out</template>
+        </p>
+        <CategoryGrid :model-value="categoryRow.category" :options="CATEGORY_PICKLIST" @pick="pickCategory" />
+        <p v-if="categoryError" class="tx-cat-error">{{ categoryError }}</p>
+      </template>
+      <template v-if="categoryRow?.tx.category_override" #footer>
+        <button type="button" class="btn" :disabled="savingCategory" @click="pickCategory(null)">
+          Back to {{ categoryRow.tx.category_original || "the store's category" }}
+        </button>
+      </template>
+    </BottomSheet>
 
     <nav
       v-if="paginated && totalPages > 1"
@@ -141,6 +163,11 @@ import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
 import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
 import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import BottomSheet from "@/shared/components/BottomSheet.vue";
+import CategoryGrid from "@/shared/components/CategoryGrid.vue";
+import { CATEGORY_PICKLIST } from "@/shared/categories";
+import { friendlyError } from "@/shared/utils/friendlyError";
+import { isBitTransfer, saveChargeCategory } from "@/shared/composables/useChargeCategory";
 import { effectiveSpend } from "@/shared/utils/transaction";
 import { transactionRowKey } from "@/shared/utils/transaction";
 
@@ -324,6 +351,34 @@ function openSheet(row: TxRow) {
 
 function closeSheet() {
   sheetRow.value = null;
+}
+
+const categoryRow = ref<TxRow | null>(null);
+const savingCategory = ref(false);
+const categoryError = ref("");
+
+function openCategory() {
+  categoryRow.value = sheetRow.value;
+  categoryError.value = "";
+  closeSheet();
+}
+
+async function pickCategory(category: string | null) {
+  const row = categoryRow.value;
+  if (!row || savingCategory.value) return;
+  const original = row.tx.category_original ?? row.tx.category_en;
+  // Picking the store's own category is the same as clearing the override.
+  const value = category && category !== original ? category : null;
+  savingCategory.value = true;
+  categoryError.value = "";
+  try {
+    await saveChargeCategory(row.tx, value);
+    categoryRow.value = null;
+  } catch (e) {
+    categoryError.value = friendlyError(e);
+  } finally {
+    savingCategory.value = false;
+  }
 }
 
 function runSheet(action: "adjust" | "exclude") {
