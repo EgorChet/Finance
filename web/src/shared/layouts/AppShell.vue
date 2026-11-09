@@ -266,7 +266,15 @@
     </Teleport>
 
     <main class="main main--with-tabbar">
-      <RouterView />
+      <div
+        class="ptr"
+        :class="{ 'ptr--ready': pullDistance >= PULL_TRIGGER, 'ptr--busy': pullRefreshing, 'ptr--dragging': pullDistance > 0 }"
+        :style="{ height: `${pullRefreshing ? PULL_TRIGGER : pullDistance}px` }"
+        aria-hidden="true"
+      >
+        <span class="ptr-icon" :style="{ transform: `rotate(${pullRefreshing ? 0 : pullDistance * 3}deg)` }">↻</span>
+      </div>
+      <RouterView :key="viewKey" />
     </main>
     <nav class="app-tabbar" aria-label="Sections">
       <RouterLink
@@ -367,6 +375,7 @@ import {
 import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "@/shared/utils/calSyncSession";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
+import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
@@ -730,6 +739,72 @@ async function wakeAnalyzerFromHere() {
     /* the server keeps trying on its own */
   }
 }
+
+/* ── Pull to refresh: drag down at the top of any screen to reload it from the server. ── */
+const PULL_TRIGGER = 64;
+const pullDistance = ref(0);
+const pullRefreshing = ref(false);
+const viewKey = ref(0);
+let pullStartY: number | null = null;
+let pullStartX = 0;
+
+function pullBlocked(): boolean {
+  // Not while a sheet, dialog or the account panel is open, and only at the very top.
+  return navOpen.value || window.scrollY > 0 || document.body.style.overflow === "hidden";
+}
+
+function onPullStart(e: TouchEvent) {
+  if (pullRefreshing.value || e.touches.length !== 1 || pullBlocked()) {
+    pullStartY = null;
+    return;
+  }
+  pullStartY = e.touches[0].clientY;
+  pullStartX = e.touches[0].clientX;
+}
+
+function onPullMove(e: TouchEvent) {
+  if (pullStartY == null) return;
+  const dy = e.touches[0].clientY - pullStartY;
+  const dx = Math.abs(e.touches[0].clientX - pullStartX);
+  if (dy <= 0 || dx > dy || window.scrollY > 0) {
+    pullDistance.value = 0;
+    return;
+  }
+  // Resistance: the indicator follows at half speed and stops at 1.5× the trigger.
+  pullDistance.value = Math.min(dy * 0.5, PULL_TRIGGER * 1.5);
+  if (e.cancelable) e.preventDefault();
+}
+
+async function onPullEnd() {
+  if (pullStartY == null) return;
+  pullStartY = null;
+  const trigger = pullDistance.value >= PULL_TRIGGER;
+  pullDistance.value = 0;
+  if (!trigger) return;
+  pullRefreshing.value = true;
+  try {
+    invalidateAllDataCaches();
+    void portfolio.refresh(auth.isDemo, auth.token || undefined, true);
+    viewKey.value += 1; // remount the screen so it loads fresh data
+    await new Promise((r) => setTimeout(r, 700));
+  } finally {
+    pullRefreshing.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("touchstart", onPullStart, { passive: true });
+  window.addEventListener("touchmove", onPullMove, { passive: false });
+  window.addEventListener("touchend", onPullEnd, { passive: true });
+  window.addEventListener("touchcancel", onPullEnd, { passive: true });
+});
+
+onUnmounted(() => {
+  window.removeEventListener("touchstart", onPullStart);
+  window.removeEventListener("touchmove", onPullMove);
+  window.removeEventListener("touchend", onPullEnd);
+  window.removeEventListener("touchcancel", onPullEnd);
+});
 
 async function runUpload(file: File, statementType: "partial" | "final") {
   void wakeAnalyzerFromHere();
