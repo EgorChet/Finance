@@ -2,7 +2,7 @@
   <div class="pace-card">
     <header class="pace-header">
       <div class="pace-header-title">
-        <h3 class="pace-card-title">Am I overspending?</h3>
+        <h3 class="pace-card-title">How am I doing?</h3>
         <p class="pace-card-sub">{{ formatCycleRange(cycleInfo.cycleStart, cycleInfo.cycleEnd) }}</p>
       </div>
       <div class="pace-progress-wrap">
@@ -48,123 +48,106 @@
         </div>
       </section>
 
-      <template v-if="pace">
-        <section class="pace-panel pace-panel-metrics">
-          <div class="pace-simple">
-            <template v-if="displaySpend > 0 && paceCompareAvg > 0">
-              <div class="pace-verdict" :class="injectionCushionVerdict ? 'pace-verdict--injection' : verdictToneClass">
-                <template v-if="injectionCushionVerdict">
-                  <p class="pace-verdict-injection-title">{{ injectionCushionVerdict.status }}</p>
-                  <p v-if="injectionCushionVerdict.spentVsUsual" class="pace-verdict-injection-line">
-                    Spent <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> more than usual at this point
-                  </p>
-                  <p v-else class="pace-verdict-injection-line">
-                    Spending <span class="pace-verdict-injection-spent-amt">{{ injectionCushionVerdict.spentAmount }}</span> faster than usual at month-end
-                  </p>
-                  <p class="pace-verdict-injection-line">
-                    Money left is <span class="pace-verdict-injection-left-amt">{{ injectionCushionVerdict.moneyLeftAmount }}</span> higher than usual
-                  </p>
-                  <p class="pace-verdict-injection-reason">{{ injectionCushionVerdict.reason }}</p>
-                </template>
-                <template v-else>
-                  <p class="pace-verdict-status">{{ verdictStatus }}</p>
-                  <p class="pace-verdict-delta">{{ verdictDelta }}</p>
-                </template>
-                <p v-if="budgetNote" class="pace-budget-note">{{ budgetNote }}</p>
-              </div>
+      <section v-if="plan && (displaySpend > 0 || plan.flexSpent > 0)" class="pace-panel pace-panel-metrics">
+        <div class="pace-simple">
+          <div class="pace-verdict" :class="verdictToneClass">
+            <p class="pace-verdict-status">{{ plan.status }}</p>
+            <p class="pace-verdict-delta">{{ verdictLine }}</p>
+            <p v-if="perDayLine" class="pace-budget-note">{{ perDayLine }}</p>
+          </div>
 
-              <details class="pace-simple-details">
-                <summary>See the numbers</summary>
-                <p class="pace-simple-details-note">
-                  Same as the Everyday spending tile — excludes rent, car loan, and Dev Institute.
-                </p>
-                <div class="pace-simple-table-wrap">
-                  <table class="pace-simple-table">
-                    <tbody>
-                      <tr class="pace-simple-table-group">
-                        <td colspan="2">So far this cycle</td>
-                      </tr>
-                      <tr>
-                        <td>Everyday spending</td>
-                        <td>{{ formatIls(displaySpend) }}</td>
-                      </tr>
-                      <tr v-if="everydayComposition.exportTotal > 0" class="pace-simple-table-sub">
-                        <td>On Visa export</td>
-                        <td>{{ formatIls(everydayComposition.exportTotal) }}</td>
-                      </tr>
-                      <tr v-if="everydayComposition.configuredTotal > 0" class="pace-simple-table-sub">
-                        <td>Extra charges</td>
-                        <td>{{ formatIls(everydayComposition.configuredTotal) }}</td>
-                      </tr>
-                      <tr>
-                        <td>Usual everyday at this point</td>
-                        <td>{{ formatIls(paceCompareAvg) }}</td>
-                      </tr>
-                      <tr class="pace-simple-table-gap" :class="deltaClass">
-                        <td>Difference</td>
-                        <td>{{ formatGap(pace?.vsAvgDelta ?? 0) }}</td>
-                      </tr>
-                      <tr class="pace-simple-table-group">
-                        <td colspan="2">Month-end estimate</td>
-                      </tr>
-                      <tr v-if="!projectionReliable" class="pace-simple-table-note">
-                        <td colspan="2">
-                          Early in the cycle — estimate assumes your current pace, not a full-month spike.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Your everyday month</td>
-                        <td>~{{ formatIls(projectedTotal) }}</td>
-                      </tr>
-                      <tr>
-                        <td>Usual everyday month</td>
-                        <td>~{{ formatIls(projectedAtUsualPaceForecast) }}</td>
-                      </tr>
-                      <tr class="pace-simple-table-gap" :class="projectedDeltaClass">
-                        <td>Difference</td>
-                        <td>{{ formatGap(projectedVsUsualDelta) }}</td>
-                      </tr>
-                      <template v-if="budgetContext">
-                        <tr class="pace-simple-table-group">
-                          <td colspan="2">Living budget</td>
-                        </tr>
-                        <tr>
-                          <td>Money left</td>
-                          <td>{{ formatMoneyLeft(budgetContext.moneyLeft) }}</td>
-                        </tr>
-                        <tr v-if="showHistoricalBudgetCompare">
-                          <td>Usual money left at this point</td>
-                          <td>{{ formatMoneyLeft(budgetContext.lastCycleMoneyLeftAtDay!) }}</td>
-                        </tr>
-                        <tr
-                          v-if="showHistoricalBudgetCompare"
-                          class="pace-simple-table-gap"
-                          :class="moneyLeftVsUsualTableClass"
-                        >
-                          <td>Net vs usual</td>
-                          <td>{{ formatGap(budgetContext.moneyLeftVsLastCycle!) }}</td>
-                        </tr>
-                      </template>
-                    </tbody>
-                  </table>
-                </div>
-              </details>
-            </template>
-
-            <div v-else-if="displaySpend > 0" class="pace-simple-fallback">
-              <p class="pace-simple-fallback-value">{{ formatIls(displaySpend) }}</p>
-              <p class="pace-simple-fallback-label">everyday spending so far</p>
-              <p class="pace-simple-meta pace-simple-meta-muted">
-                Upload more past statements to see if you're overspending.
-              </p>
+          <details class="pace-simple-details">
+            <summary>How this is worked out</summary>
+            <p class="pace-simple-details-note">
+              Your budget minus the fixed bills is spread evenly over the cycle. That daily
+              amount never changes this cycle — only your buffer does.
+            </p>
+            <div class="pace-simple-table-wrap">
+              <table class="pace-simple-table">
+                <tbody>
+                  <tr class="pace-simple-table-group">
+                    <td colspan="2">The plan</td>
+                  </tr>
+                  <tr>
+                    <td>Living budget</td>
+                    <td>{{ formatIlsWhole(plan.budget) }}</td>
+                  </tr>
+                  <tr class="pace-simple-table-sub">
+                    <td>− Rent, car loan, Dev Institute, vaad bayit{{ plan.vaadReserve > 0 ? " (reserved)" : "" }}</td>
+                    <td>{{ formatIlsWhole(plan.bills) }}</td>
+                  </tr>
+                  <tr>
+                    <td>= Flexible money</td>
+                    <td>{{ formatIlsWhole(plan.flexBudget) }}</td>
+                  </tr>
+                  <tr>
+                    <td>÷ {{ plan.cycleLength }} days</td>
+                    <td>{{ formatIlsWhole(plan.planPerDay) }}/day</td>
+                  </tr>
+                  <tr class="pace-simple-table-group">
+                    <td colspan="2">So far (day {{ plan.dayIndex }})</td>
+                  </tr>
+                  <tr>
+                    <td>Plan through yesterday</td>
+                    <td>{{ formatIlsWhole(plan.plannedSoFar) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Flexible spending</td>
+                    <td>{{ formatIlsWhole(plan.flexSpent) }}</td>
+                  </tr>
+                  <tr class="pace-simple-table-gap" :class="plan.buffer >= 0 ? 'pace-delta-good' : 'pace-delta-bad'">
+                    <td>Buffer</td>
+                    <td>{{ formatSigned(plan.buffer) }}</td>
+                  </tr>
+                  <tr class="pace-simple-table-group">
+                    <td colspan="2">Rest of the cycle</td>
+                  </tr>
+                  <tr>
+                    <td>Flexible money left</td>
+                    <td>{{ formatIlsWhole(plan.flexLeft) }}</td>
+                  </tr>
+                  <tr>
+                    <td>÷ {{ plan.daysLeft }} days (incl. today)</td>
+                    <td>{{ formatIlsWhole(plan.perDayLeft) }}/day</td>
+                  </tr>
+                  <template v-if="usualGap !== null">
+                    <tr class="pace-simple-table-group">
+                      <td colspan="2">For context — not used for the colour</td>
+                    </tr>
+                    <tr>
+                      <td>Everyday vs your usual by day {{ plan.dayIndex }}</td>
+                      <td>{{ formatSigned(-usualGap) }}</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
+            <p class="pace-simple-details-note">
+              Green: you can keep spending {{ formatIlsWhole(plan.planPerDay) }}/day. Yellow: you need
+              to trim a little (75–90% of that). Red: under 75%, or the budget is gone.
+            </p>
+          </details>
+        </div>
+      </section>
 
-            <p v-else class="pace-simple-meta pace-simple-meta-muted">
-              Enter spending from your bank app, or upload a partial statement.
+      <section v-else-if="displaySpend > 0" class="pace-panel pace-panel-metrics">
+        <div class="pace-simple">
+          <div class="pace-simple-fallback">
+            <p class="pace-simple-fallback-value">{{ formatIls(displaySpend) }}</p>
+            <p class="pace-simple-fallback-label">everyday spending so far</p>
+            <p v-if="usualGap !== null" class="pace-simple-meta">{{ usualGapLine }}</p>
+            <p class="pace-simple-meta pace-simple-meta-muted">
+              Set a living budget on
+              <RouterLink to="/app/household#living-budget">Household</RouterLink>
+              to see whether you're on track.
             </p>
           </div>
-        </section>
-      </template>
+        </div>
+      </section>
+
+      <p v-else-if="!showEntryPanel" class="pace-simple-meta pace-simple-meta-muted pace-panel-wide">
+        Enter spending from your bank app, or upload a partial statement.
+      </p>
 
       <p v-if="pace?.dataStale && !resolvedManualSpend" class="pace-warning pace-panel-wide">
         Upload your latest bill or enter current spending above — this cycle isn't on your statements yet.
@@ -176,11 +159,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
-import { formatIls, formatAboutIls } from "@/shared/utils/format";
-import { everydaySpendingComposition } from "@/features/household/utils/householdBudget";
-import { computePaceBudgetContext, paceBudgetNote, paceHealthTone, paceHealthVerdictClass, paceInjectionCushionVerdict } from "@/features/spending/utils/paceBudget";
-import type { LivingBudgetMonthTopup, LivingBudgetSegment } from "@/features/household/utils/livingBudget";
-import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
+import { formatIls, formatIlsWhole } from "@/shared/utils/format";
+import { budgetPlanBufferLabel, computeBudgetPlan, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
   billingCycleProgress,
@@ -189,7 +169,6 @@ import {
   effectiveManualCycleSpend,
   loadCycleDay,
   loadPaceAvgCycles,
-  projectionTrust,
   pruneStaleManualCycleSpend,
   saveManualCycleSpend,
 } from "@/features/spending/utils/pace";
@@ -214,14 +193,8 @@ const props = defineProps<{
   cycleStart?: string | null;
   /** Resolved living budget for this cycle (incl. Cibus + monthly injection). */
   livingBudget?: number | null;
-  /** Base budget before monthly injection. */
-  livingBudgetBase?: number | null;
-  /** One-off extra cap added this calendar month. */
-  livingBudgetTopup?: number;
-  livingBudgetSegments?: LivingBudgetSegment[];
-  livingBudgetMonthTopups?: LivingBudgetMonthTopup[];
-  /** When set (e.g. from Overview), keeps verdict color in sync with the money-left card. */
-  paceTone?: PaceHealthTone | null;
+  /** Same plan as the Money left card; computed here when not passed. */
+  plan?: BudgetPlan | null;
 }>();
 
 const emit = defineEmits<{ "settings-change": [] }>();
@@ -297,10 +270,6 @@ const everydaySpendOverride = computed(() => {
   return undefined;
 });
 
-const everydayComposition = computed(() =>
-  everydaySpendingComposition(props.cycleTransactions ?? []),
-);
-
 const pace = computed(() =>
   computePace(props.transactions, {
     cycleDay: cycleDay.value,
@@ -328,135 +297,52 @@ const showEntryPanel = computed(() => {
   return true;
 });
 
-const projectionReliable = computed(
-  () => projectionTrust(cycleInfo.value.dayIndex, cycleInfo.value.cycleLength) >= 1,
-);
-
-const projectedTotal = computed(() => pace.value?.projectedTotal ?? 0);
-
-const paceCompareAvg = computed(() => pace.value?.historicalAvgAtDay ?? 0);
-
-const projectedAtUsualPaceForecast = computed(() => pace.value?.projectedAtUsualPaceForecast ?? 0);
-
-const projectedVsUsualDelta = computed(() => pace.value?.projectedVsUsualDelta ?? 0);
-
-const budgetContext = computed(() => {
-  if (props.livingBudget == null || props.livingBudget <= 0) return null;
-  return computePaceBudgetContext(
-    props.cycleTransactions ?? [],
-    props.livingBudget,
-    projectedTotal.value,
-    projectedAtUsualPaceForecast.value,
-    {
-      baseBudget: props.livingBudgetBase,
-      topupExtra: props.livingBudgetTopup ?? 0,
-      allTransactions: props.transactions,
-      cycleStart: cycleStart.value,
-      cycleDay: cycleDay.value,
-      dayIndex: cycleInfo.value.dayIndex,
-      budgetSegments: props.livingBudgetSegments ?? [],
-      budgetMonthTopups: props.livingBudgetMonthTopups ?? [],
-      configuredCharges: props.configuredCharges ?? [],
-      avgCycles: avgCycles.value,
-    },
-  );
+const plan = computed((): BudgetPlan | null => {
+  if (props.plan !== undefined) return props.plan;
+  return computeBudgetPlan(props.cycleTransactions ?? [], props.livingBudget ?? null, {
+    cycleStart: cycleStart.value,
+    cycleDay: cycleDay.value,
+    referenceDate: props.referenceDate ?? new Date(),
+  });
 });
 
-const showHistoricalBudgetCompare = computed(() => budgetContext.value?.lastCycleMoneyLeftAtDay != null);
+const verdictToneClass = computed(() => `pace-verdict--${plan.value?.tone ?? "good"}`);
 
-const injectionCushionVerdict = computed(() =>
-  budgetContext.value ? paceInjectionCushionVerdict(budgetContext.value) : null,
-);
-
-const paceTone = computed(
-  () =>
-    props.paceTone ??
-    paceHealthTone(budgetContext.value, projectedVsUsualDelta.value, pace.value?.vsAvgDelta ?? 0),
-);
-
-const budgetNote = computed(() => {
-  if (!budgetContext.value || injectionCushionVerdict.value) return "";
-  return paceBudgetNote(budgetContext.value, projectedVsUsualDelta.value);
+const verdictLine = computed(() => {
+  const p = plan.value;
+  if (!p) return "";
+  if (p.moneyLeft < 0) return `${formatIlsWhole(Math.abs(p.moneyLeft))} over this cycle's budget`;
+  return budgetPlanBufferLabel(p, formatIlsWhole);
 });
 
-const moneyLeftVsUsualTableClass = computed(() => {
-  const d = budgetContext.value?.moneyLeftVsLastCycle ?? 0;
-  if (d > 0) return "pace-delta-good";
-  if (d < 0) return "pace-delta-bad";
-  return "";
+const perDayLine = computed(() => {
+  const p = plan.value;
+  if (!p || p.daysLeft <= 0) return "";
+  if (p.flexLeft <= 0) return "No flexible money left for the rest of the cycle.";
+  const days = p.daysLeft === 1 ? "today" : `each of the next ${p.daysLeft} days`;
+  return `You can spend ${formatIlsWhole(p.perDayLeft)} ${days} (plan: ${formatIlsWhole(p.planPerDay)}/day).`;
 });
 
-const projectedDeltaClass = computed(() => {
-  const d = projectedVsUsualDelta.value;
-  if (d > 0) return "pace-delta-bad";
-  if (d < 0) return "pace-delta-good";
-  return "";
+/** Everyday spend so far minus usual at this day — context only. */
+const usualGap = computed((): number | null => {
+  const p = pace.value;
+  if (!p || p.historicalAvgAtDay <= 0) return null;
+  return p.vsAvgDelta;
 });
 
-const overBudgetNow = computed(() => (budgetContext.value?.moneyLeft ?? 0) < 0);
-
-const verdictStatus = computed(() => {
-  if (overBudgetNow.value) return "Over budget";
-  if (injectionCushionVerdict.value) return injectionCushionVerdict.value.status;
-  if (!projectionReliable.value) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "Early in the cycle";
-    if (nowGap > 0) return "Above usual so far";
-    return "Below usual so far";
-  }
-  if (paceTone.value === "bad" || paceTone.value === "warn") return "Overspending";
-
-  const monthGap = projectedVsUsualDelta.value;
-  if (Math.abs(monthGap) < 50) return "Doing fine";
-  if (monthGap > 0) return "Overspending";
-  return "Doing fine";
+const usualGapLine = computed(() => {
+  const gap = usualGap.value;
+  if (gap === null) return "";
+  if (Math.abs(gap) < 1) return "Same as usual by this day.";
+  return gap > 0
+    ? `${formatIlsWhole(gap)} more than usual by this day.`
+    : `${formatIlsWhole(Math.abs(gap))} less than usual by this day.`;
 });
 
-const verdictDelta = computed(() => {
-  if (overBudgetNow.value && budgetContext.value) {
-    const over = `${formatIls(Math.abs(budgetContext.value.moneyLeft))} over this cycle's budget`;
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    return nowGap > 50 ? `${over} · ~${formatAboutIls(nowGap)} above usual so far` : over;
-  }
-  if (injectionCushionVerdict.value) return "";
-
-  if (!projectionReliable.value) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "Not enough of the cycle has passed for a month-end forecast";
-    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
-    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
-  }
-
-  const monthGap = projectedVsUsualDelta.value;
-  if (Math.abs(monthGap) < 50) {
-    const nowGap = pace.value?.vsAvgDelta ?? 0;
-    if (Math.abs(nowGap) < 50) return "About the same as your usual month";
-    if (nowGap > 0) return `~${formatAboutIls(nowGap)} above usual so far`;
-    return `~${formatAboutIls(Math.abs(nowGap))} below usual so far`;
-  }
-  if (monthGap > 0) return `~${formatAboutIls(monthGap)} above your usual month`;
-  return `~${formatAboutIls(Math.abs(monthGap))} below your usual month`;
-});
-
-const verdictToneClass = computed(() => paceHealthVerdictClass(paceTone.value));
-
-function formatMoneyLeft(amount: number): string {
-  if (amount < 0) return `${formatIls(Math.abs(amount))} over`;
-  return formatIls(amount);
+function formatSigned(delta: number): string {
+  if (Math.abs(delta) < 1) return "₪0";
+  return delta > 0 ? `+${formatIlsWhole(delta)}` : `−${formatIlsWhole(Math.abs(delta))}`;
 }
-
-function formatGap(delta: number): string {
-  if (Math.abs(delta) < 1) return "Same";
-  const abs = formatIls(Math.abs(delta));
-  return delta > 0 ? `+${abs}` : `−${abs}`;
-}
-
-const deltaClass = computed(() => {
-  const delta = pace.value?.vsAvgDelta ?? 0;
-  if (delta > 0) return "pace-delta-bad";
-  if (delta < 0) return "pace-delta-good";
-  return "";
-});
 
 function formatCycleRange(start: string, end: string): string {
   const s = new Date(start + "T12:00:00");

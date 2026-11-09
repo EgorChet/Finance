@@ -1586,11 +1586,50 @@ html.sheet-editor-open body {
 
 /* Budget hero: how much of the living budget is used. */
 .metric-budget-progress {
+  position: relative;
   height: 6px;
   margin: 0.75rem 0 0.15rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
-  overflow: hidden;
+}
+
+/* "Plan for today" tick: fill left of it = under plan. */
+.metric-budget-progress__plan {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.metric-budget-status {
+  margin: 0.45rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-card-budget--ok .metric-budget-status {
+  color: var(--success);
+}
+
+.metric-card-budget--low .metric-budget-status {
+  color: var(--warning);
+}
+
+.metric-card-budget--over .metric-budget-status {
+  color: var(--danger);
+}
+
+.metric-budget-legend {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .metric-budget-progress__fill {

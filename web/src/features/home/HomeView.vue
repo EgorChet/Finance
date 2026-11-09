@@ -20,8 +20,7 @@
             compact
             :report="spendingReport"
             :living-budget="livingBudgetAmount"
-            :pace-tone="summaryPaceTone"
-            :pace-colored="showPaceHealth"
+            :plan="summaryPlan"
             :cycle-day="cycleDay"
             :reference-date="refDate"
           />
@@ -61,15 +60,12 @@ import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
-import { computeLivePaceHealth } from "@/features/spending/utils/paceHealth";
+import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
-  livingBudgetBaseForMonth,
-  monthTopupExtraForMonth,
-  cycleMonthYmForOverview,
 } from "@/features/household/utils/livingBudget";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
@@ -89,7 +85,6 @@ import {
   mergeMonthsWithOpenCycles,
   partialStatementSavedAtForCycle,
   pruneStaleManualCycleSpend,
-  latestFinalBillingDate as getLatestFinalBillingDate,
 } from "@/features/spending/utils/pace";
 
 const auth = useAuthStore();
@@ -149,17 +144,8 @@ const livingBudgetAmount = computed(() =>
   ),
 );
 
-const livingBudgetCycleYm = computed(() =>
-  cycleMonthYmForOverview(currentMonthKey.value, spendingReport.value, cycleDay.value),
-);
 
-const livingBudgetTopupExtra = computed(() =>
-  monthTopupExtraForMonth(livingBudgetCycleYm.value, livingBudgetMonthTopups.value),
-);
 
-const livingBudgetBaseAmount = computed(() =>
-  livingBudgetBaseForMonth(livingBudgetCycleYm.value, livingBudgetSegments.value, configuredCharges.value),
-);
 
 const showPaceHealth = computed(() => {
   if (!spendingReport.value || !currentMonthKey.value) return false;
@@ -171,31 +157,14 @@ const showPaceHealth = computed(() => {
   return cycleNeedsOpenTab(start, cycleDay.value, months.value);
 });
 
-const summaryPaceTone = computed(() => {
+const summaryPlan = computed(() => {
   if (!showPaceHealth.value || !spendingReport.value) return null;
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
-  const partial = findPartialMonth(months.value, start, cycleDay.value);
-  const statementAt = partial?.saved_at ?? null;
-  const hasStatementSpend = everydaySpendingTotal(spendingReport.value.transactions) > 0;
-  return computeLivePaceHealth({
-    transactions: paceReport.value?.transactions ?? spendingReport.value.transactions,
+  return computeLiveBudgetPlan({
     cycleTransactions: spendingReport.value.transactions,
     cycleDay: cycleDay.value,
+    cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     referenceDate: refDate.value,
     livingBudget: livingBudgetAmount.value,
-    livingBudgetBase: livingBudgetBaseAmount.value,
-    livingBudgetTopup: livingBudgetTopupExtra.value,
-    budgetSegments: livingBudgetSegments.value,
-    budgetMonthTopups: livingBudgetMonthTopups.value,
-    latestBillingDate: getLatestFinalBillingDate(months.value),
-    configuredCharges: configuredCharges.value,
-    cycleStart: start,
-    statementSavedAt: statementAt,
-    hasStatementSpend,
-    partialStatementActive: isPartialCycle.value,
-    cycleEverydaySpend: hasStatementSpend
-      ? everydaySpendingTotal(spendingReport.value.transactions)
-      : null,
   });
 });
 

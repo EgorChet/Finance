@@ -10,13 +10,14 @@
             </div>
             <div class="metric-budget-daily">
               <div class="metric-budget-daily-value">{{ dailyBudgetDisplay.perDay }}</div>
-              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.daysLeft }} days left</div>
+              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.meta }}</div>
             </div>
           </div>
           <template v-else>
             <div class="metric-label">{{ budgetLabel }}</div>
             <div class="metric-value">{{ budgetDisplayValue }}</div>
           </template>
+          <p v-if="planStatusLine" class="metric-budget-status">{{ planStatusLine }}</p>
           <div
             class="metric-budget-progress"
             role="progressbar"
@@ -26,7 +27,16 @@
             :aria-label="`${budgetUsedPct}% of the living budget used`"
           >
             <span class="metric-budget-progress__fill" :style="{ width: `${budgetUsedPct}%` }" />
+            <span
+              v-if="plan"
+              class="metric-budget-progress__plan"
+              :style="{ left: `${plan.planMarkerPct}%` }"
+              title="Where the plan says you should be today"
+            />
           </div>
+          <p v-if="plan" class="metric-budget-legend">
+            Bar = used so far · line = plan for today
+          </p>
           <p class="metric-budget-formula">{{ budgetFormula }}</p>
           <ul class="metric-budget-breakdown">
             <li>
@@ -172,7 +182,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "@/shared/types";
-import { formatAboutIls, formatIls } from "@/shared/utils/format";
+import { formatAboutIls, formatIls, formatIlsWhole } from "@/shared/utils/format";
 import {
   budgetSpendBreakdown,
   dailyBudgetLeft,
@@ -181,8 +191,11 @@ import {
   monthlyBillsTotal,
   moneyLeft,
 } from "@/features/household/utils/householdBudget";
-import { paceHealthBudgetClass } from "@/features/spending/utils/paceBudget";
-import type { PaceHealthTone } from "@/features/spending/utils/paceHealth";
+import {
+  budgetPlanBufferLabel,
+  budgetPlanToneClass,
+  type BudgetPlan,
+} from "@/features/spending/utils/budgetPlan";
 import { getBillingCycle } from "@/features/spending/utils/pace";
 
 const props = withDefaults(
@@ -192,10 +205,8 @@ const props = withDefaults(
     hideLivingBudget?: boolean;
     retrospective?: boolean;
     compact?: boolean;
-    /** Live-cycle pace tone — green / yellow / red money-left card. */
-    paceTone?: PaceHealthTone | null;
-    /** When true, use pace tone instead of raw budget-left coloring. */
-    paceColored?: boolean;
+    /** Live-cycle plan — drives the green / yellow / red card, the per-day figure and the bar marker. */
+    plan?: BudgetPlan | null;
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
@@ -203,8 +214,7 @@ const props = withDefaults(
   {
     retrospective: false,
     compact: false,
-    paceTone: null,
-    paceColored: false,
+    plan: null,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
   },
@@ -246,7 +256,21 @@ const daysLeftInCycle = computed(() => {
   return cycleLength - dayIndex + 1;
 });
 
+const planStatusLine = computed(() => {
+  const plan = props.plan;
+  if (!plan) return "";
+  if (plan.tone === "bad" && plan.moneyLeft < 0) return plan.status;
+  return `${plan.status} · ${budgetPlanBufferLabel(plan, formatIlsWhole)}`;
+});
+
 const dailyBudgetDisplay = computed(() => {
+  const plan = props.plan;
+  if (plan && plan.daysLeft > 0) {
+    return {
+      perDay: plan.perDayLeft <= 0 ? "₪0/day" : `${formatIlsWhole(plan.perDayLeft)}/day`,
+      meta: `plan ${formatIlsWhole(plan.planPerDay)}/day · ${plan.daysLeft} days left`,
+    };
+  }
   if (budgetLeft.value === null || daysLeftInCycle.value === null || daysLeftInCycle.value <= 0) {
     return null;
   }
@@ -259,7 +283,7 @@ const dailyBudgetDisplay = computed(() => {
   const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `~${formatAboutIls(perDay)}/day`;
   return {
     perDay: perDayLabel,
-    daysLeft: daysLeftInCycle.value,
+    meta: `${daysLeftInCycle.value} days left`,
   };
 });
 
@@ -276,9 +300,7 @@ const budgetFormula = computed(() => {
   return `${budget} living budget − ${spent} used`;
 });
 const budgetClass = computed(() => {
-  if (props.paceColored) {
-    return props.paceTone ? paceHealthBudgetClass(props.paceTone) : "";
-  }
+  if (props.plan) return budgetPlanToneClass(props.plan.tone);
   if (props.livingBudget === null || budgetLeft.value === null) return "";
   if (budgetLeft.value < 0) return "metric-card-budget--over";
   if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";

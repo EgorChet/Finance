@@ -11,7 +11,6 @@ import type { ConfiguredCharge } from "./household/fixedCharges.js";
 import {
   budgetSpendBreakdown,
   dailyBudgetLeft,
-  everydaySpendingTotal,
   moneyLeft,
 } from "./household/householdBudget.js";
 import {
@@ -36,7 +35,6 @@ import {
   getBillingCycle,
   getCycleRangeForStart,
   isCycleMonthKey,
-  latestFinalBillingDate,
   mergeMonthsWithOpenCycles,
 } from "./spending/pace.js";
 import {
@@ -44,8 +42,8 @@ import {
   loadCycleDay,
   loadPaceIncludeFixed,
 } from "./spending/paceSettings.js";
-import { computeLivePaceHealth } from "./spending/paceHealth.js";
-import type { PaceHealthTone } from "./spending/paceBudget.js";
+import { computeLiveBudgetPlan, type PaceHealthTone } from "./spending/paceHealth.js";
+import type { BudgetPlan } from "./spending/budgetPlan.js";
 import { roundMoney } from "./utils/format.js";
 
 export interface SummaryInputs {
@@ -85,8 +83,17 @@ export interface SpendingSummary {
   money_left: number | null;
   over_budget: boolean;
   daily_budget_left: number | null;
-  /** good = on pace, warn = over pace but covered by the rent cushion, bad = over pace. */
+  /**
+   * good = can keep spending the planned daily amount, warn = trim a little,
+   * bad = cut hard or already over. See core/spending/budgetPlan.ts.
+   */
   pace: PaceHealthTone | null;
+  /** Headline for the colour, e.g. "On track" / "Slow down a little". */
+  pace_status: string | null;
+  /** Flexible money spread evenly over the cycle (budget − rent, loans, vaad bayit). */
+  plan_per_day: number | null;
+  /** Plan through yesterday − flexible spent. Positive = under plan. */
+  plan_buffer: number | null;
   transaction_count: number;
   manual_spend_used: number | null;
 }
@@ -157,28 +164,14 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     if (cycleStart) cycleEnd = getCycleRangeForStart(cycleStart, cycleDay).end;
   }
 
-  let pace: PaceHealthTone | null = null;
+  let plan: BudgetPlan | null = null;
   if (openCycle && cap !== null) {
-    const start = cycleStart ?? cycleStartForDate(refDate, cycleDay);
-    const partial = findPartialMonth(months, start, cycleDay);
-    const hasStatementSpend = everydaySpendingTotal(report.transactions) > 0;
-    pace = computeLivePaceHealth({
-      transactions: input.paceReport?.transactions ?? report.transactions,
+    plan = computeLiveBudgetPlan({
       cycleTransactions: report.transactions,
       cycleDay,
+      cycleStart: cycleStart ?? cycleStartForDate(refDate, cycleDay),
       referenceDate: refDate,
       livingBudget: cap,
-      livingBudgetBase: base,
-      livingBudgetTopup: topUp,
-      budgetSegments: segments,
-      budgetMonthTopups: topups,
-      latestBillingDate: latestFinalBillingDate(months),
-      configuredCharges: input.fixedCharges,
-      cycleStart: start,
-      statementSavedAt: partial?.saved_at ?? null,
-      hasStatementSpend,
-      partialStatementActive: partialSnapshot,
-      cycleEverydaySpend: hasStatementSpend ? everydaySpendingTotal(report.transactions) : null,
     });
   }
 
@@ -204,8 +197,15 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     },
     money_left: left,
     over_budget: left !== null && left < 0,
-    daily_budget_left: left !== null && daysLeft ? dailyBudgetLeft(left, report.transactions, daysLeft) : null,
-    pace,
+    daily_budget_left: plan
+      ? plan.perDayLeft
+      : left !== null && daysLeft
+        ? dailyBudgetLeft(left, report.transactions, daysLeft)
+        : null,
+    pace: plan?.tone ?? null,
+    pace_status: plan?.status ?? null,
+    plan_per_day: plan?.planPerDay ?? null,
+    plan_buffer: plan?.buffer ?? null,
     transaction_count: report.transaction_count,
     manual_spend_used: manualUsed,
   };
