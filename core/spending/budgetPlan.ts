@@ -28,6 +28,7 @@ import {
 import { effectiveSpend } from "../utils/transaction.js";
 import { roundMoney } from "../utils/format.js";
 import { billingCycleProgress, getBillingCycle } from "./pace.js";
+import { configuredChargesForCycle, type ConfiguredCharge } from "../household/fixedCharges.js";
 
 export type BudgetPlanTone = "good" | "warn" | "bad";
 
@@ -62,6 +63,8 @@ export interface BudgetPlan {
   /** Committed charges by kind, for the details sheet (vaad reserve included). */
   committedRows: { kind: CommittedKind; label: string; amount: number }[];
   vaadReserve: number;
+  /** Charges added under Budget that are due later this cycle (set aside, not charged yet). */
+  upcomingReserve: number;
   flexBudget: number;
   flexSpent: number;
   flexLeft: number;
@@ -101,13 +104,25 @@ const STANDING_ORDER = "הוראת קבע";
 const INSTALLMENT_TYPES = new Set(["תשלומים", "רכישה בקרדיט"]);
 const ARNONA_RE = /עיריית|ארנונה|arnona|municipality/i;
 
-export type CommittedKind = "rent" | "carLoan" | "devInstitute" | "vaad" | "standingOrder" | "installment" | "arnona" | "earlier";
+export type CommittedKind =
+  | "rent"
+  | "carLoan"
+  | "devInstitute"
+  | "vaad"
+  | "configured"
+  | "upcoming"
+  | "standingOrder"
+  | "installment"
+  | "arnona"
+  | "earlier";
 
 export const COMMITTED_LABELS: Record<CommittedKind, string> = {
   rent: "Flat rent",
   carLoan: "Car loan",
   devInstitute: "Dev Institute",
   vaad: "Vaad bayit",
+  configured: "Charges you added",
+  upcoming: "Coming up this cycle",
   standingOrder: "Standing orders",
   installment: "Installments",
   arnona: "Arnona",
@@ -124,6 +139,8 @@ export function committedKind(tx: Transaction, cycleStart?: string): CommittedKi
   if (isCarLoanTransaction(tx)) return "carLoan";
   if (isDevInstituteTransaction(tx)) return "devInstitute";
   if (isVaadBayitTransaction(tx)) return "vaad";
+  // Charges entered under Budget (one-time or monthly) are known in advance, not day-to-day spending.
+  if (tx.notes?.startsWith("fixed_charge:")) return "configured";
   if (isInstallmentTransaction(tx)) return "installment";
   if (tx.transaction_type_he === STANDING_ORDER) return "standingOrder";
   if (ARNONA_RE.test(`${tx.merchant_he ?? ""} ${tx.merchant_en ?? ""}`)) return "arnona";
@@ -236,11 +253,13 @@ export function computeBudgetPlan(
     referenceDate: Date;
     /** Past transactions to learn the spending curve from; omitted → even split. */
     history?: Transaction[];
+    /** Charges entered under Budget; the ones not posted yet this cycle are set aside up front. */
+    configuredCharges?: ConfiguredCharge[];
   },
 ): BudgetPlan | null {
   if (budget == null || budget <= 0) return null;
 
-  const { dayIndex, cycleLength, start } = billingCycleProgress(
+  const { dayIndex, cycleLength, start, end } = billingCycleProgress(
     cycle.cycleStart,
     cycle.cycleDay,
     cycle.referenceDate,
@@ -248,17 +267,40 @@ export function computeBudgetPlan(
   const daysLeft = Math.max(0, cycleLength - dayIndex + 1);
 
   const breakdown = budgetSpendBreakdown(cycleTransactions);
-  const byKind = new Map<CommittedKind, number>();
+  // Rows keyed by label: charges you added are listed one by one, by name.
+  const rows = new Map<string, { kind: CommittedKind; label: string; amount: number }>();
+  const addRow = (kind: CommittedKind, label: string, amount: number) => {
+    const cur = rows.get(label) ?? { kind, label, amount: 0 };
+    cur.amount += amount;
+    rows.set(label, cur);
+  };
+  let committedPosted = 0;
+  const postedChargeIds = new Set<string>();
   for (const tx of cycleTransactions) {
     const kind = committedKind(tx, start);
-    if (kind) byKind.set(kind, (byKind.get(kind) ?? 0) + effectiveSpend(tx));
+    if (tx.notes?.startsWith("fixed_charge:")) postedChargeIds.add(tx.notes.slice("fixed_charge:".length));
+    if (!kind) continue;
+    const amount = effectiveSpend(tx);
+    committedPosted += amount;
+    addRow(kind, kind === "configured" ? tx.merchant_en || tx.merchant_he : COMMITTED_LABELS[kind], amount);
   }
-  const committedPosted = roundMoney([...byKind.values()].reduce((s, v) => s + v, 0));
+  committedPosted = roundMoney(committedPosted);
+
+  // Charges entered under Budget that fall in this cycle but aren't on the list yet (dated later).
+  let upcomingReserve = 0;
+  for (const charge of configuredChargesForCycle(start, cycle.configuredCharges ?? [], end)) {
+    if (postedChargeIds.has(charge.id) || !(charge.amount > 0)) continue;
+    upcomingReserve += charge.amount;
+    const when = charge.charge_date ? ` (${charge.charge_date.slice(8, 10)}/${charge.charge_date.slice(5, 7)})` : "";
+    addRow("upcoming", `${charge.name_en}${when}`, charge.amount);
+  }
+  upcomingReserve = roundMoney(upcomingReserve);
+
   const vaadReserve = hasVaadBayitCharge(cycleTransactions) ? 0 : VAAD_BAYIT_RESERVE;
-  if (vaadReserve > 0) byKind.set("vaad", (byKind.get("vaad") ?? 0) + vaadReserve);
-  const bills = roundMoney(committedPosted + vaadReserve);
-  const committedRows = [...byKind.entries()]
-    .map(([kind, amount]) => ({ kind, label: COMMITTED_LABELS[kind], amount: roundMoney(amount) }))
+  if (vaadReserve > 0) addRow("vaad", COMMITTED_LABELS.vaad, vaadReserve);
+  const bills = roundMoney(committedPosted + upcomingReserve + vaadReserve);
+  const committedRows = [...rows.values()]
+    .map((r) => ({ ...r, amount: roundMoney(r.amount) }))
     .filter((r) => r.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 
@@ -329,6 +371,7 @@ export function computeBudgetPlan(
     bills,
     committedRows,
     vaadReserve,
+    upcomingReserve,
     flexBudget,
     flexSpent,
     flexLeft,

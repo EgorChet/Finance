@@ -219,6 +219,7 @@ const plan = computed((): BudgetPlan | null => {
     cycleDay: cycleDay.value,
     referenceDate: props.referenceDate ?? new Date(),
     history: props.transactions,
+    configuredCharges: props.configuredCharges ?? [],
   });
 });
 
