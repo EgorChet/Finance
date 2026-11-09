@@ -71,12 +71,12 @@
 
       <section v-if="current" class="rv-hints" aria-live="polite">
         <div v-if="hintsLoading" class="rv-ai rv-ai--loading">
-          <span class="rv-ai-badge">✦ Claude</span>
-          <span>Looking at this merchant…</span>
+          <span class="rv-ai-badge">🐶 Totoshka</span>
+          <span>Loading hints…</span>
         </div>
         <div v-else-if="hints?.ai" class="rv-ai">
           <div class="rv-ai-top">
-            <span class="rv-ai-badge">✦ Claude's guess<template v-if="hints.ai.confidence !== 'high'"> · {{ hints.ai.confidence }} confidence</template></span>
+            <span class="rv-ai-badge">🐶 Totoshka's guess<template v-if="hints.ai.confidence !== 'high'"> · {{ hints.ai.confidence }} confidence</template></span>
             <button
               v-if="english !== hints.ai.english_name || category !== hints.ai.category"
               type="button"
@@ -89,7 +89,9 @@
           <p class="rv-ai-guess">{{ categoryIcon(hints.ai.category) }} {{ hints.ai.english_name }} · {{ hints.ai.category }}</p>
           <p class="rv-ai-reason">{{ hints.ai.reason }}</p>
         </div>
-        <p v-else-if="hints?.ai_status === 'error'" class="rv-hint-line">Claude couldn't make a guess this time.</p>
+        <p v-else-if="hints?.ai_status === 'waiting' && !auth.isDemo" class="rv-hint-line rv-hint-muted">
+          🐶 Totoshka hasn't looked at this one yet. Ask it in Telegram to "guess my new merchants".
+        </p>
 
         <p v-if="hints?.bank_category" class="rv-hint-line">
           <span class="rv-hint-label">Bank calls it</span> {{ categoryIcon(hints.bank_category) }} {{ hints.bank_category }}

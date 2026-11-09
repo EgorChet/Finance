@@ -1,15 +1,25 @@
 /**
- * Hints for labelling a Hebrew merchant: a translation, what the bank calls it, what else
- * was paid that day, earlier charges at the same place, and (when ANTHROPIC_API_KEY is set)
- * Claude's guess at the English name and category with a one-line reason.
+ * Hints for labelling a Hebrew merchant in Review: a translation, what the bank calls it,
+ * what else was paid that day, earlier charges at the same place, and Totoshka's guess.
  *
- * Sent to Claude: the Hebrew merchant name, the bank's category, the charge amount/date,
- * earlier amounts at that merchant and the names of other merchants paid the same day.
+ * Totoshka (the Telegram assistant) works by pulling: it fetches merchants that still need
+ * a guess (GET /review/to-guess), decides an English name + category + reason, and posts them
+ * back (POST /review/suggestions). The app never calls a paid model API itself.
+ * Contract: docs/TOTOSHKA.md.
  */
-import Anthropic from "@anthropic-ai/sdk";
 import { CATEGORY_PICKLIST } from "../../../core/categories.js";
-import type { Transaction } from "../types.js";
+import { readLabelSuggestions, writeLabelSuggestions } from "../storage/index.js";
+import type { ReviewQueueItem, Transaction } from "../types.js";
 import { translateMerchant } from "./analyzerClient.js";
+
+export interface LabelSuggestion {
+  english_name: string;
+  category: string;
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  source: "totoshka";
+  at: string;
+}
 
 export interface LabelHints {
   translation: string;
@@ -17,15 +27,14 @@ export interface LabelHints {
   bank_category_he: string | null;
   same_day: { merchant: string; category: string; amount: number }[];
   history: { date: string; amount: number }[];
-  ai: { english_name: string; category: string; confidence: "low" | "medium" | "high"; reason: string } | null;
-  /** off = no API key configured; error = the call failed or was declined. */
-  ai_status: "ok" | "off" | "error";
+  ai: LabelSuggestion | null;
+  /** waiting = Totoshka hasn't looked at this merchant yet. */
+  ai_status: "ok" | "waiting";
 }
 
 const HEBREW_RE = /[֐-׿]/;
-const aiCache = new Map<string, LabelHints["ai"]>();
+const CONFIDENCE = new Set(["low", "medium", "high"]);
 const translationCache = new Map<string, string>();
-let client: Anthropic | null = null;
 
 function displayName(tx: Transaction): string {
   const en = tx.merchant_en?.trim();
@@ -46,71 +55,22 @@ async function translate(hebrew: string): Promise<string> {
   }
 }
 
-const AI_SCHEMA = {
-  type: "object",
-  properties: {
-    english_name: { type: "string", description: "Short English name of the business, as an English speaker would call it" },
-    category: { type: "string", enum: [...CATEGORY_PICKLIST] },
-    confidence: { type: "string", enum: ["low", "medium", "high"] },
-    reason: { type: "string", description: "One short sentence: what the Hebrew means and why this category" },
-  },
-  required: ["english_name", "category", "confidence", "reason"],
-  additionalProperties: false,
-} as const;
-
-const SYSTEM = `You help an English speaker in Israel who doesn't read Hebrew label merchants from their Leumi Visa credit-card statement.
-Given a Hebrew merchant name and context, give the business's English name and the best spending category from the allowed list.
-Use what you know about Israeli chains and brands. If the name is ambiguous, say so in the reason and set confidence to low.`;
-
-async function askClaude(
-  hebrew: string,
-  context: { translation: string; bankCategoryHe: string | null; amount: number; date: string; sameDay: string[]; history: string[] },
-): Promise<LabelHints["ai"]> {
-  client ??= new Anthropic();
-  const lines = [
-    `Merchant on the statement: ${hebrew}`,
-    context.translation ? `Machine translation: ${context.translation}` : null,
-    context.bankCategoryHe ? `Bank's own category (Hebrew): ${context.bankCategoryHe}` : null,
-    `This charge: ₪${context.amount} on ${context.date}`,
-    context.history.length ? `Other charges at this merchant: ${context.history.join(", ")}` : null,
-    context.sameDay.length ? `Other places paid the same day: ${context.sameDay.join("; ")}` : null,
-  ].filter(Boolean);
-
-  const response = await client.beta.messages.create({
-    model: "claude-opus-5-5",
-    max_tokens: 4000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "low", format: { type: "json_schema", schema: AI_SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: "user", content: lines.join("\n") }],
-  });
-  if (response.stop_reason === "refusal") return null;
-  for (const block of response.content) {
-    if (block.type !== "text") continue;
-    const parsed = JSON.parse(block.text) as NonNullable<LabelHints["ai"]>;
-    if (!(CATEGORY_PICKLIST as readonly string[]).includes(parsed.category)) return null;
-    return parsed;
-  }
-  return null;
+export async function loadLabelSuggestions(): Promise<Record<string, LabelSuggestion>> {
+  const raw = (await readLabelSuggestions()) as { suggestions?: Record<string, LabelSuggestion> } | null;
+  return raw?.suggestions ?? {};
 }
 
-export async function buildLabelHints(
-  allTransactions: Transaction[],
-  target: { merchant_he: string; date: string; charge_amount: number; category_he?: string | null; category_en?: string },
-  options: { ai?: boolean } = {},
-): Promise<LabelHints> {
-  const hebrew = target.merchant_he.trim();
-  const day = target.date.slice(0, 10);
-
-  const sameDay = allTransactions
+function sameDayFor(all: Transaction[], hebrew: string, day: string) {
+  return all
     .filter((t) => t.date.slice(0, 10) === day && t.merchant_he.trim() !== hebrew && t.charge_amount > 0)
     .sort((a, b) => b.charge_amount - a.charge_amount)
     .slice(0, 8)
     .map((t) => ({ merchant: displayName(t), category: t.category_en || "Uncategorized", amount: t.charge_amount }));
+}
 
+function historyFor(all: Transaction[], hebrew: string) {
   const seen = new Set<string>();
-  const history = allTransactions
+  return all
     .filter((t) => t.merchant_he.trim() === hebrew)
     .map((t) => ({ date: t.date.slice(0, 10), amount: t.charge_amount }))
     .filter((h) => {
@@ -121,45 +81,80 @@ export async function buildLabelHints(
     })
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 12);
+}
 
-  const translation = await translate(hebrew);
-  const bankCategoryHe = target.category_he?.trim() || null;
-  const bankCategory = target.category_en && target.category_en !== "Uncategorized" ? target.category_en : null;
-
-  let ai: LabelHints["ai"] = null;
-  let aiStatus: LabelHints["ai_status"] = "off";
-  if (options.ai !== false && process.env.ANTHROPIC_API_KEY) {
-    const cacheKey = `${hebrew}|${day}|${target.charge_amount}`;
-    if (aiCache.has(cacheKey)) {
-      ai = aiCache.get(cacheKey) ?? null;
-      aiStatus = ai ? "ok" : "error";
-    } else {
-      try {
-        ai = await askClaude(hebrew, {
-          translation,
-          bankCategoryHe,
-          amount: target.charge_amount,
-          date: day,
-          sameDay: sameDay.map((s) => `${s.merchant} (${s.category}, ₪${s.amount})`),
-          history: history.map((h) => `₪${h.amount} on ${h.date}`),
-        });
-        aiStatus = ai ? "ok" : "error";
-        if (ai) aiCache.set(cacheKey, ai);
-      } catch (e) {
-        if (e instanceof Anthropic.APIError) console.error(`label hints: Claude API ${e.status}: ${e.message}`);
-        else console.error("label hints:", e);
-        aiStatus = "error";
-      }
-    }
-  }
-
+export async function buildLabelHints(
+  allTransactions: Transaction[],
+  target: { merchant_he: string; date: string; charge_amount: number; category_he?: string | null; category_en?: string },
+  options: { suggestions?: Record<string, LabelSuggestion> } = {},
+): Promise<LabelHints> {
+  const hebrew = target.merchant_he.trim();
+  const suggestions = options.suggestions ?? (await loadLabelSuggestions());
+  const ai = suggestions[hebrew] ?? null;
   return {
-    translation,
-    bank_category: bankCategory,
-    bank_category_he: bankCategoryHe,
-    same_day: sameDay,
-    history,
+    translation: await translate(hebrew),
+    bank_category: target.category_en && target.category_en !== "Uncategorized" ? target.category_en : null,
+    bank_category_he: target.category_he?.trim() || null,
+    same_day: sameDayFor(allTransactions, hebrew, target.date.slice(0, 10)),
+    history: historyFor(allTransactions, hebrew),
     ai,
-    ai_status: aiStatus,
+    ai_status: ai ? "ok" : "waiting",
   };
+}
+
+/** Merchants in the Review queue that Totoshka hasn't guessed yet, with the context to guess them. */
+export async function buildGuessQueue(allTransactions: Transaction[], queue: ReviewQueueItem[], limit: number) {
+  const suggestions = await loadLabelSuggestions();
+  const seen = new Set<string>();
+  const out = [];
+  for (const item of queue) {
+    const hebrew = item.transaction.merchant_he.trim();
+    if (!hebrew || seen.has(hebrew) || suggestions[hebrew]) continue;
+    seen.add(hebrew);
+    out.push({
+      merchant_he: hebrew,
+      bank_category_he: item.transaction.category_he?.trim() || null,
+      bank_category: item.transaction.category_en || null,
+      example: { date: item.transaction.date.slice(0, 10), amount: item.transaction.charge_amount },
+      charges: item.occurrence_count,
+      history: historyFor(allTransactions, hebrew),
+      same_day: sameDayFor(allTransactions, hebrew, item.transaction.date.slice(0, 10)),
+    });
+    if (out.length >= limit) break;
+  }
+  return { categories: [...CATEGORY_PICKLIST], merchants: out };
+}
+
+/** Validate and store Totoshka's guesses. Returns how many were saved and why others were skipped. */
+export async function saveLabelSuggestions(input: unknown): Promise<{ saved: number; skipped: { merchant_he?: string; reason: string }[] }> {
+  const items = Array.isArray(input) ? input : [];
+  const current = await loadLabelSuggestions();
+  const skipped: { merchant_he?: string; reason: string }[] = [];
+  let saved = 0;
+  const now = new Date().toISOString();
+  for (const raw of items.slice(0, 200)) {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const hebrew = typeof r.merchant_he === "string" ? r.merchant_he.trim() : "";
+    const english = typeof r.english_name === "string" ? r.english_name.trim() : "";
+    const category = typeof r.category === "string" ? r.category.trim() : "";
+    const confidence = typeof r.confidence === "string" && CONFIDENCE.has(r.confidence) ? r.confidence : "medium";
+    const reason = typeof r.reason === "string" ? r.reason.trim().slice(0, 300) : "";
+    if (!hebrew) { skipped.push({ reason: "merchant_he missing" }); continue; }
+    if (!english || english.length > 80) { skipped.push({ merchant_he: hebrew, reason: "english_name missing or too long" }); continue; }
+    if (!(CATEGORY_PICKLIST as readonly string[]).includes(category)) {
+      skipped.push({ merchant_he: hebrew, reason: `category must be one of the listed categories, got "${category}"` });
+      continue;
+    }
+    current[hebrew] = {
+      english_name: english,
+      category,
+      confidence: confidence as LabelSuggestion["confidence"],
+      reason,
+      source: "totoshka",
+      at: now,
+    };
+    saved += 1;
+  }
+  if (saved) await writeLabelSuggestions({ suggestions: current, updated_at: now });
+  return { saved, skipped };
 }

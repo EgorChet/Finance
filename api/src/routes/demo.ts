@@ -199,7 +199,7 @@ router.put("/rules", (_req, res) => {
   res.status(403).json({ error: "Saving rules disabled in demo mode" });
 });
 
-/** Demo: same hints from the sample statements, without the Claude call. */
+/** Demo: same hints from the sample statements, with no Totoshka guesses. */
 router.post("/review/hints", async (req, res) => {
   const tx = (req.body as { transaction?: { merchant_he: string; date: string; charge_amount: number; category_en?: string } }).transaction;
   if (!tx?.merchant_he) {
@@ -207,7 +207,7 @@ router.post("/review/hints", async (req, res) => {
     return;
   }
   const all = demoMonthCatalog().flatMap((m) => getDemoReport(m.key).transactions);
-  res.json(await buildLabelHints(all, tx, { ai: false }));
+  res.json(await buildLabelHints(all, tx, { suggestions: {} }));
 });
 
 router.post("/review/confirm", (_req, res) => {

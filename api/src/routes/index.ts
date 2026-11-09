@@ -26,7 +26,7 @@ import {
 } from "../services/statementUpload.js";
 import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
-import { buildLabelHints } from "../services/labelHints.js";
+import { buildGuessQueue, buildLabelHints, saveLabelSuggestions } from "../services/labelHints.js";
 import {
   buildReviewQueue,
   normalizeReviewKey,
@@ -647,7 +647,7 @@ router.get("/review/suggest", async (req, res) => {
   res.json({ english });
 });
 
-/** Translation, context and (with ANTHROPIC_API_KEY) Claude's guess for labelling one merchant. */
+/** Translation, context and Totoshka's guess (if it has made one) for labelling one merchant. */
 router.post("/review/hints", async (req, res) => {
   const { transaction } = req.body as {
     transaction?: { merchant_he: string; date: string; charge_amount: number; category_he?: string | null; category_en?: string };
@@ -660,6 +660,39 @@ router.post("/review/hints", async (req, res) => {
   const version = await getFinalizeVersion();
   const all = await getCombinedReportAsync(data, null, version);
   res.json(await buildLabelHints(all?.transactions ?? [], transaction));
+});
+
+/** For Totoshka: merchants waiting in Review that it hasn't guessed yet, with context. ?limit=20 */
+router.get("/review/to-guess", async (req, res) => {
+  const data = await loadStatementsRepaired();
+  const version = await getFinalizeVersion();
+  const rules = await readRules();
+  const progress = await readReviewProgress();
+  const reviewed = new Set(progress.reviewed_transactions.map(normalizeReviewKey));
+  const report = await getCombinedReportAsync(data, null, version);
+  if (!report) {
+    res.json({ categories: [], merchants: [] });
+    return;
+  }
+  const queue = buildReviewQueue(report, rules, reviewed, {
+    includeReviewed: false,
+    includeLabeled: false,
+    onePerMerchant: true,
+    reviewedMerchants: new Set(progress.reviewed_merchants || []),
+  });
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+  res.json(await buildGuessQueue(report.transactions, queue, limit));
+});
+
+/** For Totoshka: store guesses [{merchant_he, english_name, category, confidence, reason}]. */
+router.post("/review/suggestions", async (req, res) => {
+  const body = req.body as { suggestions?: unknown } | unknown[];
+  const list = Array.isArray(body) ? body : (body as { suggestions?: unknown }).suggestions;
+  if (!Array.isArray(list)) {
+    res.status(400).json({ error: "send { suggestions: [...] }" });
+    return;
+  }
+  res.json(await saveLabelSuggestions(list));
 });
 
 router.post("/review/confirm", async (req, res) => {

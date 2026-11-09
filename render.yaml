@@ -23,8 +23,6 @@ services:
         sync: false
       - key: ASSISTANT_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
-        sync: false
       - key: CAL_USERNAME
         sync: false
       - key: CAL_PASSWORD

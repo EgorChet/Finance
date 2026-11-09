@@ -393,8 +393,9 @@ export interface LabelHints {
   bank_category_he: string | null;
   same_day: { merchant: string; category: string; amount: number }[];
   history: { date: string; amount: number }[];
-  ai: { english_name: string; category: string; confidence: "low" | "medium" | "high"; reason: string } | null;
-  ai_status: "ok" | "off" | "error";
+  /** Totoshka's guess, when it has made one. */
+  ai: { english_name: string; category: string; confidence: "low" | "medium" | "high"; reason: string; at?: string } | null;
+  ai_status: "ok" | "waiting";
 }
 
 /** Translation, same-day charges, history and Claude's guess for one merchant in Review. */

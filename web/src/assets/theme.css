@@ -3258,3 +3258,7 @@ html.sheet-editor-open body {
   margin-left: 0.2rem;
   font-variant-numeric: tabular-nums;
 }
+
+.rv-hint-muted {
+  color: var(--text-muted);
+}
