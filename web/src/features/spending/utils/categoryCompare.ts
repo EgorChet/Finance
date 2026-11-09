@@ -4,9 +4,9 @@ import {
   homeSubsectionKey,
   rollupCategory,
 } from "@/shared/categories";
-import { roundMoney, formatIls } from "@/shared/utils/format";
+import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 import { effectiveSpend } from "@/shared/utils/transaction";
-import { getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "@/features/spending/utils/pace";
+import { billingCycleProgress, getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "@/features/spending/utils/pace";
 import { subscriptionSubsectionLabel } from "@/features/spending/utils/subscriptionSections";
 
 function parseIsoDate(dateStr: string): Date {
@@ -35,40 +35,37 @@ export type CategoryCompareScope =
 export interface CategoryCompareResult {
   label: string;
   current: number;
+  /** Most recent previous cycle / statement, at the same point. */
+  last: number | null;
+  /** Average of recent previous cycles / statements, at the same point. */
   usual: number | null;
+  /** current − usual. */
   delta: number | null;
-  cyclesUsed: number;
-  dayIndex: number;
-  cycleLength: number;
+  samplesUsed: number;
 }
 
-export type CategoryCompareTone = "high" | "low" | "neutral" | "unknown";
+export type CategoryCompareTone = "high" | "low" | "neutral" | "unknown" | "new";
 
-/** Ignore small noise — same order of magnitude as pace deltas. */
-export const CATEGORY_COMPARE_NEUTRAL_THRESHOLD = 30;
+/** Differences under ₪50 or 15% of usual are noise. */
+export const CATEGORY_COMPARE_MIN_ABS = 50;
+export const CATEGORY_COMPARE_MIN_REL = 0.15;
 
-export function categoryCompareTone(
-  delta: number | null,
-  usual: number | null,
-): CategoryCompareTone {
-  if (delta == null || usual == null) return "unknown";
-  if (Math.abs(delta) < CATEGORY_COMPARE_NEUTRAL_THRESHOLD) return "neutral";
-  return delta > 0 ? "high" : "low";
+export function categoryCompareTone(result: CategoryCompareResult | undefined | null): CategoryCompareTone {
+  if (!result || result.usual == null || result.delta == null) return "unknown";
+  if (result.usual < 1 && result.current >= CATEGORY_COMPARE_MIN_ABS) return "new";
+  const threshold = Math.max(CATEGORY_COMPARE_MIN_ABS, result.usual * CATEGORY_COMPARE_MIN_REL);
+  if (Math.abs(result.delta) < threshold) return "neutral";
+  return result.delta > 0 ? "high" : "low";
 }
 
-export function categoryCompareAriaLabel(tone: CategoryCompareTone, label?: string): string {
-  const name = label ? `${label}: ` : "";
-  if (tone === "high") return `${name}Spending above usual — open comparison`;
-  if (tone === "low") return `${name}Spending below usual — open comparison`;
-  if (tone === "neutral") return `${name}About usual — open comparison`;
-  return `${name}Compare with usual spending`;
-}
-
-export function categoryCompareTitle(delta?: number | null): string {
-  if (delta == null) return "Compare with usual spending";
-  if (Math.abs(delta) < 1) return "About usual at this point in the cycle";
-  const abs = formatIls(Math.abs(delta));
-  return delta > 0 ? `${abs} above usual` : `${abs} below usual`;
+/** One short line for a category row: "₪320 more than usual", "About usual", "New". */
+export function categoryCompareLine(result: CategoryCompareResult | undefined | null): string {
+  const tone = categoryCompareTone(result);
+  if (!result || tone === "unknown") return "";
+  if (tone === "new") return "Not usual for you";
+  if (tone === "neutral") return "About usual";
+  const abs = formatIlsWhole(Math.abs(result.delta!));
+  return tone === "high" ? `${abs} more than usual` : `${abs} less than usual`;
 }
 
 export function scopeKey(scope: CategoryCompareScope): string {
@@ -86,11 +83,22 @@ export function scopeKey(scope: CategoryCompareScope): string {
   }
 }
 
+/**
+ * What a category is compared against.
+ * - cycle: open billing cycle — previous cycles summed through the same day (fair mid-cycle).
+ * - statement: closed month — previous statements in full.
+ */
 export interface CategoryCompareContext {
-  dayIndex: number;
-  cycleLength: number;
-  currentStart: Date;
-  historical: { start: Date; txs: Transaction[] }[];
+  mode: "cycle" | "statement";
+  /** Day of the cycle being compared (cycle mode). */
+  dayIndex: number | null;
+  currentStart: Date | null;
+  /** Most recent first. */
+  historical: { start: Date | null; txs: Transaction[]; label: string }[];
+  /** "by day 15" / "" — appended to "usual" / "last" labels. */
+  pointLabel: string;
+  /** "Last cycle" / "Sep 2026". */
+  lastLabel: string;
 }
 
 export function buildCategoryCompareContext(
@@ -111,7 +119,7 @@ export function buildCategoryCompareContext(
     options.referenceDate.getMonth(),
     options.referenceDate.getDate(),
   );
-  const cycle = getBillingCycle(ref, options.cycleDay);
+  const { dayIndex } = billingCycleProgress(options.cycleStart, options.cycleDay, ref);
   const currentStart = parseIsoDate(options.cycleStart);
   const currentKey = isoDate(currentStart);
 
@@ -127,51 +135,56 @@ export function buildCategoryCompareContext(
     bucket.txs.push(tx);
   }
 
-  const historical: { start: Date; txs: Transaction[] }[] = [];
+  const historical: CategoryCompareContext["historical"] = [];
   for (const [key, bucket] of byCycle.entries()) {
-    if (key === currentKey) continue;
+    if (key >= currentKey) continue;
     if (bucket.end >= ref) continue;
-    historical.push({ start: bucket.start, txs: bucket.txs });
+    historical.push({ start: bucket.start, txs: bucket.txs, label: key });
   }
-  historical.sort((a, b) => b.start.getTime() - a.start.getTime());
+  historical.sort((a, b) => b.start!.getTime() - a.start!.getTime());
 
   return {
-    dayIndex: cycle.dayIndex,
-    cycleLength: cycle.cycleLength,
+    mode: "cycle",
+    dayIndex,
     currentStart,
     historical: historical.slice(0, targetCycles),
+    pointLabel: `by day ${dayIndex}`,
+    lastLabel: "Last cycle",
+  };
+}
+
+/** Closed statement month vs the statements before it (most recent first). */
+export function buildStatementCompareContext(
+  previous: { label: string; txs: Transaction[] }[],
+): CategoryCompareContext | null {
+  if (!previous.length) return null;
+  return {
+    mode: "statement",
+    dayIndex: null,
+    currentStart: null,
+    historical: previous.map((p) => ({ start: null, txs: p.txs, label: p.label })),
+    pointLabel: "",
+    lastLabel: previous[0].label,
   };
 }
 
 export function computeCategoryCompareFromContext(
   ctx: CategoryCompareContext,
-  currentCycleTransactions: Transaction[],
+  currentTransactions: Transaction[],
   scope: CategoryCompareScope,
   label: string,
 ): CategoryCompareResult {
-  const usualSamples = ctx.historical.map((row) =>
-    sumScopeThroughDay(row.txs, row.start, ctx.dayIndex, scope),
-  );
-  const cyclesUsed = usualSamples.length;
-  const usual =
-    cyclesUsed > 0 ? roundMoney(usualSamples.reduce((s, v) => s + v, 0) / cyclesUsed) : null;
-
-  const current = sumScopeThroughDay(
-    currentCycleTransactions,
-    ctx.currentStart,
-    ctx.dayIndex,
-    scope,
-  );
-  const delta = usual != null ? roundMoney(current - usual) : null;
-
+  const samples = ctx.historical.map((row) => sumScope(row.txs, row.start, ctx.dayIndex, scope));
+  const samplesUsed = samples.length;
+  const usual = samplesUsed > 0 ? roundMoney(samples.reduce((s, v) => s + v, 0) / samplesUsed) : null;
+  const current = sumScope(currentTransactions, ctx.currentStart, ctx.dayIndex, scope);
   return {
     label,
     current,
+    last: samplesUsed > 0 ? samples[0] : null,
     usual,
-    delta,
-    cyclesUsed,
-    dayIndex: ctx.dayIndex,
-    cycleLength: ctx.cycleLength,
+    delta: usual != null ? roundMoney(current - usual) : null,
+    samplesUsed,
   };
 }
 
@@ -196,63 +209,21 @@ function transactionMatchesScope(tx: Transaction, scope: CategoryCompareScope): 
   }
 }
 
-function sumScopeThroughDay(
+/** Sum a scope; in cycle mode only charges through `dayIndex` of the cycle starting at `start`. */
+function sumScope(
   transactions: Transaction[],
-  cycleStart: Date,
-  dayIndex: number,
+  start: Date | null,
+  dayIndex: number | null,
   scope: CategoryCompareScope,
 ): number {
-  if (dayIndex <= 0) return 0;
   let sum = 0;
   for (const tx of transactions) {
     if (!transactionMatchesScope(tx, scope)) continue;
-    const d = parseIsoDate(tx.date);
-    const day = daysBetween(cycleStart, d) + 1;
-    if (day > dayIndex) continue;
+    if (start && dayIndex != null) {
+      const day = daysBetween(start, parseIsoDate(tx.date)) + 1;
+      if (day > dayIndex) continue;
+    }
     sum += effectiveSpend(tx);
   }
   return roundMoney(sum);
-}
-
-export function computeCategoryCompare(
-  allTransactions: Transaction[],
-  currentCycleTransactions: Transaction[],
-  options: {
-    scope: CategoryCompareScope;
-    label: string;
-    cycleDay: number;
-    cycleStart: string;
-    referenceDate: Date;
-    avgCycles?: PaceAvgCycles;
-  },
-): CategoryCompareResult {
-  const ref = new Date(
-    options.referenceDate.getFullYear(),
-    options.referenceDate.getMonth(),
-    options.referenceDate.getDate(),
-  );
-  const cycle = getBillingCycle(ref, options.cycleDay);
-  const ctx = buildCategoryCompareContext(allTransactions, options);
-  if (!ctx) {
-    return {
-      label: options.label,
-      current: sumScopeThroughDay(
-        currentCycleTransactions,
-        parseIsoDate(options.cycleStart),
-        cycle.dayIndex,
-        options.scope,
-      ),
-      usual: null,
-      delta: null,
-      cyclesUsed: 0,
-      dayIndex: cycle.dayIndex,
-      cycleLength: cycle.cycleLength,
-    };
-  }
-  return computeCategoryCompareFromContext(
-    ctx,
-    currentCycleTransactions,
-    options.scope,
-    options.label,
-  );
 }
