@@ -482,6 +482,7 @@ const summaryPlan = computed(() => {
     livingBudget: resolvedLivingBudget.value,
     history: paceTransactions.value,
     configuredCharges: configuredCharges.value,
+    dataAsOf: statementSavedAt.value,
   });
 });
 

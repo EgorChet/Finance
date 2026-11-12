@@ -235,9 +235,11 @@ const byDay = computed(() => {
   const n = b.past.length + 1;
   const record = b.everydayRank === 1 || b.totalRank === 1;
   const d = b.day;
-  if (b.everydayRank === 1) return { record, line: `🔺 Most everyday spending by day ${d} in ${n} cycles (${whole(b.everyday)})` };
-  if (b.totalRank === 1) return { record, line: `🔺 Most spent by day ${d} in ${n} cycles (${whole(b.total)} incl. bills)` };
-  return { record, line: `By day ${d}: ${whole(b.everyday)} everyday · ${ordinal(b.everydayRank)} of ${n} cycles` };
+  const asOf = b.dataAsOf ? ` (data from ${b.dataAsOf.slice(8, 10)}/${b.dataAsOf.slice(5, 7)})` : "";
+  const stale = b.dataAgeDays >= 3 ? ` · ⚠️ data is ${b.dataAgeDays} days old` : "";
+  if (b.everydayRank === 1) return { record, line: `🔺 Most everyday spending by day ${d}${asOf} in ${n} cycles (${whole(b.everyday)})${stale}` };
+  if (b.totalRank === 1) return { record, line: `🔺 Most spent by day ${d}${asOf} in ${n} cycles (${whole(b.total)} incl. bills)${stale}` };
+  return { record, line: `By day ${d}${asOf}: ${whole(b.everyday)} everyday · ${ordinal(b.everydayRank)} of ${n} cycles${stale}` };
 });
 
 const compareRows = computed(() => {
@@ -258,10 +260,9 @@ const compareNote = computed(() => {
   const rank = compareMode.value === "everyday" ? b.everydayRank : b.totalRank;
   const n = b.past.length + 1;
   const what = compareMode.value === "everyday" ? "everyday spending (what the card paces)" : "everything on the card, incl. bills and installments";
-  const asOf =
-    b.latestChargeDate && b.day < props.plan.dayIndex
-      ? ` Compared through day ${b.day}: the latest charges are from ${b.latestChargeDate.slice(8, 10)}/${b.latestChargeDate.slice(5, 7)}.`
-      : "";
+  const asOf = b.dataAsOf
+    ? ` Compared through day ${b.day}: your card data is from the ${b.dataAsOf.slice(8, 10)}/${b.dataAsOf.slice(5, 7)} sync.`
+    : "";
   return `${rank === 1 ? "The most" : `${ordinal(rank)} most`} of ${n} cycles — ${what}, actual shekels, nothing scaled.${asOf}`;
 });
 

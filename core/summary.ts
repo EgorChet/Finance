@@ -174,6 +174,7 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
       livingBudget: cap,
       history: input.paceReport?.transactions,
       configuredCharges: input.fixedCharges,
+      dataAsOf: findPartialMonth(months, cycleStart ?? cycleStartForDate(refDate, cycleDay), cycleDay)?.saved_at ?? null,
     });
   }
 
