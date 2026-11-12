@@ -127,7 +127,7 @@
 
         <section v-if="plan.byThisDay" class="bh-compare">
           <div class="bh-compare-head">
-            <p class="bh-compare-title">By day {{ plan.dayIndex }}, cycle by cycle</p>
+            <p class="bh-compare-title">By day {{ plan.byThisDay.day }}, cycle by cycle</p>
             <div class="seg bh-compare-seg" role="tablist">
               <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'everyday' }" @click="compareMode = 'everyday'">Everyday</button>
               <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'total' }" @click="compareMode = 'total'">Everything</button>
@@ -234,7 +234,7 @@ const byDay = computed(() => {
   if (!b || props.plan.dayIndex < 1) return null;
   const n = b.past.length + 1;
   const record = b.everydayRank === 1 || b.totalRank === 1;
-  const d = props.plan.dayIndex;
+  const d = b.day;
   if (b.everydayRank === 1) return { record, line: `🔺 Most everyday spending by day ${d} in ${n} cycles (${whole(b.everyday)})` };
   if (b.totalRank === 1) return { record, line: `🔺 Most spent by day ${d} in ${n} cycles (${whole(b.total)} incl. bills)` };
   return { record, line: `By day ${d}: ${whole(b.everyday)} everyday · ${ordinal(b.everydayRank)} of ${n} cycles` };
@@ -258,7 +258,11 @@ const compareNote = computed(() => {
   const rank = compareMode.value === "everyday" ? b.everydayRank : b.totalRank;
   const n = b.past.length + 1;
   const what = compareMode.value === "everyday" ? "everyday spending (what the card paces)" : "everything on the card, incl. bills and installments";
-  return `${rank === 1 ? "The most" : `${ordinal(rank)} most`} of ${n} cycles — ${what}, actual shekels, nothing scaled.`;
+  const asOf =
+    b.latestChargeDate && b.day < props.plan.dayIndex
+      ? ` Compared through day ${b.day}: the latest charges are from ${b.latestChargeDate.slice(8, 10)}/${b.latestChargeDate.slice(5, 7)}.`
+      : "";
+  return `${rank === 1 ? "The most" : `${ordinal(rank)} most`} of ${n} cycles — ${what}, actual shekels, nothing scaled.${asOf}`;
 });
 
 // ── Chart ──

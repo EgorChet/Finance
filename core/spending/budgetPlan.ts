@@ -94,6 +94,13 @@ export interface BudgetPlan {
    * (everyday = what the card paces; total = everything on the card incl. bills). Most recent first.
    */
   byThisDay: {
+    /**
+     * The day compared: the last day of this cycle with card charges (statements arrive a day
+     * late), not necessarily today — past cycles are counted through the same day.
+     */
+    day: number;
+    /** Date of the latest card charge this cycle (YYYY-MM-DD), when there is one. */
+    latestChargeDate: string | null;
     everyday: number;
     total: number;
     past: { cycleStart: string; label: string; everyday: number; total: number }[];
@@ -433,10 +440,28 @@ export function computeBudgetPlan(
     roundMoney(flexBudget * planShareAt(i + 1)),
   );
 
-  // Plain "have we ever spent this much by day N?" — counted the same way as the past cycles.
+  // Plain "have we ever spent this much by day N?" — counted the same way as the past cycles,
+  // through the last day that has card data (charges usually show up a day late).
   let byThisDay: BudgetPlan["byThisDay"] = null;
-  if (cycle.history?.length) {
-    const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, dayIndex);
+  if (cycle.history?.length && dayIndex >= 1) {
+    let latestDay = 0;
+    let latestChargeDate: string | null = null;
+    let datedEveryday = 0;
+    for (const tx of cycleTransactions) {
+      if (tx.notes?.startsWith("fixed_charge:")) continue; // added under Budget, not card data
+      const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
+      if (day < 1 || day > dayIndex) continue;
+      if (day > latestDay) {
+        latestDay = day;
+        latestChargeDate = tx.date.slice(0, 10);
+      }
+      if (isFlexibleTransaction(tx) && effectiveSpend(tx) > 0) datedEveryday += effectiveSpend(tx);
+    }
+    // A manual "spent so far" total is as of now; otherwise use the last day with charges.
+    const manualTotal = flexSpent > datedEveryday + 1;
+    const compareDay = manualTotal ? dayIndex : latestDay || Math.max(1, dayIndex - 1);
+
+    const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, compareDay);
     if (past.length) {
       let everyday = 0;
       let total = 0;
@@ -444,14 +469,15 @@ export function computeBudgetPlan(
         const amt = effectiveSpend(tx);
         if (!(amt > 0)) continue;
         const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
-        if (day > dayIndex) continue;
+        if (day > compareDay) continue;
         total += amt;
         if (isFlexibleTransaction(tx)) everyday += amt;
       }
-      // A manual "spent so far" total has no per-charge dates; count it as everyday.
-      everyday = Math.max(everyday, flexSpent);
+      if (manualTotal) everyday = Math.max(everyday, flexSpent);
       total = Math.max(total, everyday);
       byThisDay = {
+        day: compareDay,
+        latestChargeDate,
         everyday: roundMoney(everyday),
         total: roundMoney(total),
         past,
