@@ -95,12 +95,14 @@ export interface BudgetPlan {
    */
   byThisDay: {
     /**
-     * The day compared: the last day of this cycle with card charges (statements arrive a day
-     * late), not necessarily today — past cycles are counted through the same day.
+     * The day compared: the day the card data was last synced / uploaded (a hand-typed total
+     * counts as today). Past cycles are counted through the same day.
      */
     day: number;
-    /** Date of the latest card charge this cycle (YYYY-MM-DD), when there is one. */
-    latestChargeDate: string | null;
+    /** Date the data is from (YYYY-MM-DD), or null when it's today's (hand-typed / no sync info). */
+    dataAsOf: string | null;
+    /** Days between the data and today (0 = up to date). */
+    dataAgeDays: number;
     everyday: number;
     total: number;
     past: { cycleStart: string; label: string; everyday: number; total: number }[];
@@ -326,6 +328,8 @@ export function computeBudgetPlan(
     history?: Transaction[];
     /** Charges entered under Budget; the ones not posted yet this cycle are set aside up front. */
     configuredCharges?: ConfiguredCharge[];
+    /** When the card data was last synced / uploaded (ISO); "by day N" compares through that day. */
+    dataAsOf?: string | null;
   },
 ): BudgetPlan | null {
   if (budget == null || budget <= 0) return null;
@@ -441,25 +445,38 @@ export function computeBudgetPlan(
   );
 
   // Plain "have we ever spent this much by day N?" — counted the same way as the past cycles,
-  // through the last day that has card data (charges usually show up a day late).
+  // through the day the card data is from (last sync / upload), not the last day with a charge:
+  // a quiet week after a sync is real data and must count.
   let byThisDay: BudgetPlan["byThisDay"] = null;
   if (cycle.history?.length && dayIndex >= 1) {
-    let latestDay = 0;
-    let latestChargeDate: string | null = null;
     let datedEveryday = 0;
+    let latestChargeDay = 0;
     for (const tx of cycleTransactions) {
-      if (tx.notes?.startsWith("fixed_charge:")) continue; // added under Budget, not card data
+      if (tx.notes?.startsWith("fixed_charge:")) continue;
       const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
       if (day < 1 || day > dayIndex) continue;
-      if (day > latestDay) {
-        latestDay = day;
-        latestChargeDate = tx.date.slice(0, 10);
-      }
+      latestChargeDay = Math.max(latestChargeDay, day);
       if (isFlexibleTransaction(tx) && effectiveSpend(tx) > 0) datedEveryday += effectiveSpend(tx);
     }
-    // A manual "spent so far" total is as of now; otherwise use the last day with charges.
+    // A hand-typed "spent so far" total is as of now.
     const manualTotal = flexSpent > datedEveryday + 1;
-    const compareDay = manualTotal ? dayIndex : latestDay || Math.max(1, dayIndex - 1);
+    let compareDay = dayIndex;
+    let dataAsOfDate: string | null = null;
+    if (!manualTotal && cycle.dataAsOf) {
+      const synced = new Date(cycle.dataAsOf);
+      if (!Number.isNaN(synced.getTime())) {
+        const local = new Date(synced.getFullYear(), synced.getMonth(), synced.getDate());
+        const day = daysBetween(startDate, local) + 1;
+        // A charge dated after the sync means the data reaches at least that day.
+        compareDay = Math.min(dayIndex, Math.max(1, day, latestChargeDay));
+        if (compareDay < dayIndex) {
+          const y = local.getFullYear();
+          const m = String(local.getMonth() + 1).padStart(2, "0");
+          const d = String(local.getDate()).padStart(2, "0");
+          dataAsOfDate = `${y}-${m}-${d}`;
+        }
+      }
+    }
 
     const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, compareDay);
     if (past.length) {
@@ -477,7 +494,8 @@ export function computeBudgetPlan(
       total = Math.max(total, everyday);
       byThisDay = {
         day: compareDay,
-        latestChargeDate,
+        dataAsOf: dataAsOfDate,
+        dataAgeDays: dayIndex - compareDay,
         everyday: roundMoney(everyday),
         total: roundMoney(total),
         past,

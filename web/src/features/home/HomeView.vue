@@ -214,6 +214,11 @@ const summaryPlan = computed(() => {
     livingBudget: livingBudgetAmount.value,
     history: paceReport.value?.transactions,
     configuredCharges: configuredCharges.value,
+    dataAsOf: findPartialMonth(
+      months.value,
+      activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
+      cycleDay.value,
+    )?.saved_at ?? null,
   });
 });
 

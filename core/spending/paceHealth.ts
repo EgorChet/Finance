@@ -16,6 +16,8 @@ export interface LivePaceHealthInput {
   history?: Transaction[];
   /** Charges entered under Budget — set aside before they post. */
   configuredCharges?: ConfiguredCharge[];
+  /** When the open cycle's card data was last synced / uploaded (partial snapshot saved_at). */
+  dataAsOf?: string | null;
 }
 
 export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | null {
@@ -25,6 +27,7 @@ export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | 
     referenceDate: input.referenceDate,
     history: input.history,
     configuredCharges: input.configuredCharges,
+    dataAsOf: input.dataAsOf,
   });
 }
 
