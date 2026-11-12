@@ -73,6 +73,8 @@
       </button>
     </div>
 
+    <p v-if="byDay" class="bh-byday" :class="{ 'bh-byday--record': byDay.record }">{{ byDay.line }}</p>
+
     <div class="bh-stats">
       <div>
         <span>Free to spend</span>
@@ -122,6 +124,24 @@
             <strong>{{ whole(Math.abs(plan.buffer)) }}</strong>
           </li>
         </ul>
+
+        <section v-if="plan.byThisDay" class="bh-compare">
+          <div class="bh-compare-head">
+            <p class="bh-compare-title">By day {{ plan.dayIndex }}, cycle by cycle</p>
+            <div class="seg bh-compare-seg" role="tablist">
+              <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'everyday' }" @click="compareMode = 'everyday'">Everyday</button>
+              <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'total' }" @click="compareMode = 'total'">Everything</button>
+            </div>
+          </div>
+          <p class="bh-compare-note">{{ compareNote }}</p>
+          <ul class="bh-compare-list">
+            <li v-for="row in compareRows" :key="row.key" :class="{ 'bh-compare-row--now': row.now }">
+              <span class="bh-compare-label">{{ row.label }}</span>
+              <span class="bh-compare-track"><span :style="{ width: `${row.pct}%` }" /></span>
+              <b>{{ whole(row.value) }}</b>
+            </li>
+          </ul>
+        </section>
 
         <ul v-if="plan.daysLeft > 0" class="bh-rows">
           <li><span>Left for {{ plan.daysLeft }} {{ plan.daysLeft === 1 ? "day" : "days" }}</span><strong>{{ whole(Math.max(0, plan.flexLeft)) }}</strong></li>
@@ -199,6 +219,47 @@ const curveNote = computed(() =>
     ? `"Usual" follows how you spent across your last ${props.plan.curve.cyclesUsed} cycles, scaled to this month's budget.`
     : `"Usual" spreads the flexible money evenly until there are 3 past cycles to learn from.`,
 );
+
+// ── By this day, cycle by cycle (plain amounts, no scaling) ──
+const compareMode = ref<"everyday" | "total">("everyday");
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+const byDay = computed(() => {
+  const b = props.plan.byThisDay;
+  if (!b || props.plan.dayIndex < 1) return null;
+  const n = b.past.length + 1;
+  const record = b.everydayRank === 1 || b.totalRank === 1;
+  const d = props.plan.dayIndex;
+  if (b.everydayRank === 1) return { record, line: `🔺 Most everyday spending by day ${d} in ${n} cycles (${whole(b.everyday)})` };
+  if (b.totalRank === 1) return { record, line: `🔺 Most spent by day ${d} in ${n} cycles (${whole(b.total)} incl. bills)` };
+  return { record, line: `By day ${d}: ${whole(b.everyday)} everyday · ${ordinal(b.everydayRank)} of ${n} cycles` };
+});
+
+const compareRows = computed(() => {
+  const b = props.plan.byThisDay;
+  if (!b) return [];
+  const key = compareMode.value;
+  const rows = [
+    { key: "now", label: "This cycle", value: b[key], now: true },
+    ...b.past.map((p) => ({ key: p.cycleStart, label: p.label, value: p[key], now: false })),
+  ].sort((a, c) => c.value - a.value);
+  const max = Math.max(1, ...rows.map((r) => r.value));
+  return rows.map((r) => ({ ...r, pct: Math.round((r.value / max) * 100) }));
+});
+
+const compareNote = computed(() => {
+  const b = props.plan.byThisDay;
+  if (!b) return "";
+  const rank = compareMode.value === "everyday" ? b.everydayRank : b.totalRank;
+  const n = b.past.length + 1;
+  const what = compareMode.value === "everyday" ? "everyday spending (what the card paces)" : "everything on the card, incl. bills and installments";
+  return `${rank === 1 ? "The most" : `${ordinal(rank)} most`} of ${n} cycles — ${what}, actual shekels, nothing scaled.`;
+});
 
 // ── Chart ──
 // Zoomed by default: days so far plus a little ahead, height fitted to that window, so a

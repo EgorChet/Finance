@@ -89,6 +89,70 @@ export interface BudgetPlan {
   actualByDay: number[];
   /** Planned cumulative flexible spend at the end of each day of the cycle. */
   planByDay: number[];
+  /**
+   * The plain comparison: what you spent by this day of the cycle, now and in each past cycle
+   * (everyday = what the card paces; total = everything on the card incl. bills). Most recent first.
+   */
+  byThisDay: {
+    everyday: number;
+    total: number;
+    past: { cycleStart: string; label: string; everyday: number; total: number }[];
+    /** 1 = the most of all listed cycles. */
+    everydayRank: number;
+    totalRank: number;
+  } | null;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Spending through day `dayIndex` of each past cycle, straight from the transactions — no
+ * scaling, no curve. Cycles the loaded statements only half cover are skipped.
+ */
+export function pastCyclesByDay(
+  history: Transaction[],
+  cycleStart: string,
+  cycleDay: number,
+  dayIndex: number,
+): { cycleStart: string; label: string; everyday: number; total: number }[] {
+  const start = parseIsoDate(cycleStart);
+  const buckets = new Map<number, { start: Date; everyday: number; total: number; full: number }>();
+  for (const tx of history) {
+    const amt = effectiveSpend(tx);
+    if (!(amt > 0)) continue;
+    const d = parseIsoDate(tx.date);
+    const cycle = getBillingCycle(d, cycleDay);
+    if (cycle.start >= start) continue;
+    const key = cycle.start.getTime();
+    let b = buckets.get(key);
+    if (!b) {
+      b = { start: cycle.start, everyday: 0, total: 0, full: 0 };
+      buckets.set(key, b);
+    }
+    b.full += amt;
+    const day = daysBetween(cycle.start, d) + 1;
+    if (day > dayIndex) continue;
+    b.total += amt;
+    if (isFlexibleTransaction(tx)) b.everyday += amt;
+  }
+  const all = [...buckets.values()];
+  const fulls = all.map((b) => b.full).sort((a, b) => a - b);
+  const medianFull = fulls.length ? fulls[Math.floor(fulls.length / 2)] : 0;
+  return all
+    .filter((b) => b.full >= medianFull * 0.5)
+    .sort((a, b) => b.start.getTime() - a.start.getTime())
+    .slice(0, 12)
+    .map((b) => {
+      const y = b.start.getFullYear();
+      const m = String(b.start.getMonth() + 1).padStart(2, "0");
+      const dd = String(b.start.getDate()).padStart(2, "0");
+      return {
+        cycleStart: `${y}-${m}-${dd}`,
+        label: `${MONTHS[b.start.getMonth()]} ${y}`,
+        everyday: roundMoney(b.everyday),
+        total: roundMoney(b.total),
+      };
+    });
 }
 
 function parseIsoDate(dateStr: string): Date {
@@ -369,6 +433,34 @@ export function computeBudgetPlan(
     roundMoney(flexBudget * planShareAt(i + 1)),
   );
 
+  // Plain "have we ever spent this much by day N?" — counted the same way as the past cycles.
+  let byThisDay: BudgetPlan["byThisDay"] = null;
+  if (cycle.history?.length) {
+    const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, dayIndex);
+    if (past.length) {
+      let everyday = 0;
+      let total = 0;
+      for (const tx of cycleTransactions) {
+        const amt = effectiveSpend(tx);
+        if (!(amt > 0)) continue;
+        const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
+        if (day > dayIndex) continue;
+        total += amt;
+        if (isFlexibleTransaction(tx)) everyday += amt;
+      }
+      // A manual "spent so far" total has no per-charge dates; count it as everyday.
+      everyday = Math.max(everyday, flexSpent);
+      total = Math.max(total, everyday);
+      byThisDay = {
+        everyday: roundMoney(everyday),
+        total: roundMoney(total),
+        past,
+        everydayRank: 1 + past.filter((p) => p.everyday > everyday).length,
+        totalRank: 1 + past.filter((p) => p.total > total).length,
+      };
+    }
+  }
+
   return {
     tone,
     status,
@@ -394,6 +486,7 @@ export function computeBudgetPlan(
     curve,
     actualByDay,
     planByDay,
+    byThisDay,
   };
 }
 
