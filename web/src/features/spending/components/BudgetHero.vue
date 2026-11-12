@@ -28,21 +28,49 @@
     </template>
     <p class="bh-sub">{{ subline }}</p>
 
-    <svg class="bh-chart" viewBox="0 0 300 84" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="currentColor" stop-opacity="0.35" />
-          <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      <path :d="planPath" class="bh-chart-plan" />
-      <path v-if="actualArea" :d="actualArea" :fill="`url(#${gradId})`" />
-      <path v-if="actualPath" :d="actualPath" class="bh-chart-actual" />
-      <circle v-if="todayPoint" :cx="todayPoint.x" :cy="todayPoint.y" r="3.5" class="bh-chart-dot" />
-    </svg>
-    <div class="bh-legend" aria-hidden="true">
-      <span><i class="bh-key bh-key--actual" />You</span>
-      <span><i class="bh-key bh-key--plan" />Your usual pace</span>
+    <div class="bh-chart-wrap">
+      <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="currentColor" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <path v-if="actualArea" :d="actualArea" :fill="`url(#${gradId})`" />
+        <path v-if="gapUnder" :d="gapUnder" class="bh-chart-gap bh-chart-gap--under" />
+        <path v-if="gapOverArea" :d="gapOverArea" class="bh-chart-gap bh-chart-gap--over" />
+        <path :d="planPath" class="bh-chart-plan" />
+        <path v-if="actualPath" :d="actualPath" class="bh-chart-actual" />
+        <circle v-if="todayPoint" :cx="todayPoint.x" :cy="todayPoint.y" r="3.5" class="bh-chart-dot" />
+      </svg>
+      <span
+        v-if="todayPoint && gapLabel"
+        class="bh-gap-label"
+        :class="gapOver ? 'bh-gap-label--over' : 'bh-gap-label--under'"
+        :style="{
+          left: `${(todayPoint.x / W) * 100}%`,
+          top: `${(todayPoint.y / H) * 100}%`,
+          transform: todayPoint.x < W * 0.3 ? 'translate(-10%, -150%)' : 'translate(-100%, -150%)',
+        }"
+      >{{ gapLabel }}</span>
+    </div>
+    <div class="bh-axis" aria-hidden="true">
+      <span>Day 1</span>
+      <span v-if="zoomed && windowEnd < plan.cycleLength">Day {{ windowEnd }} →</span>
+      <span v-else>Day {{ plan.cycleLength }}</span>
+    </div>
+    <div class="bh-legend">
+      <span aria-hidden="true"><i class="bh-key bh-key--actual" />You</span>
+      <span aria-hidden="true"><i class="bh-key bh-key--plan" />Your usual pace</span>
+      <button
+        v-if="plan.daysLeft > 0 && plan.dayIndex < plan.cycleLength * 0.7"
+        type="button"
+        class="bh-zoom"
+        @click.stop="zoomed = !zoomed"
+        @keydown.enter.stop
+      >
+        {{ zoomed ? "Whole cycle" : "Zoom in" }}
+      </button>
     </div>
 
     <div class="bh-stats">
@@ -173,20 +201,38 @@ const curveNote = computed(() =>
 );
 
 // ── Chart ──
+// Zoomed by default: days so far plus a little ahead, height fitted to that window, so a
+// real difference from your usual pace is visible instead of a few pixels on a month-high scale.
 const W = 300;
-const H = 84;
-const PAD = 4;
-const maxY = computed(() =>
-  Math.max(1, props.plan.flexBudget, ...props.plan.actualByDay) * 1.06,
-);
-const x = (day: number) => (day / props.plan.cycleLength) * W;
+const H = 96;
+const PAD = 6;
+const zoomed = ref(true);
+
+const windowEnd = computed(() => {
+  const L = props.plan.cycleLength;
+  if (!zoomed.value) return L;
+  return Math.min(L, Math.max(7, Math.ceil(props.plan.dayIndex * 1.4) + 1));
+});
+
+const maxY = computed(() => {
+  const end = windowEnd.value;
+  const plan = props.plan.planByDay.slice(0, end);
+  const top = Math.max(1, ...props.plan.actualByDay, ...plan);
+  return top * (zoomed.value ? 1.15 : 1.06);
+});
+
+const x = (day: number) => (day / windowEnd.value) * W;
 const y = (v: number) => H - PAD - (v / maxY.value) * (H - PAD * 2);
 
-const planPath = computed(() => {
-  const pts = [`M0,${y(0).toFixed(1)}`];
-  props.plan.planByDay.forEach((v, i) => pts.push(`L${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`));
-  return pts.join(" ");
-});
+const planPoints = computed(() => [
+  { x: 0, y: y(0) },
+  ...props.plan.planByDay.slice(0, windowEnd.value).map((v, i) => ({ x: x(i + 1), y: y(v) })),
+]);
+
+const toPath = (pts: { x: number; y: number }[]) =>
+  pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+const planPath = computed(() => toPath(planPoints.value));
 
 const actualPoints = computed(() => {
   const a = props.plan.actualByDay;
@@ -194,15 +240,36 @@ const actualPoints = computed(() => {
   return [{ x: 0, y: y(0) }, ...a.map((v, i) => ({ x: x(i + 1), y: y(v) }))];
 });
 
-const actualPath = computed(() =>
-  actualPoints.value.length ? actualPoints.value.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") : "",
-);
+const actualPath = computed(() => (actualPoints.value.length ? toPath(actualPoints.value) : ""));
 
 const actualArea = computed(() => {
   const pts = actualPoints.value;
   if (!pts.length) return "";
   const last = pts[pts.length - 1];
   return `${actualPath.value} L${last.x.toFixed(1)},${H} L0,${H} Z`;
+});
+
+/**
+ * Shaded band between your line and the usual-pace line, up to today: red on the days you
+ * were above your usual pace, green on the days you were below. (Smaller y = higher on screen.)
+ */
+function gapBand(pick: (actualY: number, planY: number) => number): string {
+  const a = actualPoints.value;
+  if (a.length < 2) return "";
+  const p = planPoints.value.slice(0, a.length);
+  const edge = a.map((pt, i) => ({ x: pt.x, y: pick(pt.y, p[i]?.y ?? pt.y) }));
+  const back = [...p].reverse();
+  return `${toPath(edge)} ${back.map((pt) => `L${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(" ")} Z`;
+}
+const gapOverArea = computed(() => gapBand((ay, py) => Math.min(ay, py)));
+const gapUnder = computed(() => gapBand((ay, py) => Math.max(ay, py)));
+
+/** Same number as the "over / under plan" line above the chart. */
+const gapOver = computed(() => props.plan.buffer < 0);
+const gapLabel = computed(() => {
+  const b = props.plan.buffer;
+  if (Math.abs(b) < 1) return "";
+  return `${b < 0 ? "+" : "−"}${whole(Math.abs(b))}`;
 });
 
 const todayPoint = computed(() => {
