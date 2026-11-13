@@ -12,7 +12,10 @@
  *   (water, gas), or for electricity the average of the last bill and the same bill a year
  *   earlier (summer AC / winter heating), when the history reaches that far.
  * - Hairdresser and nails have no fixed rhythm: set aside every cycle until they come.
- * - A charge that hasn't come for a whole extra period is treated as stopped.
+ * - Only charges seen on the card at least once are set aside (a new subscription starts
+ *   being held after its first charge).
+ * - A bill more than 14 days past its expected date is released ("missed"); if it still
+ *   comes, it's simply charged then.
  *
  * Egor can switch a line off or fix its amount under Budget (overrides).
  * Built from his Cal statements (Nov 2026): arnona / electricity / water every 2 months
@@ -103,8 +106,11 @@ export interface RegularChargeStatus {
   id: string;
   name: string;
   everyMonths: 1 | 2;
-  /** posted = came this cycle; due = expected this cycle (set aside); later = next cycle or after; unknown = no history. */
-  state: "posted" | "due" | "later" | "unknown";
+  /**
+   * posted = came this cycle; due = expected this cycle (set aside); later = next cycle or after;
+   * missed = more than 14 days late, released; unknown = never seen on the card yet.
+   */
+  state: "posted" | "due" | "later" | "missed" | "unknown";
   /** Real amount when posted, otherwise the estimate. */
   amount: number;
   /** YYYY-MM-DD: when it posted, or the expected date. */
@@ -131,6 +137,8 @@ function addMonths(s: string, months: number): string {
   target.setDate(Math.min(d.getDate(), last));
   return iso(target);
 }
+
+export const LATE_RELEASE_DAYS = 14;
 
 function addDays(s: string, days: number): string {
   const d = parse(s);
@@ -198,6 +206,8 @@ export function regularChargesForCycle(
   history: Transaction[] | undefined,
   cycleStart: string,
   cycleEnd: string,
+  /** Today (YYYY-MM-DD): bills more than LATE_RELEASE_DAYS past their date are released. */
+  today?: string,
 ): RegularChargeStatus[] {
   const seen = new Set<string>();
   const all: Transaction[] = [];
@@ -224,16 +234,19 @@ export function regularChargesForCycle(
       return { ...base, state: "due" as const, amount: est.amount, date: null, late: false, basis: est.basis };
     }
     if (!past.length) {
-      // Monthly charges are due every cycle; a 2-monthly bill needs one posting to know its rhythm.
+      // Never on the card yet (e.g. a subscription not started) — nothing to hold until it shows up.
       const est = estimateAmount(rule, past, null);
-      const state = rule.everyMonths === 1 ? "due" : "unknown";
-      return { ...base, state, amount: est.amount, date: null, late: false, basis: est.basis };
+      return { ...base, state: "unknown" as const, amount: est.amount, date: null, late: false, basis: est.basis };
     }
     const expected = nextDate(past, rule.everyMonths);
     const est = estimateAmount(rule, past, expected);
     // Not come for a whole extra period → stopped (cancelled subscription, nails on a break).
     if (expected < addMonths(cycleStart, -rule.everyMonths)) {
       return { ...base, state: "unknown" as const, amount: est.amount, date: expected, late: true, basis: est.basis };
+    }
+    // Too late to still be coming — release the money; if it does come, it's just charged.
+    if (today && expected < today && daysApart(expected, today) > LATE_RELEASE_DAYS) {
+      return { ...base, state: "missed" as const, amount: est.amount, date: expected, late: true, basis: est.basis };
     }
     const dueBy = rule.earlyWindowDays ? addDays(cycleEnd, rule.earlyWindowDays) : cycleEnd;
     const state = expected <= dueBy ? "due" : "later";

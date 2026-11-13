@@ -410,7 +410,9 @@ export function computeBudgetPlan(
   }
 
   // Regular charges expected this cycle (or late from the last one) that haven't posted yet.
-  const regularCharges = regularChargesForCycle(rules, cycleTransactions, cycle.history, start, end);
+  const ref = cycle.referenceDate;
+  const todayIso = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
+  const regularCharges = regularChargesForCycle(rules, cycleTransactions, cycle.history, start, end, todayIso);
   let vaadReserve = 0;
   for (const r of regularCharges) {
     if (r.state !== "due" || !(r.amount > 0)) continue;
