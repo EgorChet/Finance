@@ -4,16 +4,16 @@
       class="input select-field month-select-month"
       :value="monthPart"
       :disabled="disabled"
-      aria-label="Month"
+      :aria-label="t('Month')"
       @change="onMonthChange"
     >
-      <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+      <option v-for="(m, i) in monthOptions" :key="m.value" :value="m.value">{{ monthShort(i) }}</option>
     </select>
     <select
       class="input select-field month-select-year"
       :value="yearPart"
       :disabled="disabled"
-      aria-label="Year"
+      :aria-label="t('Year')"
       @change="onYearChange"
     >
       <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
@@ -22,6 +22,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
+import { monthShort } from "@core/utils/displayLocale";
 import { computed } from "vue";
 
 const props = withDefaults(

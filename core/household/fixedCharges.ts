@@ -3,6 +3,7 @@ import { costTypeForCategory } from "../categories.js";
 import { isConfiguredEverydayCharge } from "./householdBudget.js";
 import { roundMoney } from "../utils/format.js";
 import { isoDateLocal } from "../utils/transactionPeriod.js";
+import { monthShort, monthYearLabel } from "../utils/displayLocale.js";
 
 export type ChargeSchedule = "monthly" | "once";
 
@@ -237,18 +238,16 @@ export function slugifyId(name: string): string {
 
 export function ymToLabel(ym: string): string {
   const [y, m] = ym.split("-");
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const idx = Number.parseInt(m, 10) - 1;
   if (idx < 0 || idx > 11 || !y) return ym;
-  return `${months[idx]} ${y}`;
+  return monthYearLabel(idx, y);
 }
 
 export function dateToLabel(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split("-");
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const idx = Number.parseInt(m, 10) - 1;
   if (idx < 0 || idx > 11) return iso;
-  return `${Number.parseInt(d, 10)} ${months[idx]} ${y}`;
+  return `${Number.parseInt(d, 10)} ${monthShort(idx)} ${y}`;
 }
 
 export function monthRangeLabel(fromMonth: string, throughMonth: string): string {

@@ -8,12 +8,13 @@
       :class="{ active: modelValue === opt.value }"
       @click="$emit('update:modelValue', opt.value)"
     >
-      {{ opt.label }}
+      {{ t(opt.label) }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import type { TransactionPeriod } from "@/shared/utils/transactionPeriod";
 import { TRANSACTION_PERIOD_OPTIONS } from "@/shared/utils/transactionPeriod";
 

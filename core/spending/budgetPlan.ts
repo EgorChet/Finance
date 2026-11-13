@@ -28,12 +28,14 @@ import {
   matchRegularCharge,
   regularChargesForCycle,
   resolveRegularCharges,
+  rulesCoveredByConfigured,
   type RegularChargeOverrides,
   type RegularChargeRule,
   type RegularChargeStatus,
 } from "./regularCharges.js";
 import { effectiveSpend } from "../utils/transaction.js";
 import { roundMoney } from "../utils/format.js";
+import { monthYearLabel } from "../utils/displayLocale.js";
 import { billingCycleProgress, getBillingCycle } from "./pace.js";
 import { tightCycleAdvice, type TightCycleAdvice } from "./tightCycle.js";
 import { configuredChargesForCycle, type ConfiguredCharge } from "../household/fixedCharges.js";
@@ -127,7 +129,6 @@ export interface BudgetPlan {
   } | null;
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
  * Spending through day `dayIndex` of each past cycle, straight from the transactions — no
@@ -173,7 +174,7 @@ export function pastCyclesByDay(
       const dd = String(b.start.getDate()).padStart(2, "0");
       return {
         cycleStart: `${y}-${m}-${dd}`,
-        label: `${MONTHS[b.start.getMonth()]} ${y}`,
+        label: monthYearLabel(b.start.getMonth(), y),
         everyday: roundMoney(b.everyday),
         total: roundMoney(b.total),
       };
@@ -458,9 +459,11 @@ export function computeBudgetPlan(
   const ref = cycle.referenceDate;
   const todayIso = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
   const regularCharges = regularChargesForCycle(rules, cycleTransactions, cycle.history, start, end, todayIso);
+  // A bill you also entered under Budget is already counted there.
+  const covered = rulesCoveredByConfigured(rules, configuredChargesForCycle(start, cycle.configuredCharges ?? [], end));
   let vaadReserve = 0;
   for (const r of regularCharges) {
-    if (r.state !== "due" || !(r.amount > 0)) continue;
+    if (r.state !== "due" || !(r.amount > 0) || covered.has(r.id)) continue;
     if (r.id === "vaad") vaadReserve += r.amount;
     else upcomingReserve += r.amount;
     const when = r.date ? ` (${r.late ? "late, was due " : "≈"}${r.date.slice(8, 10)}/${r.date.slice(5, 7)})` : "";

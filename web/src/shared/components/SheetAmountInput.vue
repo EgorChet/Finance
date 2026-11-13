@@ -1,6 +1,6 @@
 <template>
   <label class="sheet-field">
-    <span class="sheet-field__label">{{ label }}</span>
+    <span class="sheet-field__label">{{ t(label) }}</span>
     <span class="sheet-amount">
       <span class="sheet-amount__currency" aria-hidden="true">₪</span>
       <input
@@ -12,7 +12,7 @@
         :placeholder="placeholder"
         :value="display"
         :disabled="disabled"
-        :aria-label="label"
+        :aria-label="t(label)"
         @input="onInput"
         @focus="onFocus"
       />
@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { ref, watch } from "vue";
 
 const props = withDefaults(

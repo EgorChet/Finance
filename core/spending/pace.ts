@@ -12,6 +12,7 @@ import {
   transactionDateForCharge,
 } from "../household/fixedCharges.js";
 import { billingCycleLabel, openCycleTabLabel, roundMoney } from "../utils/format.js";
+import { dateLocaleTag } from "../utils/displayLocale.js";
 import { dedupeTransactionSnapshots, effectiveSpend, filterSpendTransactions } from "../utils/transaction.js";
 
 export interface BillingCycle {
@@ -733,7 +734,7 @@ export function computePace(
     tomorrowVariables.length > 0
       ? roundMoney(tomorrowVariables.reduce((s, v) => s + v, 0) / tomorrowVariables.length)
       : 0;
-  const avgCyclesTomorrowLabel = tomorrowNorm.toLocaleDateString("en-GB", {
+  const avgCyclesTomorrowLabel = tomorrowNorm.toLocaleDateString(dateLocaleTag(), {
     day: "numeric",
     month: "short",
   });

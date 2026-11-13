@@ -1,5 +1,6 @@
 /** Round to agorot (2 dp) — avoids float noise like 2392.2343465673. */
 import { isRefundTransaction } from "./transaction.js";
+import { dateLocaleTag, monthYearLabel } from "./displayLocale.js";
 
 export function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
@@ -124,7 +125,6 @@ function parseIsoDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Format YYYY-MM-DD as "Mon YYYY" without timezone drift. */
 export function monthLabelFromIso(dateStr: string): string {
@@ -132,7 +132,7 @@ export function monthLabelFromIso(dateStr: string): string {
   const [y, m] = dateStr.slice(0, 10).split("-");
   const monthIndex = parseInt(m, 10) - 1;
   if (monthIndex < 0 || monthIndex > 11 || !y) return "Unknown cycle";
-  return `${MONTHS[monthIndex]} ${y}`;
+  return monthYearLabel(monthIndex, y);
 }
 
 /**
@@ -156,15 +156,15 @@ export function billingCycleLabel(isoDateStr: string): string {
   d.setMonth(d.getMonth() - 1);
   const month = d.getMonth();
   if (month < 0 || month > 11) return "Unknown cycle";
-  return `${MONTHS[month]} ${d.getFullYear()}`;
+  return monthYearLabel(month, d.getFullYear());
 }
 
 export function formatDate(dateStr: string): string {
-  return parseIsoDate(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  return parseIsoDate(dateStr).toLocaleDateString(dateLocaleTag(), { day: "2-digit", month: "short" });
 }
 
 export function formatTransactionDate(dateStr: string): string {
-  return parseIsoDate(dateStr).toLocaleDateString("en-GB", {
+  return parseIsoDate(dateStr).toLocaleDateString(dateLocaleTag(), {
     day: "2-digit",
     month: "short",
     year: "numeric",

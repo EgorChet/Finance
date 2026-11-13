@@ -5,8 +5,8 @@
       <div class="app-loader-spinner" aria-hidden="true">
         <span class="app-loader-ring" />
       </div>
-      <p class="app-loader-title">{{ title }}</p>
-      <p v-if="subtitle" class="app-loader-subtitle">{{ subtitle }}</p>
+      <p class="app-loader-title">{{ t(title) }}</p>
+      <p v-if="subtitle" class="app-loader-subtitle">{{ t(subtitle) }}</p>
       <ul v-if="steps.length" class="app-loader-steps">
         <li
           v-for="(step, i) in steps"
@@ -17,7 +17,7 @@
           }"
         >
           <span class="app-loader-step-icon" aria-hidden="true">{{ i < activeStep ? "✓" : i === activeStep ? "●" : "○" }}</span>
-          <span>{{ step }}</span>
+          <span>{{ t(step) }}</span>
         </li>
       </ul>
     </div>
@@ -31,7 +31,7 @@
     role="status"
     aria-live="polite"
   >
-    <span class="skeleton-sr">{{ title }}</span>
+    <span class="skeleton-sr">{{ t(title) }}</span>
 
     <template v-if="compact">
       <div class="skeleton-row"><span class="skeleton-line skeleton-line--w60" /><span class="skeleton-line skeleton-line--w20" /></div>
@@ -86,13 +86,14 @@
 
     <Transition name="skeleton-caption">
       <p v-if="slowStage > 0" class="skeleton-caption">
-        {{ slowStage > 1 ? "Still loading. The server may be waking up, this can take up to a minute." : `${title}…` }}
+        {{ slowStage > 1 ? t("Still loading. The server may be waking up, this can take up to a minute.") : `${t(title)}…` }}
       </p>
     </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { onMounted, onUnmounted, ref } from "vue";
 
 const props = withDefaults(

@@ -19,16 +19,17 @@
         class="btn btn-ghost upload-job-toast-btn"
         @click="$emit('retry')"
       >
-        Retry
+        {{ t("Retry") }}
       </button>
       <button type="button" class="btn btn-ghost upload-job-toast-btn" @click="$emit('dismiss')">
-        {{ state === 'syncing' ? 'Hide' : 'Dismiss' }}
+        {{ state === 'syncing' ? t('Hide') : t('Dismiss') }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -43,8 +44,8 @@ defineEmits<{
 }>();
 
 const title = computed(() => {
-  if (props.state === "done") return "Upload complete";
-  if (props.state === "error") return "Upload failed";
-  return "Uploading in background";
+  if (props.state === "done") return t("Upload complete");
+  if (props.state === "error") return t("Upload failed");
+  return t("Uploading in background");
 });
 </script>

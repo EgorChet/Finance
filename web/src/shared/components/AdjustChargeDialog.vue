@@ -7,16 +7,16 @@
         aria-modal="true"
         aria-labelledby="adjust-dialog-title"
       >
-        <h3 id="adjust-dialog-title" class="confirm-dialog-title">{{ state.title }}</h3>
+        <h3 id="adjust-dialog-title" class="confirm-dialog-title">{{ t(state.title) }}</h3>
         <p v-if="state.transaction" class="adjust-dialog-lead">
-          {{ merchantLabel }} · {{ formatIls(state.transaction.charge_amount) }} total
+          {{ merchantLabel }} · {{ t("{amount} total", { amount: formatIls(state.transaction.charge_amount) }) }}
         </p>
         <p class="adjust-dialog-hint">
-          How much was paid back to you? Only the remainder counts toward your spending.
+          {{ t("How much was paid back to you? Only the remainder counts toward your spending.") }}
         </p>
 
         <label class="adjust-field">
-          <span class="adjust-field-label">Reimbursed to you (₪)</span>
+          <span class="adjust-field-label">{{ t("Reimbursed to you (₪)") }}</span>
           <input
             ref="inputRef"
             v-model="state.reimbursement"
@@ -31,24 +31,24 @@
         </label>
 
         <label class="adjust-field">
-          <span class="adjust-field-label">Note (optional)</span>
+          <span class="adjust-field-label">{{ t("Note (optional)") }}</span>
           <input
             v-model="state.note"
             type="text"
             class="adjust-input"
-            placeholder="Friends paid back"
+            :placeholder="t('Friends paid back')"
             @keydown.enter.prevent="submit"
           />
         </label>
 
         <p v-if="previewNet != null" class="adjust-preview">
-          Your spend: <strong>{{ formatIls(previewNet) }}</strong>
+          {{ t("Your spend:") }} <strong>{{ formatIls(previewNet) }}</strong>
         </p>
         <p v-if="error" class="adjust-error">{{ error }}</p>
 
         <div class="confirm-dialog-actions">
-          <button type="button" class="btn" @click="cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="submit">Save</button>
+          <button type="button" class="btn" @click="cancel">{{ t("Cancel") }}</button>
+          <button type="button" class="btn btn-primary" @click="submit">{{ t("Save") }}</button>
         </div>
       </div>
     </div>
@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { useAdjustChargeState } from "@/shared/composables/useAdjustCharge";
@@ -89,11 +90,11 @@ function submit() {
   if (!tx) return;
   const reimbursed = roundMoney(Number.parseFloat(state.reimbursement));
   if (!Number.isFinite(reimbursed) || reimbursed <= 0) {
-    error.value = "Enter how much was reimbursed to you.";
+    error.value = t("Enter how much was reimbursed to you.");
     return;
   }
   if (reimbursed >= tx.charge_amount) {
-    error.value = "Use Exclude if the full charge isn’t yours.";
+    error.value = t("Use Exclude if the full charge isn’t yours.");
     return;
   }
   accept(reimbursed, state.note.trim() || undefined);

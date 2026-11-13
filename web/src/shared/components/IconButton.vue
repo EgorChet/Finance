@@ -3,7 +3,7 @@
     type="button"
     class="btn btn-icon"
     :class="{ 'btn-icon-danger': variant === 'danger' }"
-    :aria-label="label"
+    :aria-label="t(label)"
     :disabled="disabled"
     @click="$emit('click')"
   >
@@ -67,6 +67,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 withDefaults(
   defineProps<{
     icon: "close" | "plus" | "trash" | "upload" | "logout";

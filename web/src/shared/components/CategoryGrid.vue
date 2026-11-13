@@ -1,5 +1,5 @@
 <template>
-  <div class="cg" role="radiogroup" :aria-label="ariaLabel">
+  <div class="cg" role="radiogroup" :aria-label="t(ariaLabel)">
     <button
       v-if="emptyLabel"
       type="button"
@@ -10,7 +10,7 @@
       @click="pick('')"
     >
       <span class="cg-icon" aria-hidden="true">✱</span>
-      <span class="cg-name">{{ emptyLabel }}</span>
+      <span class="cg-name">{{ t(emptyLabel) }}</span>
     </button>
     <button
       v-for="c in options"
@@ -29,6 +29,7 @@
 </template>
 
 <script setup lang="ts">
+import { catName, isRu, t } from "@/shared/i18n";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 
 withDefaults(
@@ -55,7 +56,19 @@ const SHORT: Record<string, string> = {
   Uncategorized: "No category",
 };
 
+const SHORT_RU: Record<string, string> = {
+  "Government & Institutions": "Госуслуги",
+  "Leisure & Entertainment": "Досуг",
+  "Beauty & Personal Care": "Красота",
+  "Health & Medical": "Здоровье",
+  "Eating out": "Кафе",
+  "Bank fees": "Комиссии",
+  "Home & Living": "Дом",
+  Uncategorized: "Без категории",
+};
+
 function shortName(c: string): string {
+  if (isRu()) return SHORT_RU[c] ?? catName(c);
   return SHORT[c] ?? c;
 }
 
