@@ -2,11 +2,10 @@ import type { Transaction } from "../types.js";
 
 export type TransactionPeriod = "today" | "yesterday" | "week" | "month";
 
+/** Shown on Spending: the last 7 days (rolling, from today back) and the whole cycle. */
 export const TRANSACTION_PERIOD_OPTIONS: { value: TransactionPeriod; label: string }[] = [
-  { value: "today", label: "Today" },
-  { value: "yesterday", label: "Yesterday" },
-  { value: "week", label: "This week" },
-  { value: "month", label: "This month" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "This cycle" },
 ];
 
 function parseIsoDate(dateStr: string): Date {
@@ -91,10 +90,10 @@ export function filterTransactionsByPeriod(
     if (period === "today") return dateIso === todayIso;
     if (period === "yesterday") return dateIso === yesterdayIso;
     if (period === "week") {
-      const anchorStart = liveCycleStart ?? monthStart;
-      const weekStart = laterDate(startOfWeekMonday(ref), anchorStart);
-      const weekEnd = earlierDate(endOfWeekSunday(ref), ref);
-      return inRange(dateIso, weekStart, weekEnd);
+      // Rolling: today and the 6 days before it, whatever day of the week it is.
+      const weekStart = new Date(ref);
+      weekStart.setDate(ref.getDate() - 6);
+      return inRange(dateIso, weekStart, ref);
     }
     if (liveCycleStart) {
       return inRange(dateIso, liveCycleStart, ref);
