@@ -39,18 +39,30 @@
     </template>
 
     <template v-else-if="variant === 'hero'">
+      <!-- Same shape as the budget card, so nothing jumps when it loads. -->
       <div class="skeleton-block skeleton-block--hero">
+        <div class="skeleton-row"><span class="skeleton-line skeleton-line--pill" /><span class="skeleton-line skeleton-line--w20" /></div>
         <span class="skeleton-line skeleton-line--w30" />
-        <span class="skeleton-line skeleton-line--xl skeleton-line--w70" />
-        <span class="skeleton-line skeleton-line--pill" />
-        <span class="skeleton-line skeleton-line--w90" />
+        <span class="skeleton-line skeleton-line--xxl skeleton-line--w45" />
+        <span class="skeleton-line skeleton-line--w60" />
+        <span class="skeleton-chart" />
+        <div class="skeleton-row skeleton-row--start"><span class="skeleton-line skeleton-line--chip" /><span class="skeleton-line skeleton-line--chip" /></div>
+        <div class="skeleton-row"><span class="skeleton-line skeleton-line--w40" /><span class="skeleton-line skeleton-line--w20" /></div>
+        <span class="skeleton-line skeleton-line--bar" />
+        <div class="skeleton-tiles skeleton-tiles--3">
+          <span class="skeleton-col"><span class="skeleton-line skeleton-line--sm skeleton-line--w60" /><span class="skeleton-line skeleton-line--lg skeleton-line--w80" /></span>
+          <span class="skeleton-col"><span class="skeleton-line skeleton-line--sm skeleton-line--w60" /><span class="skeleton-line skeleton-line--lg skeleton-line--w80" /></span>
+          <span class="skeleton-col"><span class="skeleton-line skeleton-line--sm skeleton-line--w60" /><span class="skeleton-line skeleton-line--lg skeleton-line--w80" /></span>
+        </div>
       </div>
-      <div class="skeleton-tiles">
-        <div class="skeleton-block"><span class="skeleton-line skeleton-line--w50" /><span class="skeleton-line skeleton-line--lg skeleton-line--w80" /></div>
-        <div class="skeleton-block"><span class="skeleton-line skeleton-line--w50" /><span class="skeleton-line skeleton-line--lg skeleton-line--w80" /></div>
-      </div>
-      <div v-for="n in 3" :key="n" class="skeleton-row skeleton-row--card">
-        <span class="skeleton-line skeleton-line--w55" /><span class="skeleton-line skeleton-line--w20" />
+      <span class="skeleton-line skeleton-line--title" />
+      <div v-for="n in 4" :key="n" class="skeleton-row skeleton-row--card">
+        <span class="skeleton-dot" />
+        <span class="skeleton-col">
+          <span class="skeleton-line" :class="n % 2 ? 'skeleton-line--w55' : 'skeleton-line--w40'" />
+          <span class="skeleton-line skeleton-line--sm skeleton-line--w30" />
+        </span>
+        <span class="skeleton-line skeleton-line--w20" />
       </div>
     </template>
 
@@ -102,7 +114,7 @@ const props = withDefaults(
     overlay: false,
     compact: false,
     variant: "list",
-    rows: 5,
+    rows: 9,
   },
 );
 

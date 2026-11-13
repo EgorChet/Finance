@@ -4471,3 +4471,56 @@ button.topup-item {
   padding-top: 0;
   border-top: 0;
 }
+
+/* ── Skeleton shaped like the budget card ── */
+.skeleton-block--hero {
+  gap: 0.75rem;
+  min-height: 470px;
+}
+
+.skeleton-line--xxl {
+  height: 3.2rem;
+  border-radius: 14px;
+}
+
+.skeleton-line--chip {
+  width: 34%;
+  height: 1.6rem;
+}
+
+.skeleton-line--bar {
+  height: 0.5rem;
+}
+
+.skeleton-line--title {
+  width: 35%;
+  height: 1.1rem;
+  margin-top: 0.6rem;
+}
+
+.skeleton-chart {
+  display: block;
+  height: 150px;
+  border-radius: 14px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--text) 9%, transparent),
+    transparent
+  );
+}
+
+.skeleton-row--start {
+  justify-content: flex-start;
+}
+
+.skeleton-tiles--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.skeleton-dot {
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
