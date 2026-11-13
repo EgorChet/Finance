@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   DEFAULT_REGULAR_CHARGES,
   regularChargesForCycle,
@@ -88,7 +88,7 @@ import {
 } from "@/features/spending/utils/pace";
 
 const props = defineProps<{ readonly: boolean }>();
-const emit = defineEmits<{ saved: [string] }>();
+const emit = defineEmits<{ saved: [string]; monthly: [number] }>();
 
 const ICONS: Record<string, string> = {
   vaad: "🏢",
@@ -181,6 +181,19 @@ const setAsideTotal = computed(() =>
     return !r.off && s?.state === "due" ? sum + s.amount : sum;
   }, 0),
 );
+
+/** Average per month of the lines in use (2-monthly bills count half; never-seen ones skipped). */
+const monthlyAverage = computed(() =>
+  Math.round(
+    DEFAULT_REGULAR_CHARGES.reduce((sum, rule) => {
+      if (overrides.value[rule.id]?.off) return sum;
+      const s = statuses.value.get(rule.id);
+      if (!s || (s.state === "unknown" && !s.date && !rule.irregular)) return sum;
+      return sum + s.amount / rule.everyMonths;
+    }, 0),
+  ),
+);
+watch(monthlyAverage, (v) => emit("monthly", v), { immediate: true });
 
 const editingRule = computed(() => DEFAULT_REGULAR_CHARGES.find((r) => r.id === editing.value?.id) ?? null);
 const editingEstimate = computed(() => {

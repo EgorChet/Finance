@@ -49,7 +49,7 @@
               :aria-pressed="includeRecurring"
               @click="includeRecurring = !includeRecurring"
             >
-              {{ includeRecurring ? "✓ " : "" }}Fixed bills
+              {{ includeRecurring ? "✓ " : "" }}Added charges
             </button>
             <button v-if="hasActiveFilters" type="button" class="find-chip find-chip--clear" @click="clearFilters">
               Clear

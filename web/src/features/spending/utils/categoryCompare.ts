@@ -6,7 +6,7 @@ import {
 } from "@/shared/categories";
 import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 import { effectiveSpend } from "@/shared/utils/transaction";
-import { isInstallmentTransaction } from "@/features/spending/utils/budgetPlan";
+import { isFlexibleTransaction } from "@/features/spending/utils/budgetPlan";
 import { billingCycleProgress, getBillingCycle, loadPaceAvgCycles, type PaceAvgCycles } from "@/features/spending/utils/pace";
 import { subscriptionSubsectionLabel } from "@/features/spending/utils/subscriptionSections";
 
@@ -20,6 +20,12 @@ function isoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** "25 Aug" for day `day` of a cycle starting `start`. */
+function shortDay(start: Date, day: number): string {
+  const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + day - 1);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -109,6 +115,8 @@ export function buildCategoryCompareContext(
     cycleStart: string;
     referenceDate: Date;
     avgCycles?: PaceAvgCycles;
+    /** Compare through this day instead of today — the day the card data is from (same as the budget card). */
+    throughDay?: number | null;
   },
 ): CategoryCompareContext | null {
   if (!allTransactions.length) return null;
@@ -120,7 +128,9 @@ export function buildCategoryCompareContext(
     options.referenceDate.getMonth(),
     options.referenceDate.getDate(),
   );
-  const { dayIndex } = billingCycleProgress(options.cycleStart, options.cycleDay, ref);
+  const today = billingCycleProgress(options.cycleStart, options.cycleDay, ref).dayIndex;
+  const dayIndex =
+    options.throughDay != null && options.throughDay >= 1 ? Math.min(today, options.throughDay) : today;
   const currentStart = parseIsoDate(options.cycleStart);
   const currentKey = isoDate(currentStart);
 
@@ -149,7 +159,7 @@ export function buildCategoryCompareContext(
     dayIndex,
     currentStart,
     historical: historical.slice(0, targetCycles),
-    pointLabel: `by day ${dayIndex}`,
+    pointLabel: dayIndex < today ? `by ${shortDay(currentStart, dayIndex)}, the last sync` : `by day ${dayIndex}`,
     lastLabel: "Last cycle",
   };
 }
@@ -180,6 +190,11 @@ export function computeCategoryCompareFromContext(
   // Median, not mean: one freak month (a yearly purchase) must not redefine "usual".
   const usual = samplesUsed > 0 ? roundMoney(median(samples)) : null;
   const current = sumScope(currentTransactions, ctx.currentStart, ctx.dayIndex, scope);
+  // Mid-cycle only everyday spending is compared; a category that's all bills (arnona, Bezeq…)
+  // has nothing to compare — its bills just land on different days.
+  if (ctx.mode === "cycle" && current < 1 && (usual ?? 0) < 1) {
+    return { label, current, last: null, usual: null, delta: null, samplesUsed };
+  }
   return {
     label,
     current,
@@ -228,8 +243,9 @@ function sumScope(
   for (const tx of transactions) {
     if (!transactionMatchesScope(tx, scope)) continue;
     if (start && dayIndex != null) {
-      // Installments carry the original purchase date, which puts them in the wrong cycle.
-      if (isInstallmentTransaction(tx)) continue;
+      // Same rule as the budget card: bills, subscriptions, rent, loans, installments and one-time
+      // charges are fixed — their timing isn't spending more or less.
+      if (!isFlexibleTransaction(tx, isoDate(start))) continue;
       const day = daysBetween(start, parseIsoDate(tx.date)) + 1;
       if (day > dayIndex) continue;
     }
