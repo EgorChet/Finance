@@ -184,6 +184,15 @@ const NAMES: [RegExp, string][] = [
  * "ארקפה ביג גלילות", "ARCAFFE RAANANA" → "Arcaffe". Tested on "merchant_he merchant_en".
  */
 const CANONICAL: [RegExp, string][] = [
+  // Named by Egor
+  [/גוסטו|goosto/i, "Gusto (hookah store)"],
+  [/דנאל אי וי|zeekr/i, "Zeekr (Danel EV)"],
+  [/אילונה שוורץ|chaplin/i, "Chaplin Grooming (dog grooming)"],
+  [/משק השרון/, "Meshek HaSharon 26"],
+  [/תל יצחק/, "Tel Yitzhak Bakery"],
+  [/deli vino|דלי וינו/i, "Deli Vino"],
+  [/skims/i, "SKIMS"],
+  [/משרד התחבורה/, "Ministry of Transport"],
   // Saved under an odd label ("Super Agamim (Belarus)"); מרכולית = minimarket.
   [/מרכולית אגמים/, "Agamim Minimarket"],
   [/arcaffe|ארקפה/i, "Arcaffe"],
