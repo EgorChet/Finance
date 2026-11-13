@@ -14,7 +14,6 @@
         v-show="photoOk"
         :src="mark.logoUrl"
         alt=""
-        loading="lazy"
         decoding="async"
         @load="onLoad"
         @error="photoBad = true"
