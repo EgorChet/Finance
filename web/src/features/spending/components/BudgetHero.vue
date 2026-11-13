@@ -119,7 +119,7 @@
         <section v-if="tight" class="bh-tight">
           <p class="bh-tight-title">Getting back on track</p>
           <p class="bh-tight-text">
-            After bills you have <b>{{ whole(tight.freeLeft) }}</b> for {{ plan.daysLeft }} {{ plan.daysLeft === 1 ? "day" : "days" }}.
+            After bills and what you've spent so far, you have <b>{{ whole(tight.freeLeft) }}</b> left for {{ plan.daysLeft }} {{ plan.daysLeft === 1 ? "day" : "days" }}.
             You usually spend about <b>{{ whole(tight.needAhead) }}</b> on everyday things in that time —
             <b>{{ whole(tight.shortBy) }}</b> more than you have.
           </p>
@@ -162,7 +162,7 @@
           <li v-for="bill in billRows" :key="bill.label" class="bh-rows-sub">
             <span>− {{ bill.label }}</span><span>{{ whole(bill.amount) }}</span>
           </li>
-          <li class="bh-rows-total"><span>Left for everyday</span><strong>{{ whole(plan.flexBudget) }}</strong></li>
+          <li class="bh-rows-total"><span>Everyday money this cycle</span><strong>{{ whole(plan.flexBudget) }}</strong></li>
         </ul>
 
         <ul class="bh-rows">
