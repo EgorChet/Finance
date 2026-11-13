@@ -32,7 +32,7 @@
           :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
           @click="hasActions && openSheet(row)"
         >
-          <span class="tx-row-icon" aria-hidden="true">{{ row.icon }}</span>
+          <MerchantIcon :merchant-he="row.tx.merchant_he" :merchant-en="row.tx.merchant_en" :fallback="row.icon" />
           <span class="tx-row-body">
             <span class="tx-row-top">
               <span class="tx-row-merchant">{{ row.merchant }}</span>
@@ -164,6 +164,7 @@ import type { Transaction } from "@/shared/types";
 import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
 import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
+import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
 import { friendlyError } from "@/shared/utils/friendlyError";
