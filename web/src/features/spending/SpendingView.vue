@@ -83,6 +83,7 @@
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
+      :budget-extras="budgetExtras"
     />
     <PendingCycleCard v-if="isPendingCycleSelected && selectedCycleStart" :cycle-start="selectedCycleStart" />
     <template v-if="showTransactions && isLiveTransactionView">
@@ -219,6 +220,7 @@ import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
+  monthTopupsForMonth,
 } from "@/features/household/utils/livingBudget";
 import {
   analyzeSpendingPeriod,
@@ -399,6 +401,11 @@ const monthLivingBudget = computed(() =>
 
 const livingBudgetCycleYm = computed(() =>
   cycleMonthYmForOverview(selectedMonth.value, report.value, cycleDay.value),
+);
+
+/** This month's extra money, each addition separately (shown under the budget). */
+const budgetExtras = computed(() =>
+  selectedMonth.value === null ? [] : monthTopupsForMonth(livingBudgetCycleYm.value, livingBudgetMonthTopups.value),
 );
 
 

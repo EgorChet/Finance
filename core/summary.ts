@@ -74,7 +74,10 @@ export interface SpendingSummary {
   living_budget: {
     cap: number | null;
     base: number | null;
+    /** Sum of all of the month's extras. */
     top_up: number;
+    /** Each extra separately (a month can have several). */
+    top_ups: { extra: number; note: string | null }[];
   };
   spent: {
     total_on_card: number;
@@ -198,7 +201,12 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     cycle_start: cycleStart,
     cycle_end: cycleEnd,
     days_left_in_cycle: daysLeft,
-    living_budget: { cap, base, top_up: roundMoney(topUp) },
+    living_budget: {
+      cap,
+      base,
+      top_up: roundMoney(topUp),
+      top_ups: topups.filter((t) => t.month === budgetYm).map((t) => ({ extra: t.extra, note: t.note ?? null })),
+    },
     spent: {
       total_on_card: roundMoney(report.total_spent),
       counted_against_budget: breakdown.spent,

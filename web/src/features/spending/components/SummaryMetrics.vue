@@ -3,6 +3,7 @@
     <BudgetHero
       v-if="plan && !hideLivingBudget"
       :plan="plan"
+      :extras="budgetExtras"
       :everyday-enabled="everydayBreakdownEnabled"
       @everyday="openEverydayBreakdown"
     />
@@ -11,7 +12,9 @@
     <div v-else-if="!hideLivingBudget && livingBudget !== null" class="bh bh-result" :class="`bh--${resultTone}`">
       <div class="bh-top">
         <span class="bh-pill"><span class="bh-dot" />{{ resultStatus }}</span>
-        <span class="bh-day">Budget {{ formatIlsWhole(livingBudget) }}</span>
+        <span class="bh-day">
+          Budget {{ formatIlsWhole(livingBudget - extrasTotal) }}<template v-if="extrasTotal > 0"> + {{ formatIlsWhole(extrasTotal) }} extra</template>
+        </span>
       </div>
       <p class="bh-label">{{ isOverBudget ? "Over budget by" : retrospective ? "Left at the end" : "Left so far" }}</p>
       <p class="bh-value">{{ formatIlsWhole(isOverBudget ? overAmount : Math.max(0, budgetLeft ?? 0)) }}</p>
@@ -153,6 +156,8 @@ const props = withDefaults(
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
+    /** This month's extra money, each addition separately. */
+    budgetExtras?: { extra: number; note?: string }[];
   }>(),
   {
     retrospective: false,
@@ -160,6 +165,7 @@ const props = withDefaults(
     plan: null,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
+    budgetExtras: () => [],
   },
 );
 
@@ -175,6 +181,7 @@ const budgetUsedPct = computed(() => {
   if (!props.livingBudget || props.livingBudget <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((budgetSpent.value / props.livingBudget) * 100)));
 });
+const extrasTotal = computed(() => roundMoney(props.budgetExtras.reduce((s, e) => s + (Number(e.extra) || 0), 0)));
 const isOverBudget = computed(() => budgetLeft.value !== null && budgetLeft.value < 0);
 const overAmount = computed(() => Math.abs(budgetLeft.value ?? 0));
 

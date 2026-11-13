@@ -24,7 +24,11 @@ export interface LivingBudgetSegment {
   through_month: string;
 }
 
-/** One-off extra cap for a single calendar month (added on top of the active period). */
+/**
+ * One extra amount for a single calendar month, added on top of the active period.
+ * A month can have several (leftover from last month, a refund, money from savings…):
+ * the month's extra is their sum. Old data with one entry per month works unchanged.
+ */
 export interface LivingBudgetMonthTopup {
   month: string;
   extra: number;
@@ -62,8 +66,13 @@ export function normalizeLivingBudgetMonthTopup(topup: LivingBudgetMonthTopup): 
   };
 }
 
-export function livingBudgetMonthTopupStableKey(topup: LivingBudgetMonthTopup): string {
-  return topup.month;
+export function livingBudgetMonthTopupStableKey(topup: LivingBudgetMonthTopup, index = 0): string {
+  return `${topup.month}#${index}`;
+}
+
+/** Extras of one month, in the order they were added. */
+export function monthTopupsForMonth(ym: string, monthTopups: LivingBudgetMonthTopup[]): LivingBudgetMonthTopup[] {
+  return monthTopups.filter((t) => t.month === ym).map(normalizeLivingBudgetMonthTopup);
 }
 
 export function monthTopupExtraForMonth(ym: string, monthTopups: LivingBudgetMonthTopup[]): number {
@@ -153,7 +162,6 @@ export function validateLivingBudgetMonthTopups(
   monthTopups: LivingBudgetMonthTopup[],
   segments: LivingBudgetSegment[],
 ): string | null {
-  const seen = new Set<string>();
   for (const raw of monthTopups) {
     const topup = normalizeLivingBudgetMonthTopup(raw);
     if (!/^\d{4}-\d{2}$/.test(topup.month)) {
@@ -162,10 +170,6 @@ export function validateLivingBudgetMonthTopups(
     if (!Number.isFinite(topup.extra) || topup.extra <= 0) {
       return "Each monthly extra must be a positive amount.";
     }
-    if (seen.has(topup.month)) {
-      return `Only one extra amount per month — merge duplicates for ${ymToLabel(topup.month)}.`;
-    }
-    seen.add(topup.month);
     if (livingBudgetBaseForMonth(topup.month, segments) === null) {
       return `No base budget covers ${ymToLabel(topup.month)} — add a period first.`;
     }

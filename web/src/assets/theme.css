@@ -4317,3 +4317,83 @@ button.sm-strip-cell {
 .pd-trend--down {
   color: var(--success);
 }
+
+/* ── Budget page: extra money, grouped by month ── */
+.topup-group {
+  margin-top: 0.6rem;
+  padding: 0.75rem 0.9rem 0.55rem;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.topup-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
+.topup-group-month {
+  font-weight: 700;
+}
+
+.topup-group-total {
+  font-weight: 700;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
+.topup-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topup-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.45rem 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+button.topup-item {
+  cursor: pointer;
+}
+
+.topup-item-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.topup-item-amount {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.topup-group-add {
+  margin-top: 0.2rem;
+  padding: 0.35rem 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Budget card details: base + extras ── */
+.bh-rows-extra {
+  cursor: pointer;
+}
