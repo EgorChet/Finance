@@ -147,7 +147,7 @@
       </label>
 
       <p class="rv-field-label">{{ t("Category") }}</p>
-      <CategoryGrid v-model="category" :options="categories" />
+      <CategoryPicker v-model="category" :options="categories" :suggestions="reviewSuggestions" />
 
       <template #footer>
         <button type="button" class="btn" :disabled="confirming" @click="skip">{{ t("Skip") }}</button>
@@ -173,7 +173,7 @@ import AppLoader from "@/shared/components/AppLoader.vue";
 import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
-import CategoryGrid from "@/shared/components/CategoryGrid.vue";
+import CategoryPicker from "@/shared/components/CategoryPicker.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { invalidateRulesDataCaches } from "@/shared/stores/invalidateCaches";
 import { useReviewDataStore, type ReviewQueueBundle } from "@/features/merchants/stores/reviewData";
@@ -253,6 +253,18 @@ async function translateRows() {
   };
   await Promise.all([worker(), worker(), worker()]);
 }
+
+/** Totoshka's guess and the bank's category first. */
+const reviewSuggestions = computed(() => {
+  const out: string[] = [];
+  const add = (c?: string | null) => {
+    if (c && c !== "Uncategorized" && !out.includes(c)) out.push(c);
+  };
+  add(hints.value?.ai?.category);
+  add(current.value?.transaction.category_en);
+  for (const c of ["Eating out", "Groceries", "Coffee", "Transport"]) if (out.length < 4) add(c);
+  return out;
+});
 
 const historyPattern = computed(() => {
   const h = hints.value?.history ?? [];

@@ -107,7 +107,7 @@
     </BottomSheet>
 
     <BottomSheet :open="sheet === 'category'" :title="t('Category')" @close="sheet = null">
-      <CategoryGrid v-model="categoryFilter" :options="categoryOptions" empty-label="Any" @pick="sheet = null" />
+      <CategoryPicker v-model="categoryFilter" :options="categoryOptions" empty-label="Any category" @pick="sheet = null" />
     </BottomSheet>
 
     <BottomSheet :open="sheet === 'amount'" :title="t('Amount')" @close="sheet = null">
@@ -149,7 +149,7 @@ import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { addExclusion, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
-import CategoryGrid from "@/shared/components/CategoryGrid.vue";
+import CategoryPicker from "@/shared/components/CategoryPicker.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { useHomeDataStore } from "@/features/home/stores/homeData";

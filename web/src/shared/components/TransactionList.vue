@@ -93,7 +93,7 @@
           {{ formatChargeAmount(categoryRow.tx) }} · {{ formatTransactionDate(categoryRow.tx.date) }}
           <template v-if="isBitTransfer(categoryRow.tx)"> · {{ t("e.g. paying someone back for dinner → Eating out") }}</template>
         </p>
-        <CategoryGrid :model-value="categoryRow.category" :options="CATEGORY_PICKLIST" @pick="pickCategory" />
+        <CategoryPicker :model-value="categoryRow.category" :options="CATEGORY_PICKLIST" :suggestions="categorySuggestions" @pick="pickCategory" />
         <p v-if="categoryError" class="tx-cat-error">{{ categoryError }}</p>
       </template>
       <template v-if="categoryRow?.tx.category_override" #footer>
@@ -166,7 +166,9 @@ import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, m
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { merchantDisplayName } from "@/shared/utils/merchantNames";
-import CategoryGrid from "@/shared/components/CategoryGrid.vue";
+import CategoryPicker from "@/shared/components/CategoryPicker.vue";
+import { showToast } from "@/shared/composables/useToast";
+import { chargeSuggestions } from "@/shared/utils/categorySuggest";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { isBitTransfer, saveChargeCategory } from "@/shared/composables/useChargeCategory";
@@ -356,6 +358,9 @@ function closeSheet() {
 }
 
 const categoryRow = ref<TxRow | null>(null);
+const categorySuggestions = computed(() =>
+  categoryRow.value ? chargeSuggestions(categoryRow.value.tx, props.transactions) : [],
+);
 const savingCategory = ref(false);
 const categoryError = ref("");
 
@@ -373,9 +378,14 @@ async function pickCategory(category: string | null) {
   const value = category && category !== original ? category : null;
   savingCategory.value = true;
   categoryError.value = "";
+  const previous = row.tx.category_override ?? null;
   try {
     await saveChargeCategory(row.tx, value);
     categoryRow.value = null;
+    showToast(t("Changed to {name}", { name: catName(value ?? original) }), {
+      label: t("Undo"),
+      run: () => void saveChargeCategory(row.tx, previous).catch(() => undefined),
+    });
   } catch (e) {
     categoryError.value = friendlyError(e);
   } finally {

@@ -369,6 +369,7 @@
       </div>
     </div>
 
+    <AppToast />
     <Teleport to="body">
       <UploadJobToast
         v-if="uploadToast"
@@ -390,6 +391,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import UploadJobToast from "@/shared/components/UploadJobToast.vue";
+import AppToast from "@/shared/components/AppToast.vue";
 import {
   fetchCalSyncJob,
   fetchUploadJob,
