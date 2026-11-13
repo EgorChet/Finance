@@ -37,6 +37,10 @@ export interface TightCycleAdvice {
   needAhead: number;
   freeLeft: number;
   shortBy: number;
+  /** What a normal day of everyday spending costs you (usual need for the days left ÷ days left). */
+  usualPerDay: number;
+  /** Days with no spending at all that close the gap; null when even every day left isn't enough. */
+  noSpendDays: number | null;
   /** Usual spending on pausable things per day. */
   pausablePerDay: number;
   /** Stay-home days (essentials only) that close the gap; null when even every day left isn't enough. */
@@ -114,12 +118,18 @@ export function tightCycleAdvice(
   const pausablePerDay = pausablePerCycle / opts.cycleLength;
   const daysShare = opts.daysLeft / opts.cycleLength;
   const homeDaysNeeded = pausablePerDay > 0 ? Math.ceil(shortBy / pausablePerDay) : Infinity;
+  // A no-spend day skips a whole normal day of spending — the simplest way back.
+  const usualPerDay = needAhead / opts.daysLeft;
+  const noSpendNeeded = usualPerDay > 0 ? Math.ceil(shortBy / usualPerDay) : Infinity;
 
   return {
     usualNeed: roundMoney(usualNeed),
     needAhead: roundMoney(needAhead),
     freeLeft: roundMoney(freeLeft),
     shortBy: roundMoney(shortBy),
+    usualPerDay: roundMoney(usualPerDay),
+    // Leave at least a few days to live on: past that, it needs a top-up.
+    noSpendDays: noSpendNeeded <= Math.max(1, opts.daysLeft - 3) ? noSpendNeeded : null,
     pausablePerDay: roundMoney(pausablePerDay),
     homeDays: homeDaysNeeded <= opts.daysLeft ? homeDaysNeeded : null,
     homeAllDaysSaving: roundMoney(pausablePerDay * opts.daysLeft),
