@@ -253,3 +253,19 @@ export function regularChargesForCycle(
     return { ...base, state, amount: est.amount, date: expected, late: expected < cycleStart, basis: est.basis };
   });
 }
+
+/**
+ * Regular charges you also entered by hand under Budget (e.g. "Vaad bayit" as a recurring charge).
+ * The hand-entered one already counts, so these are skipped here — never set aside twice.
+ */
+export function rulesCoveredByConfigured(
+  rules: readonly RegularChargeRule[],
+  configured: readonly { name_en: string; name_he?: string }[],
+): Set<string> {
+  const covered = new Set<string>();
+  for (const c of configured) {
+    const text = `${c.name_he ?? ""} ${c.name_en ?? ""}`;
+    for (const rule of rules) if (rule.pattern.test(text)) covered.add(rule.id);
+  }
+  return covered;
+}

@@ -54,7 +54,7 @@
       <button
         type="button"
         class="app-account-btn"
-        aria-label="Account, portfolio and add data"
+        :aria-label="t('Account, portfolio and add data')"
         :aria-expanded="navOpen"
         @click="navOpen = !navOpen"
       >
@@ -67,8 +67,8 @@
         <div class="mobile-nav-backdrop" aria-hidden="true" @click="closeNav" />
         <nav class="mobile-nav-drawer" aria-label="Main navigation">
           <div class="mobile-nav-drawer-head">
-            <span class="mobile-nav-drawer-title">Account</span>
-            <button type="button" class="btn btn-icon mobile-nav-close" aria-label="Close" @click="closeNav">
+            <span class="mobile-nav-drawer-title">{{ t("Account") }}</span>
+            <button type="button" class="btn btn-icon mobile-nav-close" :aria-label="t('Close')" @click="closeNav">
               ×
             </button>
           </div>
@@ -107,7 +107,7 @@
                 class="mobile-nav-portfolio-row mobile-nav-portfolio-row--combined"
                 :title="portfolioCombinedTitle"
               >
-                <span class="mobile-nav-portfolio-label">Total</span>
+                <span class="mobile-nav-portfolio-label">{{ t("Total") }}</span>
                 <span class="mobile-nav-portfolio-values">
                   <span>{{ formatUsd(portfolioCombinedUsd, 0) }}</span>
                   <template v-if="portfolioCombinedIls != null">
@@ -143,16 +143,43 @@
                   </svg>
                 </span>
                 <span class="mobile-nav-setting-copy">
-                  <span class="mobile-nav-setting-label">Light mode</span>
-                  <span class="mobile-nav-setting-hint">{{ app.lightMode ? "On" : "Off" }}</span>
+                  <span class="mobile-nav-setting-label">{{ t("Light mode") }}</span>
+                  <span class="mobile-nav-setting-hint">{{ app.lightMode ? t("On") : t("Off") }}</span>
                 </span>
                 <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
               </label>
 
+              <div v-if="LANGUAGE_READY" class="mobile-nav-setting-row">
+                <span class="mobile-nav-setting-icon" aria-hidden="true">
+                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16">
+                    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
+                    <path d="M1.75 8h12.5M8 1.75c1.9 1.8 2.75 3.9 2.75 6.25S9.9 12.45 8 14.25C6.1 12.45 5.25 10.35 5.25 8S6.1 3.55 8 1.75z" fill="none" stroke="currentColor" stroke-width="1.3" />
+                  </svg>
+                </span>
+                <span class="mobile-nav-setting-copy">
+                  <span class="mobile-nav-setting-label">{{ t("Language") }}</span>
+                  <span class="mobile-nav-setting-hint">{{ locale === "ru" ? "Русский" : "English" }}</span>
+                </span>
+                <div class="lang-switch" role="radiogroup" :aria-label="t('Language')">
+                  <button
+                    v-for="opt in LANGS"
+                    :key="opt.value"
+                    type="button"
+                    role="radio"
+                    class="lang-switch-btn"
+                    :class="{ 'lang-switch-btn--on': locale === opt.value }"
+                    :aria-checked="locale === opt.value"
+                    @click="setLocale(opt.value)"
+                  >
+                    {{ opt.label }}
+                  </button>
+                </div>
+              </div>
+
               <div v-if="auth.isDemo" class="mobile-nav-account-card">
-                <p class="mobile-nav-demo-note">You're viewing demo data. Sign in to use your own statements.</p>
+                <p class="mobile-nav-demo-note">{{ t("You're viewing demo data. Sign in to use your own statements.") }}</p>
                 <button type="button" class="mobile-nav-action btn mobile-nav-action--accent" @click="goLogin">
-                  Sign in
+                  {{ t("Sign in") }}
                 </button>
               </div>
 
@@ -160,7 +187,7 @@
                 <div v-if="auth.userLabel" class="mobile-nav-account-header">
                   <span class="mobile-nav-account-avatar" aria-hidden="true">{{ accountInitial }}</span>
                   <div class="mobile-nav-account-meta">
-                    <span class="mobile-nav-account-eyebrow">Signed in as</span>
+                    <span class="mobile-nav-account-eyebrow">{{ t("Signed in as") }}</span>
                     <span class="mobile-nav-account-name">{{ auth.userLabel }}</span>
                   </div>
                 </div>
@@ -191,7 +218,7 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                  Import statement
+                  {{ t("Import statement") }}
                 </button>
 
                 <button
@@ -201,7 +228,7 @@
                   :disabled="calBusy"
                   @click="syncCal()"
                 >
-                  Sync Cal
+                  {{ t("Sync Cal") }}
                 </button>
 
                 <button
@@ -229,7 +256,7 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                  Sync .xlsx files
+                  {{ t("Sync .xlsx files") }}
                 </button>
 
                 <button
@@ -256,7 +283,7 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                  Sign out
+                  {{ t("Sign out") }}
                 </button>
               </div>
             </div>
@@ -276,7 +303,7 @@
       </div>
       <RouterView :key="viewKey" />
     </main>
-    <nav class="app-tabbar" aria-label="Sections">
+    <nav class="app-tabbar" :aria-label="t('Sections')">
       <RouterLink
         v-for="item in tabItems"
         :key="item.to"
@@ -295,11 +322,11 @@
             stroke-linejoin="round"
           />
         </svg>
-        <span class="app-tab-label">{{ item.label }}</span>
+        <span class="app-tab-label">{{ t(item.label) }}</span>
         <span
           v-if="item === TRANSACTIONS_TAB && merchantsWaiting > 0"
           class="app-tab-badge"
-          :aria-label="`${merchantsWaiting} merchants need a name`"
+          :aria-label="t('{n} merchants need a name', { n: merchantsWaiting })"
         >{{ merchantsWaiting > 9 ? "9+" : merchantsWaiting }}</span>
       </RouterLink>
     </nav>
@@ -318,26 +345,23 @@
         <h3>{{ processErrorTitle }}</h3>
         <p>{{ processError }}</p>
         <div class="process-error-actions">
-          <button type="button" class="btn" @click="dismissProcessError">Dismiss</button>
-          <button v-if="canRetry" type="button" class="btn btn-primary" @click="retryProcess">Try again</button>
+          <button type="button" class="btn" @click="dismissProcessError">{{ t("Dismiss") }}</button>
+          <button v-if="canRetry" type="button" class="btn btn-primary" @click="retryProcess">{{ t("Try again") }}</button>
         </div>
       </div>
     </div>
 
     <div v-if="uploadPromptFile" class="process-error-overlay" role="dialog" aria-modal="true">
       <div class="process-error-card upload-type-card">
-        <h3>Statement type</h3>
+        <h3>{{ t("Statement type") }}</h3>
         <p class="upload-type-file">{{ uploadPromptFile.name }}</p>
         <p class="upload-type-hint">
-          Exports around the <strong>10th–13th</strong> are often still incomplete — pick
-          <strong>Partial</strong> unless this file is the full official bill for the cycle.
-          <strong>Final</strong> closes the month (pace tab, projections) — use only when nothing is missing.
-          After you choose, processing continues in the background — you can keep using the app or leave.
+          {{ t("Exports around the 10th–13th are often still incomplete — pick Partial unless this file is the full official bill for the cycle. Final closes the month (pace tab, projections) — use only when nothing is missing. After you choose, processing continues in the background — you can keep using the app or leave.") }}
         </p>
         <div class="process-error-actions upload-type-actions">
-          <button type="button" class="btn" @click="cancelUploadPrompt">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="confirmUpload('partial')">Partial snapshot</button>
-          <button type="button" class="btn" @click="confirmUpload('final')">Final — closes cycle</button>
+          <button type="button" class="btn" @click="cancelUploadPrompt">{{ t("Cancel") }}</button>
+          <button type="button" class="btn btn-primary" @click="confirmUpload('partial')">{{ t("Partial snapshot") }}</button>
+          <button type="button" class="btn" @click="confirmUpload('final')">{{ t("Final — closes cycle") }}</button>
         </div>
       </div>
     </div>
@@ -385,6 +409,14 @@ import { goToSignIn } from "@/features/auth/utils/signIn";
 import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
 import kaspaLogo from "@/assets/kaspa.png";
+import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
+
+/** The switch shows once every screen is translated. */
+const LANGUAGE_READY = false;
+const LANGS: { value: Locale; label: string }[] = [
+  { value: "en", label: "EN" },
+  { value: "ru", label: "RU" },
+];
 
 /** v2 — default header asset is KAS (v1 may have persisted FXCN). */
 const PORTFOLIO_ASSET_KEY = "portfolio_header_asset_v2";
@@ -440,7 +472,7 @@ const processSubtitle = ref("");
 const processSteps = ref<string[]>([]);
 const processStep = ref(0);
 const processError = ref("");
-const processErrorTitle = ref("Something went wrong");
+const processErrorTitle = ref(t("Something went wrong"));
 const canRetry = ref(false);
 const retryProcessFn = ref<(() => void) | null>(null);
 const uploadInput = ref<HTMLInputElement | null>(null);
@@ -497,7 +529,7 @@ const portfolioCombinedTitle = computed(() => {
   const parts = [formatUsd(usd)];
   if (portfolioCombinedIls.value != null) parts.push(formatIls(portfolioCombinedIls.value, 0));
   if (portfolioCombinedRub.value != null) parts.push(formatRub(portfolioCombinedRub.value, 0));
-  return `Combined portfolio · ${parts.join(" · ")}`;
+  return `${t("Combined portfolio")} · ${parts.join(" · ")}`;
 });
 
 const portfolioStripVisible = computed(() =>
@@ -529,20 +561,20 @@ const portfolioValueLabel = computed(() => {
 });
 
 const portfolioRefreshLabel = computed(() =>
-  portfolioAsset.value === "kas" ? "Refresh KAS price" : "Refresh FXCN NAV",
+  portfolioAsset.value === "kas" ? t("Refresh KAS price") : t("Refresh FXCN NAV"),
 );
 
 const kasPortfolioTitle = computed(() => {
   if (!kaspaQuote.value) return "";
   const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
-  const staleNote = stale ? " · cached" : "";
+  const staleNote = stale ? ` · ${t("cached")}` : "";
   return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} · ${source}${staleNote}`;
 });
 
 const fxcnPortfolioTitle = computed(() => {
   if (!fxcnQuote.value) return "";
   const { nav_usd, lots, portfolio_usd, source, stale } = fxcnQuote.value;
-  const staleNote = stale ? " · cached" : "";
+  const staleNote = stale ? ` · ${t("cached")}` : "";
   return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
 });
 
@@ -677,7 +709,7 @@ function applyUploadJobStatus(job: UploadJobResponse) {
     stopUploadPolling();
     clearUploadJobId();
     uploadRetry.value = null;
-    const detail = job.message || "Statement saved";
+    const detail = tr(job.message) || t("Statement saved");
     showUploadToast("done", detail);
     uploadDoneTimer = window.setTimeout(dismissUploadToast, 6000);
     emitSpendingRefresh();
@@ -686,10 +718,10 @@ function applyUploadJobStatus(job: UploadJobResponse) {
   if (job.status === "error") {
     stopUploadPolling();
     clearUploadJobId();
-    showUploadToast("error", job.error?.trim() || job.message || "Upload failed");
+    showUploadToast("error", tr(job.error?.trim() || job.message) || t("Upload failed"));
     return;
   }
-  showUploadToast("syncing", job.message || "Processing statement…");
+  showUploadToast("syncing", tr(job.message) || t("Processing statement…"));
 }
 
 async function pollUploadJob(jobId: string) {
@@ -702,7 +734,7 @@ async function pollUploadJob(jobId: string) {
     const message = e instanceof Error ? e.message : String(e);
     stopUploadPolling();
     clearUploadJobId();
-    showUploadToast("error", message.trim() || "Could not check upload status");
+    showUploadToast("error", message.trim() || t("Could not check upload status"));
   }
 }
 
@@ -720,7 +752,7 @@ async function resumeUploadJobIfNeeded() {
   if (auth.isDemo) return;
   const jobId = readUploadJobId();
   if (!jobId || activeUploadJobId) return;
-  showUploadToast("syncing", "Checking upload…");
+  showUploadToast("syncing", t("Checking upload…"));
   watchUploadJob(jobId);
 }
 
@@ -820,8 +852,8 @@ async function runUpload(file: File, statementType: "partial" | "final") {
   showUploadToast(
     "syncing",
     statementType === "partial"
-      ? `Sending ${file.name} (partial)…`
-      : `Sending ${file.name}…`,
+      ? t("Sending {name} (partial)…", { name: file.name })
+      : t("Sending {name}…", { name: file.name }),
   );
   try {
     const job = await startUploadJob(file, statementType, auth.token || undefined);
@@ -855,7 +887,7 @@ function applyCalJobStatus(job: CalSyncJob) {
     clearCalSyncJobId();
     activeCalJobId = null;
     calBusy.value = false;
-    showUploadToast("done", job.message || "Statement saved");
+    showUploadToast("done", tr(job.message) || t("Statement saved"));
     uploadDoneTimer = window.setTimeout(dismissUploadToast, 6000);
     emitSpendingRefresh();
     return;
@@ -865,10 +897,10 @@ function applyCalJobStatus(job: CalSyncJob) {
     clearCalSyncJobId();
     activeCalJobId = null;
     calBusy.value = false;
-    showUploadToast("error", job.error?.trim() || job.message || "Cal sync failed");
+    showUploadToast("error", tr(job.error?.trim() || job.message) || t("Cal sync failed"));
     return;
   }
-  showUploadToast("syncing", job.message || "Syncing Cal…");
+  showUploadToast("syncing", tr(job.message) || t("Syncing Cal…"));
 }
 
 async function pollCalJob(jobId: string) {
@@ -883,7 +915,7 @@ async function pollCalJob(jobId: string) {
     activeCalJobId = null;
     calBusy.value = false;
     const message = e instanceof Error ? e.message : String(e);
-    showUploadToast("error", message.trim() || "Could not check Cal sync");
+    showUploadToast("error", message.trim() || t("Could not check Cal sync"));
   }
 }
 
@@ -902,7 +934,7 @@ async function resumeCalSyncIfNeeded() {
   if (auth.isDemo || !auth.canEdit) return;
   const jobId = readCalSyncJobId();
   if (!jobId || activeCalJobId) return;
-  showUploadToast("syncing", "Checking Cal sync…");
+  showUploadToast("syncing", t("Checking Cal sync…"));
   watchCalJob(jobId);
 }
 
@@ -911,7 +943,7 @@ async function syncCal() {
   void wakeAnalyzerFromHere();
   calBusy.value = true;
   uploadToastMuted.value = false;
-  showUploadToast("syncing", "Starting Cal sync…");
+  showUploadToast("syncing", t("Starting Cal sync…"));
   try {
     const job = await startCalSync(auth.token || undefined);
     applyCalJobStatus(job);
@@ -919,25 +951,25 @@ async function syncCal() {
   } catch (err) {
     calBusy.value = false;
     const message = err instanceof Error ? err.message : String(err);
-    showUploadToast("error", message.trim() || "Cal sync failed");
+    showUploadToast("error", message.trim() || t("Cal sync failed"));
   }
 }
 
 async function sync() {
   closeNav();
-  beginProcess("Syncing statements", "Reading files from your statements folder", SYNC_STEPS);
+  beginProcess(t("Syncing statements"), t("Reading files from your statements folder"), SYNC_STEPS.map((s) => t(s)));
   try {
     startStepTimer(SYNC_STEPS.length - 2);
     await syncStatements(auth.token || undefined);
     clearStepTimer();
     processStep.value = SYNC_STEPS.length - 1;
-    processSubtitle.value = "Done — refreshing your data…";
+    processSubtitle.value = t("Done — refreshing your data…");
     await new Promise((r) => setTimeout(r, 500));
     processing.value = false;
     emitSpendingRefresh();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    failProcess("Sync failed", message, sync);
+    failProcess(t("Sync failed"), message, sync);
   }
 }
 

@@ -63,10 +63,15 @@
 <script setup lang="ts">
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { computed, onMounted, ref, watch } from "vue";
+import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
+import type { BudgetPlan } from "@core/spending/budgetPlan";
+import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
+import { livingBudgetForMonth, normalizeLivingBudgetMonthTopup, normalizeLivingBudgetSegment } from "@/features/household/utils/livingBudget";
 import {
   DEFAULT_REGULAR_CHARGES,
   regularChargesForCycle,
   resolveRegularCharges,
+  rulesCoveredByConfigured,
   type RegularChargeOverrides,
   type RegularChargeRule,
   type RegularChargeStatus,
@@ -89,7 +94,7 @@ import {
 } from "@/features/spending/utils/pace";
 
 const props = defineProps<{ readonly: boolean }>();
-const emit = defineEmits<{ saved: [string]; monthly: [number] }>();
+const emit = defineEmits<{ saved: [string]; monthly: [number]; plan: [BudgetPlan | null] }>();
 
 /** Which brand mark / category icon each bill line shows (the name as it appears on the card). */
 const BILL_MARKS: Record<string, { he?: string; category: string }> = {
@@ -118,6 +123,29 @@ const cycle = ref<{ start: string; end: string; today: string } | null>(null);
 const saving = ref(false);
 const error = ref("");
 const editing = ref<{ id: string; on: boolean; amount: number } | null>(null);
+const configured = ref<ConfiguredCharge[]>([]);
+const budget = ref<number | null>(null);
+
+/** Bills you also entered under Budget → Recurring: counted there, not here. */
+const covered = computed(() =>
+  rulesCoveredByConfigured(DEFAULT_REGULAR_CHARGES, configured.value.filter((c) => c.schedule !== "once")),
+);
+
+/** This cycle's plan — the same numbers the Spending screen shows. */
+const plan = computed((): BudgetPlan | null => {
+  if (!cycle.value || budget.value == null) return null;
+  return computeLiveBudgetPlan({
+    cycleTransactions: cycleTxs.value,
+    cycleDay: loadCycleDay(),
+    cycleStart: cycle.value.start,
+    referenceDate: referenceDate(auth.isDemo, auth.demoAsOf),
+    livingBudget: budget.value,
+    history: history.value,
+    configuredCharges: configured.value,
+    regularCharges: overrides.value,
+  });
+});
+watch(plan, (p) => emit("plan", p), { immediate: true });
 
 function rhythm(rule: RegularChargeRule): string {
   if (rule.irregular) return "Whenever it comes";
@@ -152,6 +180,7 @@ const rows = computed(() =>
     let pill: { label: string; cls: string } | null = null;
     let when = "";
     if (off) pill = { label: "Off", cls: "ended" };
+    else if (covered.value.has(rule.id)) pill = { label: "Counted in Recurring", cls: "ended" };
     else if (s?.state === "posted") pill = { label: `Charged ${s.date ? shortDate(s.date) : ""}`.trim(), cls: "active" };
     else if (s?.state === "due") {
       pill = { label: s.late ? "Late · set aside" : "Set aside", cls: "upcoming" };
@@ -174,7 +203,7 @@ const rows = computed(() =>
       name: rule.name,
       amount,
       exact: s?.state === "posted" || rule.exactAmount != null || !!overrides.value[rule.id]?.amount,
-      off,
+      off: off || covered.value.has(rule.id),
       pill,
       meta,
     };
@@ -192,7 +221,7 @@ const setAsideTotal = computed(() =>
 const monthlyAverage = computed(() =>
   Math.round(
     DEFAULT_REGULAR_CHARGES.reduce((sum, rule) => {
-      if (overrides.value[rule.id]?.off) return sum;
+      if (overrides.value[rule.id]?.off || covered.value.has(rule.id)) return sum;
       const s = statuses.value.get(rule.id);
       if (!s || (s.state === "unknown" && !s.date && !rule.irregular)) return sum;
       return sum + s.amount / rule.everyMonths;
@@ -244,6 +273,7 @@ onMounted(async () => {
   try {
     const bundle = await homeData.load(auth.isDemo, auth.token || undefined);
     overrides.value = bundle.regular_charges ?? {};
+    configured.value = bundle.fixed_charges ?? [];
     history.value = bundle.report?.transactions ?? [];
     const cycleDay = loadCycleDay();
     const now = referenceDate(auth.isDemo, auth.demoAsOf);
@@ -251,6 +281,12 @@ onMounted(async () => {
     const { end } = getCycleRangeForStart(start, cycleDay);
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     cycle.value = { start, end, today };
+    budget.value = livingBudgetForMonth(
+      start.slice(0, 7),
+      bundle.living_budget.segments.map(normalizeLivingBudgetSegment),
+      (bundle.living_budget.month_topups || []).map(normalizeLivingBudgetMonthTopup),
+      configured.value,
+    );
     const partial = findPartialMonth(bundle.months, start, cycleDay);
     if (partial) {
       const r = await fetchReport(auth.isDemo, partial.key, auth.token || undefined);

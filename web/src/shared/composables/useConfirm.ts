@@ -1,3 +1,4 @@
+import { t } from "@/shared/i18n";
 import { reactive } from "vue";
 
 export type ConfirmTone = "default" | "danger";
@@ -23,19 +24,19 @@ let resolveFn: ((value: boolean) => void) | null = null;
 
 function applyOptions(options: ConfirmOptions | string) {
   if (typeof options === "string") {
-    state.title = "Are you sure?";
+    state.title = t("Are you sure?");
     state.message = options;
-    state.confirmLabel = "Confirm";
-    state.cancelLabel = "Cancel";
+    state.confirmLabel = t("Confirm");
+    state.cancelLabel = t("Cancel");
     state.tone = "default";
     return;
   }
 
   const tone = options.tone ?? "default";
-  state.title = options.title ?? (tone === "danger" ? "Delete?" : "Are you sure?");
+  state.title = options.title ?? (tone === "danger" ? t("Delete?") : t("Are you sure?"));
   state.message = options.message;
-  state.confirmLabel = options.confirmLabel ?? (tone === "danger" ? "Delete" : "Confirm");
-  state.cancelLabel = options.cancelLabel ?? "Cancel";
+  state.confirmLabel = options.confirmLabel ?? (tone === "danger" ? t("Delete") : t("Confirm"));
+  state.cancelLabel = options.cancelLabel ?? t("Cancel");
   state.tone = tone;
 }
 

@@ -34,6 +34,7 @@
         :persist="persistCharges"
         :save-error="status"
         :card-bills="cardBillsMonthly"
+        :cycle-plan="cyclePlan"
         @save="persistCharges"
         @edit-recurring-charge="editRecurringCharge"
       />
@@ -95,7 +96,7 @@
         <p v-else class="bx-empty-line">No recurring bills yet. Rent, loans and subscriptions go here.</p>
       </section>
 
-      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" />
+      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" @plan="cyclePlan = $event" />
 
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
@@ -289,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import type { BudgetPlan } from "@core/spending/budgetPlan";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -349,6 +351,7 @@ const auth = useAuthStore();
 /** Demo, or a household member who isn't allowed to change the budget. */
 /** Average monthly bills on the Cal card, reported by "Bills on your card". */
 const cardBillsMonthly = ref(0);
+const cyclePlan = ref<BudgetPlan | null>(null);
 const budgetLocked = computed(() => auth.readOnly || !auth.canEditBudget);
 const homeData = useHomeDataStore();
 const householdData = useHouseholdDataStore();

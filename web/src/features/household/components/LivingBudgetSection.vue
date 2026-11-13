@@ -47,7 +47,26 @@
           </li>
         </ul>
 
-        <template v-if="monthlyBills > 0 || cardBills > 0">
+        <template v-if="cycleSplit">
+          <p class="bx-bar-label">{{ cycleSplit.title }}</p>
+          <div class="bx-bar" aria-hidden="true">
+            <span v-for="part in cycleSplit.parts" :key="part.key" :style="{ width: `${part.pct}%`, background: part.color }" />
+          </div>
+          <ul class="bx-legend">
+            <li v-for="part in cycleSplit.parts" :key="part.key">
+              <component
+                :is="part.key === 'bills' && !readonly ? 'button' : 'span'"
+                :type="part.key === 'bills' && !readonly ? 'button' : undefined"
+                class="bx-legend-item"
+                @click="part.key === 'bills' && !readonly && scrollToRecurring()"
+              >
+                <i :style="{ background: part.color }" /><span class="bx-legend-name">{{ part.label }}</span><b>{{ formatIlsWhole(part.amount) }}</b>
+              </component>
+            </li>
+          </ul>
+          <p class="bx-note">Same numbers as Spending: bills already charged plus those still to come are taken off first.</p>
+        </template>
+        <template v-else-if="monthlyBills > 0 || cardBills > 0">
           <p class="bx-bar-label">Where it goes each month</p>
           <div class="bx-bar" aria-hidden="true">
             <span :style="{ width: `${billsPct}%`, background: 'var(--warning)' }" />
@@ -240,6 +259,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import type { BudgetPlan } from "@core/spending/budgetPlan";
 import IconButton from "@/shared/components/IconButton.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
@@ -276,6 +296,8 @@ const props = withDefaults(
     saveError?: string;
     /** Bills on the Cal card per month on average (2-monthly bills count half), from "Bills on your card". */
     cardBills?: number;
+    /** This cycle's plan (from "Bills on your card"): the real split, same as Spending. */
+    cyclePlan?: BudgetPlan | null;
   }>(),
   {
     readonly: false,
@@ -285,6 +307,7 @@ const props = withDefaults(
     persist: undefined,
     saveError: "",
     cardBills: 0,
+    cyclePlan: null,
   },
 );
 
@@ -480,6 +503,27 @@ const monthlyBills = computed(() => {
   return chargesForMonth(ym, props.configuredCharges)
     .filter(isMonthlyCharge)
     .reduce((s, c) => s + c.amount, 0);
+});
+
+/** This cycle: bills (charged + still to come), installments & earlier purchases, and what's left for everyday. */
+const cycleSplit = computed(() => {
+  const plan = props.cyclePlan;
+  if (!plan || !(plan.budget > 0)) return null;
+  const isInstallment = (k: string) => k === "installment" || k === "earlier";
+  const installments = plan.committedRows.filter((r) => isInstallment(r.kind)).reduce((s, r) => s + r.amount, 0);
+  const bills = Math.max(0, plan.bills - installments);
+  const everyday = plan.flexBudget;
+  const parts = [
+    { key: "bills", label: "Bills & fixed charges", amount: bills, color: "var(--warning)" },
+    ...(installments > 0 ? [{ key: "inst", label: "Installments & earlier purchases", amount: installments, color: "var(--accent)" }] : []),
+    { key: "everyday", label: "Left for everyday", amount: everyday, color: "var(--success)" },
+  ];
+  const total = parts.reduce((s, p) => s + p.amount, 0) || 1;
+  const d = new Date(`${plan.cycleStart}T12:00:00`);
+  return {
+    title: `This cycle (from ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}) · ${formatIlsWhole(plan.budget)}`,
+    parts: parts.map((p) => ({ ...p, pct: (p.amount / total) * 100 })),
+  };
 });
 
 const cardBillsPct = computed(() => {

@@ -1,3 +1,6 @@
+import { displayLocale } from "@core/utils/displayLocale";
+import { RU_MERCHANT_NAMES } from "./merchantNamesRu";
+
 /**
  * English names for merchants that only have a Hebrew name — chains by their usual English name,
  * small places transliterated. Used wherever a charge is shown, and offered in Review as the
@@ -301,7 +304,7 @@ export function knownMerchantName(merchantHe: string | null | undefined): string
  * a canonical brand name, else its English name (tidied), else a known translation, else the
  * Hebrew. A Latin-only statement name is tidied too ("GO MOBILE" → "Go Mobile").
  */
-export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: string | null }): string {
+export function englishMerchantName(tx: { merchant_he: string; merchant_en?: string | null }): string {
   const canonical = canonicalMerchantName(tx.merchant_he, tx.merchant_en);
   if (canonical) return canonical;
   const en = tx.merchant_en?.trim();
@@ -312,8 +315,15 @@ export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: str
   return en || tx.merchant_he;
 }
 
+/** The name to show in the chosen language (Russian forms for local places; brands keep theirs). */
+export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: string | null }): string {
+  const en = englishMerchantName(tx);
+  if (displayLocale() !== "ru") return en;
+  return RU_MERCHANT_NAMES[en] ?? en;
+}
+
 /** English name to offer in Review: canonical / known / tidied Latin, or "" when we'd be guessing. */
 export function suggestedEnglishName(merchantHe: string, merchantEn?: string | null): string {
-  const name = merchantDisplayName({ merchant_he: merchantHe, merchant_en: merchantEn });
+  const name = englishMerchantName({ merchant_he: merchantHe, merchant_en: merchantEn });
   return HEBREW_RE.test(name) ? "" : name;
 }

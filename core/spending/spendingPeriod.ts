@@ -2,6 +2,7 @@ import type { Transaction } from "../types.js";
 import { rollupCategory } from "../categories.js";
 import { formatIls, roundMoney } from "../utils/format.js";
 import { effectiveSpend } from "../utils/transaction.js";
+import { dateLocaleTag } from "../utils/displayLocale.js";
 import { spendingSplit } from "./budgetPlan.js";
 
 export type SpendingPeriodMode = "ytd" | "rolling12";
@@ -70,7 +71,7 @@ function normDate(d: Date): Date {
 
 function monthLabel(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  return new Date(y, m - 1, 1).toLocaleDateString(dateLocaleTag(), { month: "short", year: "numeric" });
 }
 
 function deltaPct(current: number, prior: number): number | null {

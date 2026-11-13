@@ -13,7 +13,7 @@
         >
           <div class="tx-sheet-grabber" aria-hidden="true" />
           <header class="sheet-editor__head">
-            <button type="button" class="sheet-editor__cancel" :disabled="busy" @click="onCancel">Cancel</button>
+            <button type="button" class="sheet-editor__cancel" :disabled="busy" @click="onCancel">{{ t("Cancel") }}</button>
             <h3 class="sheet-editor__title">{{ title }}</h3>
             <span class="sheet-editor__head-spacer" aria-hidden="true" />
           </header>
@@ -27,7 +27,7 @@
 
           <footer class="sheet-editor__foot">
             <button type="submit" class="btn btn-primary sheet-editor__save" :disabled="busy">
-              {{ busy ? "Saving…" : saveLabel }}
+              {{ busy ? t("Saving…") : t(saveLabel) }}
             </button>
             <button
               v-if="deletable"
@@ -36,7 +36,7 @@
               :disabled="busy"
               @click="$emit('delete')"
             >
-              {{ deleteLabel }}
+              {{ t(deleteLabel) }}
             </button>
           </footer>
         </form>
@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { onUnmounted, watch } from "vue";
 
 const props = withDefaults(

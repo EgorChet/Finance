@@ -3,15 +3,16 @@
     class="input select-field"
     :value="modelValue"
     :disabled="disabled"
-    :aria-label="ariaLabel"
+    :aria-label="t(ariaLabel)"
     @change="onChange"
   >
-    <option v-if="allowEmpty" value="">{{ emptyLabel }}</option>
-    <option v-for="c in options" :key="c" :value="c">{{ c }}</option>
+    <option v-if="allowEmpty" value="">{{ t(emptyLabel) }}</option>
+    <option v-for="c in options" :key="c" :value="c">{{ catName(c) }}</option>
   </select>
 </template>
 
 <script setup lang="ts">
+import { catName, t } from "@/shared/i18n";
 withDefaults(
   defineProps<{
     modelValue: string;

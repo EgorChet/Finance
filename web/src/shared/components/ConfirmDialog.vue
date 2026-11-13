@@ -17,12 +17,12 @@
           class="confirm-dialog-title"
           :class="{ 'confirm-dialog-title--danger': state.tone === 'danger' }"
         >
-          {{ state.title }}
+          {{ t(state.title) }}
         </h3>
-        <p :id="messageId" class="confirm-dialog-message">{{ state.message }}</p>
+        <p :id="messageId" class="confirm-dialog-message">{{ t(state.message) }}</p>
         <div class="confirm-dialog-actions">
           <button ref="cancelBtn" type="button" class="btn" @click="cancel">
-            {{ state.cancelLabel }}
+            {{ t(state.cancelLabel) }}
           </button>
           <button
             type="button"
@@ -30,7 +30,7 @@
             :class="state.tone === 'danger' ? 'btn-danger' : 'btn-primary'"
             @click="accept"
           >
-            {{ state.confirmLabel }}
+            {{ t(state.confirmLabel) }}
           </button>
         </div>
       </div>
@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { nextTick, onUnmounted, ref, watch } from "vue";
 import { useConfirmState } from "@/shared/composables/useConfirm";
 

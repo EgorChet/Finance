@@ -8,7 +8,7 @@
             <slot name="head">
               <h3 class="bs-title">{{ title }}</h3>
             </slot>
-            <button type="button" class="bs-close" aria-label="Close" @click="emit('close')">✕</button>
+            <button type="button" class="bs-close" :aria-label="t('Close')" @click="emit('close')">✕</button>
           </header>
           <div class="bs-body">
             <slot />
@@ -23,6 +23,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { onUnmounted, watch } from "vue";
 
 const props = defineProps<{ open: boolean; title?: string }>();
