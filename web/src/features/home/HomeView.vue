@@ -108,6 +108,7 @@ import { goToSignIn } from "@/features/auth/utils/signIn";
 import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
+import type { RegularChargeOverrides } from "@core/spending/regularCharges";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
@@ -147,6 +148,7 @@ const paceReport = ref<SpendingReport | null>(null);
 const months = ref<MonthItem[]>([]);
 const currentMonthKey = ref<string | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
+const regularChargeOverrides = ref<RegularChargeOverrides>({});
 const livingBudgetSegments = ref<ReturnType<typeof normalizeLivingBudgetSegment>[]>([]);
 const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonthTopup>[]>([]);
 const cycleDay = ref(loadCycleDay());
@@ -214,6 +216,7 @@ const summaryPlan = computed(() => {
     livingBudget: livingBudgetAmount.value,
     history: paceReport.value?.transactions,
     configuredCharges: configuredCharges.value,
+    regularCharges: regularChargeOverrides.value,
     dataAsOf: findPartialMonth(
       months.value,
       activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
@@ -364,6 +367,7 @@ async function applySpendingBundle(bundle: HomeDataBundle, opts: { preserveMonth
   months.value = bundle.months;
   if (auth.isDemo && bundle.demo_as_of) auth.demoAsOf = bundle.demo_as_of;
   configuredCharges.value = bundle.fixed_charges;
+  regularChargeOverrides.value = bundle.regular_charges ?? {};
   paceReport.value = bundle.report;
   livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(

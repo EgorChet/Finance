@@ -27,6 +27,7 @@ import {
 import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import { buildGuessQueue, buildLabelHints, saveLabelSuggestions } from "../services/labelHints.js";
+import { loadRegularChargeOverrides, saveRegularChargeOverrides } from "../services/regularCharges.js";
 import {
   buildReviewQueue,
   normalizeReviewKey,
@@ -174,6 +175,7 @@ router.get("/home-data", async (req, res) => {
     pace_months: paceKeys.length,
     pace_months_requested: paceMonths,
     fixed_charges: loadFixedCharges(),
+    regular_charges: await loadRegularChargeOverrides(),
     living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
   });
 });
@@ -223,11 +225,13 @@ router.get("/summary", async (req, res) => {
     const r = await getCombinedReportAsync(data, [key], version);
     if (r) reports[key] = r as unknown as CoreSpendingReport;
   }
+  const regularOverrides = await loadRegularChargeOverrides();
   const summary = withPaceSettings(settings, () =>
     computeSpendingSummary({
       months,
       paceReport: (paceReport ?? null) as unknown as CoreSpendingReport | null,
       fixedCharges: loadFixedCharges() as unknown as Parameters<typeof computeSpendingSummary>[0]["fixedCharges"],
+      regularCharges: regularOverrides,
       livingBudget: { segments: budget.segments, month_topups: budget.month_topups || [] },
       referenceDate: householdNow(),
       monthKey,
@@ -311,6 +315,20 @@ router.put("/fixed-charges", async (req, res) => {
   }
   const saved = await saveFixedCharges(charges);
   res.json({ saved: true, charges: saved });
+});
+
+/** Regular charges (bills / subscriptions set aside until they post): lines switched off, hand-set amounts. */
+router.get("/regular-charges", async (_req, res) => {
+  res.json({ overrides: await loadRegularChargeOverrides() });
+});
+
+router.put("/regular-charges", async (req, res) => {
+  const body = req.body as { overrides?: unknown };
+  if (!body || typeof body.overrides !== "object" || body.overrides === null) {
+    res.status(400).json({ error: "overrides object required" });
+    return;
+  }
+  res.json({ saved: true, overrides: await saveRegularChargeOverrides(body.overrides) });
 });
 
 router.get("/living-budget", async (_req, res) => {

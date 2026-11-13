@@ -46,3 +46,5 @@ export const readPaceSettings = store.readPaceSettings;
 export const writePaceSettings = store.writePaceSettings;
 export const readLabelSuggestions = store.readLabelSuggestions;
 export const writeLabelSuggestions = store.writeLabelSuggestions;
+export const readRegularCharges = store.readRegularCharges;
+export const writeRegularCharges = store.writeRegularCharges;

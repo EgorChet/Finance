@@ -94,6 +94,8 @@
         <p v-else class="bx-empty-line">No recurring bills yet. Rent, loans and subscriptions go here.</p>
       </section>
 
+      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" />
+
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
           <h3>One-time charges</h3>
@@ -296,6 +298,7 @@ import AdjustmentsSection from "@/features/household/components/AdjustmentsSecti
 import ExcludedSection from "@/features/household/components/ExcludedSection.vue";
 import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";
+import RegularChargesSection from "@/features/household/components/RegularChargesSection.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";

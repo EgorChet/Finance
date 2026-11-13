@@ -201,6 +201,7 @@ import {
 } from "@/shared/categories";
 import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
+import type { RegularChargeOverrides } from "@core/spending/regularCharges";
 import {
   buildCategoryCompareContext,
   buildStatementCompareContext,
@@ -263,6 +264,7 @@ const error = ref("");
 const report = ref<SpendingReport | null>(null);
 const paceReport = ref<SpendingReport | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
+const regularChargeOverrides = ref<RegularChargeOverrides>({});
 const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
 const livingBudgetMonthTopups = ref<LivingBudgetMonthTopup[]>([]);
 const months = ref<MonthItem[]>([]);
@@ -482,6 +484,7 @@ const summaryPlan = computed(() => {
     livingBudget: resolvedLivingBudget.value,
     history: paceTransactions.value,
     configuredCharges: configuredCharges.value,
+    regularCharges: regularChargeOverrides.value,
     dataAsOf: statementSavedAt.value,
   });
 });
@@ -746,6 +749,7 @@ async function refreshConfiguredCharges() {
   const token = auth.token || undefined;
   const bundle = await homeData.load(demo, token, { force: true });
   configuredCharges.value = bundle.fixed_charges;
+  regularChargeOverrides.value = bundle.regular_charges ?? {};
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
     normalizeLivingBudgetMonthTopup(t),
@@ -885,6 +889,7 @@ async function applyFromBundle(bundle: HomeDataBundle, opts: { preserveSelection
   seedMonthReportCache(bundle.scoped_reports);
   summary.value = mapSummaryRows(bundle.summary, bundle.months);
   configuredCharges.value = bundle.fixed_charges;
+  regularChargeOverrides.value = bundle.regular_charges ?? {};
   paceReport.value = bundle.report;
   paceReportIsFull.value = false;
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));

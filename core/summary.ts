@@ -8,6 +8,7 @@
  */
 import type { MonthItem, SpendingReport, Transaction } from "./types.js";
 import type { ConfiguredCharge } from "./household/fixedCharges.js";
+import type { RegularChargeOverrides } from "./spending/regularCharges.js";
 import {
   budgetSpendBreakdown,
   dailyBudgetLeft,
@@ -51,6 +52,8 @@ export interface SummaryInputs {
   /** Multi-month report used for the usual-pace baseline (home-data `report`). */
   paceReport: SpendingReport | null;
   fixedCharges: ConfiguredCharge[];
+  /** Regular charges switched off / amounts fixed under Budget. */
+  regularCharges?: RegularChargeOverrides | null;
   livingBudget: { segments: LivingBudgetSegment[]; month_topups?: LivingBudgetMonthTopup[] };
   referenceDate: Date;
   /** Month or open-cycle key; defaults to the one Home opens on. */
@@ -94,6 +97,8 @@ export interface SpendingSummary {
   plan_per_day: number | null;
   /** Plan through yesterday − flexible spent. Positive = under plan. */
   plan_buffer: number | null;
+  /** Bills and subscriptions expected this cycle that haven't been charged yet (already taken out of the daily number). */
+  set_aside: { name: string; amount: number; expected: string | null; late: boolean }[];
   transaction_count: number;
   manual_spend_used: number | null;
 }
@@ -174,6 +179,7 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
       livingBudget: cap,
       history: input.paceReport?.transactions,
       configuredCharges: input.fixedCharges,
+      regularCharges: input.regularCharges,
       dataAsOf: findPartialMonth(months, cycleStart ?? cycleStartForDate(refDate, cycleDay), cycleDay)?.saved_at ?? null,
     });
   }
@@ -209,6 +215,9 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     pace_status: plan?.status ?? null,
     plan_per_day: plan?.planPerDay ?? null,
     plan_buffer: plan?.buffer ?? null,
+    set_aside: (plan?.regularCharges ?? [])
+      .filter((r) => r.state === "due")
+      .map((r) => ({ name: r.name, amount: r.amount, expected: r.date, late: r.late })),
     transaction_count: report.transaction_count,
     manual_spend_used: manualUsed,
   };

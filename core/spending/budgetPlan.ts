@@ -2,8 +2,8 @@
  * "Am I on track?" — one rule, anchored to the living budget, shaped by your own habits.
  *
  * 1. Budget − committed charges = flexible money for the cycle. Committed = what you
- *    can't steer day to day: rent, car loan, Dev Institute, vaad bayit (reserved until it
- *    posts), standing orders (utilities, insurance, subscriptions), installment payments,
+ *    can't steer day to day: rent, car loan, Dev Institute, regular charges (bills and
+ *    subscriptions, set aside until they post — see regularCharges.ts), standing orders (utilities, insurance, subscriptions), installment payments,
  *    charges dated before the cycle, and arnona. On real statements these were 1–6k a
  *    month and posted early, which used to paint whole months red.
  * 2. Spending curve: from your last completed cycles the app learns what share of the
@@ -18,13 +18,19 @@
 import type { Transaction } from "../types.js";
 import {
   budgetSpendBreakdown,
-  hasVaadBayitCharge,
   isCarLoanTransaction,
   isDevInstituteTransaction,
   isRentTransaction,
   isVaadBayitTransaction,
-  VAAD_BAYIT_RESERVE,
 } from "../household/householdBudget.js";
+import {
+  matchRegularCharge,
+  regularChargesForCycle,
+  resolveRegularCharges,
+  type RegularChargeOverrides,
+  type RegularChargeRule,
+  type RegularChargeStatus,
+} from "./regularCharges.js";
 import { effectiveSpend } from "../utils/transaction.js";
 import { roundMoney } from "../utils/format.js";
 import { billingCycleProgress, getBillingCycle } from "./pace.js";
@@ -58,13 +64,16 @@ export interface BudgetPlan {
   /** "On track", "Slow down a little", "Slow down", "Over budget", "Finished within budget". */
   status: string;
   budget: number;
-  /** Committed charges posted so far + vaad reserve. */
+  /** Committed charges posted so far + everything set aside for charges still to come. */
   bills: number;
   /** Committed charges by kind, for the details sheet (vaad reserve included). */
   committedRows: { kind: CommittedKind; label: string; amount: number; oneTimeDate?: string }[];
+  /** Part of the set-aside money that is for vaad bayit (kept for older screens). */
   vaadReserve: number;
-  /** Charges added under Budget that are due later this cycle (set aside, not charged yet). */
+  /** Set aside for charges not posted yet: regular charges + charges added under Budget (vaad excluded). */
   upcomingReserve: number;
+  /** Every regular charge and where it stands this cycle (charged / set aside / later). */
+  regularCharges: RegularChargeStatus[];
   flexBudget: number;
   flexSpent: number;
   flexLeft: number;
@@ -123,6 +132,7 @@ export function pastCyclesByDay(
   cycleStart: string,
   cycleDay: number,
   dayIndex: number,
+  rules: readonly RegularChargeRule[] = DEFAULT_RULES,
 ): { cycleStart: string; label: string; everyday: number; total: number }[] {
   const start = parseIsoDate(cycleStart);
   const buckets = new Map<number, { start: Date; everyday: number; total: number; full: number }>();
@@ -142,7 +152,7 @@ export function pastCyclesByDay(
     const day = daysBetween(cycle.start, d) + 1;
     if (day > dayIndex) continue;
     b.total += amt;
-    if (isFlexibleTransaction(tx)) b.everyday += amt;
+    if (isFlexibleTransaction(tx, undefined, rules)) b.everyday += amt;
   }
   const all = [...buckets.values()];
   const fulls = all.map((b) => b.full).sort((a, b) => a - b);
@@ -182,6 +192,7 @@ export type CommittedKind =
   | "carLoan"
   | "devInstitute"
   | "vaad"
+  | "regular"
   | "configured"
   | "upcoming"
   | "standingOrder"
@@ -194,6 +205,7 @@ export const COMMITTED_LABELS: Record<CommittedKind, string> = {
   carLoan: "Car loan",
   devInstitute: "Dev Institute",
   vaad: "Vaad bayit",
+  regular: "Regular charges",
   configured: "Charges you added",
   upcoming: "Coming up this cycle",
   standingOrder: "Standing orders",
@@ -206,11 +218,19 @@ export function isInstallmentTransaction(tx: Transaction): boolean {
   return INSTALLMENT_TYPES.has(tx.transaction_type_he ?? "");
 }
 
+const DEFAULT_RULES = resolveRegularCharges();
+
 /** Why a charge is committed (not day-to-day spending), or null when it's flexible. */
-export function committedKind(tx: Transaction, cycleStart?: string): CommittedKind | null {
+export function committedKind(
+  tx: Transaction,
+  cycleStart?: string,
+  rules: readonly RegularChargeRule[] = DEFAULT_RULES,
+): CommittedKind | null {
   if (isRentTransaction(tx)) return "rent";
   if (isCarLoanTransaction(tx)) return "carLoan";
   if (isDevInstituteTransaction(tx)) return "devInstitute";
+  // Bills and subscriptions on the regular list (incl. hairdresser / nails) — known in advance.
+  if (matchRegularCharge(tx, rules)) return "regular";
   if (isVaadBayitTransaction(tx)) return "vaad";
   // Charges entered under Budget (one-time or monthly) are known in advance, not day-to-day spending.
   if (tx.notes?.startsWith("fixed_charge:")) return "configured";
@@ -222,8 +242,12 @@ export function committedKind(tx: Transaction, cycleStart?: string): CommittedKi
 }
 
 /** Day-to-day spending: everything on the cap that isn't committed. */
-export function isFlexibleTransaction(tx: Transaction, cycleStart?: string): boolean {
-  return committedKind(tx, cycleStart) === null;
+export function isFlexibleTransaction(
+  tx: Transaction,
+  cycleStart?: string,
+  rules: readonly RegularChargeRule[] = DEFAULT_RULES,
+): boolean {
+  return committedKind(tx, cycleStart, rules) === null;
 }
 
 function median(values: number[]): number {
@@ -258,11 +282,12 @@ export function learnSpendingCurve(
   history: Transaction[],
   cycleStart: string,
   cycleDay: number,
+  rules: readonly RegularChargeRule[] = DEFAULT_RULES,
 ): SpendingCurve {
   const start = parseIsoDate(cycleStart);
   const buckets = new Map<number, { start: Date; length: number; byDay: number[] }>();
   for (const tx of history) {
-    if (!isFlexibleTransaction(tx)) continue;
+    if (!isFlexibleTransaction(tx, undefined, rules)) continue;
     const amt = effectiveSpend(tx);
     if (!(amt > 0)) continue;
     const d = parseIsoDate(tx.date);
@@ -330,6 +355,8 @@ export function computeBudgetPlan(
     configuredCharges?: ConfiguredCharge[];
     /** When the card data was last synced / uploaded (ISO); "by day N" compares through that day. */
     dataAsOf?: string | null;
+    /** Regular charges switched off / amounts fixed under Budget. */
+    regularCharges?: RegularChargeOverrides | null;
   },
 ): BudgetPlan | null {
   if (budget == null || budget <= 0) return null;
@@ -341,6 +368,7 @@ export function computeBudgetPlan(
   );
   const daysLeft = Math.max(0, cycleLength - dayIndex + 1);
 
+  const rules = resolveRegularCharges(cycle.regularCharges);
   const breakdown = budgetSpendBreakdown(cycleTransactions);
   // Rows keyed by label: charges you added are listed one by one, by name.
   const rows = new Map<string, { kind: CommittedKind; label: string; amount: number; oneTimeDate?: string }>();
@@ -352,12 +380,18 @@ export function computeBudgetPlan(
   let committedPosted = 0;
   const postedChargeIds = new Set<string>();
   for (const tx of cycleTransactions) {
-    const kind = committedKind(tx, start);
+    const kind = committedKind(tx, start, rules);
     if (tx.notes?.startsWith("fixed_charge:")) postedChargeIds.add(tx.notes.slice("fixed_charge:".length));
     if (!kind) continue;
     const amount = effectiveSpend(tx);
     committedPosted += amount;
-    addRow(kind, kind === "configured" ? tx.merchant_en || tx.merchant_he : COMMITTED_LABELS[kind], amount);
+    const label =
+      kind === "configured"
+        ? tx.merchant_en || tx.merchant_he
+        : kind === "regular"
+          ? (matchRegularCharge(tx, rules)?.name ?? COMMITTED_LABELS.regular)
+          : COMMITTED_LABELS[kind];
+    addRow(kind, label, amount);
   }
   committedPosted = roundMoney(committedPosted);
 
@@ -374,10 +408,19 @@ export function computeBudgetPlan(
       charge.schedule === "once" ? charge.charge_date?.slice(0, 10) : undefined,
     );
   }
-  upcomingReserve = roundMoney(upcomingReserve);
 
-  const vaadReserve = hasVaadBayitCharge(cycleTransactions) ? 0 : VAAD_BAYIT_RESERVE;
-  if (vaadReserve > 0) addRow("vaad", COMMITTED_LABELS.vaad, vaadReserve);
+  // Regular charges expected this cycle (or late from the last one) that haven't posted yet.
+  const regularCharges = regularChargesForCycle(rules, cycleTransactions, cycle.history, start, end);
+  let vaadReserve = 0;
+  for (const r of regularCharges) {
+    if (r.state !== "due" || !(r.amount > 0)) continue;
+    if (r.id === "vaad") vaadReserve += r.amount;
+    else upcomingReserve += r.amount;
+    const when = r.date ? ` (${r.late ? "late, was due " : "≈"}${r.date.slice(8, 10)}/${r.date.slice(5, 7)})` : "";
+    addRow("upcoming", `${r.name}${when}`, r.amount);
+  }
+  upcomingReserve = roundMoney(upcomingReserve);
+  vaadReserve = roundMoney(vaadReserve);
   const bills = roundMoney(committedPosted + upcomingReserve + vaadReserve);
   const committedRows = [...rows.values()]
     .map((r) => ({ ...r, amount: roundMoney(r.amount) }))
@@ -390,7 +433,7 @@ export function computeBudgetPlan(
   const flexLeft = roundMoney(flexBudget - flexSpent);
 
   const curve = cycle.history?.length
-    ? learnSpendingCurve(cycle.history, start, cycle.cycleDay)
+    ? learnSpendingCurve(cycle.history, start, cycle.cycleDay, rules)
     : evenCurve();
   const planShareAt = (day: number) => curveAt(curve, day / cycleLength);
 
@@ -425,7 +468,7 @@ export function computeBudgetPlan(
   const startDate = parseIsoDate(start);
   const perDay = new Array(cycleLength).fill(0);
   for (const tx of cycleTransactions) {
-    if (!isFlexibleTransaction(tx, start)) continue;
+    if (!isFlexibleTransaction(tx, start, rules)) continue;
     const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
     if (day < 1 || day > dayIndex) continue;
     perDay[day - 1] += effectiveSpend(tx);
@@ -456,7 +499,7 @@ export function computeBudgetPlan(
       const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
       if (day < 1 || day > dayIndex) continue;
       latestChargeDay = Math.max(latestChargeDay, day);
-      if (isFlexibleTransaction(tx) && effectiveSpend(tx) > 0) datedEveryday += effectiveSpend(tx);
+      if (isFlexibleTransaction(tx, undefined, rules) && effectiveSpend(tx) > 0) datedEveryday += effectiveSpend(tx);
     }
     // A hand-typed "spent so far" total is as of now.
     const manualTotal = flexSpent > datedEveryday + 1;
@@ -478,7 +521,7 @@ export function computeBudgetPlan(
       }
     }
 
-    const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, compareDay);
+    const past = pastCyclesByDay(cycle.history, start, cycle.cycleDay, compareDay, rules);
     if (past.length) {
       let everyday = 0;
       let total = 0;
@@ -488,7 +531,7 @@ export function computeBudgetPlan(
         const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
         if (day > compareDay) continue;
         total += amt;
-        if (isFlexibleTransaction(tx)) everyday += amt;
+        if (isFlexibleTransaction(tx, undefined, rules)) everyday += amt;
       }
       if (manualTotal) everyday = Math.max(everyday, flexSpent);
       total = Math.max(total, everyday);
@@ -513,6 +556,7 @@ export function computeBudgetPlan(
     committedRows,
     vaadReserve,
     upcomingReserve,
+    regularCharges,
     flexBudget,
     flexSpent,
     flexLeft,
