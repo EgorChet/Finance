@@ -78,7 +78,8 @@ const NAMES: [RegExp, string][] = [
   [/דמי כרטיס/, "Card fee"],
   // Local places (transliterated)
   [/דני בתי מאפה/, "Dani Bakery"],
-  [/מרכולית אגמים/, "Agamim Minimarket"],
+  // Also whatever Hebrew spelling it came under — the old English label wins over nothing.
+  [/מרכולית אגמים|סופר אגמים|super agamim/i, "Agamim Minimarket"],
   [/ממתקים אגמים/, "Agamim Sweets"],
   [/רונן בשרים/, "Ronen Meats"],
   [/גינגר בריאות/, "Ginger Health Food"],
@@ -197,7 +198,8 @@ const CANONICAL: [RegExp, string][] = [
   [/skims/i, "SKIMS"],
   [/משרד התחבורה/, "Ministry of Transport"],
   // Saved under an odd label ("Super Agamim (Belarus)"); מרכולית = minimarket.
-  [/מרכולית אגמים/, "Agamim Minimarket"],
+  // Also whatever Hebrew spelling it came under — the old English label wins over nothing.
+  [/מרכולית אגמים|סופר אגמים|super agamim/i, "Agamim Minimarket"],
   [/arcaffe|ארקפה/i, "Arcaffe"],
   [/\baroma\b|ארומה/i, "Aroma"],
   [/roladin|רולדין/i, "Roladin"],
