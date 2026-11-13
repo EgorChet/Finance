@@ -52,7 +52,7 @@
               :disabled="!budgetLocked && saving"
               @click="onGroupTap(group)"
             >
-              <CategoryIcon :category="group.category_en" />
+              <MerchantIcon :merchant-he="groupDisplayName(group)" :category="group.category_en" />
               <span class="bx-row-body">
                 <span class="bx-row-top">
                   <span class="bx-row-name">{{ groupDisplayName(group) }}</span>
@@ -112,7 +112,7 @@
             :disabled="!budgetLocked && saving"
             @click="!budgetLocked && startEditCharge(charge)"
           >
-            <CategoryIcon :category="charge.category_en" />
+            <MerchantIcon :merchant-he="chargeDisplayName(charge)" :category="charge.category_en" />
             <span class="bx-row-body">
               <span class="bx-row-top">
                 <span class="bx-row-name">{{ chargeDisplayName(charge) }}</span>
@@ -289,7 +289,7 @@
 </template>
 
 <script setup lang="ts">
-import CategoryIcon from "@/shared/components/CategoryIcon.vue";
+import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute } from "vue-router";

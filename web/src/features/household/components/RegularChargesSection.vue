@@ -93,7 +93,7 @@ const emit = defineEmits<{ saved: [string]; monthly: [number] }>();
 
 /** Which brand mark / category icon each bill line shows (the name as it appears on the card). */
 const BILL_MARKS: Record<string, { he?: string; category: string }> = {
-  vaad: { category: "Housing" },
+  vaad: { he: "ועד הבית", category: "Housing" },
   chatgpt: { he: "OPENAI", category: "Subscriptions" },
   cursor: { he: "CURSOR", category: "Subscriptions" },
   bezeq: { he: "בזק", category: "Subscriptions" },
