@@ -73,8 +73,10 @@
       </button>
     </div>
 
-    <p v-if="byDay" class="bh-byday" :class="{ 'bh-byday--record': byDay.record }">{{ byDay.line }}</p>
-    <p v-if="setAsideLine" class="bh-setaside">{{ setAsideLine }}</p>
+    <div v-if="byDay || setAsideLine" class="bh-chips">
+      <span v-if="byDay" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
+      <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
+    </div>
 
     <div class="bh-stats">
       <div>
@@ -205,16 +207,14 @@ const billRows = computed(() =>
 /** Money already promised to charges that haven't gone through yet. */
 const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
 
-/** "🧾 ₪2,086 set aside for bills still to come: Arnona, Electricity, Claude +2" — why the daily number is lower. */
+/** "🧾 6 bills to come" — why the daily number is lower (amount under Set aside, names in the sheet). */
 const setAsideLine = computed(() => {
   if (reserved.value < 1 || props.plan.daysLeft === 0) return "";
   const names = props.plan.committedRows
     .filter((r) => r.kind === "upcoming")
     .map((r) => r.label.replace(/\s*\(.*\)\s*$/, ""));
   if (!names.length) return "";
-  const shown = names.slice(0, 3).join(", ");
-  const more = names.length > 3 ? ` +${names.length - 3}` : "";
-  return `🧾 ${whole(reserved.value)} set aside for bills still to come: ${shown}${more}`;
+  return `🧾 ${names.length} ${names.length === 1 ? "bill" : "bills"} to come`;
 });
 
 const explanation = computed(() => {
@@ -248,11 +248,11 @@ const byDay = computed(() => {
   const n = b.past.length + 1;
   const record = b.everydayRank === 1 || b.totalRank === 1;
   const d = b.day;
-  const asOf = b.dataAsOf ? ` (data from ${b.dataAsOf.slice(8, 10)}/${b.dataAsOf.slice(5, 7)})` : "";
-  const stale = b.dataAgeDays >= 3 ? ` · ⚠️ data is ${b.dataAgeDays} days old` : "";
-  if (b.everydayRank === 1) return { record, line: `🔺 Most everyday spending by day ${d}${asOf} in ${n} cycles (${whole(b.everyday)})${stale}` };
-  if (b.totalRank === 1) return { record, line: `🔺 Most spent by day ${d}${asOf} in ${n} cycles (${whole(b.total)} incl. bills)${stale}` };
-  return { record, line: `By day ${d}${asOf}: ${whole(b.everyday)} everyday · ${ordinal(b.everydayRank)} of ${n} cycles${stale}` };
+  // Short chip; the full comparison (and the data date) is in the details sheet.
+  const stale = b.dataAgeDays >= 3 ? ` · ⚠️ ${b.dataAgeDays}d old` : "";
+  if (b.everydayRank === 1) return { record, line: `🔺 Record by day ${d} · ${whole(b.everyday)}${stale}` };
+  if (b.totalRank === 1) return { record, line: `🔺 Record by day ${d} incl. bills${stale}` };
+  return { record, line: `Day ${d}: ${ordinal(b.everydayRank)} of ${n} cycles${stale}` };
 });
 
 const compareRows = computed(() => {
