@@ -4397,3 +4397,77 @@ button.topup-item {
 .bh-rows-extra {
   cursor: pointer;
 }
+
+/* ── Budget card: the month's budget and how it splits ── */
+.bh-budget {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.bh-budget-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.bh-budget-head strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bh-budget-extra {
+  margin: 0.1rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.bh-split {
+  display: flex;
+  height: 8px;
+  margin-top: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  overflow: hidden;
+}
+
+.bh-split span {
+  height: 100%;
+}
+
+.bh-split-spent,
+.bh-dot-key--spent {
+  background: var(--text);
+}
+
+.bh-split-aside,
+.bh-dot-key--aside {
+  background: color-mix(in srgb, var(--text) 40%, transparent);
+}
+
+.bh-split-free,
+.bh-dot-key--free {
+  background: var(--bh-tone);
+}
+
+.bh-dot-key {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.35rem;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+
+/* The budget block already draws the divider. */
+.bh-budget + .bh-stats {
+  margin-top: 0.7rem;
+  padding-top: 0;
+  border-top: 0;
+}

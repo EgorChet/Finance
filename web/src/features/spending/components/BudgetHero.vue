@@ -76,25 +76,33 @@
     <div v-if="byDay || setAsideLine" class="bh-chips">
       <span v-if="byDay" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
       <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
-      <span v-if="extrasTotal > 0" class="bh-chip">➕ {{ whole(extrasTotal) }} extra</span>
+    </div>
+
+    <div class="bh-budget">
+      <div class="bh-budget-head">
+        <span>Budget this month</span>
+        <strong>{{ whole(plan.budget) }}</strong>
+      </div>
+      <p v-if="extrasTotal > 0" class="bh-budget-extra">{{ whole(plan.budget - extrasTotal) }} + {{ whole(extrasTotal) }} extra</p>
+      <div class="bh-split" aria-hidden="true">
+        <span class="bh-split-spent" :style="{ width: `${split.spent}%` }" />
+        <span class="bh-split-aside" :style="{ width: `${split.aside}%` }" />
+        <span class="bh-split-free" :style="{ width: `${split.free}%` }" />
+      </div>
     </div>
 
     <div class="bh-stats">
       <div>
-        <span>Free to spend</span>
-        <strong>{{ whole(Math.max(0, plan.flexLeft)) }}</strong>
-      </div>
-      <div>
-        <span>Spent</span>
+        <span><i class="bh-dot-key bh-dot-key--spent" />Spent</span>
         <strong>{{ whole(plan.spentOnCap) }}</strong>
       </div>
-      <div v-if="reserved > 0">
-        <span>Set aside</span>
+      <div>
+        <span><i class="bh-dot-key bh-dot-key--aside" />Set aside</span>
         <strong>{{ whole(reserved) }}</strong>
       </div>
-      <div v-else>
-        <span>Budget</span>
-        <strong>{{ whole(plan.budget) }}</strong>
+      <div>
+        <span><i class="bh-dot-key bh-dot-key--free" />{{ plan.moneyLeft < 0 ? "Over" : "Free to spend" }}</span>
+        <strong>{{ whole(plan.moneyLeft < 0 ? -plan.moneyLeft : Math.max(0, plan.flexLeft)) }}</strong>
       </div>
     </div>
   </div>
@@ -261,6 +269,14 @@ const extrasOpen = ref(false);
 
 /** Money already promised to charges that haven't gone through yet. */
 const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
+
+/** Budget = spent + set aside + free; the bar shows the three shares (spent fills it when over). */
+const split = computed(() => {
+  const p = props.plan;
+  const total = Math.max(p.budget, p.spentOnCap + reserved.value + Math.max(0, p.flexLeft), 1);
+  const pct = (n: number) => Math.max(0, Math.min(100, (n / total) * 100));
+  return { spent: pct(p.spentOnCap), aside: pct(reserved.value), free: pct(Math.max(0, p.flexLeft)) };
+});
 
 /** "🧾 6 bills to come" — why the daily number is lower (amount under Set aside, names in the sheet). */
 const setAsideLine = computed(() => {
