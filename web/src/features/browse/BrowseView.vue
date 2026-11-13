@@ -151,6 +151,7 @@ import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { useHomeDataStore } from "@/features/home/stores/homeData";
+import { useAllReportStore } from "@/shared/stores/allReport";
 import { confirm } from "@/shared/composables/useConfirm";
 import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, Transaction } from "@/shared/types";
@@ -186,6 +187,7 @@ function setView(next: "charges" | "merchants") {
   void router.replace({ name: "browse", query: next === "merchants" ? { view: "merchants" } : {} });
 }
 const homeData = useHomeDataStore();
+const allReport = useAllReportStore();
 const loading = ref(true);
 const error = ref("");
 const months = ref<MonthItem[]>([]);
@@ -341,7 +343,8 @@ async function loadTransactions(options: { background?: boolean } = {}) {
   }
 
   try {
-    const report = await fetchReport(demo, month, token);
+    // All months: shared cache (instant on return, refreshed in the background).
+    const report = month ? await fetchReport(demo, month, token) : await allReport.load(demo, token);
     if (month === (selectedMonth.value || null)) {
       allTransactions.value = [...report.transactions];
     }
