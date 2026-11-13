@@ -1,13 +1,53 @@
 /**
  * Brand marks for merchants you pay often:
  * - international brands use their real logo (simple-icons, bundled in brandIcons.ts);
- * - the rest show their site's original logo when it's sharp (≥ 48px), otherwise a round badge
+ * - the rest show their site's original logo (bundled, see BUNDLED_LOGOS), otherwise a round badge
  *   in the brand's colour with its initials (like Revolut's merchant avatars) — never a globe
  *   or a blurry icon.
  * Anything not listed keeps the category emoji. Patterns are tested against
  * "merchant_he merchant_en"; first match wins.
  */
 import { BRAND_ICONS } from "./brandIcons";
+
+/**
+ * Original logos downloaded once from each brand's site and bundled in web/public/logos/
+ * (checked by eye; nothing loads from outside at runtime). Brands not here keep their badge.
+ */
+const BUNDLED_LOGOS = new Set([
+  "amazon.com",
+  "arcaffe.co.il",
+  "aws.amazon.com",
+  "bezeq.co.il",
+  "bitpay.co.il",
+  "bth.co.il",
+  "castro.com",
+  "cellcom.co.il",
+  "delek.co.il",
+  "good-pharm.co.il",
+  "gotoglobal.com",
+  "iec.co.il",
+  "iherb.com",
+  "jorno.co.il",
+  "landwer.co.il",
+  "leumi.co.il",
+  "midjourney.com",
+  "moovitapp.com",
+  "openai.com",
+  "pango.co.il",
+  "partner.co.il",
+  "payboxapp.com",
+  "paz.co.il",
+  "pluxee.co.il",
+  "roladin.co.il",
+  "shein.com",
+  "shufersal.co.il",
+  "sonol.co.il",
+  "super-pharm.co.il",
+  "supergas.co.il",
+  "temu.com",
+  "victoryonline.co.il",
+  "wolt.com",
+]);
 
 /** domain: the brand's site — its original logo is used when it's sharp enough, the badge otherwise. */
 type Mark = { icon: string } | { text: string; bg: string; fg?: string; domain?: string };
@@ -18,6 +58,7 @@ const BRANDS: [RegExp, Mark][] = [
   [/aroma|ארומה/i, { text: "a", bg: "#E31B23", domain: "aroma.co.il" }],
   [/קפה קפה|cafe cafe/i, { text: "CC", bg: "#5B3A29", domain: "cafecafe.co.il" }],
   [/roladin|רולדין/i, { text: "R", bg: "#1A1A1A", domain: "roladin.co.il" }],
+  [/jorno|ג'ורנו/i, { text: "J", bg: "#1A1A1A", domain: "jorno.co.il" }],
   [/benedict|בנדיקט/i, { text: "B", bg: "#F2A900", fg: "#1A1A1A", domain: "benedict.co.il" }],
   [/landwer|לנדוור/i, { text: "L", bg: "#1F3A5F", domain: "landwer.co.il" }],
   [/biscotti|ביסקוטי/i, { text: "B", bg: "#8A5A44", domain: "biscotti.co.il" }],
@@ -119,8 +160,7 @@ export function merchantMark(merchantHe: string | null | undefined, merchantEn?:
       text: mark.text,
       bg: mark.bg,
       fg: mark.fg ?? contrastOn(mark.bg),
-      // The site's own icon at up to 128px; MerchantIcon keeps it only when it's sharp.
-      logoUrl: mark.domain ? `https://www.google.com/s2/favicons?domain=${mark.domain}&sz=128` : null,
+      logoUrl: mark.domain && BUNDLED_LOGOS.has(mark.domain) ? `${import.meta.env.BASE_URL}logos/${mark.domain}.png` : null,
     };
   }
   cache.set(text, out);
