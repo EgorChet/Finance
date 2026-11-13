@@ -7,7 +7,7 @@
       </h3>
     </div>
     <p class="bx-section-note">
-      Set aside from the day each cycle starts until the charge comes. Amounts are learned from your statements.
+      Bills due this cycle are set aside until they're charged; "Next cycle" ones aren't counted yet. Amounts are learned from your statements.
     </p>
     <div class="bx-list">
       <component
@@ -154,7 +154,11 @@ const rows = computed(() =>
     else if (s?.state === "due") {
       pill = { label: s.late ? "Late · set aside" : "Set aside", cls: "upcoming" };
       if (s.date) when = s.late ? `was due ${shortDate(s.date)}` : `≈ ${shortDate(s.date)}`;
-    } else if (s?.state === "later" && s.date) when = `next ≈ ${shortDate(s.date)}`;
+    } else if (s?.state === "later" && s.date) {
+      // Expected after this cycle ends: not set aside now.
+      pill = { label: "Next cycle", cls: "ended" };
+      when = `next ≈ ${shortDate(s.date)}`;
+    }
     else if (s?.state === "missed") {
       pill = { label: "Didn't come · released", cls: "ended" };
       if (s.date) when = `was due ${shortDate(s.date)}`;
