@@ -19,7 +19,7 @@
         :aria-selected="tab === 'mappings'"
         @click="setTab('mappings')"
       >
-        Saved names
+        All merchants
       </button>
     </div>
     <ReviewView v-if="tab === 'label'" embedded />

@@ -192,7 +192,14 @@ const error = ref("");
 const months = ref<MonthItem[]>([]);
 const allTransactions = ref<Transaction[]>([]);
 const selectedMonth = ref("");
-const searchQuery = ref("");
+/** "See all charges" from a merchant opens Transactions searched for it (?q=). */
+const searchQuery = ref(typeof route.query.q === "string" ? route.query.q : "");
+watch(
+  () => route.query.q,
+  (q) => {
+    if (typeof q === "string") searchQuery.value = q;
+  },
+);
 const categoryFilter = ref("");
 const minAmount = ref("");
 const maxAmount = ref("");
