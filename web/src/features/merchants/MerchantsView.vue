@@ -1,6 +1,6 @@
 <template>
   <div class="merchants-page">
-    <div class="merchants-tabs" role="tablist" aria-label="Merchants">
+    <div class="merchants-tabs" role="tablist" :aria-label="t('Merchants')">
       <button
         type="button"
         role="tab"
@@ -9,7 +9,7 @@
         :aria-selected="tab === 'label'"
         @click="setTab('label')"
       >
-        To label
+        {{ t("To label") }}
       </button>
       <button
         type="button"
@@ -19,7 +19,7 @@
         :aria-selected="tab === 'mappings'"
         @click="setTab('mappings')"
       >
-        All merchants
+        {{ t("All merchants") }}
       </button>
     </div>
     <ReviewView v-if="tab === 'label'" embedded />
@@ -28,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import MappingsView from "@/features/merchants/MappingsView.vue";

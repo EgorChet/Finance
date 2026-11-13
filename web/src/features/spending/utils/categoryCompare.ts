@@ -1,3 +1,4 @@
+import { dateTag, t } from "@/shared/i18n";
 import type { Transaction } from "@/shared/types";
 import {
   HOME_LIVING,
@@ -25,7 +26,7 @@ function isoDate(d: Date): string {
 /** "25 Aug" for day `day` of a cycle starting `start`. */
 function shortDay(start: Date, day: number): string {
   const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + day - 1);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return d.toLocaleDateString(dateTag(), { day: "numeric", month: "short" });
 }
 
 function daysBetween(a: Date, b: Date): number {
@@ -69,10 +70,10 @@ export function categoryCompareTone(result: CategoryCompareResult | undefined | 
 export function categoryCompareLine(result: CategoryCompareResult | undefined | null): string {
   const tone = categoryCompareTone(result);
   if (!result || tone === "unknown") return "";
-  if (tone === "new") return "Not usual for you";
-  if (tone === "neutral") return "About usual";
+  if (tone === "new") return t("Not usual for you");
+  if (tone === "neutral") return t("About usual");
   const abs = formatIlsWhole(Math.abs(result.delta!));
-  return tone === "high" ? `${abs} more than usual` : `${abs} less than usual`;
+  return tone === "high" ? t("{amount} more than usual", { amount: abs }) : t("{amount} less than usual", { amount: abs });
 }
 
 export function scopeKey(scope: CategoryCompareScope): string {
@@ -159,7 +160,7 @@ export function buildCategoryCompareContext(
     dayIndex,
     currentStart,
     historical: historical.slice(0, targetCycles),
-    pointLabel: dayIndex < today ? `by ${shortDay(currentStart, dayIndex)}, the last sync` : `by day ${dayIndex}`,
+    pointLabel: dayIndex < today ? t("by {date}, the last sync", { date: shortDay(currentStart, dayIndex) }) : t("by day {n}", { n: dayIndex }),
     lastLabel: "Last cycle",
   };
 }

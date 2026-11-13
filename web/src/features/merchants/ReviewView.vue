@@ -1,14 +1,14 @@
 <template>
   <div class="rv">
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample queue only. Sign in to label your real charges.</div>
+    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — sample queue only. Sign in to label your real charges.") }}</div>
 
-    <AppLoader v-if="loading" variant="card" title="Loading queue" subtitle="Finding charges that still need a label" />
+    <AppLoader v-if="loading" variant="card" :title="t('Loading queue')" :subtitle="t('Finding charges that still need a label')" />
 
     <template v-else>
       <section class="rv-hero" :class="{ 'rv-hero--done': !queue.length }">
         <template v-if="queue.length">
           <p class="rv-hero-value">{{ queue.length }}</p>
-          <p class="rv-hero-label">{{ queue.length === 1 ? "merchant needs" : "merchants need" }} a name and category</p>
+          <p class="rv-hero-label">{{ t("{n|merchant needs|merchants need} a name and category", { n: queue.length }) }}</p>
           <button
             v-if="!auth.readOnly && knownItems.length"
             type="button"
@@ -16,37 +16,37 @@
             :disabled="bulkSaving"
             @click="saveAllKnown"
           >
-            {{ bulkSaving ? `Saving ${bulkDone} of ${knownItems.length}…` : `Save all ${knownItems.length} known names` }}
+            {{ bulkSaving ? t("Saving {n} of {total}…", { n: bulkDone, total: knownItems.length }) : t("Save all {n} known names", { n: knownItems.length }) }}
           </button>
           <p v-if="!auth.readOnly && knownItems.length" class="rv-hero-sub">
-            Chains and easy translations I'm sure about — the rest stay here for you.
+            {{ t("Chains and easy translations I'm sure about — the rest stay here for you.") }}
           </p>
           <button v-if="!auth.readOnly || auth.isDemo" type="button" class="btn rv-hero-cta" @click="openAt(0)">
-            Start labelling
+            {{ t("Start labelling") }}
           </button>
         </template>
         <template v-else>
           <p class="rv-hero-value">✓</p>
-          <p class="rv-hero-label">Everything is labelled</p>
-          <p class="rv-hero-sub">New merchants show up here after the next statement upload.</p>
+          <p class="rv-hero-label">{{ t("Everything is labelled") }}</p>
+          <p class="rv-hero-sub">{{ t("New merchants show up here after the next statement upload.") }}</p>
         </template>
-        <p v-if="savedThisSession > 0" class="rv-hero-sub">{{ savedThisSession }} saved just now · {{ reviewedCount }} in total</p>
+        <p v-if="savedThisSession > 0" class="rv-hero-sub">{{ t("{n} saved just now · {total} in total", { n: savedThisSession, total: reviewedCount }) }}</p>
       </section>
 
       <BitSortCard />
 
-      <div class="find-chips rv-filters" role="toolbar" aria-label="What to show">
+      <div class="find-chips rv-filters" role="toolbar" :aria-label="t('What to show')">
         <button type="button" class="find-chip" :class="{ 'find-chip--on': onePerMerchant }" :aria-pressed="onePerMerchant" @click="onePerMerchant = !onePerMerchant">
-          {{ onePerMerchant ? "✓ " : "" }}One per store
+          {{ onePerMerchant ? "✓ " : "" }}{{ t("One per store") }}
         </button>
         <button type="button" class="find-chip" :class="{ 'find-chip--on': includeLabeled }" :aria-pressed="includeLabeled" @click="includeLabeled = !includeLabeled">
-          {{ includeLabeled ? "✓ " : "" }}Already named
+          {{ includeLabeled ? "✓ " : "" }}{{ t("Already named") }}
         </button>
         <button type="button" class="find-chip" :class="{ 'find-chip--on': includeReviewed }" :aria-pressed="includeReviewed" @click="includeReviewed = !includeReviewed">
-          {{ includeReviewed ? "✓ " : "" }}Already done
+          {{ includeReviewed ? "✓ " : "" }}{{ t("Already done") }}
         </button>
-        <button type="button" class="find-chip" @click="() => load({ force: true })">↻ Refresh</button>
-        <button v-if="!auth.readOnly" type="button" class="find-chip" @click="reset">Reset progress</button>
+        <button type="button" class="find-chip" @click="() => load({ force: true })">↻ {{ t("Refresh") }}</button>
+        <button v-if="!auth.readOnly" type="button" class="find-chip" @click="reset">{{ t("Reset progress") }}</button>
       </div>
 
       <div v-if="queue.length" class="rv-list">
@@ -63,56 +63,56 @@
             </span>
             <span class="rv-row-meta">
               <span v-if="rowTitle(item) !== item.transaction.merchant_he" class="rv-row-he" dir="rtl" lang="he">{{ item.transaction.merchant_he }}</span>
-              <span>{{ item.occurrence_count > 1 ? `${item.occurrence_count} charges` : formatTransactionDate(item.transaction.date) }}</span>
+              <span>{{ item.occurrence_count > 1 ? t("{n} {n|charge|charges}", { n: item.occurrence_count }) : formatTransactionDate(item.transaction.date) }}</span>
             </span>
           </span>
         </button>
       </div>
-      <p v-else-if="includeLabeled || includeReviewed" class="rv-empty">Nothing matches these filters.</p>
+      <p v-else-if="includeLabeled || includeReviewed" class="rv-empty">{{ t("Nothing matches these filters.") }}</p>
     </template>
 
     <BottomSheet :open="sheetOpen && !!current" @close="sheetOpen = false">
       <template #head>
         <div v-if="current" class="rv-sheet-head">
-          <p class="rv-sheet-step">{{ index + 1 }} of {{ queue.length }}</p>
+          <p class="rv-sheet-step">{{ t("{n} of {total}", { n: index + 1, total: queue.length }) }}</p>
           <p class="rv-sheet-title">{{ hints?.translation || rowTitle(current) }}</p>
           <p class="rv-sheet-he-small" dir="rtl" lang="he">{{ current.transaction.merchant_he }}</p>
           <p class="rv-sheet-meta">
             {{ formatIls(current.transaction.charge_amount) }} · {{ formatTransactionDate(current.transaction.date) }}
-            <template v-if="current.occurrence_count > 1"> · {{ current.occurrence_count }} charges<template v-if="onePerMerchant">, all get this label</template></template>
+            <template v-if="current.occurrence_count > 1"> · {{ t("{n} {n|charge|charges}", { n: current.occurrence_count }) }}<template v-if="onePerMerchant">, {{ t("all get this label") }}</template></template>
           </p>
         </div>
       </template>
 
       <section v-if="current" class="rv-hints" aria-live="polite">
         <div v-if="hintsLoading" class="rv-ai rv-ai--loading">
-          <span class="rv-ai-badge">🐶 Totoshka</span>
-          <span>Loading hints…</span>
+          <span class="rv-ai-badge">🐶 {{ t("Totoshka") }}</span>
+          <span>{{ t("Loading hints…") }}</span>
         </div>
         <div v-else-if="hints?.ai" class="rv-ai">
           <div class="rv-ai-top">
-            <span class="rv-ai-badge">🐶 Totoshka's guess<template v-if="hints.ai.confidence !== 'high'"> · {{ hints.ai.confidence }} confidence</template></span>
+            <span class="rv-ai-badge">🐶 {{ t("Totoshka's guess") }}<template v-if="hints.ai.confidence !== 'high'"> · {{ t(`${hints.ai.confidence} confidence`) }}</template></span>
             <button
               v-if="english !== hints.ai.english_name || category !== hints.ai.category"
               type="button"
               class="rv-ai-use"
               @click="useAiGuess"
             >
-              Use
+              {{ t("Use") }}
             </button>
           </div>
-          <p class="rv-ai-guess">{{ hints.ai.english_name }} · {{ hints.ai.category }}</p>
+          <p class="rv-ai-guess">{{ hints.ai.english_name }} · {{ catName(hints.ai.category) }}</p>
           <p class="rv-ai-reason">{{ hints.ai.reason }}</p>
         </div>
         <p v-else-if="hints?.ai_status === 'waiting' && !auth.isDemo" class="rv-hint-line rv-hint-muted">
-          🐶 Totoshka hasn't looked at this one yet. Ask it in Telegram to "guess my new merchants".
+          🐶 {{ t("Totoshka hasn't looked at this one yet. Ask it in Telegram to \"guess my new merchants\".") }}
         </p>
 
         <p v-if="hints?.bank_category" class="rv-hint-line">
-          <span class="rv-hint-label">Bank calls it</span> {{ hints.bank_category }}
+          <span class="rv-hint-label">{{ t("Bank calls it") }}</span> {{ hints.bank_category }}
         </p>
         <div v-if="hints?.same_day.length" class="rv-hint-block">
-          <p class="rv-hint-label">Same day you also paid</p>
+          <p class="rv-hint-label">{{ t("Same day you also paid") }}</p>
           <div class="rv-hint-chips">
             <span v-for="(d, i) in hints.same_day" :key="i" class="rv-hint-chip">
               {{ d.merchant }} <b>{{ formatIlsWhole(d.amount) }}</b>
@@ -121,7 +121,7 @@
         </div>
         <div v-if="hints && hints.history.length > 1" class="rv-hint-block">
           <p class="rv-hint-label">
-            Every charge here
+            {{ t("Every charge here") }}
             <template v-if="historyPattern"> — {{ historyPattern }}</template>
           </p>
           <div class="rv-hint-chips">
@@ -132,8 +132,8 @@
 
       <label v-if="current" class="rv-field">
         <span class="rv-field-label">
-          English name
-          <span v-if="hintsLoading && !english" class="rv-field-hint">translating…</span>
+          {{ t("English name") }}
+          <span v-if="hintsLoading && !english" class="rv-field-hint">{{ t("translating…") }}</span>
         </span>
         <input
           v-model="english"
@@ -142,22 +142,22 @@
           autocomplete="off"
           autocapitalize="words"
           enterkeyhint="done"
-          :placeholder="hintsLoading ? 'Translating…' : 'e.g. Shufersal, Wolt, Arcaffe'"
+          :placeholder="hintsLoading ? t('Translating…') : t('e.g. Shufersal, Wolt, Arcaffe')"
         />
       </label>
 
-      <p class="rv-field-label">Category</p>
+      <p class="rv-field-label">{{ t("Category") }}</p>
       <CategoryGrid v-model="category" :options="categories" />
 
       <template #footer>
-        <button type="button" class="btn" :disabled="confirming" @click="skip">Skip</button>
+        <button type="button" class="btn" :disabled="confirming" @click="skip">{{ t("Skip") }}</button>
         <button
           type="button"
           class="btn btn-primary"
           :disabled="confirming || !english.trim()"
           @click="save"
         >
-          {{ confirming ? "Saving…" : queue.length > 1 ? "Save & next" : "Save" }}
+          {{ confirming ? t("Saving…") : queue.length > 1 ? t("Save & next") : t("Save") }}
         </button>
       </template>
     </BottomSheet>
@@ -165,6 +165,7 @@
 </template>
 
 <script setup lang="ts">
+import { catName, t } from "@/shared/i18n";
 import { suggestedEnglishName } from "@/shared/utils/merchantNames";
 import { computed, onMounted, ref, watch } from "vue";
 import { confirmReview, fetchLabelHints, fetchReviewSuggestion, resetReviewProgress, type LabelHints } from "@/shared/api/client";
@@ -258,7 +259,7 @@ const historyPattern = computed(() => {
   if (h.length < 3) return "";
   const amounts = h.map((x) => x.amount);
   const same = amounts.every((a) => Math.abs(a - amounts[0]) < 1);
-  return same ? "same amount every time, looks like a subscription or regular bill" : "";
+  return same ? t("same amount every time, looks like a subscription or regular bill") : "";
 });
 
 function useAiGuess() {
@@ -441,9 +442,9 @@ async function save() {
 
 async function reset() {
   const ok = await askConfirm({
-    title: "Reset progress?",
-    message: "Show merchants you already went through again? Saved names and categories stay.",
-    confirmLabel: "Reset",
+    title: t("Reset progress?"),
+    message: t("Show merchants you already went through again? Saved names and categories stay."),
+    confirmLabel: t("Reset"),
     tone: "danger",
   });
   if (!ok) return;

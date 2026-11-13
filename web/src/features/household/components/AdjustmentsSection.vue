@@ -7,24 +7,24 @@
       aria-controls="splits-body"
       @click="open = !open"
     >
-      <span class="minor-section__title">Split charges</span>
+      <span class="minor-section__title">{{ t("Split charges") }}</span>
       <span class="minor-section__count">{{ loading ? "…" : entries.length }}</span>
       <span class="minor-section__chevron" :class="{ 'is-open': open }" aria-hidden="true" />
     </button>
 
     <div v-show="open" id="splits-body" class="minor-section__body">
-    <p class="manual-section-lead">Charges you paid for others — only your share counts toward totals.</p>
+    <p class="manual-section-lead">{{ t("Charges you paid for others — only your share counts toward totals.") }}</p>
 
     <AppLoader
       v-if="loading"
       compact
-      title="Loading splits"
-      subtitle="Fetching reimbursed charges"
+      :title="t('Loading splits')"
+      :subtitle="t('Fetching reimbursed charges')"
     />
     <template v-else>
       <p v-if="error" class="recurring-form-error">{{ error }}</p>
       <p v-else-if="!entries.length" class="manual-empty">
-        No split charges yet. Tap any charge in Spending and choose <strong>Split</strong>.
+        {{ t("No split charges yet. Tap any charge in Spending and choose Split.") }}
       </p>
       <div v-else class="excluded-list">
         <article v-for="row in entries" :key="row.key" class="excluded-card">
@@ -39,7 +39,7 @@
           <div class="excluded-card-footer">
             <p class="excluded-card-note">
               <span v-if="row.amount != null && row.reimbursement">
-                {{ formatIls(row.amount) }} − {{ formatIls(row.reimbursement) }} back
+                {{ t("{total} − {back} back", { total: formatIls(row.amount), back: formatIls(row.reimbursement) }) }}
               </span>
               <span v-if="row.note"> · {{ row.note }}</span>
             </p>
@@ -49,7 +49,7 @@
               :disabled="auth.readOnly || removingKey === row.key"
               @click="remove(row)"
             >
-              {{ removingKey === row.key ? "Removing…" : "Remove split" }}
+              {{ removingKey === row.key ? t("Removing…") : t("Remove split") }}
             </button>
           </div>
         </article>
@@ -61,6 +61,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
@@ -83,7 +85,8 @@ const entries = ref<AdjustmentItem[]>([]);
 const removingKey = ref<string | null>(null);
 
 function merchantLabel(row: AdjustmentItem): string {
-  return row.merchant_en?.trim() || row.merchant_he?.trim() || row.key;
+  if (!row.merchant_en?.trim() && !row.merchant_he?.trim()) return row.key;
+  return merchantDisplayName({ merchant_he: row.merchant_he ?? "", merchant_en: row.merchant_en });
 }
 
 function merchantSubtitle(row: AdjustmentItem): string | null {
@@ -131,7 +134,7 @@ async function remove(row: AdjustmentItem) {
     entries.value = entries.value.filter((e) => e.key !== row.key);
     adjustmentsData.invalidate();
     invalidateSpendingDataCaches();
-    status.value = "Split removed — totals will update on Overview.";
+    status.value = t("Split removed — totals will update on Overview.");
   } catch (e) {
     status.value = friendlyError(e);
   } finally {

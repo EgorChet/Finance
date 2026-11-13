@@ -1,20 +1,20 @@
 <template>
   <div class="find">
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — sample transactions only.</div>
-    <h2 class="page-title">Transactions</h2>
-    <div class="seg" role="tablist" aria-label="Transactions view">
+    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — sample transactions only.") }}</div>
+    <h2 class="page-title">{{ t("Transactions") }}</h2>
+    <div class="seg" role="tablist" :aria-label="t('Transactions')">
       <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'charges' }" :aria-selected="view === 'charges'" @click="setView('charges')">
-        Charges
+        {{ t("Charges") }}
       </button>
       <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'merchants' }" :aria-selected="view === 'merchants'" @click="setView('merchants')">
-        Merchants
+        {{ t("Merchants") }}
         <span v-if="merchantsWaiting > 0" class="seg-badge">{{ merchantsWaiting }}</span>
       </button>
     </div>
 
     <MerchantsView v-if="view === 'merchants'" />
 
-    <AppLoader v-else-if="loading" title="Loading transactions" subtitle="Fetching your statement history" />
+    <AppLoader v-else-if="loading" :title="t('Loading transactions')" :subtitle="t('Fetching your statement history')" />
     <template v-else>
       <p v-if="error" class="browse-error">{{ error }}</p>
       <template v-else>
@@ -24,19 +24,19 @@
             <input
               v-model="searchQuery"
               type="search"
-              placeholder="Search merchants"
+              :placeholder="t('Search merchants')"
               autocomplete="off"
               enterkeyhint="search"
-              aria-label="Search merchants"
+              :aria-label="t('Search merchants')"
             />
           </label>
-          <div class="find-chips" role="toolbar" aria-label="Filters">
+          <div class="find-chips" role="toolbar" :aria-label="t('Filters')">
             <button type="button" class="find-chip" :class="{ 'find-chip--on': !!selectedMonth }" @click="sheet = 'month'">
               {{ monthChipLabel }} <span aria-hidden="true">▾</span>
             </button>
             <button type="button" class="find-chip" :class="{ 'find-chip--on': !!categoryFilter }" @click="sheet = 'category'">
-              <template v-if="categoryFilter">{{ categoryFilter }}</template>
-              <template v-else>Category</template>
+              <template v-if="categoryFilter">{{ catName(categoryFilter) }}</template>
+              <template v-else>{{ t("Category") }}</template>
               <span aria-hidden="true">▾</span>
             </button>
             <button type="button" class="find-chip" :class="{ 'find-chip--on': amountActive }" @click="openAmount">
@@ -49,10 +49,10 @@
               :aria-pressed="includeRecurring"
               @click="includeRecurring = !includeRecurring"
             >
-              {{ includeRecurring ? "✓ " : "" }}Added charges
+              {{ includeRecurring ? "✓ " : "" }}{{ t("Added charges") }}
             </button>
             <button v-if="hasActiveFilters" type="button" class="find-chip find-chip--clear" @click="clearFilters">
-              Clear
+              {{ t("Clear") }}
             </button>
           </div>
         </div>
@@ -61,15 +61,15 @@
           <p class="find-summary-label">{{ summaryLabel }}</p>
           <p class="find-summary-total">{{ formatIlsWhole(filteredTotal) }}</p>
           <p class="find-summary-meta">
-            {{ filteredTransactions.length.toLocaleString() }} charge{{ filteredTransactions.length === 1 ? "" : "s" }}
-            <template v-if="filteredTransactions.length > 1"> · avg {{ formatIlsWhole(filteredTotal / filteredTransactions.length) }}</template>
+            {{ t("{n} {n|charge|charges}", { n: filteredTransactions.length }) }}
+            <template v-if="filteredTransactions.length > 1"> · {{ t("avg {amount}", { amount: formatIlsWhole(filteredTotal / filteredTransactions.length) }) }}</template>
           </p>
         </section>
 
-        <p v-if="!allTransactions.length" class="browse-empty">No transactions yet. Upload a statement from the menu.</p>
+        <p v-if="!allTransactions.length" class="browse-empty">{{ t("No transactions yet. Upload a statement from the menu.") }}</p>
         <div v-else-if="!filteredTransactions.length" class="find-empty">
-          <p>No charges match.</p>
-          <button type="button" class="btn" @click="clearFilters">Clear filters</button>
+          <p>{{ t("No charges match.") }}</p>
+          <button type="button" class="btn" @click="clearFilters">{{ t("Clear filters") }}</button>
         </div>
         <TransactionList
           v-else
@@ -88,10 +88,10 @@
       </template>
     </template>
 
-    <BottomSheet :open="sheet === 'month'" title="Month" @close="sheet = null">
+    <BottomSheet :open="sheet === 'month'" :title="t('Month')" @close="sheet = null">
       <div class="find-options">
         <button type="button" class="find-option" :class="{ 'find-option--on': !selectedMonth }" @click="pickMonth('')">
-          All months
+          {{ t("All months") }}
         </button>
         <button
           v-for="m in months"
@@ -101,16 +101,16 @@
           :class="{ 'find-option--on': selectedMonth === m.key }"
           @click="pickMonth(m.key)"
         >
-          {{ m.label }}
+          {{ tr(m.label) }}
         </button>
       </div>
     </BottomSheet>
 
-    <BottomSheet :open="sheet === 'category'" title="Category" @close="sheet = null">
+    <BottomSheet :open="sheet === 'category'" :title="t('Category')" @close="sheet = null">
       <CategoryGrid v-model="categoryFilter" :options="categoryOptions" empty-label="Any" @pick="sheet = null" />
     </BottomSheet>
 
-    <BottomSheet :open="sheet === 'amount'" title="Amount" @close="sheet = null">
+    <BottomSheet :open="sheet === 'amount'" :title="t('Amount')" @close="sheet = null">
       <div class="find-presets">
         <button
           v-for="chip in amountPresets"
@@ -120,23 +120,24 @@
           :class="{ 'find-chip--on': draftPreset === chip.id }"
           @click="applyDraftPreset(chip)"
         >
-          {{ chip.label }}
+          {{ t(chip.label) }}
         </button>
       </div>
       <div class="find-range">
-        <input v-model="draftMin" class="input" type="number" min="0" inputmode="decimal" placeholder="Min ₪" aria-label="Minimum amount" />
+        <input v-model="draftMin" class="input" type="number" min="0" inputmode="decimal" :placeholder="t('Min ₪')" :aria-label="t('Minimum amount')" />
         <span aria-hidden="true">–</span>
-        <input v-model="draftMax" class="input" type="number" min="0" inputmode="decimal" placeholder="Max ₪" aria-label="Maximum amount" />
+        <input v-model="draftMax" class="input" type="number" min="0" inputmode="decimal" :placeholder="t('Max ₪')" :aria-label="t('Maximum amount')" />
       </div>
       <template #footer>
-        <button type="button" class="btn" @click="resetAmount">Any amount</button>
-        <button type="button" class="btn btn-primary" @click="applyAmount">Show results</button>
+        <button type="button" class="btn" @click="resetAmount">{{ t("Any amount") }}</button>
+        <button type="button" class="btn btn-primary" @click="applyAmount">{{ t("Show results") }}</button>
       </template>
     </BottomSheet>
   </div>
 </template>
 
 <script setup lang="ts">
+import { catName, t, tr } from "@/shared/i18n";
 import { knownMerchantName, merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -233,7 +234,7 @@ const filteredTransactions = computed(() => {
   return allTransactions.value.filter((tx) => {
     if (!includeRecurring.value && isSystemRecurringTransaction(tx)) return false;
     if (q) {
-      const merchant = `${tx.merchant_en} ${tx.merchant_he} ${knownMerchantName(tx.merchant_he) ?? ""}`.toLowerCase();
+      const merchant = `${tx.merchant_en} ${tx.merchant_he} ${knownMerchantName(tx.merchant_he) ?? ""} ${merchantDisplayName(tx)}`.toLowerCase();
       if (!merchant.includes(q)) return false;
     }
     if (cat) {
@@ -264,7 +265,10 @@ const draftMin = ref("");
 const draftMax = ref("");
 
 const monthChipLabel = computed(
-  () => months.value.find((m) => m.key === selectedMonth.value)?.label ?? "All months",
+  () => {
+    const label = months.value.find((m) => m.key === selectedMonth.value)?.label;
+    return label ? tr(label) : t("All months");
+  },
 );
 
 const amountActive = computed(() => !!minAmount.value || !!maxAmount.value);
@@ -273,17 +277,17 @@ const amountChipLabel = computed(() => {
   const min = parseAmount(minAmount.value);
   const max = parseAmount(maxAmount.value);
   if (min != null && max != null) return `₪${min}–${max}`;
-  if (min != null) return `Over ₪${min}`;
-  if (max != null) return `Under ₪${max}`;
-  return "Amount";
+  if (min != null) return t("Over ₪{n}", { n: min });
+  if (max != null) return t("Under ₪{n}", { n: max });
+  return t("Amount");
 });
 
 const summaryLabel = computed(() => {
   const parts: string[] = [];
-  if (categoryFilter.value) parts.push(categoryFilter.value);
+  if (categoryFilter.value) parts.push(catName(categoryFilter.value));
   if (searchQuery.value.trim()) parts.push(`“${searchQuery.value.trim()}”`);
-  const where = selectedMonth.value ? monthChipLabel.value : "All months";
-  return parts.length ? `${parts.join(" · ")} — ${where}` : `Spent — ${where}`;
+  const where = selectedMonth.value ? monthChipLabel.value : t("All months");
+  return parts.length ? `${parts.join(" · ")} — ${where}` : `${t("Spent")} — ${where}`;
 });
 
 const draftPreset = computed(() => {
@@ -350,7 +354,7 @@ async function loadTransactions(options: { background?: boolean } = {}) {
     }
   } catch (e) {
     if (!options.background) {
-      error.value = e instanceof Error ? e.message : "Could not load transactions";
+      error.value = e instanceof Error ? e.message : t("Could not load transactions");
       allTransactions.value = [];
     }
   }
@@ -375,7 +379,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
     months.value = bundle.months;
     await loadTransactions({ background: options.background });
   } catch (e) {
-    if (!options.background) error.value = e instanceof Error ? e.message : "Could not load data";
+    if (!options.background) error.value = e instanceof Error ? e.message : t("Could not load data");
   } finally {
     if (!options.background) loading.value = false;
   }
@@ -385,9 +389,9 @@ async function excludeTransaction(tx: Transaction) {
   if (auth.readOnly) return;
   const label = `${formatIls(tx.charge_amount)} · ${merchantDisplayName(tx)}`;
   const ok = await confirm({
-    title: "Exclude transaction?",
-    message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
-    confirmLabel: "Exclude",
+    title: t("Exclude transaction?"),
+    message: t("Exclude {label} from your totals?\n\nYou can restore it anytime from the Excluded tab.", { label }),
+    confirmLabel: t("Exclude"),
     tone: "danger",
   });
   if (!ok) return;

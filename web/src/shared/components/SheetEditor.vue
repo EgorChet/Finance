@@ -7,17 +7,17 @@
           class="tx-sheet sheet-editor"
           role="dialog"
           aria-modal="true"
-          :aria-label="title"
+          :aria-label="tr(title)"
           novalidate
           @submit.prevent="onSave"
         >
           <div class="tx-sheet-grabber" aria-hidden="true" />
           <header class="sheet-editor__head">
             <button type="button" class="sheet-editor__cancel" :disabled="busy" @click="onCancel">{{ t("Cancel") }}</button>
-            <h3 class="sheet-editor__title">{{ title }}</h3>
+            <h3 class="sheet-editor__title">{{ tr(title) }}</h3>
             <span class="sheet-editor__head-spacer" aria-hidden="true" />
           </header>
-          <p v-if="subtitle" class="sheet-editor__subtitle">{{ subtitle }}</p>
+          <p v-if="subtitle" class="sheet-editor__subtitle">{{ tr(subtitle) }}</p>
 
           <div class="sheet-editor__body">
             <slot />
@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from "@/shared/i18n";
+import { t, tr } from "@/shared/i18n";
 import { onUnmounted, watch } from "vue";
 
 const props = withDefaults(

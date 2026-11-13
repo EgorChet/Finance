@@ -2,12 +2,12 @@
   <section id="card-bills" class="bx-section">
     <div class="bx-list-head">
       <h3>
-        Bills on your card
-        <span v-if="setAsideTotal > 0" class="bx-list-total">{{ formatIlsWhole(setAsideTotal) }} set aside now</span>
+        {{ t("Bills on your card") }}
+        <span v-if="setAsideTotal > 0" class="bx-list-total">{{ t("{amount} set aside now", { amount: formatIlsWhole(setAsideTotal) }) }}</span>
       </h3>
     </div>
     <p class="bx-section-note">
-      Bills due this cycle are set aside until they're charged; "Next cycle" ones aren't counted yet. Amounts are learned from your statements.
+      {{ t("Bills due this cycle are set aside until they're charged; \"Next cycle\" ones aren't counted yet. Amounts are learned from your statements.") }}
     </p>
     <div class="bx-list">
       <component
@@ -23,7 +23,7 @@
         <MerchantIcon :merchant-he="BILL_MARKS[row.id]?.he" :category="BILL_MARKS[row.id]?.category ?? 'Housing'" />
         <span class="bx-row-body">
           <span class="bx-row-top">
-            <span class="bx-row-name">{{ row.name }}</span>
+            <span class="bx-row-name">{{ tr(row.name) }}</span>
             <span class="bx-row-amount">{{ row.exact ? "" : "~" }}{{ formatIlsWhole(row.amount) }}</span>
           </span>
           <span class="bx-row-meta">
@@ -36,7 +36,7 @@
 
     <SheetEditor
       :open="!readonly && !!editing"
-      :title="editingRule?.name ?? ''"
+      :title="editingRule ? tr(editingRule.name) : ''"
       :subtitle="editingRule ? rhythm(editingRule) : ''"
       save-label="Save"
       :busy="saving"
@@ -46,14 +46,14 @@
     >
       <template v-if="editing && editingRule">
         <label class="sheet-toggle-row">
-          <span>Set aside each cycle</span>
+          <span>{{ t("Set aside each cycle") }}</span>
           <ToggleSwitch v-model="editing.on" />
         </label>
         <SheetAmountInput
           v-model="editing.amount"
           label="Amount"
           :placeholder="String(Math.round(editingEstimate))"
-          :hint="`Leave empty to use the learned amount (~${formatIlsWhole(editingEstimate)}).`"
+          :hint="t('Leave empty to use the learned amount (~{amount}).', { amount: formatIlsWhole(editingEstimate) })"
         />
       </template>
     </SheetEditor>
@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import { dateTag, t, tr } from "@/shared/i18n";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
@@ -148,12 +149,12 @@ const plan = computed((): BudgetPlan | null => {
 watch(plan, (p) => emit("plan", p), { immediate: true });
 
 function rhythm(rule: RegularChargeRule): string {
-  if (rule.irregular) return "Whenever it comes";
-  return rule.everyMonths === 2 ? "Every 2 months" : "Every month";
+  if (rule.irregular) return t("Whenever it comes");
+  return rule.everyMonths === 2 ? t("Every 2 months") : t("Every month");
 }
 
 function shortDate(iso: string): string {
-  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString(dateTag(), { day: "numeric", month: "short" });
 }
 
 /** Status for every line, also the switched-off ones (so their amount still shows). */
@@ -179,24 +180,24 @@ const rows = computed(() =>
     const amount = s?.amount ?? rule.defaultAmount;
     let pill: { label: string; cls: string } | null = null;
     let when = "";
-    if (off) pill = { label: "Off", cls: "ended" };
-    else if (covered.value.has(rule.id)) pill = { label: "Counted in Recurring", cls: "ended" };
-    else if (s?.state === "posted") pill = { label: `Charged ${s.date ? shortDate(s.date) : ""}`.trim(), cls: "active" };
+    if (off) pill = { label: t("Off"), cls: "ended" };
+    else if (covered.value.has(rule.id)) pill = { label: t("Counted in Recurring"), cls: "ended" };
+    else if (s?.state === "posted") pill = { label: `${t("Charged")} ${s.date ? shortDate(s.date) : ""}`.trim(), cls: "active" };
     else if (s?.state === "due") {
-      pill = { label: s.late ? "Late · set aside" : "Set aside", cls: "upcoming" };
-      if (s.date) when = s.late ? `was due ${shortDate(s.date)}` : `≈ ${shortDate(s.date)}`;
+      pill = { label: s.late ? t("Late · set aside") : t("Set aside"), cls: "upcoming" };
+      if (s.date) when = s.late ? t("was due {date}", { date: shortDate(s.date) }) : `≈ ${shortDate(s.date)}`;
     } else if (s?.state === "later" && s.date) {
       // Expected after this cycle ends: not set aside now.
-      pill = { label: "Next cycle", cls: "ended" };
-      when = `next ≈ ${shortDate(s.date)}`;
+      pill = { label: t("Next cycle"), cls: "ended" };
+      when = t("next ≈ {date}", { date: shortDate(s.date) });
     }
     else if (s?.state === "missed") {
-      pill = { label: "Didn't come · released", cls: "ended" };
-      if (s.date) when = `was due ${shortDate(s.date)}`;
+      pill = { label: t("Didn't come · released"), cls: "ended" };
+      if (s.date) when = t("was due {date}", { date: shortDate(s.date) });
     } else if (s?.state === "unknown" && !s.date) {
-      pill = { label: "Not on the card yet", cls: "ended" };
+      pill = { label: t("Not on the card yet"), cls: "ended" };
     }
-    const basis = s && s.state !== "posted" ? s.basis : "";
+    const basis = s && s.state !== "posted" ? tr(s.basis) : "";
     const meta = [rhythm(rule), when, basis].filter(Boolean).join(" · ");
     return {
       id: rule.id,
@@ -261,9 +262,9 @@ async function saveEdit() {
     overrides.value = res.overrides;
     editing.value = null;
     invalidateAllDataCaches();
-    emit("saved", `Saved ${editingRule.value?.name ?? "bill"}`);
+    emit("saved", t("Saved {name}", { name: editingRule.value ? tr(editingRule.value.name) : t("bill") }));
   } catch {
-    error.value = "Could not save — try again.";
+    error.value = t("Could not save — try again.");
   } finally {
     saving.value = false;
   }

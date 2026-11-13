@@ -2,31 +2,31 @@
   <section class="pd">
     <div class="pd-hero">
       <div class="pd-hero-top">
-        <span class="pd-hero-label">{{ analysis.current.label }}</span>
+        <span class="pd-hero-label">{{ tr(analysis.current.label) }}</span>
         <span class="pd-hero-range">{{ formatRange(analysis.current) }}</span>
       </div>
       <p class="pd-hero-value">{{ whole(analysis.currentTotal) }}</p>
       <p class="pd-hero-sub">
-        {{ whole(analysis.avgPerMonth) }} a month on average · {{ analysis.transactionCount.toLocaleString() }} charges
+        {{ t("{amount} a month on average", { amount: whole(analysis.avgPerMonth) }) }} · {{ t("{n} {n|charge|charges}", { n: analysis.transactionCount }) }}
       </p>
       <p v-if="analysis.priorComparable && totalTrend" class="pd-chip" :class="`pd-chip--${totalTrend.cls}`">
         {{ totalTrend.text }}
       </p>
       <p v-else-if="!analysis.priorComparable" class="pd-hero-note">
-        No comparison — the statements don't reach far enough back.
+        {{ t("No comparison — the statements don't reach far enough back.") }}
       </p>
 
       <div class="bh-stats">
         <div>
-          <span>Everyday</span>
+          <span>{{ t("Everyday") }}</span>
           <strong>{{ whole(analysis.everyday) }}</strong>
         </div>
         <div>
-          <span>Bills &amp; fixed</span>
+          <span>{{ t("Bills & fixed") }}</span>
           <strong>{{ whole(analysis.fixed) }}</strong>
         </div>
         <div>
-          <span>Months</span>
+          <span>{{ t("Months") }}</span>
           <strong>{{ analysis.monthsWithData }}</strong>
         </div>
       </div>
@@ -35,29 +35,30 @@
     <MonthBars v-if="monthItems.length > 1" :items="monthItems" />
 
     <section class="pd-card">
-      <h3 class="pd-card-title">Where it went</h3>
+      <h3 class="pd-card-title">{{ t("Where it went") }}</h3>
       <ul v-if="topCategories.length" class="pd-cats">
         <li v-for="row in topCategories" :key="row.category" class="pd-cat">
           <CategoryIcon :category="row.category" />
           <span class="pd-cat-body">
             <span class="pd-cat-top">
-              <span class="pd-cat-name">{{ row.category }}</span>
+              <span class="pd-cat-name">{{ catName(row.category) }}</span>
               <b>{{ whole(row.current) }}</b>
             </span>
             <span class="pd-cat-track"><span :style="{ width: `${row.barPct}%` }" /></span>
             <span class="pd-cat-meta">
-              <span>{{ Math.round(row.sharePct) }}% of spending</span>
+              <span>{{ t("{pct}% of spending", { pct: Math.round(row.sharePct) }) }}</span>
               <span v-if="row.trend" :class="`pd-trend--${row.trend.cls}`">{{ row.trend.text }}</span>
             </span>
           </span>
         </li>
       </ul>
-      <p v-else class="bx-empty-line">No spending in this period.</p>
+      <p v-else class="bx-empty-line">{{ t("No spending in this period.") }}</p>
     </section>
   </section>
 </template>
 
 <script setup lang="ts">
+import { catName, dateTag, isRu, t, tr } from "@/shared/i18n";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { computed } from "vue";
 import { formatIlsWhole } from "@/shared/utils/format";
@@ -77,9 +78,10 @@ function trend(delta: number, base: number): { text: string; cls: "up" | "down" 
 
 const totalTrend = computed(() => {
   const a = props.analysis;
-  const t = trend(a.totalDelta, a.priorTotal);
-  if (!t) return { text: `About the same as the ${a.prior.label.toLowerCase()}`, cls: "flat" };
-  return { text: `${t.text} vs the ${a.prior.label.toLowerCase()}`, cls: t.cls };
+  const tt = trend(a.totalDelta, a.priorTotal);
+  const prior = isRu() ? tr(a.prior.label) : a.prior.label.toLowerCase();
+  if (!tt) return { text: t("About the same as the {prior}", { prior }), cls: "flat" };
+  return { text: t("{change} vs the {prior}", { change: tt.text, prior }), cls: tt.cls };
 });
 
 const topCategories = computed(() => {
@@ -95,13 +97,13 @@ const topCategories = computed(() => {
 const monthItems = computed(() =>
   props.analysis.monthlyTotals.map((m) => {
     const [y, mo] = m.key.split("-").map(Number);
-    return { key: m.key, label: new Date(y, mo - 1, 1).toLocaleDateString("en-GB", { month: "short" }), total: m.total };
+    return { key: m.key, label: new Date(y, mo - 1, 1).toLocaleDateString(dateTag(), { month: "short" }), total: m.total };
   }),
 );
 
 function formatRange(window: { start: string; end: string }): string {
   const fmt = (iso: string) =>
-    new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString(dateTag(), { day: "numeric", month: "short", year: "numeric" });
   return `${fmt(window.start)} – ${fmt(window.end)}`;
 }
 </script>

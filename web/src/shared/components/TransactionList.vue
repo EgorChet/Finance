@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="tx-list-header">
-      <strong v-if="title">{{ title }}</strong>
+      <strong v-if="title">{{ t(title) }}</strong>
       <div v-if="showSort" class="tx-list-sort">
         <button
           v-for="col in sortOptions"
@@ -11,7 +11,7 @@
           :class="{ active: sortKey === col.key }"
           @click="setSort(col.key)"
         >
-          {{ col.label }}{{ sortKey === col.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '' }}
+          {{ t(col.label) }}{{ sortKey === col.key ? (sortDir === 'desc' ? ' ↓' : ' ↑') : '' }}
         </button>
       </div>
     </div>
@@ -29,7 +29,7 @@
           :type="hasActions ? 'button' : undefined"
           class="tx-row"
           :class="{ 'tx-row--tappable': hasActions, 'tx-row--busy': actingKey === row.key }"
-          :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
+          :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: ${t('actions')}` : undefined"
           @click="hasActions && openSheet(row)"
         >
           <MerchantIcon :merchant-he="row.tx.merchant_he" :merchant-en="row.tx.merchant_en" :category="row.category" />
@@ -61,27 +61,27 @@
                 {{ formatChargeAmount(sheetRow.tx) }}
               </div>
               <div class="tx-sheet-meta">
-                {{ sheetRow.dateLabel }}<span v-if="sheetRow.category"> · {{ sheetRow.category }}</span>
+                {{ sheetRow.dateLabel }}<span v-if="sheetRow.category"> · {{ catName(sheetRow.category) }}</span>
               </div>
               <div v-if="sheetRow.reimbursementLabel" class="tx-sheet-note">{{ sheetRow.reimbursementLabel }}</div>
             </div>
             <div class="tx-sheet-actions">
               <button v-if="adjustable" type="button" class="tx-sheet-action" @click="openCategory">
-                <span class="tx-sheet-action-title">{{ sheetRow.tx.category_override ? "Category: " + sheetRow.category : "Change category" }}</span>
+                <span class="tx-sheet-action-title">{{ sheetRow.tx.category_override ? t("Category: {name}", { name: catName(sheetRow.category) }) : t("Change category") }}</span>
                 <span class="tx-sheet-action-hint">
-                  {{ isBitTransfer(sheetRow.tx) ? "What was this BIT transfer for? Only this charge changes" : "Only this charge — other charges from this store stay as they are" }}
+                  {{ isBitTransfer(sheetRow.tx) ? t("What was this BIT transfer for? Only this charge changes") : t("Only this charge — other charges from this store stay as they are") }}
                 </span>
               </button>
               <button v-if="adjustable" type="button" class="tx-sheet-action" @click="runSheet('adjust')">
-                <span class="tx-sheet-action-title">{{ sheetRow.adjustLabel }}</span>
-                <span class="tx-sheet-action-hint">Someone paid you back for part of it</span>
+                <span class="tx-sheet-action-title">{{ t(sheetRow.adjustLabel) }}</span>
+                <span class="tx-sheet-action-hint">{{ t("Someone paid you back for part of it") }}</span>
               </button>
               <button v-if="excludeable" type="button" class="tx-sheet-action" @click="runSheet('exclude')">
-                <span class="tx-sheet-action-title">Exclude from spending</span>
-                <span class="tx-sheet-action-hint">Not a real expense, e.g. a transfer or a refund pair</span>
+                <span class="tx-sheet-action-title">{{ t("Exclude from spending") }}</span>
+                <span class="tx-sheet-action-hint">{{ t("Not a real expense, e.g. a transfer or a refund pair") }}</span>
               </button>
             </div>
-            <button type="button" class="btn tx-sheet-cancel" @click="closeSheet">Cancel</button>
+            <button type="button" class="btn tx-sheet-cancel" @click="closeSheet">{{ t("Cancel") }}</button>
           </div>
         </div>
       </Transition>
@@ -91,14 +91,14 @@
       <template v-if="categoryRow">
         <p class="tx-cat-meta">
           {{ formatChargeAmount(categoryRow.tx) }} · {{ formatTransactionDate(categoryRow.tx.date) }}
-          <template v-if="isBitTransfer(categoryRow.tx)"> · e.g. paying someone back for dinner → Eating out</template>
+          <template v-if="isBitTransfer(categoryRow.tx)"> · {{ t("e.g. paying someone back for dinner → Eating out") }}</template>
         </p>
         <CategoryGrid :model-value="categoryRow.category" :options="CATEGORY_PICKLIST" @pick="pickCategory" />
         <p v-if="categoryError" class="tx-cat-error">{{ categoryError }}</p>
       </template>
       <template v-if="categoryRow?.tx.category_override" #footer>
         <button type="button" class="btn" :disabled="savingCategory" @click="pickCategory(null)">
-          Back to {{ categoryRow.tx.category_original || "the store's category" }}
+          {{ t("Back to {name}", { name: categoryRow.tx.category_original ? catName(categoryRow.tx.category_original) : t("the store's category") }) }}
         </button>
       </template>
     </BottomSheet>
@@ -106,7 +106,7 @@
     <nav
       v-if="paginated && totalPages > 1"
       class="tx-pagination"
-      aria-label="Charge pages"
+      :aria-label="t('Charge pages')"
     >
       <button
         type="button"
@@ -114,10 +114,10 @@
         :disabled="currentPage <= 1"
         @click="currentPage -= 1"
       >
-        Previous
+        {{ t("Previous") }}
       </button>
       <span class="tx-pagination-meta">
-        {{ paginationRangeLabel }} · page {{ currentPage }} of {{ totalPages }}
+        {{ paginationRangeLabel }} · {{ t("page {n} of {total}", { n: currentPage, total: totalPages }) }}
       </span>
       <button
         type="button"
@@ -125,14 +125,14 @@
         :disabled="currentPage >= totalPages"
         @click="currentPage += 1"
       >
-        Next
+        {{ t("Next") }}
       </button>
     </nav>
     <p
       v-else-if="paginated && total > 0"
       class="tx-pagination-meta tx-pagination-meta--solo"
     >
-      {{ total }} charge{{ total === 1 ? "" : "s" }}
+      {{ t("{n} {n|charge|charges}", { n: total }) }}
     </p>
     <button
       v-else-if="total > defaultLimit && !showAll"
@@ -141,7 +141,7 @@
       style="margin-top: 0.65rem"
       @click="showAll = true"
     >
-      Show all {{ total }} charges
+      {{ t("Show all {n} charges", { n: total }) }}
     </button>
     <button
       v-else-if="total > defaultLimit && showAll"
@@ -150,15 +150,16 @@
       style="margin-top: 0.65rem"
       @click="showAll = false"
     >
-      Show recent {{ defaultLimit }}
+      {{ t("Show recent {n}", { n: defaultLimit }) }}
     </button>
     <p v-else-if="total > 0 && total <= defaultLimit" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem">
-      {{ total }} charge{{ total === 1 ? '' : 's' }}
+      {{ t("{n} {n|charge|charges}", { n: total }) }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { catName, dateTag, t, t as i18n, tr } from "@/shared/i18n";
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
 import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
@@ -264,7 +265,7 @@ const paginationRangeLabel = computed(() => {
   if (!total.value) return "";
   const start = (currentPage.value - 1) * props.defaultLimit + 1;
   const end = Math.min(currentPage.value * props.defaultLimit, total.value);
-  return `${start.toLocaleString()}–${end.toLocaleString()} of ${total.value.toLocaleString()} charges`;
+  return t("{start}–{end} of {total} charges", { start: start.toLocaleString(), end: end.toLocaleString(), total: total.value.toLocaleString() });
 });
 
 const visibleRows = computed(() => {
@@ -285,7 +286,7 @@ const visibleRows = computed(() => {
     amount: t.effective_amount ?? t.charge_amount,
     adjustLabel: t.reimbursement ? "Edit split" : "Split",
     reimbursementLabel: t.reimbursement
-      ? `${formatIls(t.charge_amount)} − ${formatIls(t.reimbursement)} back`
+      ? i18n("{total} − {back} back", { total: formatIls(t.charge_amount), back: formatIls(t.reimbursement) })
       : null,
   }));
 });
@@ -313,7 +314,7 @@ function dayLabel(iso: string): string {
   const date = new Date(y, m - 1, d);
   const now = new Date();
   const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString("en-GB", {
+  return date.toLocaleDateString(dateTag(), {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -325,10 +326,10 @@ function dayLabel(iso: string): string {
 function rowMeta(t: Transaction): string {
   const parts: string[] = [];
   if (sortKey.value !== "date") parts.push(formatTransactionDate(t.date));
-  if (props.showCategory) parts.push(t.category_en || "Uncategorized");
-  const billMonth = t.billing_month || props.statementBilling;
-  if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(`billed ${billMonth}`);
-  if (props.adjustable && !t.category_override && isBitTransfer(t)) parts.push("tap to say what it was for");
+  if (props.showCategory) parts.push(catName(t.category_en || "Uncategorized"));
+  const billMonth = tr(t.billing_month || props.statementBilling);
+  if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(i18n("billed {month}", { month: billMonth }));
+  if (props.adjustable && !t.category_override && isBitTransfer(t)) parts.push(i18n("tap to say what it was for"));
   return parts.join(" · ");
 }
 
@@ -392,7 +393,7 @@ function runSheet(action: "adjust" | "exclude") {
 
 function formatChargeDate(tx: Transaction): string {
   const purchase = formatTransactionDate(tx.date);
-  const billMonth = tx.billing_month || props.statementBilling;
+  const billMonth = tr(tx.billing_month || props.statementBilling);
   if (!billMonth) return purchase;
   if (monthLabelFromIso(tx.date) === billMonth) return purchase;
   return `${purchase} · ${billMonth}`;

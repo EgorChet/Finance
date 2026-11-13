@@ -11,7 +11,7 @@
           v-if="wiggleKey === m.key"
           type="button"
           class="month-picker__delete-badge"
-          aria-label="Delete statement"
+          :aria-label="t('Delete statement')"
           @click.stop="onDeleteBadge(m)"
         >
           ×
@@ -32,7 +32,7 @@
           @pointerleave="onHoldEnd"
           @contextmenu.prevent
         >
-          {{ m.label }}<span v-if="m.inProgress" class="pill-now"> · now</span><span v-else-if="m.pendingStatement" class="pill-pending-tag"> · pending</span>
+          {{ tr(m.label) }}<span v-if="m.inProgress" class="pill-now"> · {{ t("now") }}</span><span v-else-if="m.pendingStatement" class="pill-pending-tag"> · {{ t("pending") }}</span>
         </button>
       </div>
       <button
@@ -42,15 +42,16 @@
         :class="{ active: modelValue === null }"
         @click="onAllMonthsClick"
       >
-        All months
+        {{ t("All months") }}
       </button>
     </div>
-    <p v-if="wiggleKey" class="month-picker__hint">Tap × to delete this month's statement</p>
-    <p v-else-if="allowDelete" class="month-picker__hint month-picker__hint--subtle">Hold a month for 2s to delete</p>
+    <p v-if="wiggleKey" class="month-picker__hint">{{ t("Tap × to delete this month's statement") }}</p>
+    <p v-else-if="allowDelete" class="month-picker__hint month-picker__hint--subtle">{{ t("Hold a month for 2s to delete") }}</p>
   </div>
 </template>
 
 <script setup lang="ts">
+import { t, tr } from "@/shared/i18n";
 import { onUnmounted, ref, watch } from "vue";
 import type { MonthItem } from "@/shared/types";
 import { isCycleMonthKey } from "@/features/spending/utils/pace";

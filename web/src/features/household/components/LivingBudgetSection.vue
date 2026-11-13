@@ -1,16 +1,16 @@
 <template>
   <section id="living-budget" class="bx-budget">
     <div v-if="!segments.length" class="bx-empty">
-      <p>No monthly budget yet.</p>
-      <button v-if="!readonly" type="button" class="btn btn-primary" :disabled="disabled" @click="addSegment">Set a budget</button>
+      <p>{{ t("No monthly budget yet.") }}</p>
+      <button v-if="!readonly" type="button" class="btn btn-primary" :disabled="disabled" @click="addSegment">{{ t("Set a budget") }}</button>
     </div>
 
     <template v-else>
       <article v-if="headlineSegment" class="bx-hero">
         <div class="bx-hero-top">
           <span class="bx-eyebrow">
-            {{ headlineSegmentIsActive ? "Monthly budget" : "Next budget" }} ·
-            {{ monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month) }}
+            {{ headlineSegmentIsActive ? t("Monthly budget") : t("Next budget") }} ·
+            {{ tr(monthRangeLabel(headlineSegment.seg.from_month, headlineSegment.seg.through_month)) }}
           </span>
           <button
             v-if="!readonly"
@@ -19,12 +19,12 @@
             :disabled="disabled"
             @click="startEditSegment(headlineSegment.seg)"
           >
-            Edit
+            {{ t("Edit") }}
           </button>
         </div>
         <p class="bx-hero-value">{{ formatIlsWhole(segmentTotalCap(headlineSegment.seg)) }}</p>
 
-        <p class="bx-bar-label">Where it comes from</p>
+        <p class="bx-bar-label">{{ t("Where it comes from") }}</p>
         <div class="bx-bar" aria-hidden="true">
           <span
             v-for="part in sources"
@@ -41,7 +41,7 @@
               @click="!readonly && part.edit && part.edit()"
             >
               <i :style="{ background: part.color }" />
-              <span class="bx-legend-name">{{ part.label }}</span>
+              <span class="bx-legend-name">{{ t(part.label) }}</span>
               <b>{{ formatIlsWhole(part.amount) }}</b>
             </component>
           </li>
@@ -60,14 +60,14 @@
                 class="bx-legend-item"
                 @click="part.key === 'bills' && !readonly && scrollToRecurring()"
               >
-                <i :style="{ background: part.color }" /><span class="bx-legend-name">{{ part.label }}</span><b>{{ formatIlsWhole(part.amount) }}</b>
+                <i :style="{ background: part.color }" /><span class="bx-legend-name">{{ t(part.label) }}</span><b>{{ formatIlsWhole(part.amount) }}</b>
               </component>
             </li>
           </ul>
-          <p class="bx-note">Same numbers as Spending: bills already charged plus those still to come are taken off first.</p>
+          <p class="bx-note">{{ t("Same numbers as Spending: bills already charged plus those still to come are taken off first.") }}</p>
         </template>
         <template v-else-if="monthlyBills > 0 || cardBills > 0">
-          <p class="bx-bar-label">Where it goes each month</p>
+          <p class="bx-bar-label">{{ t("Where it goes each month") }}</p>
           <div class="bx-bar" aria-hidden="true">
             <span :style="{ width: `${billsPct}%`, background: 'var(--warning)' }" />
             <span :style="{ width: `${cardBillsPct}%`, background: 'var(--accent)' }" />
@@ -76,32 +76,32 @@
           <ul class="bx-legend">
             <li>
               <button v-if="!readonly" type="button" class="bx-legend-item" @click="scrollToRecurring">
-                <i style="background: var(--warning)" /><span class="bx-legend-name">Recurring bills</span><b>{{ formatIlsWhole(monthlyBills) }}</b>
+                <i style="background: var(--warning)" /><span class="bx-legend-name">{{ t("Recurring bills") }}</span><b>{{ formatIlsWhole(monthlyBills) }}</b>
               </button>
               <span v-else class="bx-legend-item">
-                <i style="background: var(--warning)" /><span class="bx-legend-name">Recurring bills</span><b>{{ formatIlsWhole(monthlyBills) }}</b>
+                <i style="background: var(--warning)" /><span class="bx-legend-name">{{ t("Recurring bills") }}</span><b>{{ formatIlsWhole(monthlyBills) }}</b>
               </span>
             </li>
             <li v-if="cardBills > 0">
               <span class="bx-legend-item">
-                <i style="background: var(--accent)" /><span class="bx-legend-name">Bills on your card (avg)</span><b>~{{ formatIlsWhole(cardBills) }}</b>
+                <i style="background: var(--accent)" /><span class="bx-legend-name">{{ t("Bills on your card (avg)") }}</span><b>~{{ formatIlsWhole(cardBills) }}</b>
               </span>
             </li>
             <li>
               <span class="bx-legend-item">
-                <i style="background: var(--success)" /><span class="bx-legend-name">Left for everyday</span><b>{{ formatIlsWhole(Math.max(0, segmentTotalCap(headlineSegment.seg) - monthlyBills - cardBills)) }}</b>
+                <i style="background: var(--success)" /><span class="bx-legend-name">{{ t("Left for everyday") }}</span><b>{{ formatIlsWhole(Math.max(0, segmentTotalCap(headlineSegment.seg) - monthlyBills - cardBills)) }}</b>
               </span>
             </li>
           </ul>
         </template>
         <p v-if="segmentCapVaries(headlineSegment.seg)" class="bx-note">
-          The total changes in months when Cibus or the rent cover change.
+          {{ t("The total changes in months when Cibus or the rent cover change.") }}
         </p>
       </article>
 
       <div class="bx-list-head">
-        <h3>Budget periods</h3>
-        <button v-if="!readonly" type="button" class="bx-pill" :disabled="disabled" @click="addSegment">+ New period</button>
+        <h3>{{ t("Budget periods") }}</h3>
+        <button v-if="!readonly" type="button" class="bx-pill" :disabled="disabled" @click="addSegment">+ {{ t("New period") }}</button>
       </div>
       <div class="bx-list">
         <component
@@ -116,13 +116,13 @@
           <span class="tx-row-icon" aria-hidden="true">🗓️</span>
           <span class="bx-row-body">
             <span class="bx-row-top">
-              <span class="bx-row-name">{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+              <span class="bx-row-name">{{ tr(monthRangeLabel(seg.from_month, seg.through_month)) }}</span>
               <span class="bx-row-amount">{{ formatIlsWhole(segmentTotalCap(seg)) }}</span>
             </span>
             <span class="bx-row-meta">
-              <span>Salary {{ formatIlsWhole(seg.amount) }}</span>
+              <span>{{ t("Salary {amount}", { amount: formatIlsWhole(seg.amount) }) }}</span>
               <span class="bx-status" :class="`bx-status--${segmentStatus(seg.from_month, seg.through_month)}`">
-                {{ livingBudgetStatusLabel(seg) }}
+                {{ tr(livingBudgetStatusLabel(seg)) }}
               </span>
             </span>
           </span>
@@ -133,7 +133,7 @@
           class="bx-row bx-row--more"
           @click="showEndedBudget = !showEndedBudget"
         >
-          {{ showEndedBudget ? "Hide" : "Show" }} ended periods ({{ endedSegments.length }})
+          {{ showEndedBudget ? t("Hide ended periods ({n})", { n: endedSegments.length }) : t("Show ended periods ({n})", { n: endedSegments.length }) }}
         </button>
       </div>
     </template>
@@ -146,11 +146,11 @@
       :disabled="disabled"
       @click="addMonthTopup()"
     >
-      + Extra money for one month <span class="living-budget-topups-add__hint">trip, guests…</span>
+      + {{ t("Extra money for one month") }} <span class="living-budget-topups-add__hint">{{ t("trip, guests…") }}</span>
     </button>
     <div v-if="sortedMonthTopups.length" class="living-budget-topups-read">
       <div class="living-budget-topups-header">
-        <h4 class="living-budget-topups-title">Extra money by month</h4>
+        <h4 class="living-budget-topups-title">{{ t("Extra money by month") }}</h4>
         <IconButton v-if="!readonly" icon="plus" label="Add extra money" :disabled="disabled" @click="addMonthTopup()" />
       </div>
 
@@ -169,7 +169,7 @@
                 :disabled="!readonly && disabled"
                 @click="!readonly && startEditTopup(topup)"
               >
-                <span class="topup-item-note">{{ topup.note || "Extra" }}</span>
+                <span class="topup-item-note">{{ topup.note || t("Extra") }}</span>
                 <span class="topup-item-amount">+{{ formatIls(topup.extra) }}</span>
               </component>
             </li>
@@ -181,7 +181,7 @@
             :disabled="disabled"
             @click="addMonthTopup(group.month)"
           >
-            + Add to {{ ymToLabel(group.month) }}
+            + {{ t("Add to {month}", { month: ymToLabel(group.month) }) }}
           </button>
         </div>
       </template>
@@ -192,14 +192,14 @@
         class="btn btn-ghost household-show-more"
         @click="showPastTopups = !showPastTopups"
       >
-        {{ showPastTopups ? "Hide" : "Show" }} past months ({{ pastTopupGroups.length }})
+        {{ showPastTopups ? t("Hide past months ({n})", { n: pastTopupGroups.length }) : t("Show past months ({n})", { n: pastTopupGroups.length }) }}
       </button>
     </div>
 
     <SheetEditor
       :open="!readonly && !!editingSegment"
       :title="segmentIsNew ? 'New budget period' : 'Edit budget period'"
-      subtitle="Cibus and rent headroom are added from Recurring monthly."
+      :subtitle="t('Cibus and rent headroom are added from Recurring monthly.')"
       :save-label="segmentIsNew ? 'Add period' : 'Save'"
       :deletable="!segmentIsNew"
       :delete-label="segmentDeleteLabel"
@@ -212,18 +212,18 @@
       <template v-if="editingSegment">
         <SheetAmountInput v-model="editingSegment.amount" label="Salary after tax" />
         <div class="sheet-field">
-          <span class="sheet-field__label">From</span>
+          <span class="sheet-field__label">{{ t("From") }}</span>
           <MonthSelect v-model="editingSegment.from_month" />
         </div>
         <label class="sheet-toggle-row">
-          <span>No end date</span>
+          <span>{{ t("No end date") }}</span>
           <ToggleSwitch
             :model-value="isOngoingThrough(editingSegment.through_month)"
             @update:model-value="toggleOngoing(editingSegment, $event)"
           />
         </label>
         <div v-if="!isOngoingThrough(editingSegment.through_month)" class="sheet-field">
-          <span class="sheet-field__label">Through</span>
+          <span class="sheet-field__label">{{ t("Through") }}</span>
           <MonthSelect v-model="editingSegment.through_month" />
         </div>
       </template>
@@ -232,7 +232,7 @@
     <SheetEditor
       :open="!readonly && !!editingTopup"
       :title="topupIsNew ? 'Add extra money' : 'Edit extra money'"
-      subtitle="A one-off boost to the cap for a single month."
+      :subtitle="t('A one-off boost to the cap for a single month.')"
       :save-label="topupIsNew ? 'Add extra' : 'Save'"
       :deletable="!topupIsNew"
       delete-label="Remove this extra"
@@ -245,12 +245,12 @@
       <template v-if="editingTopup">
         <SheetAmountInput v-model="editingTopup.extra" label="Extra" />
         <div class="sheet-field">
-          <span class="sheet-field__label">Month</span>
+          <span class="sheet-field__label">{{ t("Month") }}</span>
           <MonthSelect v-model="editingTopup.month" />
         </div>
         <label class="sheet-field">
-          <span class="sheet-field__label">Note (optional)</span>
-          <input v-model="editingTopup.note" class="input" placeholder="e.g. Left over from October" enterkeyhint="done" />
+          <span class="sheet-field__label">{{ t("Note (optional)") }}</span>
+          <input v-model="editingTopup.note" class="input" :placeholder="t('e.g. Left over from October')" enterkeyhint="done" />
         </label>
       </template>
     </SheetEditor>
@@ -258,6 +258,7 @@
 </template>
 
 <script setup lang="ts">
+import { dateTag, t, tr } from "@/shared/i18n";
 import { computed, ref } from "vue";
 import type { BudgetPlan } from "@core/spending/budgetPlan";
 import IconButton from "@/shared/components/IconButton.vue";
@@ -338,7 +339,7 @@ async function requestSave(): Promise<boolean> {
   sheetSaving.value = true;
   try {
     const ok = await props.persist();
-    if (!ok) sheetError.value = props.saveError || "Could not save. Check the months and try again.";
+    if (!ok) sheetError.value = props.saveError || t("Could not save. Check the months and try again.");
     return ok;
   } finally {
     sheetSaving.value = false;
@@ -521,7 +522,7 @@ const cycleSplit = computed(() => {
   const total = parts.reduce((s, p) => s + p.amount, 0) || 1;
   const d = new Date(`${plan.cycleStart}T12:00:00`);
   return {
-    title: `This cycle (from ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}) · ${formatIlsWhole(plan.budget)}`,
+    title: `${t("This cycle (from {date})", { date: d.toLocaleDateString(dateTag(), { day: "numeric", month: "short" }) })} · ${formatIlsWhole(plan.budget)}`,
     parts: parts.map((p) => ({ ...p, pct: (p.amount / total) * 100 })),
   };
 });
@@ -633,7 +634,7 @@ function cancelEditTopup(topup: LivingBudgetMonthTopup) {
 }
 
 function throughLabel(throughMonth: string): string {
-  return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
+  return isOngoingThrough(throughMonth) ? t("Ongoing") : ymToLabel(throughMonth);
 }
 
 function toggleOngoing(seg: LivingBudgetSegment, ongoing: boolean) {
@@ -693,9 +694,9 @@ function addSegment() {
 
 async function removeSegment(seg: LivingBudgetSegment) {
   const ok = await confirm({
-    title: segments.value.length <= 1 ? "Remove budget period?" : "Delete budget period?",
-    message: `Remove ${formatIls(seg.amount)} (${ymToLabel(seg.from_month)} → ${throughLabel(seg.through_month)})?`,
-    confirmLabel: segments.value.length <= 1 ? "Remove" : "Delete period",
+    title: segments.value.length <= 1 ? t("Remove budget period?") : t("Delete budget period?"),
+    message: t("Remove {what}?", { what: `${formatIls(seg.amount)} (${ymToLabel(seg.from_month)} → ${throughLabel(seg.through_month)})` }),
+    confirmLabel: segments.value.length <= 1 ? t("Remove") : t("Delete period"),
     tone: "danger",
   });
   if (!ok) return;
@@ -725,9 +726,9 @@ function addMonthTopup(month: string = nowYm.value) {
 
 async function removeMonthTopup(topup: LivingBudgetMonthTopup) {
   const ok = await confirm({
-    title: "Remove monthly extra?",
-    message: `Remove +${formatIls(topup.extra)}${topup.note ? ` (${topup.note})` : ""} from ${ymToLabel(topup.month)}?`,
-    confirmLabel: "Remove",
+    title: t("Remove monthly extra?"),
+    message: t("Remove {what} from {month}?", { what: `+${formatIls(topup.extra)}${topup.note ? ` (${topup.note})` : ""}`, month: ymToLabel(topup.month) }),
+    confirmLabel: t("Remove"),
     tone: "danger",
   });
   if (!ok) return;

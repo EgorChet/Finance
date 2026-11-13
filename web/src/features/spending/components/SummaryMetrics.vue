@@ -11,43 +11,43 @@
     <!-- A month without a live plan (finished, or no card data yet): one result card. -->
     <div v-else-if="!hideLivingBudget && livingBudget !== null" class="bh bh-result" :class="`bh--${resultTone}`">
       <div class="bh-top">
-        <span class="bh-pill"><span class="bh-dot" />{{ resultStatus }}</span>
+        <span class="bh-pill"><span class="bh-dot" />{{ t(resultStatus) }}</span>
         <span class="bh-day">
-          Budget {{ formatIlsWhole(livingBudget - extrasTotal) }}<template v-if="extrasTotal > 0"> + {{ formatIlsWhole(extrasTotal) }} extra</template>
+          {{ t("Budget") }} {{ formatIlsWhole(livingBudget - extrasTotal) }}<template v-if="extrasTotal > 0"> + {{ t("{amount} extra", { amount: formatIlsWhole(extrasTotal) }) }}</template>
         </span>
       </div>
-      <p class="bh-label">{{ isOverBudget ? "Over budget by" : retrospective ? "Left at the end" : "Left so far" }}</p>
+      <p class="bh-label">{{ isOverBudget ? t("Over budget by") : retrospective ? t("Left at the end") : t("Left so far") }}</p>
       <p class="bh-value">{{ formatIlsWhole(isOverBudget ? overAmount : Math.max(0, budgetLeft ?? 0)) }}</p>
       <div class="bh-bar" role="progressbar" :aria-valuenow="budgetUsedPct" aria-valuemin="0" aria-valuemax="100">
         <span :style="{ width: `${budgetUsedPct}%` }" />
       </div>
-      <p class="bh-sub">{{ formatIlsWhole(budgetSpent) }} of {{ formatIlsWhole(livingBudget) }} used</p>
+      <p class="bh-sub">{{ t("{spent} of {total} used", { spent: formatIlsWhole(budgetSpent), total: formatIlsWhole(livingBudget) }) }}</p>
       <div class="bh-stats">
         <div>
-          <button v-if="everydayBreakdownEnabled" type="button" class="bh-stat-link" @click="openEverydayBreakdown">Everyday ›</button>
-          <span v-else>Everyday</span>
+          <button v-if="everydayBreakdownEnabled" type="button" class="bh-stat-link" @click="openEverydayBreakdown">{{ t("Everyday") }} ›</button>
+          <span v-else>{{ t("Everyday") }}</span>
           <strong>{{ formatIlsWhole(everydayTotal) }}</strong>
         </div>
         <div>
-          <span>Bills &amp; fixed</span>
+          <span>{{ t("Bills & fixed") }}</span>
           <strong>{{ formatIlsWhole(fixedTotal) }}</strong>
         </div>
         <div>
-          <span>Charges</span>
+          <span>{{ t("Charges") }}</span>
           <strong>{{ report.transaction_count.toLocaleString() }}</strong>
         </div>
       </div>
     </div>
 
     <p v-else-if="!hideLivingBudget" class="bx-empty-line sm-nobudget">
-      No budget for this month yet.
-      <RouterLink class="bh-link" to="/app/household#living-budget">Set one ›</RouterLink>
+      {{ t("No budget for this month yet.") }}
+      <RouterLink class="bh-link" to="/app/household#living-budget">{{ t("Set one ›") }}</RouterLink>
     </p>
 
     <!-- Under the live card (and for a whole period): where the money went. -->
     <div v-if="!compact && (plan || hideLivingBudget || livingBudget === null)" class="sm-strip">
       <div v-if="hideLivingBudget || livingBudget === null">
-        <span>Total</span>
+        <span>{{ t("Total") }}</span>
         <strong>{{ formatIlsWhole(everydayTotal + fixedTotal) }}</strong>
       </div>
       <component
@@ -56,17 +56,17 @@
         class="sm-strip-cell"
         @click="openEverydayBreakdown"
       >
-        <span>Everyday{{ everydayBreakdownEnabled ? " ›" : "" }}</span>
+        <span>{{ t("Everyday") }}{{ everydayBreakdownEnabled ? " ›" : "" }}</span>
         <strong>{{ formatIlsWhole(everydayTotal) }}</strong>
         <small>{{ everydayPct }}%</small>
       </component>
       <div>
-        <span>Bills &amp; fixed</span>
+        <span>{{ t("Bills & fixed") }}</span>
         <strong>{{ formatIlsWhole(fixedTotal) }}</strong>
         <small>{{ fixedPct }}%</small>
       </div>
       <div v-if="!(hideLivingBudget || livingBudget === null)">
-        <span>Charges</span>
+        <span>{{ t("Charges") }}</span>
         <strong>{{ report.transaction_count.toLocaleString() }}</strong>
       </div>
     </div>
@@ -85,21 +85,20 @@
         >
           <header class="everyday-breakdown-header">
             <div>
-              <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">Everyday spending</h3>
+              <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">{{ t("Everyday spending") }}</h3>
               <p class="everyday-breakdown-meta">{{ formatIls(everydayTotal) }}</p>
               <p class="everyday-breakdown-hint">
-                Day-to-day spending: food, coffee, shopping, transfers. Bills, rent, loans, installments and
-                one-time charges aren't counted here — the budget card counts it the same way.
+                {{ t("Day-to-day spending: food, coffee, shopping, transfers. Bills, rent, loans, installments and one-time charges aren't counted here — the budget card counts it the same way.") }}
               </p>
             </div>
             <button
               ref="closeBtn"
               type="button"
               class="btn everyday-breakdown-close"
-              aria-label="Close everyday spending breakdown"
+              :aria-label="t('Close')"
               @click="closeEverydayBreakdown"
             >
-              Close
+              {{ t("Close") }}
             </button>
           </header>
 
@@ -107,27 +106,27 @@
             <section class="everyday-breakdown-section">
               <ul class="everyday-breakdown-simple">
                 <li class="everyday-breakdown-simple-row everyday-breakdown-simple-row--total">
-                  <span>Everyday total</span>
+                  <span>{{ t("Everyday total") }}</span>
                   <strong>{{ formatIls(everydayTotal) }}</strong>
                 </li>
               </ul>
               <p v-if="split.everydayPending > 0" class="everyday-breakdown-note">
-                ~{{ formatIls(split.everydayPending) }} of it is still processing and may change when the bank finalises it.
+                {{ t("~{amount} of it is still processing and may change when the bank finalises it.", { amount: formatIls(split.everydayPending) }) }}
               </p>
             </section>
             <section v-if="split.fixedRows.length" class="everyday-breakdown-section">
-              <p class="everyday-breakdown-section-title">Not counted as everyday</p>
+              <p class="everyday-breakdown-section-title">{{ t("Not counted as everyday") }}</p>
               <ul class="everyday-breakdown-simple">
                 <li v-for="row in split.fixedRows" :key="row.label" class="everyday-breakdown-simple-row everyday-breakdown-simple-row--sub">
-                  <span>{{ row.label }}</span>
+                  <span>{{ tr(row.label) }}</span>
                   <span>{{ formatIls(row.amount) }}</span>
                 </li>
                 <li class="everyday-breakdown-simple-row everyday-breakdown-simple-row--total">
-                  <span>Bills &amp; fixed</span>
+                  <span>{{ t("Bills & fixed") }}</span>
                   <strong>{{ formatIls(fixedTotal) }}</strong>
                 </li>
               </ul>
-              <RouterLink class="everyday-breakdown-link" to="/app/household">Edit bills and charges ›</RouterLink>
+              <RouterLink class="everyday-breakdown-link" to="/app/household">{{ t("Edit bills and charges ›") }}</RouterLink>
             </section>
           </div>
         </div>
@@ -137,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import { t, tr } from "@/shared/i18n";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "@/shared/types";
 import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "@/shared/utils/format";

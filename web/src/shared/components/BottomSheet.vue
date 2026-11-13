@@ -6,7 +6,7 @@
           <div class="tx-sheet-grabber" aria-hidden="true" />
           <header v-if="title || $slots.head" class="bs-head">
             <slot name="head">
-              <h3 class="bs-title">{{ title }}</h3>
+              <h3 class="bs-title">{{ tr(title) }}</h3>
             </slot>
             <button type="button" class="bs-close" :aria-label="t('Close')" @click="emit('close')">✕</button>
           </header>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { t } from "@/shared/i18n";
+import { t, tr } from "@/shared/i18n";
 import { onUnmounted, watch } from "vue";
 
 const props = defineProps<{ open: boolean; title?: string }>();

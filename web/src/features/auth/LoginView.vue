@@ -14,21 +14,35 @@
             />
           </svg>
         </div>
-        <h1 class="login-title">Your money,<br />at a glance</h1>
-        <p class="login-lead">Leumi Visa spending in plain English: budget, pace and categories.</p>
+        <div class="lang-switch login-lang" role="radiogroup" :aria-label="t('Language')">
+          <button
+            v-for="opt in LANGS"
+            :key="opt"
+            type="button"
+            role="radio"
+            class="lang-switch-btn"
+            :class="{ 'lang-switch-btn--on': locale === opt }"
+            :aria-checked="locale === opt"
+            @click="setLocale(opt)"
+          >
+            {{ opt.toUpperCase() }}
+          </button>
+        </div>
+        <h1 class="login-title">{{ t("Your money,") }}<br />{{ t("at a glance") }}</h1>
+        <p class="login-lead">{{ t("Leumi Visa spending in plain English: budget, pace and categories.") }}</p>
       </header>
 
       <div class="login-card">
         <template v-if="showPasswordForm">
           <div class="login-field">
-            <label for="login-username">Name</label>
+            <label for="login-username">{{ t("Name") }}</label>
             <input
               id="login-username"
               ref="usernameInput"
               v-model="username"
               class="input"
               type="text"
-              placeholder="Your name"
+              :placeholder="t('Your name')"
               autocomplete="username"
               autocapitalize="none"
               spellcheck="false"
@@ -36,7 +50,7 @@
             />
           </div>
           <div class="login-field">
-            <label for="login-password">Password</label>
+            <label for="login-password">{{ t("Password") }}</label>
             <input
               id="login-password"
               ref="passwordInput"
@@ -48,19 +62,19 @@
               @keyup.enter="doLogin"
             />
           </div>
-          <p v-if="auth.error" class="login-error" role="alert">{{ auth.error }}</p>
+          <p v-if="auth.error" class="login-error" role="alert">{{ t(auth.error) }}</p>
           <div class="login-actions">
             <button class="btn btn-primary login-submit" :disabled="auth.loading" @click="doLogin">
-              {{ auth.loading ? "Signing in…" : "Sign in" }}
+              {{ auth.loading ? t("Signing in…") : t("Sign in") }}
             </button>
-            <button class="btn btn-ghost" type="button" @click="tryDemo">Look around with demo data</button>
+            <button class="btn btn-ghost" type="button" @click="tryDemo">{{ t("Look around with demo data") }}</button>
           </div>
         </template>
 
         <template v-else>
           <div class="login-actions">
-            <button class="btn btn-primary login-submit" type="button" @click="goApp">Open app</button>
-            <button class="btn btn-ghost" type="button" @click="tryDemo">Explore demo</button>
+            <button class="btn btn-primary login-submit" type="button" @click="goApp">{{ t("Open app") }}</button>
+            <button class="btn btn-ghost" type="button" @click="tryDemo">{{ t("Explore demo") }}</button>
           </div>
         </template>
       </div>
@@ -68,15 +82,15 @@
       <ul class="login-features">
         <li>
           <span class="login-feature-icon" aria-hidden="true">₪</span>
-          <span>Hebrew statements, English categories</span>
+          <span>{{ t("Hebrew statements, English categories") }}</span>
         </li>
         <li>
           <span class="login-feature-icon" aria-hidden="true">↗</span>
-          <span>Pace vs your usual month</span>
+          <span>{{ t("Pace vs your usual month") }}</span>
         </li>
         <li>
           <span class="login-feature-icon" aria-hidden="true">◔</span>
-          <span>Mid-cycle snapshots</span>
+          <span>{{ t("Mid-cycle snapshots") }}</span>
         </li>
       </ul>
     </div>
@@ -84,6 +98,9 @@
 </template>
 
 <script setup lang="ts">
+import { locale, setLocale, t } from "@/shared/i18n";
+
+const LANGS = ["en", "ru"] as const;
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/shared/stores/auth";

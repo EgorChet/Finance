@@ -2,48 +2,48 @@
   <AppLoader
     v-if="loading"
     variant="hero"
-    title="Loading spending"
+    :title="t('Loading spending')"
   />
   <ErrorBanner
     v-else-if="error"
-    title="Could not load overview"
+    :title="t('Could not load overview')"
     :message="error"
     dismissible
     @dismiss="error = ''"
   />
   <template v-else-if="report || reportLoading || overviewPeriod">
     <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
-      <strong>Demo household</strong> — 9 months of sample Visa spending (~₪19k/cycle), live pace, categories &amp; partial snapshot. Sign in to use your real Leumi exports.
+      <strong>{{ t("Demo household") }}</strong> — {{ t("9 months of sample Visa spending (~₪19k/cycle), live pace, categories & partial snapshot. Sign in to use your real Leumi exports.") }}
     </div>
     <header class="overview-page-header">
-      <h2 class="overview-page-title">Spending overview</h2>
+      <h2 class="overview-page-title">{{ t("Spending overview") }}</h2>
       <div class="pill-row overview-page-periods">
         <button
           type="button"
           class="pill pill-period"
           :class="{ active: overviewPeriod === 'ytd' }"
-          aria-label="This year"
+          :aria-label="t('This year')"
           @click="togglePeriod('ytd')"
         >
-          YTD
+          {{ t("YTD") }}
         </button>
         <button
           type="button"
           class="pill pill-period"
           :class="{ active: overviewPeriod === 'rolling12' }"
-          aria-label="Last 12 months"
+          :aria-label="t('Last 12 months')"
           @click="togglePeriod('rolling12')"
         >
-          12M
+          {{ t("12M") }}
         </button>
         <button
           type="button"
           class="pill pill-period"
           :class="{ active: selectedMonth === null && !overviewPeriod }"
-          aria-label="All months"
+          :aria-label="t('All months')"
           @click="onMonthSelected(null)"
         >
-          ALL
+          {{ t("ALL") }}
         </button>
       </div>
     </header>
@@ -58,8 +58,8 @@
     <AppLoader
       v-if="overviewPeriod && periodLoading"
       compact
-      title="Loading period"
-      subtitle="Aggregating your spending history"
+      :title="t('Loading period')"
+      :subtitle="t('Aggregating your spending history')"
     />
     <SpendingPeriodPanel
       v-else-if="overviewPeriod && periodAnalysis"
@@ -68,11 +68,11 @@
     <AppLoader
       v-else-if="reportLoading"
       variant="hero"
-      title="Loading month"
+      :title="t('Loading month')"
       :subtitle="switchingMonthLabel"
     />
     <template v-else-if="report && !overviewPeriod">
-    <MonthBars v-if="selectedMonth === null && allMonthItems.length > 1" :items="allMonthItems" title="Cycle by cycle" />
+    <MonthBars v-if="selectedMonth === null && allMonthItems.length > 1" :items="allMonthItems" :title="t('Cycle by cycle')" />
     <SummaryMetrics
       v-if="showSummaryMetrics"
       :report="report"
@@ -88,10 +88,10 @@
     <PendingCycleCard v-if="isPendingCycleSelected && selectedCycleStart" :cycle-start="selectedCycleStart" />
     <template v-if="showTransactions && isLiveTransactionView">
       <section class="tx-section">
-        <h3 class="tx-section-title">Charges</h3>
+        <h3 class="tx-section-title">{{ t("Charges") }}</h3>
         <TransactionPeriodPicker v-model="txPeriod" />
         <p v-if="!periodTransactions.length" class="tx-period-empty">
-          No charges for {{ periodLabel }}.
+          {{ t("No charges for {period}.", { period: periodLabel }) }}
         </p>
         <TransactionList
           v-else
@@ -130,7 +130,7 @@
     </template>
     <template v-if="showTransactions && !isLiveTransactionView">
       <section class="tx-section tx-section--after-categories">
-        <h3 class="section-title">Charges</h3>
+        <h3 class="section-title">{{ t("Charges") }}</h3>
         <p class="tx-period-empty">{{ pastChargesHint }}</p>
         <TransactionList
           :transactions="periodTransactions"
@@ -149,13 +149,14 @@
       </section>
     </template>
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
-      Category breakdown and transactions will appear once this cycle’s statement is uploaded.
+      {{ t("Category breakdown and transactions will appear once this cycle’s statement is uploaded.") }}
     </p>
     </template>
   </template>
 </template>
 
 <script setup lang="ts">
+import { t, tr } from "@/shared/i18n";
 import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
@@ -253,7 +254,8 @@ const allMonthItems = computed(() => {
   return summary.value.map((row) => {
     // "Dec ’25" when the year changes, so a gap between statements can't read as one year.
     const year = row.month.match(/\d{4}/)?.[0] ?? "";
-    const label = year && year !== lastYear ? `${row.month.slice(0, 3)} ’${year.slice(2)}` : row.month.slice(0, 3);
+    const mon = tr(row.month).slice(0, 3);
+    const label = year && year !== lastYear ? `${mon} ’${year.slice(2)}` : mon;
     lastYear = year;
     return { key: row.month, label, total: row.total };
   });
@@ -284,9 +286,9 @@ const displayMonths = computed(() => {
 });
 
 const switchingMonthLabel = computed(() => {
-  if (selectedMonth.value === null) return "All months";
+  if (selectedMonth.value === null) return t("All months");
   const month = displayMonths.value.find((m) => m.key === selectedMonth.value);
-  return month?.label ?? "Selected month";
+  return month?.label ? tr(month.label) : t("Selected month");
 });
 
 const activeCycleStart = computed((): string | null => {
@@ -364,14 +366,15 @@ const periodTransactions = computed(() => {
 });
 
 const periodLabel = computed(() => {
-  if (!isLiveTransactionView.value) return "this billing cycle";
-  return TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label.toLowerCase() ?? txPeriod.value;
+  if (!isLiveTransactionView.value) return t("this billing cycle");
+  const label = TRANSACTION_PERIOD_OPTIONS.find((o) => o.value === txPeriod.value)?.label;
+  return label ? t(label).toLowerCase() : txPeriod.value;
 });
 
 const pastChargesHint = computed(() =>
   selectedMonth.value
-    ? "All charges in this billing cycle."
-    : "All charges across uploaded statements.",
+    ? t("All charges in this billing cycle.")
+    : t("All charges across uploaded statements."),
 );
 
 const showCategoryExplorer = computed(() => {
@@ -565,8 +568,9 @@ const categoryCompareContext = computed((): CategoryCompareContext | null => {
 });
 
 const categoryCurrentLabel = computed(() => {
-  if (showPaceCard.value) return "This cycle";
-  return displayMonths.value.find((m) => m.key === selectedMonth.value)?.label ?? "This month";
+  if (showPaceCard.value) return t("This cycle");
+  const label = displayMonths.value.find((m) => m.key === selectedMonth.value)?.label;
+  return label ? tr(label) : t("This month");
 });
 
 function cachedMonthReport(key: string): SpendingReport | null {
@@ -590,9 +594,9 @@ async function excludeTransaction(tx: Transaction) {
   if (auth.readOnly) return;
   const label = `${formatIls(tx.charge_amount)} · ${merchantDisplayName(tx)}`;
   const ok = await confirm({
-    title: "Exclude transaction?",
-    message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,
-    confirmLabel: "Exclude",
+    title: t("Exclude transaction?"),
+    message: t("Exclude {label} from your totals?\n\nYou can restore it anytime from the Excluded tab.", { label }),
+    confirmLabel: t("Exclude"),
     tone: "danger",
   });
   if (!ok) return;
@@ -739,9 +743,9 @@ async function onDeleteStatementMonth(key: string) {
 
   const month = displayMonths.value.find((m) => m.key === key);
   const ok = await confirm({
-    title: "Delete statement?",
-    message: `Remove all spending data for ${month?.label ?? key}? This cannot be undone.`,
-    confirmLabel: "Delete",
+    title: t("Delete statement?"),
+    message: t("Remove all spending data for {month}? This cannot be undone.", { month: month?.label ? tr(month.label) : key }),
+    confirmLabel: t("Delete"),
     tone: "danger",
   });
   if (!ok) return;
@@ -764,10 +768,10 @@ async function onDeleteStatementMonth(key: string) {
     await refreshReport(selectedMonth.value);
   } catch (e) {
     await confirm({
-      title: "Could not delete statement",
+      title: t("Could not delete statement"),
       message: e instanceof Error ? e.message : friendlyError(e),
       confirmLabel: "OK",
-      cancelLabel: "Close",
+      cancelLabel: t("Close"),
       tone: "danger",
     });
   }

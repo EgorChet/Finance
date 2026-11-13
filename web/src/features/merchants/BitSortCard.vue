@@ -4,25 +4,25 @@
       <span class="tx-row-icon" aria-hidden="true">💸</span>
       <div class="bit-card-text">
         <p class="bit-card-title">
-          <template v-if="unsorted.length">{{ unsorted.length }} BIT {{ unsorted.length === 1 ? "transfer" : "transfers" }} to sort</template>
-          <template v-else>All BIT transfers sorted ✓</template>
+          <template v-if="unsorted.length">{{ t("{n} BIT {n|transfer|transfers} to sort", { n: unsorted.length }) }}</template>
+          <template v-else>{{ t("All BIT transfers sorted ✓") }}</template>
         </p>
         <p class="bit-card-sub">
-          <template v-if="unsorted.length">{{ formatIlsWhole(unsortedTotal) }} · paying friends back, hairdresser, …</template>
-          <template v-else>{{ justSorted }} sorted just now</template>
+          <template v-if="unsorted.length">{{ formatIlsWhole(unsortedTotal) }} · {{ t("paying friends back, hairdresser, …") }}</template>
+          <template v-else>{{ t("{n} sorted just now", { n: justSorted }) }}</template>
         </p>
       </div>
       <button v-if="unsorted.length && !auth.readOnly" type="button" class="btn btn-primary bit-card-cta" @click="start">
-        Sort
+        {{ t("Sort") }}
       </button>
     </div>
 
     <BottomSheet :open="!!current" @close="current = null">
       <template #head>
         <div v-if="current" class="rv-sheet-head">
-          <p class="rv-sheet-step">{{ position }} of {{ unsorted.length }} · BIT transfer</p>
+          <p class="rv-sheet-step">{{ t("{n} of {total} · BIT transfer", { n: position, total: unsorted.length }) }}</p>
           <p class="bit-sheet-amount">{{ formatIls(current.charge_amount) }}</p>
-          <p class="rv-sheet-meta">{{ formatTransactionDate(current.date) }} · what was it for?</p>
+          <p class="rv-sheet-meta">{{ formatTransactionDate(current.date) }} · {{ t("what was it for?") }}</p>
         </div>
       </template>
       <CategoryGrid
@@ -34,14 +34,15 @@
       />
       <p v-if="error" class="tx-cat-error">{{ error }}</p>
       <template #footer>
-        <button type="button" class="btn" :disabled="saving" @click="next">Skip</button>
-        <button type="button" class="btn" :disabled="saving" @click="pick('BIT')">Keep as BIT</button>
+        <button type="button" class="btn" :disabled="saving" @click="next">{{ t("Skip") }}</button>
+        <button type="button" class="btn" :disabled="saving" @click="pick('BIT')">{{ t("Keep as BIT") }}</button>
       </template>
     </BottomSheet>
   </section>
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
