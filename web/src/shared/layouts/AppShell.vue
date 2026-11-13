@@ -326,7 +326,7 @@
         <span
           v-if="item === TRANSACTIONS_TAB && merchantsWaiting > 0"
           class="app-tab-badge"
-          :aria-label="t('{n} merchants need a name', { n: merchantsWaiting })"
+          :aria-label="t('{n} {n|merchant needs|merchants need} a name', { n: merchantsWaiting })"
         >{{ merchantsWaiting > 9 ? "9+" : merchantsWaiting }}</span>
       </RouterLink>
     </nav>
@@ -412,7 +412,7 @@ import kaspaLogo from "@/assets/kaspa.png";
 import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
 
 /** The switch shows once every screen is translated. */
-const LANGUAGE_READY = false;
+const LANGUAGE_READY = true;
 const LANGS: { value: Locale; label: string }[] = [
   { value: "en", label: "EN" },
   { value: "ru", label: "RU" },

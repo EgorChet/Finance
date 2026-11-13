@@ -1,15 +1,15 @@
 <template>
   <div class="home-page">
     <div v-if="auth.isDemo" class="demo-banner">
-      Demo household — sample portfolio and spending.
-      <button type="button" class="demo-banner-link" @click="goSignIn">Sign in for your real data</button>.
+      {{ t("Demo household — sample portfolio and spending.") }}
+      <button type="button" class="demo-banner-link" @click="goSignIn">{{ t("Sign in for your real data") }}</button>.
     </div>
     <header class="today-head">
-      <h2 class="page-title">Today</h2>
-      <span class="today-date">{{ todayLabel }}<template v-if="cycleLabel"> · {{ cycleLabel }}</template></span>
+      <h2 class="page-title">{{ t("Today") }}</h2>
+      <span class="today-date">{{ todayLabel }}<template v-if="cycleLabel"> · {{ tr(cycleLabel) }}</template></span>
     </header>
 
-    <AppLoader v-if="spendingLoading" variant="hero" title="Loading spending" />
+    <AppLoader v-if="spendingLoading" variant="hero" :title="t('Loading spending')" />
     <template v-else>
       <p v-if="spendingError" class="home-card-error">{{ spendingError }}</p>
       <template v-else-if="spendingReport">
@@ -24,7 +24,7 @@
         />
 
         <section v-if="todoItems.length || hasBitToSort" class="today-section">
-          <h3 class="today-title">Needs you</h3>
+          <h3 class="today-title">{{ t("Needs you") }}</h3>
           <div class="bx-list">
             <RouterLink v-for="item in todoItems" :key="item.key" :to="item.to" class="bx-row today-link">
               <span class="tx-row-icon" aria-hidden="true">{{ item.icon }}</span>
@@ -43,19 +43,19 @@
 
         <section v-if="topCategories.length" class="today-section">
           <div class="bx-list-head today-list-head">
-            <h3 class="today-title">This cycle</h3>
-            <RouterLink class="today-more" :to="overviewLink">All categories ›</RouterLink>
+            <h3 class="today-title">{{ t("This cycle") }}</h3>
+            <RouterLink class="today-more" :to="overviewLink">{{ t("All categories ›") }}</RouterLink>
           </div>
           <div class="bx-list">
             <RouterLink v-for="c in topCategories" :key="c.name" :to="overviewLink" class="bx-row today-link">
               <CategoryIcon :category="c.name" />
               <span class="bx-row-body">
                 <span class="bx-row-top">
-                  <span class="bx-row-name">{{ c.name }}</span>
+                  <span class="bx-row-name">{{ catName(c.name) }}</span>
                   <span class="bx-row-amount">{{ formatIlsWhole(c.total) }}</span>
                 </span>
                 <span class="bx-row-meta">
-                  <span :class="`cat-row-compare cat-row-compare--${c.tone}`">{{ c.line || `${c.count} ${c.count === 1 ? "charge" : "charges"}` }}</span>
+                  <span :class="`cat-row-compare cat-row-compare--${c.tone}`">{{ c.line || t("{n} {n|charge|charges}", { n: c.count }) }}</span>
                 </span>
               </span>
             </RouterLink>
@@ -64,8 +64,8 @@
 
         <section v-if="spendingReport.transactions.length" class="today-section">
           <div class="bx-list-head today-list-head">
-            <h3 class="today-title">Latest charges</h3>
-            <RouterLink class="today-more" :to="{ name: 'browse' }">All transactions ›</RouterLink>
+            <h3 class="today-title">{{ t("Latest charges") }}</h3>
+            <RouterLink class="today-more" :to="{ name: 'browse' }">{{ t("All transactions ›") }}</RouterLink>
           </div>
           <TransactionList
             class="find-list"
@@ -77,12 +77,13 @@
           />
         </section>
       </template>
-      <p v-else class="home-card-empty">Upload a statement to see spending for this cycle.</p>
+      <p v-else class="home-card-empty">{{ t("Upload a statement to see spending for this cycle.") }}</p>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { catName, dateTag, t, tr } from "@/shared/i18n";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref } from "vue";
@@ -236,7 +237,7 @@ const summaryPlan = computed(() => {
 });
 
 const todayLabel = computed(() =>
-  refDate.value.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+  refDate.value.toLocaleDateString(dateTag(), { weekday: "long", day: "numeric", month: "long" }),
 );
 
 const hasBitToSort = computed(
@@ -250,8 +251,8 @@ const todoItems = computed(() => {
     items.push({
       key: "label",
       icon: "🏷️",
-      title: `${toLabelCount.value} ${toLabelCount.value === 1 ? "merchant needs" : "merchants need"} a name`,
-      sub: "Label them so categories stay right",
+      title: t("{n} {n|merchant needs|merchants need} a name", { n: toLabelCount.value }),
+      sub: t("Label them so categories stay right"),
       to: { name: "browse", query: { view: "merchants" } },
     });
   }
@@ -261,8 +262,8 @@ const todoItems = computed(() => {
     items.push({
       key: `up-${row.label}`,
       icon: "⏳",
-      title: row.label,
-      sub: "Coming up this cycle · already set aside",
+      title: tr(row.label),
+      sub: t("Coming up this cycle · already set aside"),
       amount: formatIlsWhole(row.amount),
       to: { name: "household", hash: "#one-time" },
     });

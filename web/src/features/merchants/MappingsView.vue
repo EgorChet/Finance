@@ -1,14 +1,14 @@
 <template>
   <div class="md">
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — names are read-only.</div>
-    <AppLoader v-if="loading" title="Loading merchants" />
+    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — names are read-only.") }}</div>
+    <AppLoader v-if="loading" :title="t('Loading merchants')" />
     <template v-else>
       <p v-if="statusMessage" class="md-status" :class="{ 'md-status--error': statusIsError }">{{ statusMessage }}</p>
 
-      <input v-model="searchQuery" class="input md-search" type="search" placeholder="Search merchants" autocomplete="off" />
+      <input v-model="searchQuery" class="input md-search" type="search" :placeholder="t('Search merchants')" autocomplete="off" />
 
       <div class="md-controls">
-        <div class="seg md-period" role="tablist" aria-label="Period">
+        <div class="seg md-period" role="tablist" :aria-label="t('Period')">
           <button
             v-for="p in PERIODS"
             :key="p.id"
@@ -17,10 +17,10 @@
             :class="{ 'seg-btn--on': period === p.id }"
             @click="period = p.id"
           >
-            {{ p.label }}
+            {{ t(p.label) }}
           </button>
         </div>
-        <div class="md-sorts" role="tablist" aria-label="Sort">
+        <div class="md-sorts" role="tablist" :aria-label="t('Sort')">
           <button
             v-for="s in SORTS"
             :key="s.id"
@@ -29,13 +29,13 @@
             :class="{ 'find-chip--on': sort === s.id }"
             @click="sort = s.id"
           >
-            {{ s.label }}
+            {{ t(s.label) }}
           </button>
         </div>
       </div>
 
       <p class="md-summary">
-        {{ shown.length }} {{ shown.length === 1 ? "merchant" : "merchants" }} · {{ formatIlsWhole(shownTotal) }}
+        {{ t("{n} {n|merchant|merchants}", { n: shown.length }) }} · {{ formatIlsWhole(shownTotal) }}
       </p>
 
       <ul v-if="shown.length" class="bx-list md-list">
@@ -49,20 +49,20 @@
                 <span class="bx-row-amount">{{ formatIlsWhole(m.total) }}</span>
               </span>
               <span class="bx-row-meta">
-                <span>{{ m.count }} {{ m.count === 1 ? "visit" : "visits" }} · {{ shortDate(m.last) }} · {{ m.category }}</span>
-                <span v-if="m.count > 1">avg {{ formatIlsWhole(m.total / m.count) }}</span>
+                <span>{{ t("{n} {n|visit|visits}", { n: m.count }) }} · {{ shortDate(m.last) }} · {{ catName(m.category) }}</span>
+                <span v-if="m.count > 1">{{ t("avg {amount}", { amount: formatIlsWhole(m.total / m.count) }) }}</span>
               </span>
             </span>
           </button>
         </li>
       </ul>
-      <p v-else class="bx-empty-line">No merchants match.</p>
+      <p v-else class="bx-empty-line">{{ t("No merchants match.") }}</p>
 
       <div v-if="!auth.readOnly" class="md-tools">
-        <button type="button" class="bh-link" @click="exportJson">Export names</button>
+        <button type="button" class="bh-link" @click="exportJson">{{ t("Export names") }}</button>
         <span aria-hidden="true">·</span>
         <button type="button" class="bh-link" :disabled="importing" @click="importInput?.click()">
-          {{ importing ? "Importing…" : "Import names" }}
+          {{ importing ? t("Importing…") : t("Import names") }}
         </button>
         <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
       </div>
@@ -78,34 +78,35 @@
           </div>
         </div>
         <div class="bh-stats md-sheet-stats">
-          <div><span>Spent</span><strong>{{ formatIlsWhole(selected.total) }}</strong></div>
-          <div><span>Visits</span><strong>{{ selected.count }}</strong></div>
-          <div><span>Average</span><strong>{{ formatIlsWhole(selected.total / Math.max(1, selected.count)) }}</strong></div>
+          <div><span>{{ t("Spent") }}</span><strong>{{ formatIlsWhole(selected.total) }}</strong></div>
+          <div><span>{{ t("Visits") }}</span><strong>{{ selected.count }}</strong></div>
+          <div><span>{{ t("Average") }}</span><strong>{{ formatIlsWhole(selected.total / Math.max(1, selected.count)) }}</strong></div>
         </div>
         <p class="md-sheet-meta">
-          First {{ shortDate(selected.first) }} · last {{ shortDate(selected.last) }}<template v-if="periodLabel"> · {{ periodLabel }}</template>
+          {{ t("First {first} · last {last}", { first: shortDate(selected.first), last: shortDate(selected.last) }) }}<template v-if="periodLabel"> · {{ t(periodLabel) }}</template>
         </p>
 
         <template v-if="!auth.readOnly">
           <label class="sheet-field">
-            <span class="sheet-field__label">English name</span>
+            <span class="sheet-field__label">{{ t("English name") }}</span>
             <input v-model="draftEnglish" class="input" :placeholder="selected.name" enterkeyhint="done" />
           </label>
           <label class="sheet-field">
-            <span class="sheet-field__label">Category</span>
+            <span class="sheet-field__label">{{ t("Category") }}</span>
             <CategorySelect v-model="draftCategory" :options="CATEGORY_PICKLIST" allow-empty empty-label="Uncategorized" />
           </label>
           <button type="button" class="btn btn-primary md-sheet-save" :disabled="saving || !dirty" @click="save">
-            {{ saving ? "Saving…" : "Save" }}
+            {{ saving ? t("Saving…") : t("Save") }}
           </button>
         </template>
-        <button type="button" class="btn md-sheet-charges" @click="seeCharges(selected)">See all charges ›</button>
+        <button type="button" class="btn md-sheet-charges" @click="seeCharges(selected)">{{ t("See all charges ›") }}</button>
       </template>
     </BottomSheet>
   </div>
 </template>
 
 <script setup lang="ts">
+import { catName, dateTag, t } from "@/shared/i18n";
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { saveRuleEntry, saveRules } from "@/shared/api/client";
@@ -175,7 +176,7 @@ function setStatus(message: string, isError = false) {
 }
 
 function shortDate(iso: string): string {
-  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
+  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString(dateTag(), { day: "numeric", month: "short", year: "2-digit" });
 }
 
 const periodLabel = computed(() => PERIODS.find((p) => p.id === period.value)?.label ?? "");
@@ -272,9 +273,9 @@ async function save() {
     rules.value = { ...rules.value, [m.hebrew]: { english: entry.english, category: entry.category } };
     invalidateRulesDataCaches();
     selected.value = null;
-    setStatus(`Saved ${entry.english || m.name}.`);
+    setStatus(t("Saved {name}.", { name: entry.english || m.name }));
   } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Could not save", true);
+    setStatus(e instanceof Error ? e.message : t("Could not save"), true);
   } finally {
     saving.value = false;
   }
@@ -316,9 +317,9 @@ async function importJson(e: Event) {
     if (!result.saved) throw new Error("Server did not confirm save.");
     invalidateRulesDataCaches();
     rules.value = next;
-    setStatus(`Imported ${Object.keys(imported).length} names.`);
+    setStatus(t("Imported {n} names.", { n: Object.keys(imported).length }));
   } catch (err) {
-    setStatus(err instanceof Error ? err.message : "Import failed", true);
+    setStatus(err instanceof Error ? err.message : t("Import failed"), true);
   } finally {
     importing.value = false;
   }
@@ -332,7 +333,7 @@ onMounted(async () => {
     transactions.value = report.transactions;
     rules.value = saved as Record<string, Rule>;
   } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Could not load merchants", true);
+    setStatus(e instanceof Error ? e.message : t("Could not load merchants"), true);
   } finally {
     loading.value = false;
   }

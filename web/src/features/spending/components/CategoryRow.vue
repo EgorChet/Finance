@@ -10,7 +10,7 @@
       <CategoryIcon v-if="icon" :category="icon" />
       <span class="cat-row-text">
       <span class="cat-row-line">
-        <span class="cat-row-name">{{ name }}</span>
+        <span class="cat-row-name">{{ catName(name) }}</span>
         <span class="cat-row-amount">{{ formatIlsWhole(amount) }}</span>
       </span>
       <span class="cat-row-line cat-row-line--sub">
@@ -26,7 +26,7 @@
     <div v-if="open" class="cat-row-body">
       <div v-if="result && result.usual != null" class="cat-row-bars">
         <div v-for="bar in bars" :key="bar.label" class="cat-row-bar" :class="{ 'cat-row-bar--current': bar.current }">
-          <span class="cat-row-bar-label">{{ bar.label }}</span>
+          <span class="cat-row-bar-label">{{ tr(bar.label) }}</span>
           <span class="cat-row-bar-track">
             <span :style="{ width: `${bar.width}%` }" />
           </span>
@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { catName, t, tr } from "@/shared/i18n";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { computed } from "vue";
 import {
@@ -80,7 +81,7 @@ const toneArrow = computed(() => {
 });
 
 const countLabel = computed(() =>
-  props.count != null ? `${props.count} ${props.count === 1 ? "charge" : "charges"}` : "",
+  props.count != null ? t("{n} {n|charge|charges}", { n: props.count }) : "",
 );
 
 const bars = computed(() => {
@@ -89,9 +90,9 @@ const bars = computed(() => {
   const suffix = props.pointLabel ? ` ${props.pointLabel}` : "";
   const rows = [
     { label: props.currentLabel, value: r.current, current: true },
-    ...(r.last != null ? [{ label: `${props.lastLabel}${suffix}`, value: r.last, current: false }] : []),
+    ...(r.last != null ? [{ label: `${tr(props.lastLabel)}${suffix}`, value: r.last, current: false }] : []),
     {
-      label: `Usual${suffix}`,
+      label: `${t("Usual")}${suffix}`,
       value: r.usual,
       current: false,
     },

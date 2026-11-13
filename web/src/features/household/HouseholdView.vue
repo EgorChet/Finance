@@ -4,8 +4,8 @@
       Demo mode — household settings are read-only. Sign in to manage your budget and charges.
     </div>
     <header class="bx-page-head">
-      <h2 class="page-title">Budget</h2>
-      <p v-if="!auth.isDemo && !auth.canEditBudget" class="bx-locked">🔒 Only Egor can change the budget</p>
+      <h2 class="page-title">{{ t("Budget") }}</h2>
+      <p v-if="!auth.isDemo && !auth.canEditBudget" class="bx-locked">🔒 {{ t("Only Egor can change the budget") }}</p>
       <p
         v-if="!loading && saveStatus"
         class="recurring-save-status"
@@ -18,8 +18,8 @@
     <AppLoader
       v-if="loading"
       variant="hero"
-      title="Loading budget"
-      subtitle="Fetching budget, bills, and exclusions"
+      :title="t('Loading budget')"
+      :subtitle="t('Fetching budget, bills, and exclusions')"
     />
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
@@ -41,8 +41,8 @@
 
       <section id="recurring" class="bx-section">
         <div class="bx-list-head">
-          <h3>Recurring bills <span v-if="activeMonthlyTotal > 0" class="bx-list-total">{{ formatIlsWhole(activeMonthlyTotal) }}/mo</span></h3>
-          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('recurring')">+ Add</button>
+          <h3>{{ t("Recurring bills") }} <span v-if="activeMonthlyTotal > 0" class="bx-list-total">{{ formatIlsWhole(activeMonthlyTotal) }}{{ t("/mo") }}</span></h3>
+          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('recurring')">+ {{ t("Add") }}</button>
         </div>
         <div v-if="visibleRecurringGroups.length" class="bx-list">
           <template v-for="group in visibleRecurringGroups" :key="group.id">
@@ -56,12 +56,12 @@
               <MerchantIcon :merchant-he="groupDisplayName(group)" :category="group.category_en" />
               <span class="bx-row-body">
                 <span class="bx-row-top">
-                  <span class="bx-row-name">{{ groupDisplayName(group) }}</span>
-                  <span class="bx-row-amount">{{ formatIlsWhole(groupCurrentAmount(group)) }}<small>/mo</small></span>
+                  <span class="bx-row-name">{{ tr(groupDisplayName(group)) }}</span>
+                  <span class="bx-row-amount">{{ formatIlsWhole(groupCurrentAmount(group)) }}<small>{{ t("/mo") }}</small></span>
                 </span>
                 <span class="bx-row-meta">
                   <span>{{ groupMeta(group) }}</span>
-                  <span v-if="groupStatus(group)" class="bx-status" :class="`bx-status--${groupStatus(group)!.cls}`">{{ groupStatus(group)!.label }}</span>
+                  <span v-if="groupStatus(group)" class="bx-status" :class="`bx-status--${groupStatus(group)!.cls}`">{{ tr(groupStatus(group)!.label) }}</span>
                 </span>
               </span>
               <span v-if="!singleVisibleSegment(group)" class="bx-chevron" :class="{ 'is-open': expandedGroups.has(group.id) }" aria-hidden="true">›</span>
@@ -76,9 +76,9 @@
                 :disabled="!budgetLocked && saving"
                 @click="!budgetLocked && startEditCharge(seg)"
               >
-                <span>{{ monthRangeLabel(seg.from_month, seg.through_month) }}</span>
+                <span>{{ tr(monthRangeLabel(seg.from_month, seg.through_month)) }}</span>
                 <span class="bx-sub-right">
-                  <span v-if="statusLabel(seg) !== 'Active'" class="bx-status" :class="`bx-status--${segmentStatus(seg.from_month, seg.through_month, referenceYm)}`">{{ statusLabel(seg) }}</span>
+                  <span v-if="statusLabel(seg) !== 'Active'" class="bx-status" :class="`bx-status--${segmentStatus(seg.from_month, seg.through_month, referenceYm)}`">{{ tr(statusLabel(seg)) }}</span>
                   <b>{{ formatIlsWhole(seg.amount) }}</b>
                 </span>
               </component>
@@ -90,18 +90,18 @@
             class="bx-row bx-row--more"
             @click="showEndedRecurring = !showEndedRecurring"
           >
-            {{ showEndedRecurring ? "Hide" : "Show" }} ended periods ({{ endedRecurringCount }})
+            {{ showEndedRecurring ? t("Hide ended periods ({n})", { n: endedRecurringCount }) : t("Show ended periods ({n})", { n: endedRecurringCount }) }}
           </button>
         </div>
-        <p v-else class="bx-empty-line">No recurring bills yet. Rent, loans and subscriptions go here.</p>
+        <p v-else class="bx-empty-line">{{ t("No recurring bills yet. Rent, loans and subscriptions go here.") }}</p>
       </section>
 
       <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" @plan="cyclePlan = $event" />
 
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
-          <h3>One-time charges</h3>
-          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('once')">+ Add</button>
+          <h3>{{ t("One-time charges") }}</h3>
+          <button v-if="!budgetLocked" type="button" class="bx-pill" :disabled="saving" @click="openAddForm('once')">+ {{ t("Add") }}</button>
         </div>
         <div v-if="visibleOneTimeCharges.length || pastOneTimeCharges.length" class="bx-list">
           <component
@@ -116,11 +116,11 @@
             <MerchantIcon :merchant-he="chargeDisplayName(charge)" :category="charge.category_en" />
             <span class="bx-row-body">
               <span class="bx-row-top">
-                <span class="bx-row-name">{{ chargeDisplayName(charge) }}</span>
+                <span class="bx-row-name">{{ tr(chargeDisplayName(charge)) }}</span>
                 <span class="bx-row-amount">{{ formatIlsWhole(charge.amount) }}</span>
               </span>
               <span class="bx-row-meta">
-                <span>{{ dateToLabel(charge.charge_date!) }} · {{ charge.category_en }}</span>
+                <span>{{ dateToLabel(charge.charge_date!) }} · {{ catName(charge.category_en) }}</span>
                 <span
                   v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
                   class="bx-status"
@@ -137,11 +137,11 @@
             class="bx-row bx-row--more"
             @click="showPastOneTime = !showPastOneTime"
           >
-            {{ showPastOneTime ? "Hide" : "Show" }} past charges ({{ pastOneTimeCharges.length }})
+            {{ showPastOneTime ? t("Hide past charges ({n})", { n: pastOneTimeCharges.length }) : t("Show past charges ({n})", { n: pastOneTimeCharges.length }) }}
           </button>
         </div>
         <p v-else class="bx-empty-line">
-          Nothing planned. Add purchases on another card, cash, or a big one-off you know is coming — it's set aside in your budget.
+          {{ t("Nothing planned. Add purchases on another card, cash, or a big one-off you know is coming — it's set aside in your budget.") }}
         </p>
       </section>
 
@@ -149,7 +149,7 @@
       <SheetEditor
         :open="!budgetLocked && !!editingCharge && isMonthlyCharge(editingCharge)"
         :title="editingGroup ? groupDisplayName(editingGroup) : 'Recurring bill'"
-        :subtitle="editingIsNewSegment ? 'New period from a price change' : editingGroupSegmentCount > 1 ? `Billing period · ${editingGroup?.category_en ?? ''}` : `Monthly · ${editingGroup?.category_en ?? ''}`"
+        :subtitle="editingIsNewSegment ? t('New period from a price change') : editingGroupSegmentCount > 1 ? `${t('Billing period')} · ${catName(editingGroup?.category_en)}` : `${t('Monthly')} · ${catName(editingGroup?.category_en)}`"
         :save-label="editingIsNewSegment ? 'Add period' : 'Save'"
         :deletable="!editingIsNewSegment"
         :delete-label="editingGroup ? segmentDeleteLabel(editingGroup) : 'Delete'"
@@ -162,18 +162,18 @@
         <template v-if="editingCharge">
           <SheetAmountInput v-model="editingCharge.amount" label="Amount per month" />
           <div class="sheet-field">
-            <span class="sheet-field__label">From</span>
+            <span class="sheet-field__label">{{ t("From") }}</span>
             <MonthSelect v-model="editingCharge.from_month" />
           </div>
           <label class="sheet-toggle-row">
-            <span>No end date</span>
+            <span>{{ t("No end date") }}</span>
             <ToggleSwitch
               :model-value="isOngoingThrough(editingCharge.through_month)"
               @update:model-value="toggleOngoing(editingCharge, $event)"
             />
           </label>
           <div v-if="!isOngoingThrough(editingCharge.through_month)" class="sheet-field">
-            <span class="sheet-field__label">Through</span>
+            <span class="sheet-field__label">{{ t("Through") }}</span>
             <MonthSelect v-model="editingCharge.through_month" />
           </div>
           <button
@@ -183,7 +183,7 @@
             :disabled="saving"
             @click="addAnotherPeriod"
           >
-            + Add a new period (price change)
+            + {{ t("Add a new period (price change)") }}
           </button>
         </template>
       </SheetEditor>
@@ -203,11 +203,11 @@
         <template v-if="editingCharge">
           <SheetAmountInput v-model="editingCharge.amount" label="Amount" />
           <label class="sheet-field">
-            <span class="sheet-field__label">Name</span>
+            <span class="sheet-field__label">{{ t("Name") }}</span>
             <input v-model="editingCharge.name_en" class="input" enterkeyhint="done" />
           </label>
           <label class="sheet-field">
-            <span class="sheet-field__label">Date</span>
+            <span class="sheet-field__label">{{ t("Date") }}</span>
             <input
               class="input"
               type="date"
@@ -216,7 +216,7 @@
             />
           </label>
           <label class="sheet-field">
-            <span class="sheet-field__label">Category</span>
+            <span class="sheet-field__label">{{ t("Category") }}</span>
             <CategorySelect v-model="editingCharge.category_en" :options="categories" />
           </label>
         </template>
@@ -234,23 +234,23 @@
       >
         <SheetAmountInput v-model="newRecurring.amount" label="Amount per month" />
         <label class="sheet-field">
-          <span class="sheet-field__label">Name</span>
-          <input v-model="newRecurring.name_en" class="input" placeholder="e.g. Rent" enterkeyhint="done" />
+          <span class="sheet-field__label">{{ t("Name") }}</span>
+          <input v-model="newRecurring.name_en" class="input" :placeholder="t('e.g. Rent')" enterkeyhint="done" />
         </label>
         <label class="sheet-field">
-          <span class="sheet-field__label">Category</span>
+          <span class="sheet-field__label">{{ t("Category") }}</span>
           <CategorySelect v-model="newRecurring.category_en" :options="categories" />
         </label>
         <div class="sheet-field">
-          <span class="sheet-field__label">From</span>
+          <span class="sheet-field__label">{{ t("From") }}</span>
           <MonthSelect v-model="newRecurring.from_month" />
         </div>
         <label class="sheet-toggle-row">
-          <span>No end date</span>
+          <span>{{ t("No end date") }}</span>
           <ToggleSwitch v-model="newRecurringOngoing" />
         </label>
         <div v-if="!newRecurringOngoing" class="sheet-field">
-          <span class="sheet-field__label">Through</span>
+          <span class="sheet-field__label">{{ t("Through") }}</span>
           <MonthSelect v-model="newRecurring.through_month" />
         </div>
       </SheetEditor>
@@ -267,21 +267,21 @@
       >
         <SheetAmountInput v-model="newOneTime.amount" label="Amount" />
         <label class="sheet-field">
-          <span class="sheet-field__label">Name</span>
-          <input v-model="newOneTime.name_en" class="input" placeholder="e.g. Market on cash" enterkeyhint="done" />
+          <span class="sheet-field__label">{{ t("Name") }}</span>
+          <input v-model="newOneTime.name_en" class="input" :placeholder="t('e.g. Market on cash')" enterkeyhint="done" />
         </label>
         <label class="sheet-field">
-          <span class="sheet-field__label">Date</span>
+          <span class="sheet-field__label">{{ t("Date") }}</span>
           <input v-model="newOneTime.charge_date" class="input" type="date" />
         </label>
         <label class="sheet-field">
-          <span class="sheet-field__label">Category</span>
+          <span class="sheet-field__label">{{ t("Category") }}</span>
           <CategorySelect v-model="newOneTime.category_en" :options="categories" />
         </label>
       </SheetEditor>
 
       <div class="minor-sections">
-        <h3 class="minor-sections__title">More</h3>
+        <h3 class="minor-sections__title">{{ t("More") }}</h3>
         <ExcludedSection />
         <AdjustmentsSection />
       </div>
@@ -290,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import { catName, t, tr } from "@/shared/i18n";
 import type { BudgetPlan } from "@core/spending/budgetPlan";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
@@ -449,19 +450,19 @@ const recurringSummary = computed(() => {
   const active = recurringGroups.value.flatMap((group) =>
     group.segments.filter((seg) => segmentStatus(seg.from_month, seg.through_month, referenceYm.value) === "active"),
   );
-  if (!active.length) return recurringGroups.value.length ? "Nothing active this month" : "No bills yet";
+  if (!active.length) return recurringGroups.value.length ? t("Nothing active this month") : t("No bills yet");
   const total = active.reduce((sum, seg) => sum + (Number(seg.amount) || 0), 0);
-  return `${active.length} ${active.length === 1 ? "bill" : "bills"} · ${formatIls(total)} a month`;
+  return t("{n} {n|bill|bills} · {amount} a month", { n: active.length, amount: formatIls(total) });
 });
 
 const oneTimeSummary = computed(() => {
   const upcoming = visibleOneTimeCharges.value;
   if (upcoming.length) {
     const total = upcoming.reduce((sum, charge) => sum + (Number(charge.amount) || 0), 0);
-    return `${upcoming.length} upcoming · ${formatIls(total)}`;
+    return t("{n} upcoming · {amount}", { n: upcoming.length, amount: formatIls(total) });
   }
-  if (pastOneTimeCharges.value.length) return `None upcoming · ${pastOneTimeCharges.value.length} past`;
-  return "None yet";
+  if (pastOneTimeCharges.value.length) return t("None upcoming · {n} past", { n: pastOneTimeCharges.value.length });
+  return t("None yet");
 });
 
 const hasUnsavedChanges = computed(() => hydrated.value && isDirty());
@@ -583,7 +584,7 @@ async function runPersist(): Promise<boolean> {
   }
 
   saving.value = true;
-  showSaveStatus("Saving…");
+  showSaveStatus(t("Saving…"));
   status.value = "";
   saveError.value = false;
   try {
@@ -615,7 +616,7 @@ async function runPersist(): Promise<boolean> {
     await Promise.all(tasks);
     syncSavedSnapshots();
     invalidateHouseholdDataCaches();
-    showSaveStatus("Saved");
+    showSaveStatus(t("Saved"));
     return true;
   } catch (e) {
     showSaveStatus(friendlyError(e), true);
@@ -655,7 +656,7 @@ function addAnotherPeriod() {
 }
 
 function segmentDeleteLabel(group: ChargeGroup): string {
-  return group.segments.length <= 1 ? "Remove bill" : "Delete period";
+  return group.segments.length <= 1 ? t("Remove bill") : t("Delete period");
 }
 
 async function deleteSegmentOrBill(group: ChargeGroup, seg: ConfiguredCharge) {
@@ -664,12 +665,12 @@ async function deleteSegmentOrBill(group: ChargeGroup, seg: ConfiguredCharge) {
       ? groupDisplayName(group)
       : `${formatIls(seg.amount)} (${monthRangeLabel(seg.from_month, seg.through_month)})`;
   const ok = await confirm({
-    title: group.segments.length <= 1 ? "Remove bill?" : "Delete period?",
+    title: group.segments.length <= 1 ? t("Remove bill?") : t("Delete period?"),
     message:
       group.segments.length <= 1
-        ? `Remove ${label} from recurring bills?`
-        : `Remove this billing period — ${label}?`,
-    confirmLabel: group.segments.length <= 1 ? "Remove bill" : "Delete period",
+        ? t("Remove {label} from recurring bills?", { label })
+        : t("Remove this billing period — {label}?", { label }),
+    confirmLabel: group.segments.length <= 1 ? t("Remove bill") : t("Delete period"),
     tone: "danger",
   });
   if (!ok) return;
@@ -692,13 +693,13 @@ async function finishEditCharge(charge: ConfiguredCharge) {
   if (editingCharge.value !== charge) return;
   status.value = "";
   if (isMonthlyCharge(charge) && !isOngoingThrough(charge.through_month) && charge.from_month > charge.through_month) {
-    status.value = "Start month must be on or before end month.";
+    status.value = t("Start month must be on or before end month.");
     return;
   }
   // Keep the sheet open until the save succeeds, so a failure is shown where the user is looking.
   const ok = await persistCharges();
   if (!ok) {
-    if (!status.value) status.value = "Could not save — try again.";
+    if (!status.value) status.value = t("Could not save — try again.");
     return;
   }
   if (editingCharge.value !== charge) return;
@@ -736,7 +737,7 @@ function cancelEditCharge(charge: ConfiguredCharge) {
 }
 
 function throughLabel(throughMonth: string): string {
-  return isOngoingThrough(throughMonth) ? "Ongoing" : ymToLabel(throughMonth);
+  return isOngoingThrough(throughMonth) ? t("Ongoing") : ymToLabel(throughMonth);
 }
 
 const expandedGroups = ref(new Set<string>());
@@ -767,7 +768,7 @@ function groupMeta(group: ChargeGroup): string {
   const seg = groupCurrentSegment(group);
   const periods = visibleGroupSegments(group).length;
   const range = seg ? monthRangeLabel(seg.from_month, seg.through_month) : "";
-  return periods > 1 ? `${group.category_en} · ${periods} periods` : `${group.category_en} · ${range}`;
+  return periods > 1 ? `${catName(group.category_en)} · ${t("{n} periods", { n: periods })}` : `${catName(group.category_en)} · ${tr(range)}`;
 }
 
 function groupStatus(group: ChargeGroup): { label: string; cls: string } | null {
@@ -800,8 +801,8 @@ function statusLabel(seg: ConfiguredCharge): string {
 
 function oneTimeStatusLabel(chargeDate: string): string {
   const s = oneTimeStatus(chargeDate, referenceToday.value);
-  if (s === "upcoming") return "Scheduled · " + dateToLabel(chargeDate);
-  if (s === "active") return "Today";
+  if (s === "upcoming") return `${t("Scheduled")} · ${dateToLabel(chargeDate)}`;
+  if (s === "active") return t("Today");
   return dateToLabel(chargeDate);
 }
 
@@ -869,9 +870,9 @@ async function removeSegment(seg: ConfiguredCharge, options: { skipConfirm?: boo
   const label = `${formatIls(seg.amount)} (${monthRangeLabel(seg.from_month, seg.through_month)})`;
   if (!options.skipConfirm) {
     const ok = await confirm({
-      title: "Delete period?",
-      message: `Remove this billing period — ${label}?`,
-      confirmLabel: "Delete period",
+      title: t("Delete period?"),
+      message: t("Remove this billing period — {label}?", { label }),
+      confirmLabel: t("Delete period"),
       tone: "danger",
     });
     if (!ok) return;
@@ -890,9 +891,9 @@ async function removeCharge(id: string, options: { skipConfirm?: boolean } = {})
   const label = group ? groupDisplayName(group) : "this bill";
   if (!options.skipConfirm) {
     const ok = await confirm({
-      title: "Remove bill?",
-      message: `Remove ${label} from recurring bills?`,
-      confirmLabel: "Remove bill",
+      title: t("Remove bill?"),
+      message: t("Remove {label} from recurring bills?", { label }),
+      confirmLabel: t("Remove bill"),
       tone: "danger",
     });
     if (!ok) return;
@@ -907,9 +908,9 @@ async function removeCharge(id: string, options: { skipConfirm?: boolean } = {})
 
 async function removeOneTime(charge: ConfiguredCharge) {
   const ok = await confirm({
-    title: "Delete charge?",
-    message: `Delete "${chargeDisplayName(charge)}" (${formatIls(charge.amount)})?`,
-    confirmLabel: "Delete",
+    title: t("Delete charge?"),
+    message: t("Delete \"{name}\" ({amount})?", { name: tr(chargeDisplayName(charge)), amount: formatIls(charge.amount) }),
+    confirmLabel: t("Delete"),
     tone: "danger",
   });
   if (!ok) return;
@@ -943,15 +944,15 @@ async function addRecurring() {
   status.value = "";
   const name = newRecurring.value.name_en.trim();
   if (!name) {
-    status.value = "Enter a name for the bill.";
+    status.value = t("Enter a name for the bill.");
     return;
   }
   if (!newRecurring.value.amount || newRecurring.value.amount <= 0) {
-    status.value = "Enter a positive amount.";
+    status.value = t("Enter a positive amount.");
     return;
   }
   if (!newRecurringOngoing.value && newRecurring.value.from_month > newRecurring.value.through_month) {
-    status.value = "Start month must be on or before end month.";
+    status.value = t("Start month must be on or before end month.");
     return;
   }
   const throughMonth = newRecurringOngoing.value ? ONGOING_THROUGH_MONTH : newRecurring.value.through_month;
@@ -979,9 +980,9 @@ async function addRecurring() {
   if (ok) {
     status.value = "";
     activeAddForm.value = null;
-    showSaveStatus(`Added ${name}`);
+    showSaveStatus(t("Added {name}", { name }));
   } else {
-    status.value = "Could not save — try again.";
+    status.value = t("Could not save — try again.");
   }
 }
 
@@ -989,15 +990,15 @@ async function addOneTime() {
   status.value = "";
   const name = newOneTime.value.name_en.trim();
   if (!name) {
-    status.value = "Enter a name for the charge.";
+    status.value = t("Enter a name for the charge.");
     return;
   }
   if (!newOneTime.value.charge_date) {
-    status.value = "Pick a date.";
+    status.value = t("Pick a date.");
     return;
   }
   if (!newOneTime.value.amount || newOneTime.value.amount <= 0) {
-    status.value = "Enter a positive amount.";
+    status.value = t("Enter a positive amount.");
     return;
   }
   charges.value.push(
@@ -1023,9 +1024,9 @@ async function addOneTime() {
   if (ok) {
     status.value = "";
     activeAddForm.value = null;
-    showSaveStatus(`Added ${name}`);
+    showSaveStatus(t("Added {name}", { name }));
   } else {
-    status.value = "Could not save — try again.";
+    status.value = t("Could not save — try again.");
   }
 }
 

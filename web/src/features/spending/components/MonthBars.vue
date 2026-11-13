@@ -1,7 +1,7 @@
 <template>
   <section class="pd-card">
-    <h3 class="pd-card-title">{{ title }}</h3>
-    <div class="pd-bars" role="img" :aria-label="`${title}, highest ${formatIlsWhole(max)}`">
+    <h3 class="pd-card-title">{{ t(title) }}</h3>
+    <div class="pd-bars" role="img" :aria-label="`${t(title)}, ${t('highest')} ${formatIlsWhole(max)}`">
       <div v-for="b in bars" :key="b.key" class="pd-bar" :class="{ 'pd-bar--max': b.max }">
         <span class="pd-bar-value">{{ b.short }}</span>
         <span class="pd-bar-fill" :style="{ height: `${b.pct}%` }" />
@@ -12,6 +12,7 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
 import { computed } from "vue";
 import { formatIlsWhole } from "@/shared/utils/format";
 
@@ -29,7 +30,7 @@ const bars = computed(() => {
   return shown.value.map((m) => ({
     key: m.key,
     label: m.label,
-    short: m.total >= 1000 ? `${Math.round(m.total / 1000)}k` : String(Math.round(m.total)),
+    short: m.total >= 1000 ? `${Math.round(m.total / 1000)}${t("k")}` : String(Math.round(m.total)),
     pct: Math.max(3, Math.round((m.total / top) * 100)),
     max: m.total === top,
   }));

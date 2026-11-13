@@ -4726,3 +4726,9 @@ table.rules select {
   background: var(--accent);
   color: #fff;
 }
+
+.login-lang {
+  display: flex;
+  width: fit-content;
+  margin: 0 0 0.75rem auto;
+}

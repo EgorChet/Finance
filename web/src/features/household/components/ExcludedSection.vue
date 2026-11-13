@@ -7,24 +7,24 @@
       aria-controls="excluded-body"
       @click="open = !open"
     >
-      <span class="minor-section__title">Excluded charges</span>
+      <span class="minor-section__title">{{ t("Excluded charges") }}</span>
       <span class="minor-section__count">{{ loading ? "…" : entries.length }}</span>
       <span class="minor-section__chevron" :class="{ 'is-open': open }" aria-hidden="true" />
     </button>
 
     <div v-show="open" id="excluded-body" class="minor-section__body">
-    <p class="manual-section-lead">Hidden from totals, charts, and pace. Restore a charge to count it in your spending again.</p>
+    <p class="manual-section-lead">{{ t("Hidden from totals, charts, and pace. Restore a charge to count it in your spending again.") }}</p>
 
     <AppLoader
       v-if="loading"
       compact
-      title="Loading exclusions"
-      subtitle="Fetching charges marked as not your spend"
+      :title="t('Loading exclusions')"
+      :subtitle="t('Fetching charges marked as not your spend')"
     />
     <template v-else>
       <p v-if="error" class="recurring-form-error">{{ error }}</p>
       <p v-else-if="!entries.length" class="manual-empty">
-        No excluded charges yet. Tap any charge in Spending and choose <strong>Exclude</strong>.
+        {{ t("No excluded charges yet. Tap any charge in Spending and choose Exclude.") }}
       </p>
       <div v-else class="excluded-list">
         <article v-for="row in entries" :key="row.key" class="excluded-card">
@@ -37,8 +37,8 @@
           <div class="excluded-card-footer">
             <p class="excluded-card-note">
               <span v-if="row.note">{{ row.note }}</span>
-              <span v-else>Not my spend</span>
-              <span v-if="row.source === 'builtin'" class="excluded-source-pill">Default</span>
+              <span v-else>{{ t("Not my spend") }}</span>
+              <span v-if="row.source === 'builtin'" class="excluded-source-pill">{{ t("Default") }}</span>
             </p>
             <button
               type="button"
@@ -46,7 +46,7 @@
               :disabled="auth.readOnly || restoringKey === row.key"
               @click="restore(row)"
             >
-              {{ restoringKey === row.key ? "Restoring…" : "Restore" }}
+              {{ restoringKey === row.key ? t("Restoring…") : t("Restore") }}
             </button>
           </div>
         </article>
@@ -58,6 +58,8 @@
 </template>
 
 <script setup lang="ts">
+import { t } from "@/shared/i18n";
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
@@ -80,7 +82,8 @@ const entries = ref<ExcludedItem[]>([]);
 const restoringKey = ref<string | null>(null);
 
 function excludedMerchantLabel(row: ExcludedItem): string {
-  return row.merchant_en?.trim() || row.merchant_he?.trim() || row.key;
+  if (!row.merchant_en?.trim() && !row.merchant_he?.trim()) return row.key;
+  return merchantDisplayName({ merchant_he: row.merchant_he ?? "", merchant_en: row.merchant_en });
 }
 
 function excludedMerchantSubtitle(row: ExcludedItem): string | null {
@@ -128,7 +131,7 @@ async function restore(row: ExcludedItem) {
     entries.value = entries.value.filter((e) => e.key !== row.key);
     exclusionsData.invalidate();
     invalidateSpendingDataCaches();
-    status.value = "Charge restored — totals will update on Overview.";
+    status.value = t("Charge restored — totals will update on Overview.");
   } catch (e) {
     status.value = friendlyError(e);
   } finally {

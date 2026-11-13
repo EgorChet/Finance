@@ -1,7 +1,7 @@
 <template>
   <div class="category-accordion">
     <div class="category-legend-header">
-      <strong>Categories</strong>
+      <strong>{{ t("Categories") }}</strong>
       <span class="category-legend-count">{{ items.length }}</span>
     </div>
 
@@ -16,13 +16,13 @@
           :class="c.delta > 0 ? 'cat-change--up' : 'cat-change--down'"
           @click="openAndScroll(c.key)"
         >
-          <span class="cat-change-name">{{ c.name }}</span>
+          <span class="cat-change-name">{{ catName(c.name) }}</span>
           <span class="cat-change-delta">{{ c.delta > 0 ? "+" : "−" }}{{ formatIlsWhole(Math.abs(c.delta)) }}</span>
         </button>
       </div>
-      <p v-else class="cat-changes-empty">Every category is about where it usually is.</p>
+      <p v-else class="cat-changes-empty">{{ t("Every category is about where it usually is.") }}</p>
     </section>
-    <p v-else class="category-legend-hint">Tap a category to see its charges.</p>
+    <p v-else class="category-legend-hint">{{ t("Tap a category to see its charges.") }}</p>
 
     <div class="category-accordion-list">
       <CategoryRow
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { catName, t, tr } from "@/shared/i18n";
 import { computed, nextTick } from "vue";
 import CategoryRow from "@/features/spending/components/CategoryRow.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
@@ -263,9 +264,9 @@ const changes = computed(() => {
 const changesTitle = computed(() => {
   const ctx = props.compareContext;
   if (!ctx) return "";
-  if (ctx.mode === "cycle") return `Compared with your usual ${ctx.pointLabel}`;
+  if (ctx.mode === "cycle") return t("Compared with your usual {when}", { when: ctx.pointLabel });
   const n = ctx.historical.length;
-  return n > 1 ? `Compared with your previous ${n} months` : `Compared with ${ctx.lastLabel}`;
+  return n > 1 ? t("Compared with your previous {n} months", { n }) : t("Compared with {label}", { label: tr(ctx.lastLabel) });
 });
 
 function countFor(item: AccordionItem): number {
