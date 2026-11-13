@@ -1,3 +1,4 @@
+import { reactive } from "vue";
 /**
  * Brand marks for merchants you pay often:
  * - international brands use their real logo (simple-icons, bundled in brandIcons.ts);
@@ -191,12 +192,17 @@ function contrastOn(hex: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? "#1A1A1A" : "#FFFFFF";
 }
 
+/** Whether each bundled logo loaded sharp ("ok") or not ("bad"), shared by every icon on screen. */
+export const logoState: Record<string, "ok" | "bad"> = reactive({});
+
 export function merchantMark(merchantHe: string | null | undefined, merchantEn?: string | null): MerchantMark | null {
   const text = `${merchantHe ?? ""} ${merchantEn ?? ""}`.trim();
   if (!text) return null;
   const hit = cache.get(text);
   if (hit !== undefined) return hit;
-  const mark = BRANDS.find(([re]) => re.test(text))?.[1];
+  // Hebrew (the statement's name) first, so a wrongly saved English name can't swap the logo.
+  const he = (merchantHe ?? "").trim();
+  const mark = (he ? BRANDS.find(([re]) => re.test(he)) : undefined)?.[1] ?? BRANDS.find(([re]) => re.test(text))?.[1];
   let out: MerchantMark | null = null;
   if (mark && "icon" in mark) {
     const icon = BRAND_ICONS[mark.icon];

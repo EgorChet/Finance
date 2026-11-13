@@ -307,8 +307,15 @@ export function knownMerchantName(merchantHe: string | null | undefined): string
  * Hebrew. A Latin-only statement name is tidied too ("GO MOBILE" → "Go Mobile").
  */
 export function englishMerchantName(tx: { merchant_he: string; merchant_en?: string | null }): string {
-  const canonical = canonicalMerchantName(tx.merchant_he, tx.merchant_en);
-  if (canonical) return canonical;
+  // The statement's own (Hebrew) name decides first: a wrong English name saved for a Zara
+  // branch ("Arcaffe") must not turn it into a café.
+  const fromHebrew = canonicalMerchantName(tx.merchant_he);
+  if (fromHebrew) return fromHebrew;
+  const fromEnglish = canonicalMerchantName("", tx.merchant_en);
+  if (fromEnglish) {
+    const known = knownMerchantName(tx.merchant_he);
+    return known && known !== fromEnglish ? known : fromEnglish;
+  }
   const en = tx.merchant_en?.trim();
   if (en && !HEBREW_RE.test(en)) return tidyLatin(en);
   const known = knownMerchantName(tx.merchant_he);

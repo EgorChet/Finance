@@ -16,7 +16,7 @@
         alt=""
         decoding="async"
         @load="onLoad"
-        @error="photoBad = true"
+        @error="onError"
       />
     </template>
   </span>
@@ -24,8 +24,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { merchantMark } from "@/shared/utils/merchantLogos";
+import { computed } from "vue";
+import { logoState, merchantMark } from "@/shared/utils/merchantLogos";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 
 /**
@@ -38,16 +38,17 @@ const props = defineProps<{ merchantHe?: string | null; merchantEn?: string | nu
 const MIN_LOGO_PX = 48;
 
 const mark = computed(() => merchantMark(props.merchantHe, props.merchantEn));
-const photoOk = ref(false);
-const photoBad = ref(false);
-watch(mark, () => {
-  photoOk.value = false;
-  photoBad.value = false;
-});
+const url = computed(() => (mark.value?.kind === "badge" ? mark.value.logoUrl : null));
+/** Whether each logo file loaded sharp — shared by every icon, so a re-render never loses it. */
+const photoOk = computed(() => !!url.value && logoState[url.value] === "ok");
+const photoBad = computed(() => !url.value || logoState[url.value] === "bad");
 
 function onLoad(e: Event) {
   const img = e.target as HTMLImageElement;
-  if (img.naturalWidth >= MIN_LOGO_PX) photoOk.value = true;
-  else photoBad.value = true;
+  if (url.value) logoState[url.value] = img.naturalWidth >= MIN_LOGO_PX ? "ok" : "bad";
+}
+
+function onError() {
+  if (url.value) logoState[url.value] = "bad";
 }
 </script>
