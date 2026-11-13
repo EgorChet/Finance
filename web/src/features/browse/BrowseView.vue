@@ -137,6 +137,7 @@
 </template>
 
 <script setup lang="ts">
+import { knownMerchantName, merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
@@ -224,7 +225,7 @@ const filteredTransactions = computed(() => {
   return allTransactions.value.filter((tx) => {
     if (!includeRecurring.value && isSystemRecurringTransaction(tx)) return false;
     if (q) {
-      const merchant = `${tx.merchant_en} ${tx.merchant_he}`.toLowerCase();
+      const merchant = `${tx.merchant_en} ${tx.merchant_he} ${knownMerchantName(tx.merchant_he) ?? ""}`.toLowerCase();
       if (!merchant.includes(q)) return false;
     }
     if (cat) {
@@ -373,7 +374,7 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
 
 async function excludeTransaction(tx: Transaction) {
   if (auth.readOnly) return;
-  const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
+  const label = `${formatIls(tx.charge_amount)} · ${merchantDisplayName(tx)}`;
   const ok = await confirm({
     title: "Exclude transaction?",
     message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,

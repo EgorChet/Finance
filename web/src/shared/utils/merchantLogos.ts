@@ -63,6 +63,8 @@ const BRANDS: [RegExp, Mark][] = [
   [/עיריית נתניה/i, { text: "N", bg: "#1D4F91" }],
   // Transport & delivery
   [/pango|פנגו/i, { text: "P", bg: "#00B2A9" }],
+  [/ev ?edge|אי\.? ?וי\.? ?אדג/i, { text: "⚡", bg: "#00A651" }],
+  [/goto|^גו טו/i, { text: "GT", bg: "#00C389", fg: "#1A1A1A" }],
   [/moovit|מוביט/i, { text: "M", bg: "#F26B21" }],
   [/gett/i, { text: "G", bg: "#FFD200", fg: "#1A1A1A" }],
   [/yango/i, { text: "Y", bg: "#FC3F1D" }],
