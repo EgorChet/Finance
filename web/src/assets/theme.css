@@ -3888,6 +3888,13 @@ body {
 }
 
 /* ── Budget hero: by this day, cycle by cycle ── */
+.bh-setaside {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
 .bh-byday {
   margin: 0.55rem 0 0;
   font-size: 0.8rem;

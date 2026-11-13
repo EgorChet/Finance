@@ -74,6 +74,7 @@
     </div>
 
     <p v-if="byDay" class="bh-byday" :class="{ 'bh-byday--record': byDay.record }">{{ byDay.line }}</p>
+    <p v-if="setAsideLine" class="bh-setaside">{{ setAsideLine }}</p>
 
     <div class="bh-stats">
       <div>
@@ -203,6 +204,18 @@ const billRows = computed(() =>
 
 /** Money already promised to charges that haven't gone through yet. */
 const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
+
+/** "🧾 ₪2,086 set aside for bills still to come: Arnona, Electricity, Claude +2" — why the daily number is lower. */
+const setAsideLine = computed(() => {
+  if (reserved.value < 1 || props.plan.daysLeft === 0) return "";
+  const names = props.plan.committedRows
+    .filter((r) => r.kind === "upcoming")
+    .map((r) => r.label.replace(/\s*\(.*\)\s*$/, ""));
+  if (!names.length) return "";
+  const shown = names.slice(0, 3).join(", ");
+  const more = names.length > 3 ? ` +${names.length - 3}` : "";
+  return `🧾 ${whole(reserved.value)} set aside for bills still to come: ${shown}${more}`;
+});
 
 const explanation = computed(() => {
   const p = props.plan;
