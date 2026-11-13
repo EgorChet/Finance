@@ -53,9 +53,58 @@ function pendingCurrenciesFromMetadata(metadata: Record<string, unknown>): Recor
   return raw as Record<string, string>;
 }
 
+/** A row Cal still shows as "being received" (עסקה בקליטה / בתהליך קליטה). */
+function isBeingReceived(tx: Transaction): boolean {
+  return /קליטה/.test(`${tx.notes ?? ""} ${tx.transaction_type_he ?? ""}`);
+}
+
+function merchantWords(tx: Transaction): Set<string> {
+  return new Set(
+    `${tx.merchant_he} ${tx.merchant_en ?? ""}`
+      .toLowerCase()
+      .replace(/["'״׳*.,\-–/()]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 2),
+  );
+}
+
+function dayDiff(a: string, b: string): number {
+  return Math.abs(Date.parse(a.slice(0, 10)) - Date.parse(b.slice(0, 10))) / 86400000;
+}
+
+/**
+ * A partial Cal export can list the same purchase twice: once "being received" and once
+ * already charged. Drop the "being received" row when a charged row matches it — same amount,
+ * same or next day, same merchant (shared name word). Each charged row absorbs at most one
+ * pending row; two ordinary rows (two real payments, e.g. EV Edge) are never touched.
+ */
+export function dropPendingDuplicates(transactions: Transaction[]): Transaction[] {
+  const pending = transactions.filter(isBeingReceived);
+  if (!pending.length) return transactions;
+  const charged = transactions.filter((tx) => !isBeingReceived(tx));
+  const used = new Set<Transaction>();
+  const drop = new Set<Transaction>();
+  for (const p of pending) {
+    const words = merchantWords(p);
+    const amount = Math.abs(p.amount ?? p.charge_amount);
+    const match = charged.find(
+      (c) =>
+        !used.has(c) &&
+        Math.abs(Math.abs(c.amount ?? c.charge_amount) - amount) < 0.01 &&
+        dayDiff(c.date, p.date) <= 1 &&
+        [...merchantWords(c)].some((w) => words.has(w)),
+    );
+    if (match) {
+      used.add(match);
+      drop.add(p);
+    }
+  }
+  return drop.size ? transactions.filter((tx) => !drop.has(tx)) : transactions;
+}
+
 export function finalizeReport(report: SpendingReport): SpendingReport {
   const pendingCurrencies = pendingCurrenciesFromMetadata(report.metadata);
-  const kept = report.transactions.filter(
+  const kept = dropPendingDuplicates(report.transactions).filter(
     (tx) => !shouldSkipNonSpendRow(tx.charge_amount, tx.merchant_he, tx.notes, tx.transaction_type_he),
   );
   const base = kept.length !== report.transactions.length

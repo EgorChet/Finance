@@ -12,7 +12,7 @@ const CATEGORY_ALIASES: Record<string, string> = {
 };
 
 /** Bump when FX / pending-currency normalization logic changes — forces stored reports to re-finalize. */
-const FX_PIPELINE_VERSION = 3;
+const FX_PIPELINE_VERSION = 4; // 4: drop "being received" rows already charged (partial Cal exports)
 
 export async function getFinalizeVersion(): Promise<string> {
   const rules = await readRules();
