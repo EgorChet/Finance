@@ -3888,16 +3888,6 @@ body {
 }
 
 /* ── Budget hero: by this day, cycle by cycle ── */
-.bh-tight-strip {
-  margin: 0.4rem 0 0;
-  padding: 0.35rem 0.7rem;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
 .bh-tight {
   margin: 0 0 0.75rem;
   padding: 0.8rem 0.9rem;

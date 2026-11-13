@@ -27,7 +27,6 @@
       <p class="bh-value">{{ whole(plan.moneyLeft) }}</p>
     </template>
     <p class="bh-sub">{{ subline }}</p>
-    <p v-if="tight" class="bh-tight-strip">⚠️ ~{{ whole(tight.shortBy) }} short of what you usually spend · tap for a plan</p>
 
     <div class="bh-chart-wrap">
       <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
@@ -218,7 +217,7 @@ const subline = computed(() => {
   if (p.daysLeft === 0) return `of ${whole(p.budget)}`;
   const days = `${p.daysLeft} ${p.daysLeft === 1 ? "day" : "days"} left`;
   // On a tight cycle "under plan" vs a scaled-down pace misleads; the strip below says the real gap.
-  if (p.tight) return days;
+  if (p.tight) return `${days} · ${whole(p.tight.shortBy)} short ›`;
   if (Math.abs(p.buffer) < 1) return `Right on plan · ${days}`;
   return `${whole(Math.abs(p.buffer))} ${p.buffer > 0 ? "under" : "over"} plan · ${days}`;
 });
