@@ -124,16 +124,15 @@
             <b>{{ whole(tight.shortBy) }}</b> more than you have.
           </p>
           <ul class="bh-tight-list">
-            <li v-if="tight.homeDays != null">
-              🏠 <b>{{ tight.homeDays }} stay-home {{ tight.homeDays === 1 ? "day" : "days" }}</b> — groceries and essentials only.
-              A normal day has ~{{ whole(tight.pausablePerDay) }} of eating out, coffee and shopping, so that closes the gap.
+            <li v-if="tight.noSpendDays != null">
+              🚫 <b>{{ tight.noSpendDays }} no-spend {{ tight.noSpendDays === 1 ? "day" : "days" }}</b> and you're back on track —
+              a normal day costs you about {{ whole(tight.usualPerDay) }}.
             </li>
-            <li v-else-if="tight.homeAllDaysSaving > 0">
-              🏠 <b>Groceries and essentials only</b> for the rest of the cycle saves ~{{ whole(tight.homeAllDaysSaving) }} —
-              not the whole {{ whole(tight.shortBy) }}, so it needs a top-up too.
+            <li v-else>
+              🚫 Even no-spend days won't cover {{ whole(tight.shortBy) }} this cycle — it needs a top-up.
             </li>
             <li v-if="tight.cuts.length">
-              ⏸ <b>Biggest to pause:</b>
+              ⏸ <b>Or cut back on:</b>
               {{ tight.cuts.map((c) => `${c.category.toLowerCase()} ~${whole(c.usualAhead)}`).join(", ") }}
               (usual for the days left).
             </li>

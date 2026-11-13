@@ -104,7 +104,7 @@ export interface SpendingSummary {
   /** Bills and subscriptions expected this cycle that haven't been charged yet (already taken out of the daily number). */
   set_aside: { name: string; amount: number; expected: string | null; late: boolean }[];
   /** Tight cycle: free money vs what you usually spend in the days left (null when not tight). */
-  tight: { free_left: number; usual_need_ahead: number; short_by: number; stay_home_days: number | null } | null;
+  tight: { free_left: number; usual_need_ahead: number; short_by: number; no_spend_days: number | null } | null;
   transaction_count: number;
   manual_spend_used: number | null;
 }
@@ -235,7 +235,7 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
           free_left: plan.tight.freeLeft,
           usual_need_ahead: plan.tight.needAhead,
           short_by: plan.tight.shortBy,
-          stay_home_days: plan.tight.homeDays,
+          no_spend_days: plan.tight.noSpendDays,
         }
       : null,
     transaction_count: report.transaction_count,
