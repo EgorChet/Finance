@@ -112,7 +112,7 @@ const homeData = useHomeDataStore();
 const overrides = ref<RegularChargeOverrides>({});
 const history = ref<Transaction[]>([]);
 const cycleTxs = ref<Transaction[]>([]);
-const cycle = ref<{ start: string; end: string } | null>(null);
+const cycle = ref<{ start: string; end: string; today: string } | null>(null);
 const saving = ref(false);
 const error = ref("");
 const editing = ref<{ id: string; on: boolean; amount: number } | null>(null);
@@ -137,6 +137,7 @@ const statuses = computed((): Map<string, RegularChargeStatus> => {
     history.value,
     cycle.value.start,
     cycle.value.end,
+    cycle.value.today,
   );
   return new Map(list.map((s) => [s.id, s]));
 });
@@ -154,6 +155,12 @@ const rows = computed(() =>
       pill = { label: s.late ? "Late · set aside" : "Set aside", cls: "upcoming" };
       if (s.date) when = s.late ? `was due ${shortDate(s.date)}` : `≈ ${shortDate(s.date)}`;
     } else if (s?.state === "later" && s.date) when = `next ≈ ${shortDate(s.date)}`;
+    else if (s?.state === "missed") {
+      pill = { label: "Didn't come · released", cls: "ended" };
+      if (s.date) when = `was due ${shortDate(s.date)}`;
+    } else if (s?.state === "unknown" && !s.date) {
+      pill = { label: "Not on the card yet", cls: "ended" };
+    }
     const basis = s && s.state !== "posted" ? s.basis : "";
     const meta = [rhythm(rule), when, basis].filter(Boolean).join(" · ");
     return {
@@ -182,7 +189,7 @@ const editingEstimate = computed(() => {
   // The learned amount, ignoring a hand-set one.
   if (!cycle.value) return editingRule.value?.defaultAmount ?? 0;
   const rule = DEFAULT_REGULAR_CHARGES.find((r) => r.id === id)!;
-  const [s] = regularChargesForCycle([rule], cycleTxs.value, history.value, cycle.value.start, cycle.value.end);
+  const [s] = regularChargesForCycle([rule], cycleTxs.value, history.value, cycle.value.start, cycle.value.end, cycle.value.today);
   return s?.amount ?? rule.defaultAmount;
 });
 
@@ -220,9 +227,11 @@ onMounted(async () => {
     overrides.value = bundle.regular_charges ?? {};
     history.value = bundle.report?.transactions ?? [];
     const cycleDay = loadCycleDay();
-    const start = cycleStartForDate(referenceDate(auth.isDemo, auth.demoAsOf), cycleDay);
+    const now = referenceDate(auth.isDemo, auth.demoAsOf);
+    const start = cycleStartForDate(now, cycleDay);
     const { end } = getCycleRangeForStart(start, cycleDay);
-    cycle.value = { start, end };
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    cycle.value = { start, end, today };
     const partial = findPartialMonth(bundle.months, start, cycleDay);
     if (partial) {
       const r = await fetchReport(auth.isDemo, partial.key, auth.token || undefined);
