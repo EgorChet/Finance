@@ -20,6 +20,7 @@
           :plan="summaryPlan"
           :cycle-day="cycleDay"
           :reference-date="refDate"
+          :budget-extras="budgetExtras"
         />
 
         <section v-if="todoItems.length || hasBitToSort" class="today-section">
@@ -114,6 +115,8 @@ import {
   normalizeLivingBudgetMonthTopup,
   normalizeLivingBudgetSegment,
   resolvedLivingBudget as resolveLivingBudgetAmount,
+  cycleMonthYmForOverview,
+  monthTopupsForMonth,
 } from "@/features/household/utils/livingBudget";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import {
@@ -181,6 +184,14 @@ const activeCycleStart = computed((): string | null => {
   if (month?.partial) return cycleStartForStatementBilling(month.billing_date, cycleDay.value);
   return null;
 });
+
+/** This month's extra money, each addition separately (shown under the budget). */
+const budgetExtras = computed(() =>
+  monthTopupsForMonth(
+    cycleMonthYmForOverview(currentMonthKey.value, spendingReport.value, cycleDay.value),
+    livingBudgetMonthTopups.value,
+  ),
+);
 
 const livingBudgetAmount = computed(() =>
   resolveLivingBudgetAmount(

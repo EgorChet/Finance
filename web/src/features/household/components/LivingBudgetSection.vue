@@ -125,66 +125,56 @@
       type="button"
       class="living-budget-topups-add"
       :disabled="disabled"
-      @click="addMonthTopup"
+      @click="addMonthTopup()"
     >
       + Extra money for one month <span class="living-budget-topups-add__hint">trip, guests…</span>
     </button>
     <div v-if="sortedMonthTopups.length" class="living-budget-topups-read">
       <div class="living-budget-topups-header">
-        <h4 class="living-budget-topups-title">Extra for specific months</h4>
-        <IconButton v-if="!readonly" icon="plus" label="Add extra for month" :disabled="disabled" @click="addMonthTopup" />
+        <h4 class="living-budget-topups-title">Extra money by month</h4>
+        <IconButton v-if="!readonly" icon="plus" label="Add extra money" :disabled="disabled" @click="addMonthTopup()" />
       </div>
 
-      <ul v-if="visibleMonthTopups.length" class="charge-compact-list">
-        <li v-for="(topup, index) in visibleMonthTopups" :key="topupRowKey(topup, index)" class="charge-compact-row-wrap">
-          <component
-            :is="readonly ? 'div' : 'button'"
-            :type="readonly ? undefined : 'button'"
-            class="list-row"
-            :class="{ 'row-tappable': !readonly }"
-            :disabled="!readonly && disabled"
-            @click="!readonly && startEditTopup(topup)"
+      <template v-for="group in [...visibleTopupGroups, ...(showPastTopups ? pastTopupGroups : [])]" :key="group.month">
+        <div class="topup-group">
+          <div class="topup-group-head">
+            <span class="topup-group-month">{{ ymToLabel(group.month) }}</span>
+            <span class="topup-group-total">+{{ formatIlsWhole(group.total) }}</span>
+          </div>
+          <ul class="topup-items">
+            <li v-for="(topup, index) in group.items" :key="topupRowKey(topup, index)">
+              <component
+                :is="readonly ? 'div' : 'button'"
+                :type="readonly ? undefined : 'button'"
+                class="topup-item"
+                :disabled="!readonly && disabled"
+                @click="!readonly && startEditTopup(topup)"
+              >
+                <span class="topup-item-note">{{ topup.note || "Extra" }}</span>
+                <span class="topup-item-amount">+{{ formatIls(topup.extra) }}</span>
+              </component>
+            </li>
+          </ul>
+          <button
+            v-if="!readonly"
+            type="button"
+            class="topup-group-add"
+            :disabled="disabled"
+            @click="addMonthTopup(group.month)"
           >
-            <div class="list-row__main">
-              <span class="list-row__amount">+{{ formatIls(topup.extra) }}</span>
-              <span class="list-row__meta">
-                {{ ymToLabel(topup.month) }}<template v-if="topup.note"> · {{ topup.note }}</template>
-              </span>
-            </div>
-            <span v-if="!readonly" class="row-chevron" aria-hidden="true" />
-          </component>
-        </li>
-      </ul>
+            + Add to {{ ymToLabel(group.month) }}
+          </button>
+        </div>
+      </template>
 
       <button
-        v-if="pastMonthTopups.length"
+        v-if="pastTopupGroups.length"
         type="button"
         class="btn btn-ghost household-show-more"
         @click="showPastTopups = !showPastTopups"
       >
-        {{ showPastTopups ? "Hide" : "Show" }} past month extras ({{ pastMonthTopups.length }})
+        {{ showPastTopups ? "Hide" : "Show" }} past months ({{ pastTopupGroups.length }})
       </button>
-
-      <ul v-if="showPastTopups && pastMonthTopups.length" class="charge-compact-list household-ended-list">
-        <li v-for="(topup, index) in pastMonthTopups" :key="topupRowKey(topup, index)" class="charge-compact-row-wrap">
-          <component
-            :is="readonly ? 'div' : 'button'"
-            :type="readonly ? undefined : 'button'"
-            class="list-row"
-            :class="{ 'row-tappable': !readonly }"
-            :disabled="!readonly && disabled"
-            @click="!readonly && startEditTopup(topup)"
-          >
-            <div class="list-row__main">
-              <span class="list-row__amount">+{{ formatIls(topup.extra) }}</span>
-              <span class="list-row__meta">
-                {{ ymToLabel(topup.month) }}<template v-if="topup.note"> · {{ topup.note }}</template>
-              </span>
-            </div>
-            <span v-if="!readonly" class="row-chevron" aria-hidden="true" />
-          </component>
-        </li>
-      </ul>
     </div>
 
     <SheetEditor
@@ -222,11 +212,11 @@
 
     <SheetEditor
       :open="!readonly && !!editingTopup"
-      :title="topupIsNew ? 'New monthly extra' : 'Edit monthly extra'"
+      :title="topupIsNew ? 'Add extra money' : 'Edit extra money'"
       subtitle="A one-off boost to the cap for a single month."
       :save-label="topupIsNew ? 'Add extra' : 'Save'"
       :deletable="!topupIsNew"
-      delete-label="Remove extra"
+      delete-label="Remove this extra"
       :busy="disabled || sheetSaving"
       :error="sheetError"
       @save="editingTopup && finishEditTopup(editingTopup)"
@@ -241,7 +231,7 @@
         </div>
         <label class="sheet-field">
           <span class="sheet-field__label">Note (optional)</span>
-          <input v-model="editingTopup.note" class="input" placeholder="e.g. Trip to Europe" enterkeyhint="done" />
+          <input v-model="editingTopup.note" class="input" placeholder="e.g. Left over from October" enterkeyhint="done" />
         </label>
       </template>
     </SheetEditor>
@@ -406,6 +396,23 @@ const visibleMonthTopups = computed(() =>
 const pastMonthTopups = computed(() =>
   sortedMonthTopups.value.filter((topup) => isArchivedTopupMonth(topup.month, nowYm.value)),
 );
+
+/** Extras grouped by month: the month's total and each addition on its own line. */
+function groupTopups(list: LivingBudgetMonthTopup[]) {
+  const groups: { month: string; total: number; items: LivingBudgetMonthTopup[] }[] = [];
+  for (const topup of list) {
+    let g = groups.find((x) => x.month === topup.month);
+    if (!g) {
+      g = { month: topup.month, total: 0, items: [] };
+      groups.push(g);
+    }
+    g.items.push(topup);
+    g.total += Number(topup.extra) || 0;
+  }
+  return groups;
+}
+const visibleTopupGroups = computed(() => groupTopups(visibleMonthTopups.value));
+const pastTopupGroups = computed(() => groupTopups(pastMonthTopups.value));
 
 const segmentDeleteLabel = computed(() =>
   segments.value.length <= 1 ? "Remove budget period" : "Delete period",
@@ -659,13 +666,9 @@ async function removeSegment(seg: LivingBudgetSegment) {
   await requestSave();
 }
 
-function addMonthTopup() {
-  const used = new Set(monthTopups.value.map((t) => t.month));
-  let month = nowYm.value;
-  while (used.has(month)) {
-    month = nextMonthAfter(month);
-  }
-  const newTopup: LivingBudgetMonthTopup = { month, extra: 500 };
+/** A month can have several extras (leftover, refund, savings…) — each its own line. */
+function addMonthTopup(month: string = nowYm.value) {
+  const newTopup: LivingBudgetMonthTopup = { month, extra: 0 };
   monthTopups.value = [...monthTopups.value, newTopup];
   editingSegment.value = null;
   segmentEditSnapshot.value = null;
@@ -679,7 +682,7 @@ function addMonthTopup() {
 async function removeMonthTopup(topup: LivingBudgetMonthTopup) {
   const ok = await confirm({
     title: "Remove monthly extra?",
-    message: `Remove +${formatIls(topup.extra)} for ${ymToLabel(topup.month)}?`,
+    message: `Remove +${formatIls(topup.extra)}${topup.note ? ` (${topup.note})` : ""} from ${ymToLabel(topup.month)}?`,
     confirmLabel: "Remove",
     tone: "danger",
   });

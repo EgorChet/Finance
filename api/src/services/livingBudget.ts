@@ -168,13 +168,11 @@ export function validateLivingBudgetMonthTopups(
   segments: LivingBudgetSegment[],
   charges: FixedCharge[] = [],
 ): string | null {
-  const seen = new Set<string>();
+  // Several extras per month are fine; the month's extra is their sum.
   for (const raw of monthTopups) {
     const topup = normalizeMonthTopup(raw);
     if (!MONTH_RE.test(topup.month)) return "Each monthly extra needs a valid month (YYYY-MM)";
     if (!Number.isFinite(topup.extra) || topup.extra <= 0) return "Each monthly extra must be positive";
-    if (seen.has(topup.month)) return `Only one extra amount per month (${topup.month})`;
-    seen.add(topup.month);
     if (livingBudgetBaseForMonth(topup.month, segments, charges) === null) {
       return `No base budget covers ${topup.month}`;
     }

@@ -76,6 +76,7 @@
     <div v-if="byDay || setAsideLine" class="bh-chips">
       <span v-if="byDay" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
       <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
+      <span v-if="extrasTotal > 0" class="bh-chip">➕ {{ whole(extrasTotal) }} extra</span>
     </div>
 
     <div class="bh-stats">
@@ -136,7 +137,21 @@
         </section>
 
         <ul class="bh-rows">
-          <li><span>Budget this cycle</span><strong>{{ whole(plan.budget) }}</strong></li>
+          <template v-if="extrasTotal > 0">
+            <li><span>Base budget</span><strong>{{ whole(plan.budget - extrasTotal) }}</strong></li>
+            <li class="bh-rows-extra" @click="extrasOpen = !extrasOpen">
+              <button type="button" class="bh-link" :aria-expanded="extrasOpen">
+                + Extra money ({{ extras.length }}) {{ extrasOpen ? "▾" : "›" }}
+              </button>
+              <strong>{{ whole(extrasTotal) }}</strong>
+            </li>
+            <template v-if="extrasOpen">
+              <li v-for="(e, i) in extras" :key="i" class="bh-rows-sub">
+                <span>+ {{ e.note || "Extra" }}</span><span>{{ whole(e.extra) }}</span>
+              </li>
+            </template>
+          </template>
+          <li v-else><span>Budget this cycle</span><strong>{{ whole(plan.budget) }}</strong></li>
           <li v-for="bill in billRows" :key="bill.label" class="bh-rows-sub">
             <span>− {{ bill.label }}</span><span>{{ whole(bill.amount) }}</span>
           </li>
@@ -196,6 +211,8 @@ import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 
 const props = defineProps<{
   plan: BudgetPlan;
+  /** This month's extra money, each addition separately. */
+  extras?: { extra: number; note?: string }[];
   everydayEnabled?: boolean;
 }>();
 
@@ -237,6 +254,10 @@ const billRows = computed(() =>
 const tight = computed(() => (props.plan.daysLeft > 0 ? props.plan.tight : null));
 /** Gap rounded up to the next ₪100. */
 const topUpSuggestion = computed(() => (tight.value ? Math.ceil(tight.value.shortBy / 100) * 100 : 0));
+
+const extras = computed(() => props.extras ?? []);
+const extrasTotal = computed(() => roundMoney(extras.value.reduce((s, e) => s + (Number(e.extra) || 0), 0)));
+const extrasOpen = ref(false);
 
 /** Money already promised to charges that haven't gone through yet. */
 const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
