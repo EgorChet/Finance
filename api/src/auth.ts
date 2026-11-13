@@ -118,7 +118,7 @@ export function userCanEditBudget(userId: HouseholdUserId): boolean {
 }
 
 /** Writes that change the budget. Paths are relative to the /api mount. */
-const BUDGET_WRITE_PATHS = [/^\/living-budget\/?$/, /^\/fixed-charges\/?$/];
+const BUDGET_WRITE_PATHS = [/^\/living-budget\/?$/, /^\/fixed-charges\/?$/, /^\/regular-charges\/?$/];
 
 function isBudgetWrite(path: string): boolean {
   return BUDGET_WRITE_PATHS.some((re) => re.test(path));

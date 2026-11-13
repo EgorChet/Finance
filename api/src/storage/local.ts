@@ -27,6 +27,7 @@ const FIXED_CHARGES_PATH = path.join(DATA_DIR, "user_fixed_charges.json");
 const LIVING_BUDGET_PATH = path.join(DATA_DIR, "user_living_budget.json");
 const PACE_SETTINGS_PATH = path.join(DATA_DIR, "user_pace_settings.json");
 const LABEL_SUGGESTIONS_PATH = path.join(DATA_DIR, "label_suggestions.json");
+const REGULAR_CHARGES_PATH = path.join(DATA_DIR, "regular_charges.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
@@ -284,4 +285,17 @@ export async function readLabelSuggestions(): Promise<unknown> {
 export async function writeLabelSuggestions(data: Record<string, unknown>): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(LABEL_SUGGESTIONS_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+export async function readRegularCharges(): Promise<unknown> {
+  try {
+    return JSON.parse(await fs.readFile(REGULAR_CHARGES_PATH, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+export async function writeRegularCharges(data: Record<string, unknown>): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(REGULAR_CHARGES_PATH, JSON.stringify(data, null, 2), "utf-8");
 }

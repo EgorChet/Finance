@@ -3550,6 +3550,17 @@ button.bx-row {
   color: var(--accent);
 }
 
+.bx-section-note {
+  margin: -0.25rem 0 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.bx-row--off {
+  opacity: 0.55;
+}
+
 .bx-empty,
 .bx-empty-line {
   padding: 1rem 1.1rem;

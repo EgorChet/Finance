@@ -1,5 +1,6 @@
 import type { Transaction } from "../types.js";
 import type { ConfiguredCharge } from "../household/fixedCharges.js";
+import type { RegularChargeOverrides } from "./regularCharges.js";
 import { computeBudgetPlan, type BudgetPlan, type BudgetPlanTone } from "./budgetPlan.js";
 
 export type PaceHealthTone = BudgetPlanTone;
@@ -18,6 +19,8 @@ export interface LivePaceHealthInput {
   configuredCharges?: ConfiguredCharge[];
   /** When the open cycle's card data was last synced / uploaded (partial snapshot saved_at). */
   dataAsOf?: string | null;
+  /** Regular charges switched off / amounts fixed under Budget. */
+  regularCharges?: RegularChargeOverrides | null;
 }
 
 export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | null {
@@ -28,6 +31,7 @@ export function computeLiveBudgetPlan(input: LivePaceHealthInput): BudgetPlan | 
     history: input.history,
     configuredCharges: input.configuredCharges,
     dataAsOf: input.dataAsOf,
+    regularCharges: input.regularCharges,
   });
 }
 

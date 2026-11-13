@@ -107,6 +107,7 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
     pace_months?: number;
     pace_months_requested?: number;
     fixed_charges: ConfiguredCharge[];
+    regular_charges?: import("@core/spending/regularCharges").RegularChargeOverrides;
     living_budget: {
       segments: import("@/features/household/utils/livingBudget").LivingBudgetSegment[];
       month_topups: import("@/features/household/utils/livingBudget").LivingBudgetMonthTopup[];
@@ -150,6 +151,17 @@ export async function fetchReport(
   }
   const q = params.toString() ? `?${params}` : "";
   return get<SpendingReport>(`${prefix(demo)}/report${q}`, token);
+}
+
+export async function saveRegularCharges(
+  overrides: import("@core/spending/regularCharges").RegularChargeOverrides,
+  token?: string,
+) {
+  return put<{ saved: boolean; overrides: import("@core/spending/regularCharges").RegularChargeOverrides }>(
+    `${prefix(false)}/regular-charges`,
+    { overrides },
+    token,
+  );
 }
 
 export async function fetchFixedCharges(demo: boolean, token?: string) {

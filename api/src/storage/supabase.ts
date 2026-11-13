@@ -385,3 +385,28 @@ export async function writeLabelSuggestions(data: Record<string, unknown>): Prom
     throw new Error(`Supabase write failed (${res.status}): ${text}`);
   }
 }
+
+/** Regular charges switched off / amounts fixed under Budget (app_state id "regular_charges"). */
+export async function readRegularCharges(): Promise<unknown> {
+  if (!supabaseConfigured()) return local.readRegularCharges();
+  const res = await supabaseFetch("app_state?id=eq.regular_charges&select=data");
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { data: unknown }[];
+  return rows[0]?.data ?? null;
+}
+
+export async function writeRegularCharges(data: Record<string, unknown>): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeRegularCharges(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "regular_charges", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
