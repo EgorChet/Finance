@@ -52,7 +52,7 @@
               :disabled="!budgetLocked && saving"
               @click="onGroupTap(group)"
             >
-              <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(group.category_en) }}</span>
+              <CategoryIcon :category="group.category_en" />
               <span class="bx-row-body">
                 <span class="bx-row-top">
                   <span class="bx-row-name">{{ groupDisplayName(group) }}</span>
@@ -112,7 +112,7 @@
             :disabled="!budgetLocked && saving"
             @click="!budgetLocked && startEditCharge(charge)"
           >
-            <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(charge.category_en) }}</span>
+            <CategoryIcon :category="charge.category_en" />
             <span class="bx-row-body">
               <span class="bx-row-top">
                 <span class="bx-row-name">{{ chargeDisplayName(charge) }}</span>
@@ -289,6 +289,7 @@
 </template>
 
 <script setup lang="ts">
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute } from "vue-router";
@@ -312,7 +313,6 @@ import { type HouseholdBundle, useHouseholdDataStore } from "@/shared/stores/vie
 import { confirm } from "@/shared/composables/useConfirm";
 import { referenceDate, yearMonthForDate } from "@/shared/utils/appDate";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { isoDateLocal } from "@/shared/utils/transactionPeriod";
 import {
   type ChargeGroup,

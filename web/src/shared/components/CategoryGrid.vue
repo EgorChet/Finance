@@ -22,14 +22,14 @@
       :aria-checked="modelValue === c"
       @click="pick(c)"
     >
-      <span class="cg-icon" aria-hidden="true">{{ categoryIcon(c) }}</span>
+      <CategoryIcon :category="c" size="sm" />
       <span class="cg-name">{{ shortName(c) }}</span>
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 
 withDefaults(
   defineProps<{

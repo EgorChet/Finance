@@ -20,7 +20,7 @@
         :disabled="!readonly && saving"
         @click="!readonly && startEdit(row.id)"
       >
-        <span class="tx-row-icon" aria-hidden="true">{{ ICONS[row.id] ?? "🧾" }}</span>
+        <MerchantIcon :merchant-he="BILL_MARKS[row.id]?.he" :category="BILL_MARKS[row.id]?.category ?? 'Housing'" />
         <span class="bx-row-body">
           <span class="bx-row-top">
             <span class="bx-row-name">{{ row.name }}</span>
@@ -61,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import {
   DEFAULT_REGULAR_CHARGES,
@@ -90,20 +91,21 @@ import {
 const props = defineProps<{ readonly: boolean }>();
 const emit = defineEmits<{ saved: [string]; monthly: [number] }>();
 
-const ICONS: Record<string, string> = {
-  vaad: "🏢",
-  chatgpt: "🤖",
-  cursor: "💻",
-  bezeq: "🌐",
-  hot: "📱",
-  anthropic: "🤖",
-  apple: "🍎",
-  hairdresser: "💇",
-  nails: "💅",
-  arnona: "🏛️",
-  electricity: "💡",
-  water: "🚰",
-  gas: "🔥",
+/** Which brand mark / category icon each bill line shows (the name as it appears on the card). */
+const BILL_MARKS: Record<string, { he?: string; category: string }> = {
+  vaad: { category: "Housing" },
+  chatgpt: { he: "OPENAI", category: "Subscriptions" },
+  cursor: { he: "CURSOR", category: "Subscriptions" },
+  bezeq: { he: "בזק", category: "Subscriptions" },
+  hot: { he: "הוט מובייל", category: "Subscriptions" },
+  anthropic: { he: "ANTHROPIC", category: "Subscriptions" },
+  apple: { he: "APPLE.COM", category: "Subscriptions" },
+  hairdresser: { category: "Beauty & Personal Care" },
+  nails: { category: "Nails" },
+  arnona: { he: "עיריית נתניה", category: "Housing" },
+  electricity: { he: "חברת החשמל", category: "Housing" },
+  water: { he: "מי נתניה", category: "Housing" },
+  gas: { he: "סופרגז", category: "Housing" },
 };
 
 const auth = useAuthStore();

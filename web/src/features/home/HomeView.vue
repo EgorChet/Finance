@@ -48,7 +48,7 @@
           </div>
           <div class="bx-list">
             <RouterLink v-for="c in topCategories" :key="c.name" :to="overviewLink" class="bx-row today-link">
-              <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(c.name) }}</span>
+              <CategoryIcon :category="c.name" />
               <span class="bx-row-body">
                 <span class="bx-row-top">
                   <span class="bx-row-name">{{ c.name }}</span>
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -92,7 +93,6 @@ import SummaryMetrics from "@/features/spending/components/SummaryMetrics.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
 import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { formatIlsWhole } from "@/shared/utils/format";
 import { isBitTransfer } from "@/shared/composables/useChargeCategory";
 import {
