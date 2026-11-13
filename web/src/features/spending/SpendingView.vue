@@ -263,7 +263,7 @@ const excludingKey = ref<string | null>(null);
 const adjustingKey = ref<string | null>(null);
 const adjustmentsData = useAdjustmentsDataStore();
 const expandedCategoryKeys = ref<string[]>([]);
-const txPeriod = ref<TransactionPeriod>("today");
+const txPeriod = ref<TransactionPeriod>("week");
 const cycleDay = ref(loadCycleDay());
 const monthReportCache = ref<Map<string, SpendingReport>>(new Map());
 const overviewPeriod = ref<SpendingPeriodMode | null>(null);
@@ -800,11 +800,11 @@ async function loadFullPaceReport() {
 
 function defaultTxPeriod(month: string | null): TransactionPeriod {
   if (!month) return "month";
-  if (isCycleMonthKey(month)) return "today";
+  if (isCycleMonthKey(month)) return "week";
   const m = months.value.find((row) => row.key === month);
   if (m?.partial) {
     const start = cycleStartForStatementBilling(m.billing_date, cycleDay.value);
-    if (cycleNeedsOpenTab(start, cycleDay.value, months.value)) return "today";
+    if (cycleNeedsOpenTab(start, cycleDay.value, months.value)) return "week";
   }
   return "month";
 }

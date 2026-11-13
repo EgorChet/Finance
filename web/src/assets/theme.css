@@ -4662,3 +4662,15 @@ button.topup-item {
   flex: none;
   white-space: nowrap;
 }
+
+/* Original site logo on a white disc (shown only when it loaded sharp). */
+.tx-row-icon--photo {
+  background: #fff;
+  overflow: hidden;
+}
+
+.tx-row-icon--photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
