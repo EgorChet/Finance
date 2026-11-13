@@ -20,18 +20,19 @@
       />
     </template>
   </span>
-  <span v-else class="tx-row-icon" aria-hidden="true">{{ fallback }}</span>
+  <CategoryIcon v-else :category="category" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { merchantMark } from "@/shared/utils/merchantLogos";
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 
 /**
  * Round merchant icon: the brand's real logo when it's available and sharp, otherwise a colour
- * badge with its initials, otherwise the category emoji.
+ * badge with its initials, otherwise the category icon.
  */
-const props = defineProps<{ merchantHe?: string | null; merchantEn?: string | null; fallback: string }>();
+const props = defineProps<{ merchantHe?: string | null; merchantEn?: string | null; category: string }>();
 
 /** Below this the site has no proper logo (Google's globe is 16px) — keep the badge. */
 const MIN_LOGO_PX = 48;

@@ -7,12 +7,7 @@
       :aria-expanded="open"
       @click="emit('toggle')"
     >
-      <span
-        v-if="icon"
-        class="cat-row-icon"
-        :style="{ background: `color-mix(in srgb, ${color || 'var(--accent)'} 22%, transparent)` }"
-        aria-hidden="true"
-      >{{ icon }}</span>
+      <CategoryIcon v-if="icon" :category="icon" />
       <span class="cat-row-text">
       <span class="cat-row-line">
         <span class="cat-row-name">{{ name }}</span>
@@ -44,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { computed } from "vue";
 import {
   categoryCompareLine,
@@ -59,6 +55,7 @@ const props = withDefaults(
     /** Share of the parent total, 0–100. */
     pct: number;
     color?: string;
+    /** Category whose icon to show. */
     icon?: string;
     count?: number;
     open: boolean;

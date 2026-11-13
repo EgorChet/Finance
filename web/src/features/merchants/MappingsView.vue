@@ -42,7 +42,7 @@
         <li v-for="(m, i) in shown" :key="m.hebrew">
           <button type="button" class="bx-row md-row" @click="open(m)">
             <span v-if="sort === 'spent' || sort === 'visits'" class="md-rank">{{ i + 1 }}</span>
-            <MerchantIcon :merchant-he="m.hebrew" :merchant-en="m.english" :fallback="categoryIcon(m.category)" />
+            <MerchantIcon :merchant-he="m.hebrew" :merchant-en="m.english" :category="m.category" />
             <span class="bx-row-body">
               <span class="bx-row-top">
                 <span class="bx-row-name">{{ m.name }}</span>
@@ -71,7 +71,7 @@
     <BottomSheet :open="!!selected" @close="selected = null">
       <template v-if="selected">
         <div class="md-sheet-head">
-          <MerchantIcon :merchant-he="selected.hebrew" :merchant-en="selected.english" :fallback="categoryIcon(selected.category)" />
+          <MerchantIcon :merchant-he="selected.hebrew" :merchant-en="selected.english" :category="selected.category" />
           <div>
             <p class="md-sheet-name">{{ selected.name }}</p>
             <p v-if="selected.hebrew !== selected.name" class="md-sheet-he" dir="rtl" lang="he">{{ selected.hebrew }}</p>
@@ -120,7 +120,6 @@ import { CATEGORY_PICKLIST } from "@/shared/categories";
 import type { Transaction } from "@/shared/types";
 import { formatIlsWhole } from "@/shared/utils/format";
 import { effectiveSpend } from "@/shared/utils/transaction";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { knownMerchantName, merchantDisplayName } from "@/shared/utils/merchantNames";
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });

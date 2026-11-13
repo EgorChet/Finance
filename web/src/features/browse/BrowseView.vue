@@ -35,7 +35,7 @@
               {{ monthChipLabel }} <span aria-hidden="true">▾</span>
             </button>
             <button type="button" class="find-chip" :class="{ 'find-chip--on': !!categoryFilter }" @click="sheet = 'category'">
-              <template v-if="categoryFilter">{{ categoryIcon(categoryFilter) }} {{ categoryFilter }}</template>
+              <template v-if="categoryFilter">{{ categoryFilter }}</template>
               <template v-else>Category</template>
               <span aria-hidden="true">▾</span>
             </button>
@@ -156,7 +156,6 @@ import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, Transaction } from "@/shared/types";
 import { CATEGORY_PICKLIST, rollupCategory } from "@/shared/categories";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import { loadBrowseIncludeRecurring, saveBrowseIncludeRecurring } from "@/features/browse/utils/browsePreferences";
 import { isSystemRecurringTransaction } from "@/features/household/utils/householdBudget";
 import { effectiveSpend } from "@/shared/utils/transaction";

@@ -42,7 +42,7 @@
           <MerchantIcon
             :merchant-he="item.transaction.merchant_he"
             :merchant-en="item.transaction.merchant_en"
-            :fallback="categoryIcon(item.transaction.category_en || 'Uncategorized')"
+            :category="item.transaction.category_en || 'Uncategorized'"
           />
           <span class="rv-row-body">
             <span class="rv-row-top">
@@ -89,7 +89,7 @@
               Use
             </button>
           </div>
-          <p class="rv-ai-guess">{{ categoryIcon(hints.ai.category) }} {{ hints.ai.english_name }} · {{ hints.ai.category }}</p>
+          <p class="rv-ai-guess">{{ hints.ai.english_name }} · {{ hints.ai.category }}</p>
           <p class="rv-ai-reason">{{ hints.ai.reason }}</p>
         </div>
         <p v-else-if="hints?.ai_status === 'waiting' && !auth.isDemo" class="rv-hint-line rv-hint-muted">
@@ -97,13 +97,13 @@
         </p>
 
         <p v-if="hints?.bank_category" class="rv-hint-line">
-          <span class="rv-hint-label">Bank calls it</span> {{ categoryIcon(hints.bank_category) }} {{ hints.bank_category }}
+          <span class="rv-hint-label">Bank calls it</span> {{ hints.bank_category }}
         </p>
         <div v-if="hints?.same_day.length" class="rv-hint-block">
           <p class="rv-hint-label">Same day you also paid</p>
           <div class="rv-hint-chips">
             <span v-for="(d, i) in hints.same_day" :key="i" class="rv-hint-chip">
-              {{ categoryIcon(d.category) }} {{ d.merchant }} <b>{{ formatIlsWhole(d.amount) }}</b>
+              {{ d.merchant }} <b>{{ formatIlsWhole(d.amount) }}</b>
             </span>
           </div>
         </div>
@@ -168,7 +168,6 @@ import { confirm as askConfirm } from "@/shared/composables/useConfirm";
 import type { ReviewQueueItem } from "@/shared/types";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
 import { formatIls, formatIlsWhole, formatTransactionDate } from "@/shared/utils/format";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });
 

@@ -38,7 +38,7 @@
       <h3 class="pd-card-title">Where it went</h3>
       <ul v-if="topCategories.length" class="pd-cats">
         <li v-for="row in topCategories" :key="row.category" class="pd-cat">
-          <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(row.category) }}</span>
+          <CategoryIcon :category="row.category" />
           <span class="pd-cat-body">
             <span class="pd-cat-top">
               <span class="pd-cat-name">{{ row.category }}</span>
@@ -58,9 +58,9 @@
 </template>
 
 <script setup lang="ts">
+import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { computed } from "vue";
 import { formatIlsWhole } from "@/shared/utils/format";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import MonthBars from "@/features/spending/components/MonthBars.vue";
 import type { SpendingPeriodAnalysis } from "@/features/spending/utils/spendingPeriod";
 

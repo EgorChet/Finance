@@ -4674,3 +4674,28 @@ button.topup-item {
   height: 100%;
   object-fit: cover;
 }
+
+/* ── Category icon: line icon in the category colour on a soft tint ── */
+.cat-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.cat-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.cat-icon--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.cat-icon--sm svg {
+  width: 15px;
+  height: 15px;
+}

@@ -32,7 +32,7 @@
           :aria-label="hasActions ? `${row.merchant}, ${formatChargeAmount(row.tx)}: actions` : undefined"
           @click="hasActions && openSheet(row)"
         >
-          <MerchantIcon :merchant-he="row.tx.merchant_he" :merchant-en="row.tx.merchant_en" :fallback="row.icon" />
+          <MerchantIcon :merchant-he="row.tx.merchant_he" :merchant-en="row.tx.merchant_en" :category="row.category" />
           <span class="tx-row-body">
             <span class="tx-row-top">
               <span class="tx-row-merchant">{{ row.merchant }}</span>
@@ -67,7 +67,7 @@
             </div>
             <div class="tx-sheet-actions">
               <button v-if="adjustable" type="button" class="tx-sheet-action" @click="openCategory">
-                <span class="tx-sheet-action-title">{{ categoryIcon(sheetRow.category) }} {{ sheetRow.tx.category_override ? "Category: " + sheetRow.category : "Change category" }}</span>
+                <span class="tx-sheet-action-title">{{ sheetRow.tx.category_override ? "Category: " + sheetRow.category : "Change category" }}</span>
                 <span class="tx-sheet-action-hint">
                   {{ isBitTransfer(sheetRow.tx) ? "What was this BIT transfer for? Only this charge changes" : "Only this charge — other charges from this store stay as they are" }}
                 </span>
@@ -162,7 +162,6 @@
 import { computed, ref, watch } from "vue";
 import type { Transaction } from "@/shared/types";
 import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, monthLabelFromIso } from "@/shared/utils/format";
-import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { merchantDisplayName } from "@/shared/utils/merchantNames";
@@ -282,7 +281,6 @@ const visibleRows = computed(() => {
     dateLabel: formatChargeDate(t),
     merchant: merchantDisplayName(t),
     category: t.category_en || "Uncategorized",
-    icon: categoryIcon(t.category_en || "Uncategorized"),
     metaLabel: rowMeta(t),
     amount: t.effective_amount ?? t.charge_amount,
     adjustLabel: t.reimbursement ? "Edit split" : "Split",
