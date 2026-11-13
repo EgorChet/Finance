@@ -356,6 +356,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAllReportStore } from "@/shared/stores/allReport";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -793,6 +794,12 @@ async function onPullEnd() {
 }
 
 onMounted(() => {
+  // Warm the "all charges" data quietly after the first screen is up, so Transactions and
+  // All merchants open instantly. Any failure is ignored — those screens load it themselves.
+  setTimeout(() => {
+    if (!auth.token && !auth.isDemo) return;
+    void useAllReportStore().load(auth.isDemo, auth.token || undefined).catch(() => undefined);
+  }, 2500);
   window.addEventListener("touchstart", onPullStart, { passive: true });
   window.addEventListener("touchmove", onPullMove, { passive: false });
   window.addEventListener("touchend", onPullEnd, { passive: true });

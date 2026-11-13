@@ -108,7 +108,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { fetchReport, saveRuleEntry, saveRules } from "@/shared/api/client";
+import { saveRuleEntry, saveRules } from "@/shared/api/client";
+import { useAllReportStore } from "@/shared/stores/allReport";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
@@ -327,7 +328,7 @@ onMounted(async () => {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
   try {
-    const [report, saved] = await Promise.all([fetchReport(demo, null, token), rulesData.load(demo, token)]);
+    const [report, saved] = await Promise.all([useAllReportStore().load(demo, token), rulesData.load(demo, token)]);
     transactions.value = report.transactions;
     rules.value = saved as Record<string, Rule>;
   } catch (e) {

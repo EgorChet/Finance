@@ -277,6 +277,10 @@ export async function getPaceBundleAsync(
   return { report: combineReports(finalized, label), scopedReports };
 }
 
+/** Combined "All months" reports, reused for up to 10 minutes (pending FX rates can update). */
+const combinedMemo = new Map<string, { at: number; report: SpendingReport }>();
+const COMBINED_MEMO_MS = 10 * 60 * 1000;
+
 export async function getCombinedReportAsync(
   data: StatementsData,
   keys: string[] | null,
@@ -303,12 +307,23 @@ export async function getCombinedReportAsync(
     return getFinalizedReport(selected[0], finalizeVersion);
   }
 
+  // Combining every statement is the slow part of "All months" — reuse it until a statement,
+  // a label or an adjustment changes (each of those changes this key).
+  const memoKey = `${finalizeVersion}|${selected.map((e) => `${e.billing_key}:${e.saved_at ?? ""}:${e.file_hash ?? ""}`).join(",")}`;
+  const memo = combinedMemo.get(memoKey);
+  if (memo && Date.now() - memo.at < COMBINED_MEMO_MS) return memo.report;
+
   const labels = selected.map((e) => e.month_label);
   const label = `${labels[0]} – ${labels[labels.length - 1]} (${selected.length} months)`;
-  return combineReports(
+  const combined = combineReports(
     selected.map((e) => getFinalizedReport(e, finalizeVersion)),
     label,
   );
+  if (combined) {
+    if (combinedMemo.size >= 8) combinedMemo.delete(combinedMemo.keys().next().value!);
+    combinedMemo.set(memoKey, { at: Date.now(), report: combined });
+  }
+  return combined;
 }
 
 export function getCombinedReport(
