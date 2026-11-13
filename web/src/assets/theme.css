@@ -4699,3 +4699,215 @@ button.topup-item {
   width: 15px;
   height: 15px;
 }
+
+/* ── Category picker: suggestions, search, then the full list ── */
+.cp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cp-label {
+  margin: 0.35rem 0 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.cp-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.cp-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 52px;
+  padding: 0.45rem 0.7rem;
+  border: 1.5px solid transparent;
+  border-radius: 16px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cp-chip span:last-child {
+  min-width: 0;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cp-chip--on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-alt));
+}
+
+.cp-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 46px;
+  padding: 0 0.9rem;
+  border-radius: 14px;
+  background: var(--surface-alt);
+}
+
+.cp-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.cp-search-icon {
+  color: var(--text-faint);
+  font-size: 1.1rem;
+}
+
+.cp-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  padding: 0.35rem 0.35rem;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cp-row:active,
+.cp-chip:active {
+  background: var(--surface-raised);
+}
+
+.cp-row--on {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.cp-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.97rem;
+}
+
+.cp-row--on .cp-name {
+  font-weight: 650;
+}
+
+.cp-check {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.cp-any {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+}
+
+.cp-empty {
+  margin: 0.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Form field that opens the picker. */
+.cf {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 48px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cf-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+}
+
+.cf-name--empty {
+  color: var(--text-faint);
+}
+
+.cf-chevron {
+  color: var(--text-faint);
+  font-size: 1.2rem;
+}
+
+/* Short message with an optional Undo, above the tab bar. */
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(calc(100vw - 32px), 420px);
+  padding: 0.8rem 1rem;
+  border-radius: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.app-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-action {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+}
+
+.app-toast-enter-active,
+.app-toast-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.app-toast-enter-from,
+.app-toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 10px);
+}

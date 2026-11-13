@@ -93,7 +93,7 @@
           </label>
           <label class="sheet-field">
             <span class="sheet-field__label">{{ t("Category") }}</span>
-            <CategorySelect v-model="draftCategory" :options="CATEGORY_PICKLIST" allow-empty empty-label="Uncategorized" />
+            <CategoryField v-model="draftCategory" :options="CATEGORY_PICKLIST" allow-empty empty-label="Uncategorized" />
           </label>
           <button type="button" class="btn btn-primary md-sheet-save" :disabled="saving || !dirty" @click="save">
             {{ saving ? t("Saving…") : t("Save") }}
@@ -113,7 +113,7 @@ import { saveRuleEntry, saveRules } from "@/shared/api/client";
 import { useAllReportStore } from "@/shared/stores/allReport";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
-import CategorySelect from "@/shared/components/CategorySelect.vue";
+import CategoryField from "@/shared/components/CategoryField.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { invalidateRulesDataCaches } from "@/shared/stores/invalidateCaches";

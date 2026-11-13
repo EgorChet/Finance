@@ -196,7 +196,8 @@ export const RU: Record<string, string> = {
   "Left at the end": "Осталось в конце",
   "Left so far": "Пока осталось",
   "{spent} of {total} used": "потрачено {spent} из {total}",
-  "Charges": "Операций",
+  "Charges": "Операции",
+  "Charges||count": "Операций",
   "No budget for this month yet.": "Бюджета на этот месяц ещё нет.",
   "Set one ›": "Задать ›",
   "Everyday spending": "Повседневные расходы",
@@ -566,6 +567,14 @@ export const RU: Record<string, string> = {
   "Reset the demo?": "Сбросить демо?",
   "Everything you changed in the demo goes back to the original sample data.": "Все изменения в демо вернутся к исходным примерным данным.",
   "Not available in the demo — sign in to upload or sync your own statements.": "В демо недоступно — войдите, чтобы загружать или синхронизировать свои выписки.",
+  "Suggested": "Подходящие",
+  "Search categories": "Поиск категории",
+  "No category matches.": "Категория не найдена.",
+  "Home & bills": "Дом и счета",
+  "Other": "Другое",
+  "Changed to {name}": "Изменено: {name}",
+  "Undo": "Отменить",
+  "Any category": "Любая категория",
   // @end-ui
 };
 

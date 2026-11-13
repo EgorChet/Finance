@@ -74,7 +74,9 @@ function fill(text: string, params?: Params): string {
 export function t(key: string, params?: Params): string {
   // Touch the ref so templates and computeds re-run if the language changes.
   const ru = locale.value === "ru";
-  return fill(ru ? (RU[key] ?? key) : key, params);
+  // "Charges||count": the part after || only tells the two meanings apart for translation.
+  const plain = key.includes("||") ? key.slice(0, key.indexOf("||")) : key;
+  return fill(ru ? (RU[key] ?? RU[plain] ?? plain) : plain, params);
 }
 
 /** Translate a line built elsewhere (core labels, statuses): exact match, then known patterns. */

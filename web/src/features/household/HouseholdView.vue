@@ -215,7 +215,7 @@
           </label>
           <label class="sheet-field">
             <span class="sheet-field__label">{{ t("Category") }}</span>
-            <CategorySelect v-model="editingCharge.category_en" :options="categories" />
+            <CategoryField v-model="editingCharge.category_en" :options="categories" />
           </label>
         </template>
       </SheetEditor>
@@ -237,7 +237,7 @@
         </label>
         <label class="sheet-field">
           <span class="sheet-field__label">{{ t("Category") }}</span>
-          <CategorySelect v-model="newRecurring.category_en" :options="categories" />
+          <CategoryField v-model="newRecurring.category_en" :options="categories" />
         </label>
         <div class="sheet-field">
           <span class="sheet-field__label">{{ t("From") }}</span>
@@ -274,7 +274,7 @@
         </label>
         <label class="sheet-field">
           <span class="sheet-field__label">{{ t("Category") }}</span>
-          <CategorySelect v-model="newOneTime.category_en" :options="categories" />
+          <CategoryField v-model="newOneTime.category_en" :options="categories" />
         </label>
       </SheetEditor>
 
@@ -297,7 +297,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRoute } from "vue-router";
 import { saveFixedCharges, saveLivingBudget } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
-import CategorySelect from "@/shared/components/CategorySelect.vue";
+import CategoryField from "@/shared/components/CategoryField.vue";
 import AdjustmentsSection from "@/features/household/components/AdjustmentsSection.vue";
 import ExcludedSection from "@/features/household/components/ExcludedSection.vue";
 import IconButton from "@/shared/components/IconButton.vue";

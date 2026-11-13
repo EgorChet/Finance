@@ -25,13 +25,7 @@
           <p class="rv-sheet-meta">{{ formatTransactionDate(current.date) }} · {{ t("what was it for?") }}</p>
         </div>
       </template>
-      <CategoryGrid
-        v-if="current"
-        :model-value="''"
-        :options="BIT_OPTIONS"
-        aria-label="What the transfer was for"
-        @pick="pick"
-      />
+      <CategoryPicker v-if="current" :model-value="''" :options="BIT_OPTIONS" :suggestions="suggestions" @pick="pick" />
       <p v-if="error" class="tx-cat-error">{{ error }}</p>
       <template #footer>
         <button type="button" class="btn" :disabled="saving" @click="next">{{ t("Skip") }}</button>
@@ -42,10 +36,12 @@
 </template>
 
 <script setup lang="ts">
-import { t } from "@/shared/i18n";
+import { catName, t } from "@/shared/i18n";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
-import CategoryGrid from "@/shared/components/CategoryGrid.vue";
+import CategoryPicker from "@/shared/components/CategoryPicker.vue";
+import { showToast } from "@/shared/composables/useToast";
+import { bitSuggestions } from "@/shared/utils/categorySuggest";
 import { useAuthStore } from "@/shared/stores/auth";
 import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
@@ -80,6 +76,7 @@ const unsorted = computed(() =>
     .filter((t) => !passed.value.has(transactionKey(t)))
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const suggestions = computed(() => bitSuggestions(transactions.value));
 const unsortedTotal = computed(() => unsorted.value.reduce((s, t) => s + t.charge_amount, 0));
 const position = computed(() => (current.value ? unsorted.value.findIndex((t) => transactionKey(t) === transactionKey(current.value!)) + 1 : 0));
 
@@ -120,6 +117,16 @@ async function pick(category: string) {
   try {
     await saveChargeCategory(tx, category);
     justSorted.value += 1;
+    showToast(t("Changed to {name}", { name: catName(category) }), {
+      label: t("Undo"),
+      run: () => {
+        void saveChargeCategory(tx, null).catch(() => undefined);
+        justSorted.value = Math.max(0, justSorted.value - 1);
+        transactions.value = transactions.value.map((t) =>
+          transactionKey(t) === transactionKey(tx) ? { ...t, category_override: undefined, category_en: t.category_original ?? t.category_en } : t,
+        );
+      },
+    });
     // Mark locally right away; the refresh brings the server's version.
     transactions.value = transactions.value.map((t) =>
       transactionKey(t) === transactionKey(tx) ? { ...t, category_override: category, category_en: category } : t,

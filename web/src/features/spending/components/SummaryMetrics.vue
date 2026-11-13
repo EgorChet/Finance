@@ -33,7 +33,7 @@
           <strong>{{ formatIlsWhole(fixedTotal) }}</strong>
         </div>
         <div>
-          <span>{{ t("Charges") }}</span>
+          <span>{{ t("Charges||count") }}</span>
           <strong>{{ report.transaction_count.toLocaleString() }}</strong>
         </div>
       </div>
@@ -66,7 +66,7 @@
         <small>{{ fixedPct }}%</small>
       </div>
       <div v-if="!(hideLivingBudget || livingBudget === null)">
-        <span>{{ t("Charges") }}</span>
+        <span>{{ t("Charges||count") }}</span>
         <strong>{{ report.transaction_count.toLocaleString() }}</strong>
       </div>
     </div>
