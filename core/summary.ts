@@ -43,6 +43,7 @@ import {
   loadCycleDay,
   loadPaceIncludeFixed,
 } from "./spending/paceSettings.js";
+import { spendingSplit } from "./spending/budgetPlan.js";
 import { computeLiveBudgetPlan, type PaceHealthTone } from "./spending/paceHealth.js";
 import type { BudgetPlan } from "./spending/budgetPlan.js";
 import { roundMoney } from "./utils/format.js";
@@ -201,7 +202,8 @@ export function computeSpendingSummary(input: SummaryInputs): SpendingSummary {
     spent: {
       total_on_card: roundMoney(report.total_spent),
       counted_against_budget: breakdown.spent,
-      everyday: breakdown.everyday,
+      // Day-to-day only (same rule as the budget card): bills, loans, installments and one-time charges excluded.
+      everyday: plan ? plan.flexSpent : spendingSplit(report.transactions, cycleStart ?? undefined).everyday,
       rent: breakdown.rent,
       car_loan: breakdown.carLoan,
       dev_institute: breakdown.devInstitute,

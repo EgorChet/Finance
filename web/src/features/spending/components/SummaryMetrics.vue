@@ -45,19 +45,11 @@
                 Everyday ›
               </button>
               <span v-else>Everyday</span>
-              <span>{{ formatIlsWhole(budgetEveryday) }}</span>
+              <span>{{ formatIlsWhole(everydayTotal) }}</span>
             </li>
-            <li v-if="budgetRent > 0">
-              <span>Flat rent</span>
-              <span>{{ formatIlsWhole(budgetRent) }}</span>
-            </li>
-            <li v-if="budgetDevInstitute > 0">
-              <span>Dev Institute</span>
-              <span>{{ formatIlsWhole(budgetDevInstitute) }}</span>
-            </li>
-            <li v-if="budgetCarLoan > 0">
-              <span>Car loan</span>
-              <span>{{ formatIlsWhole(budgetCarLoan) }}</span>
+            <li v-if="fixedTotal > 0">
+              <span>Bills &amp; fixed</span>
+              <span>{{ formatIlsWhole(fixedTotal) }}</span>
             </li>
           </ul>
         </template>
@@ -77,7 +69,7 @@
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Total spent</div>
         <div class="metric-value">{{ formatIlsWhole(report.total_spent) }}</div>
-        <div class="metric-sub">{{ everydayPct }}% everyday · {{ monthlyBillsPct }}% bills</div>
+        <div class="metric-sub">{{ everydayPct }}% everyday · {{ fixedPct }}% bills &amp; fixed</div>
       </div>
       <component
         :is="everydayCardTag"
@@ -90,12 +82,12 @@
       >
         <div class="metric-label">Everyday spending</div>
         <div class="metric-value">{{ formatIlsWhole(everydayTotal) }}</div>
-        <div class="metric-sub">{{ everydayPct }}% of total</div>
+        <div class="metric-sub">Day-to-day · {{ everydayPct }}% of total</div>
       </component>
       <div v-if="!compact" class="metric-card">
-        <div class="metric-label">Monthly bills</div>
-        <div class="metric-value">{{ formatIlsWhole(monthlyBills) }}</div>
-        <div class="metric-sub">{{ monthlyBillsPct }}% · rent, car loan, Dev Institute</div>
+        <div class="metric-label">Bills &amp; fixed</div>
+        <div class="metric-value">{{ formatIlsWhole(fixedTotal) }}</div>
+        <div class="metric-sub">Rent, loans, utilities, installments</div>
       </div>
       <div v-if="!compact" class="metric-card">
         <div class="metric-label">Transactions</div>
@@ -120,7 +112,8 @@
               <h3 id="everyday-breakdown-title" class="everyday-breakdown-title">Everyday spending</h3>
               <p class="everyday-breakdown-meta">{{ formatIls(everydayTotal) }}</p>
               <p class="everyday-breakdown-hint">
-                Everything on the card except rent, car loan, and Dev Institute.
+                Day-to-day spending: food, coffee, shopping, transfers. Bills, rent, loans, installments and
+                one-time charges aren't counted here — the budget card counts it the same way.
               </p>
             </div>
             <button
@@ -136,37 +129,29 @@
 
           <div class="everyday-breakdown-body">
             <section class="everyday-breakdown-section">
-              <p class="everyday-breakdown-section-title">Where this comes from</p>
               <ul class="everyday-breakdown-simple">
-                <li class="everyday-breakdown-simple-row">
-                  <span>On your Visa export</span>
-                  <strong>{{ formatIls(everydayComposition.exportTotal) }}</strong>
-                </li>
-                <template v-if="everydayComposition.configuredTotal > 0">
-                  <li class="everyday-breakdown-simple-row">
-                    <span>
-                      Fixed bills
-                      <RouterLink class="everyday-breakdown-link" to="/app/household">edit</RouterLink>
-                    </span>
-                    <strong>{{ formatIls(everydayComposition.configuredTotal) }}</strong>
-                  </li>
-                  <li
-                    v-for="row in everydayComposition.configuredRows"
-                    :key="row.id"
-                    class="everyday-breakdown-simple-row everyday-breakdown-simple-row--sub"
-                  >
-                    <span>{{ row.label }}</span>
-                    <span>{{ formatIls(row.amount) }}</span>
-                  </li>
-                </template>
                 <li class="everyday-breakdown-simple-row everyday-breakdown-simple-row--total">
                   <span>Everyday total</span>
                   <strong>{{ formatIls(everydayTotal) }}</strong>
                 </li>
               </ul>
-              <p v-if="everydayComposition.exportPending > 0" class="everyday-breakdown-note">
-                ~{{ formatIls(everydayComposition.exportPending) }} on the export is still processing and may change when the bank finalises it.
+              <p v-if="split.everydayPending > 0" class="everyday-breakdown-note">
+                ~{{ formatIls(split.everydayPending) }} of it is still processing and may change when the bank finalises it.
               </p>
+            </section>
+            <section v-if="split.fixedRows.length" class="everyday-breakdown-section">
+              <p class="everyday-breakdown-section-title">Not counted as everyday</p>
+              <ul class="everyday-breakdown-simple">
+                <li v-for="row in split.fixedRows" :key="row.label" class="everyday-breakdown-simple-row everyday-breakdown-simple-row--sub">
+                  <span>{{ row.label }}</span>
+                  <span>{{ formatIls(row.amount) }}</span>
+                </li>
+                <li class="everyday-breakdown-simple-row everyday-breakdown-simple-row--total">
+                  <span>Bills &amp; fixed</span>
+                  <strong>{{ formatIls(fixedTotal) }}</strong>
+                </li>
+              </ul>
+              <RouterLink class="everyday-breakdown-link" to="/app/household">Edit bills and charges ›</RouterLink>
             </section>
           </div>
         </div>
@@ -178,16 +163,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "@/shared/types";
-import { formatAboutIls, formatIls, formatIlsWhole } from "@/shared/utils/format";
-import {
-  budgetSpendBreakdown,
-  dailyBudgetLeft,
-  everydaySpendingComposition,
-  everydaySpendingTotal,
-  monthlyBillsTotal,
-  moneyLeft,
-} from "@/features/household/utils/householdBudget";
-import { budgetPlanToneClass, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "@/shared/utils/format";
+import { budgetSpendBreakdown, dailyBudgetLeft, moneyLeft } from "@/features/household/utils/householdBudget";
+import { budgetPlanToneClass, spendingSplit, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import BudgetHero from "@/features/spending/components/BudgetHero.vue";
 import { getBillingCycle } from "@/features/spending/utils/pace";
 
@@ -218,10 +196,6 @@ const closeBtn = ref<HTMLButtonElement | null>(null);
 
 const budgetBreakdown = computed(() => budgetSpendBreakdown(props.report.transactions));
 const budgetSpent = computed(() => budgetBreakdown.value.spent);
-const budgetEveryday = computed(() => budgetBreakdown.value.everyday);
-const budgetRent = computed(() => budgetBreakdown.value.rent);
-const budgetDevInstitute = computed(() => budgetBreakdown.value.devInstitute);
-const budgetCarLoan = computed(() => budgetBreakdown.value.carLoan);
 const budgetLeft = computed(() =>
   props.livingBudget !== null ? moneyLeft(props.report.transactions, props.livingBudget) : null,
 );
@@ -286,15 +260,18 @@ const budgetClass = computed(() => {
   return "metric-card-budget--ok";
 });
 
-const everydayTotal = computed(() => everydaySpendingTotal(props.report.transactions));
-const everydayComposition = computed(() => everydaySpendingComposition(props.report.transactions));
-const monthlyBills = computed(() => monthlyBillsTotal(props.report.transactions));
-const everydayPct = computed(() =>
-  props.report.total_spent ? Math.round((everydayTotal.value / props.report.total_spent) * 100) : 0,
+/** Same split as the budget card: day-to-day vs bills & fixed charges. */
+const split = computed(() => spendingSplit(props.report.transactions, props.plan?.cycleStart));
+/** On the open cycle the card's own number (it includes a hand-typed total); otherwise the split. */
+const everydayTotal = computed(() => (props.plan ? props.plan.flexSpent : split.value.everyday));
+const fixedTotal = computed(() =>
+  props.plan ? roundMoney(Math.max(0, props.plan.spentOnCap - props.plan.flexSpent)) : split.value.fixed,
 );
-const monthlyBillsPct = computed(() =>
-  props.report.total_spent ? Math.round((monthlyBills.value / props.report.total_spent) * 100) : 0,
-);
+const everydayPct = computed(() => {
+  const total = everydayTotal.value + fixedTotal.value;
+  return total > 0 ? Math.round((everydayTotal.value / total) * 100) : 0;
+});
+const fixedPct = computed(() => (everydayTotal.value + fixedTotal.value > 0 ? 100 - everydayPct.value : 0));
 
 const everydayBreakdownEnabled = computed(() => everydayTotal.value > 0);
 const everydayCardTag = computed(() => (everydayBreakdownEnabled.value ? "button" : "div"));

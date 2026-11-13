@@ -20,6 +20,7 @@ import {
   budgetSpendBreakdown,
   isCarLoanTransaction,
   isDevInstituteTransaction,
+  isPendingTransaction,
   isRentTransaction,
   isVaadBayitTransaction,
 } from "../household/householdBudget.js";
@@ -65,6 +66,8 @@ export interface BudgetPlan {
   /** "On track", "Slow down a little", "Slow down", "Over budget", "Finished within budget". */
   status: string;
   budget: number;
+  /** First day of the cycle (YYYY-MM-DD). */
+  cycleStart: string;
   /** Committed charges posted so far + everything set aside for charges still to come. */
   bills: number;
   /** Committed charges by kind, for the details sheet (vaad reserve included). */
@@ -251,6 +254,45 @@ export function isFlexibleTransaction(
   rules: readonly RegularChargeRule[] = DEFAULT_RULES,
 ): boolean {
   return committedKind(tx, cycleStart, rules) === null;
+}
+
+/**
+ * Everything on a list split the way the budget card counts it: day-to-day ("everyday")
+ * spending vs fixed charges (rent, loans, bills, subscriptions, installments, one-time charges,
+ * charges dated before the cycle), with the fixed part by label. Same rule as the card and chip.
+ */
+export function spendingSplit(
+  transactions: Transaction[],
+  cycleStart?: string,
+  rules: readonly RegularChargeRule[] = DEFAULT_RULES,
+): { everyday: number; everydayPending: number; fixed: number; fixedRows: { label: string; amount: number }[] } {
+  let everyday = 0;
+  let everydayPending = 0;
+  const rows = new Map<string, number>();
+  for (const tx of transactions) {
+    const amt = effectiveSpend(tx);
+    const kind = committedKind(tx, cycleStart, rules);
+    if (!kind) {
+      everyday += amt;
+      if (isPendingTransaction(tx)) everydayPending += amt;
+      continue;
+    }
+    const label =
+      kind === "configured"
+        ? tx.merchant_en || tx.merchant_he
+        : kind === "regular"
+          ? (matchRegularCharge(tx, rules)?.name ?? COMMITTED_LABELS.regular)
+          : COMMITTED_LABELS[kind];
+    rows.set(label, (rows.get(label) ?? 0) + amt);
+  }
+  const all = [...rows.entries()].map(([label, amount]) => ({ label, amount: roundMoney(amount) }));
+  return {
+    everyday: roundMoney(everyday),
+    everydayPending: roundMoney(everydayPending),
+    fixed: roundMoney(all.reduce((s, r) => s + r.amount, 0)),
+    // Refunds of a bill (negative rows) count in the total but aren't listed.
+    fixedRows: all.filter((r) => r.amount >= 1).sort((a, b) => b.amount - a.amount),
+  };
 }
 
 function median(values: number[]): number {
@@ -576,6 +618,7 @@ export function computeBudgetPlan(
     tone,
     status,
     budget,
+    cycleStart: start,
     bills,
     committedRows,
     vaadReserve,
