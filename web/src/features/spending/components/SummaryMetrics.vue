@@ -6,92 +6,65 @@
       :everyday-enabled="everydayBreakdownEnabled"
       @everyday="openEverydayBreakdown"
     />
-    <div v-if="!compact || !plan" class="metric-grid">
-      <div v-if="!plan && !hideLivingBudget" class="metric-card metric-card-budget" :class="budgetClass">
-        <template v-if="livingBudget !== null">
-          <div v-if="dailyBudgetDisplay" class="metric-budget-top">
-            <div class="metric-budget-main">
-              <div class="metric-label">{{ budgetLabel }}</div>
-              <div class="metric-value">{{ budgetDisplayValue }}</div>
-            </div>
-            <div class="metric-budget-daily">
-              <div class="metric-budget-daily-value">{{ dailyBudgetDisplay.perDay }}</div>
-              <div class="metric-budget-daily-meta">{{ dailyBudgetDisplay.meta }}</div>
-            </div>
-          </div>
-          <template v-else>
-            <div class="metric-label">{{ budgetLabel }}</div>
-            <div class="metric-value">{{ budgetDisplayValue }}</div>
-          </template>
-          <div
-            class="metric-budget-progress"
-            role="progressbar"
-            :aria-valuenow="budgetUsedPct"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            :aria-label="`${budgetUsedPct}% of the living budget used`"
-          >
-            <span class="metric-budget-progress__fill" :style="{ width: `${budgetUsedPct}%` }" />
-          </div>
-          <p class="metric-budget-formula">{{ budgetFormula }}</p>
-          <ul class="metric-budget-breakdown">
-            <li>
-              <button
-                v-if="compact && everydayBreakdownEnabled"
-                type="button"
-                class="metric-budget-breakdown__link"
-                @click="openEverydayBreakdown"
-              >
-                Everyday ›
-              </button>
-              <span v-else>Everyday</span>
-              <span>{{ formatIlsWhole(everydayTotal) }}</span>
-            </li>
-            <li v-if="fixedTotal > 0">
-              <span>Bills &amp; fixed</span>
-              <span>{{ formatIlsWhole(fixedTotal) }}</span>
-            </li>
-          </ul>
-        </template>
-        <template v-else>
-          <div class="metric-label">Living budget</div>
-          <div class="metric-value metric-value-sm">Not set for this month</div>
-          <p class="metric-sub-note">
-            Add budget periods for this billing cycle on
-            <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Household</RouterLink>.
-          </p>
-        </template>
-        <div v-if="livingBudgetPeriodLabel" class="metric-budget-footer">
-          <div class="metric-budget-footer__period">Budget period: {{ livingBudgetPeriodLabel }}</div>
-          <RouterLink class="metric-budget-edit-link" to="/app/household#living-budget">Edit budget</RouterLink>
+
+    <!-- A month without a live plan (finished, or no card data yet): one result card. -->
+    <div v-else-if="!hideLivingBudget && livingBudget !== null" class="bh bh-result" :class="`bh--${resultTone}`">
+      <div class="bh-top">
+        <span class="bh-pill"><span class="bh-dot" />{{ resultStatus }}</span>
+        <span class="bh-day">Budget {{ formatIlsWhole(livingBudget) }}</span>
+      </div>
+      <p class="bh-label">{{ isOverBudget ? "Over budget by" : retrospective ? "Left at the end" : "Left so far" }}</p>
+      <p class="bh-value">{{ formatIlsWhole(isOverBudget ? overAmount : Math.max(0, budgetLeft ?? 0)) }}</p>
+      <div class="bh-bar" role="progressbar" :aria-valuenow="budgetUsedPct" aria-valuemin="0" aria-valuemax="100">
+        <span :style="{ width: `${budgetUsedPct}%` }" />
+      </div>
+      <p class="bh-sub">{{ formatIlsWhole(budgetSpent) }} of {{ formatIlsWhole(livingBudget) }} used</p>
+      <div class="bh-stats">
+        <div>
+          <button v-if="everydayBreakdownEnabled" type="button" class="bh-stat-link" @click="openEverydayBreakdown">Everyday ›</button>
+          <span v-else>Everyday</span>
+          <strong>{{ formatIlsWhole(everydayTotal) }}</strong>
+        </div>
+        <div>
+          <span>Bills &amp; fixed</span>
+          <strong>{{ formatIlsWhole(fixedTotal) }}</strong>
+        </div>
+        <div>
+          <span>Charges</span>
+          <strong>{{ report.transaction_count.toLocaleString() }}</strong>
         </div>
       </div>
-      <div v-if="!compact" class="metric-card">
-        <div class="metric-label">Total spent</div>
-        <div class="metric-value">{{ formatIlsWhole(report.total_spent) }}</div>
-        <div class="metric-sub">{{ everydayPct }}% everyday · {{ fixedPct }}% bills &amp; fixed</div>
+    </div>
+
+    <p v-else-if="!hideLivingBudget" class="bx-empty-line sm-nobudget">
+      No budget for this month yet.
+      <RouterLink class="bh-link" to="/app/household#living-budget">Set one ›</RouterLink>
+    </p>
+
+    <!-- Under the live card (and for a whole period): where the money went. -->
+    <div v-if="!compact && (plan || hideLivingBudget || livingBudget === null)" class="sm-strip">
+      <div v-if="hideLivingBudget || livingBudget === null">
+        <span>Total</span>
+        <strong>{{ formatIlsWhole(everydayTotal + fixedTotal) }}</strong>
       </div>
       <component
-        :is="everydayCardTag"
-        v-if="!compact"
-        class="metric-card"
-        :class="{ 'metric-card-clickable': everydayBreakdownEnabled, active: everydayBreakdownOpen }"
+        :is="everydayBreakdownEnabled ? 'button' : 'div'"
         :type="everydayBreakdownEnabled ? 'button' : undefined"
-        :aria-expanded="everydayBreakdownEnabled ? everydayBreakdownOpen : undefined"
+        class="sm-strip-cell"
         @click="openEverydayBreakdown"
       >
-        <div class="metric-label">Everyday spending</div>
-        <div class="metric-value">{{ formatIlsWhole(everydayTotal) }}</div>
-        <div class="metric-sub">Day-to-day · {{ everydayPct }}% of total</div>
+        <span>Everyday{{ everydayBreakdownEnabled ? " ›" : "" }}</span>
+        <strong>{{ formatIlsWhole(everydayTotal) }}</strong>
+        <small>{{ everydayPct }}%</small>
       </component>
-      <div v-if="!compact" class="metric-card">
-        <div class="metric-label">Bills &amp; fixed</div>
-        <div class="metric-value">{{ formatIlsWhole(fixedTotal) }}</div>
-        <div class="metric-sub">Rent, loans, utilities, installments</div>
+      <div>
+        <span>Bills &amp; fixed</span>
+        <strong>{{ formatIlsWhole(fixedTotal) }}</strong>
+        <small>{{ fixedPct }}%</small>
       </div>
-      <div v-if="!compact" class="metric-card">
-        <div class="metric-label">Transactions</div>
-        <div class="metric-value">{{ report.transaction_count.toLocaleString() }}</div>
+      <div v-if="!(hideLivingBudget || livingBudget === null)">
+        <span>Charges</span>
+        <strong>{{ report.transaction_count.toLocaleString() }}</strong>
       </div>
     </div>
 
@@ -164,10 +137,9 @@
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { SpendingReport } from "@/shared/types";
 import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "@/shared/utils/format";
-import { budgetSpendBreakdown, dailyBudgetLeft, moneyLeft } from "@/features/household/utils/householdBudget";
-import { budgetPlanToneClass, spendingSplit, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import { budgetSpendBreakdown, moneyLeft } from "@/features/household/utils/householdBudget";
+import { spendingSplit, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import BudgetHero from "@/features/spending/components/BudgetHero.vue";
-import { getBillingCycle } from "@/features/spending/utils/pace";
 
 const props = withDefaults(
   defineProps<{
@@ -206,58 +178,15 @@ const budgetUsedPct = computed(() => {
 const isOverBudget = computed(() => budgetLeft.value !== null && budgetLeft.value < 0);
 const overAmount = computed(() => Math.abs(budgetLeft.value ?? 0));
 
-const budgetLabel = computed(() => {
-  if (isOverBudget.value) return props.retrospective ? "Overspent" : "Over budget";
-  if (props.retrospective) return "Under budget";
-  return "Money left";
+/** Finished month: green under budget, red over. A month still running without a plan: yellow when < 20% is left. */
+const resultTone = computed(() => {
+  if (isOverBudget.value) return "bad";
+  if (!props.retrospective && props.livingBudget && (budgetLeft.value ?? 0) <= props.livingBudget * 0.2) return "warn";
+  return "good";
 });
-
-const budgetDisplayValue = computed(() => {
-  if (budgetLeft.value === null) return "—";
-  return isOverBudget.value ? formatIlsWhole(overAmount.value) : formatIlsWhole(budgetLeft.value);
-});
-
-const daysLeftInCycle = computed(() => {
-  if (props.retrospective || props.cycleDay == null || props.referenceDate == null) return null;
-  const { dayIndex, cycleLength } = getBillingCycle(props.referenceDate, props.cycleDay);
-  return cycleLength - dayIndex + 1;
-});
-
-const dailyBudgetDisplay = computed(() => {
-  if (budgetLeft.value === null || daysLeftInCycle.value === null || daysLeftInCycle.value <= 0) {
-    return null;
-  }
-  const perDay = dailyBudgetLeft(
-    budgetLeft.value,
-    props.report.transactions,
-    daysLeftInCycle.value,
-  );
-  if (perDay === null) return null;
-  const perDayLabel = isOverBudget.value || perDay <= 0 ? "₪0/day" : `${formatIlsWhole(perDay)}/day`;
-  return {
-    perDay: perDayLabel,
-    meta: `${daysLeftInCycle.value} days left`,
-  };
-});
-
-const budgetFormula = computed(() => {
-  if (props.livingBudget === null || budgetLeft.value === null) return "";
-  const budget = formatIlsWhole(props.livingBudget);
-  const spent = formatIlsWhole(budgetSpent.value);
-  if (isOverBudget.value) {
-    return `${budget} living budget − ${spent} used = ${formatIlsWhole(overAmount.value)} over`;
-  }
-  if (props.retrospective) {
-    return `${budget} living budget − ${spent} used = ${formatIlsWhole(budgetLeft.value)} left`;
-  }
-  return `${budget} living budget − ${spent} used`;
-});
-const budgetClass = computed(() => {
-  if (props.plan) return budgetPlanToneClass(props.plan.tone);
-  if (props.livingBudget === null || budgetLeft.value === null) return "";
-  if (budgetLeft.value < 0) return "metric-card-budget--over";
-  if (budgetLeft.value <= props.livingBudget * 0.2) return "metric-card-budget--low";
-  return "metric-card-budget--ok";
+const resultStatus = computed(() => {
+  if (isOverBudget.value) return props.retrospective ? "Finished over budget" : "Over budget";
+  return props.retrospective ? "Finished within budget" : "In progress";
 });
 
 /** Same split as the budget card: day-to-day vs bills & fixed charges. */

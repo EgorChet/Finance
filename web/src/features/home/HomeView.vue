@@ -123,7 +123,6 @@ import {
   cycleStartForStatementBilling,
   cycleStartFromMonthKey,
   defaultOverviewMonthKey,
-  effectiveManualCycleSpend,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
@@ -329,10 +328,6 @@ async function buildCycleReportForKey(monthKey: string): Promise<SpendingReport>
   });
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
-    manualSpend: effectiveManualCycleSpend(start, {
-      statementSavedAt: statementAt,
-      hasStatementSpend: hasPartialData,
-    }),
     configuredCharges: configuredCharges.value,
   });
 }

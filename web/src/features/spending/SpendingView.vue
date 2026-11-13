@@ -72,7 +72,7 @@
       :subtitle="switchingMonthLabel"
     />
     <template v-else-if="report && !overviewPeriod">
-    <MonthlyTrendChart v-if="selectedMonth === null && summary.length > 1" :summary="summary" />
+    <MonthBars v-if="selectedMonth === null && allMonthItems.length > 1" :items="allMonthItems" title="Cycle by cycle" />
     <SummaryMetrics
       v-if="showSummaryMetrics"
       :report="report"
@@ -84,28 +84,7 @@
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
     />
-    <PaceCard
-      v-if="showPaceCard"
-      :transactions="paceTransactions"
-      :cycle-transactions="report?.transactions ?? []"
-      :latest-billing-date="latestFinalBillingDate"
-      :configured-charges="configuredCharges"
-      :partial-statement-active="partialStatementActive"
-      :cycle-everyday-spend="cycleEverydaySpend"
-      :statement-saved-at="statementSavedAt"
-      :partial-total-spend="partialTotalSpend"
-      :reference-date="refDate"
-      :cycle-day="cycleDay"
-      :cycle-start="activeCycleStart"
-      :living-budget="resolvedLivingBudget"
-      :plan="summaryPlan"
-      @settings-change="onPaceSettingsChange"
-    />
-    <PendingCycleCard
-      v-if="isPendingCycleSelected && selectedCycleStart"
-      :cycle-start="selectedCycleStart"
-      @settings-change="onPaceSettingsChange"
-    />
+    <PendingCycleCard v-if="isPendingCycleSelected && selectedCycleStart" :cycle-start="selectedCycleStart" />
     <template v-if="showTransactions && isLiveTransactionView">
       <section class="tx-section">
         <h3 class="tx-section-title">Charges</h3>
@@ -187,8 +166,7 @@ import TransactionPeriodPicker from "@/shared/components/TransactionPeriodPicker
 import AppLoader from "@/shared/components/AppLoader.vue";
 import ErrorBanner from "@/shared/components/ErrorBanner.vue";
 import MonthPicker from "@/features/spending/components/MonthPicker.vue";
-import MonthlyTrendChart from "@/features/spending/components/MonthlyTrendChart.vue";
-import PaceCard from "@/features/spending/components/PaceCard.vue";
+import MonthBars from "@/features/spending/components/MonthBars.vue";
 import PendingCycleCard from "@/features/spending/components/PendingCycleCard.vue";
 import SpendingPeriodPanel from "@/features/spending/components/SpendingPeriodPanel.vue";
 import SummaryMetrics from "@/features/spending/components/SummaryMetrics.vue";
@@ -199,7 +177,6 @@ import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import {
   rollupCategoriesForDisplay,
 } from "@/shared/categories";
-import { everydaySpendingTotal } from "@/features/household/utils/householdBudget";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import type { RegularChargeOverrides } from "@core/spending/regularCharges";
 import {
@@ -214,11 +191,9 @@ import {
   cycleStartFromMonthKey,
   cycleNeedsOpenTab,
   defaultOverviewMonthKey,
-  effectiveManualCycleSpend,
   findPartialMonth,
   getCycleRangeForStart,
   isCycleMonthKey,
-  latestFinalBillingDate as getLatestFinalBillingDate,
   loadCycleDay,
   loadPaceIncludeFixed,
   formatOverviewMonthLabel,
@@ -269,6 +244,17 @@ const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
 const livingBudgetMonthTopups = ref<LivingBudgetMonthTopup[]>([]);
 const months = ref<MonthItem[]>([]);
 const summary = ref<{ month: string; total: number }[]>([]);
+/** ALL view: one bar per statement cycle ("Aug" for the cycle billed in Sep). */
+const allMonthItems = computed(() => {
+  let lastYear = "";
+  return summary.value.map((row) => {
+    // "Dec ’25" when the year changes, so a gap between statements can't read as one year.
+    const year = row.month.match(/\d{4}/)?.[0] ?? "";
+    const label = year && year !== lastYear ? `${row.month.slice(0, 3)} ’${year.slice(2)}` : row.month.slice(0, 3);
+    lastYear = year;
+    return { key: row.month, label, total: row.total };
+  });
+});
 const selectedMonth = ref<string | null>(null);
 const excludingKey = ref<string | null>(null);
 const adjustingKey = ref<string | null>(null);
@@ -281,7 +267,6 @@ const overviewPeriod = ref<SpendingPeriodMode | null>(null);
 const paceReportIsFull = ref(false);
 const periodLoading = ref(false);
 
-const latestFinalBillingDate = computed(() => getLatestFinalBillingDate(months.value));
 
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
 
@@ -464,14 +449,7 @@ const statementBilling = computed(() => {
 });
 
 const paceTransactions = computed(() => {
-  // Keep full history for pace averages; current-cycle everyday total comes from cycleEverydaySpend override.
   return paceReport.value?.transactions ?? report.value?.transactions ?? [];
-});
-
-const cycleEverydaySpend = computed(() => {
-  if (!showPaceCard.value || !report.value) return null;
-  const total = everydaySpendingTotal(report.value.transactions);
-  return total > 0 ? total : null;
 });
 
 const summaryPlan = computed(() => {
@@ -493,11 +471,6 @@ const statementSavedAt = computed((): string | null => {
   const start =
     activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
   return partialStatementSavedAtForCycle(months.value, start, cycleDay.value);
-});
-
-const partialTotalSpend = computed(() => {
-  if (!isPartialForOpenCycle.value || !report.value) return null;
-  return report.value.total_spent;
 });
 
 function mapSummaryRows(
@@ -685,10 +658,6 @@ async function buildLocalCycleReport(monthKey: string): Promise<SpendingReport> 
   });
   return buildCycleReport(txs, start, end, {
     includeFixed: loadPaceIncludeFixed(),
-    manualSpend: effectiveManualCycleSpend(start, {
-      statementSavedAt: statementAt,
-      hasStatementSpend: hasPartialData,
-    }),
     configuredCharges: configuredCharges.value,
   });
 }
@@ -869,17 +838,6 @@ async function onMonthSelected(month: string | null) {
   } finally {
     if (switchId === monthSwitchId) {
       reportLoading.value = false;
-    }
-  }
-}
-
-function onPaceSettingsChange() {
-  cycleDay.value = loadCycleDay();
-  if (showPaceCard.value) {
-    if (isCycleMonthKey(selectedMonth.value)) {
-      void refreshReport(selectedMonth.value);
-    } else if (partialStatementActive.value) {
-      void refreshReport(selectedMonth.value);
     }
   }
 }
