@@ -33,6 +33,7 @@
         :disabled="saving"
         :persist="persistCharges"
         :save-error="status"
+        :card-bills="cardBillsMonthly"
         @save="persistCharges"
         @edit-recurring-charge="editRecurringCharge"
       />
@@ -94,7 +95,7 @@
         <p v-else class="bx-empty-line">No recurring bills yet. Rent, loans and subscriptions go here.</p>
       </section>
 
-      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" />
+      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" />
 
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
@@ -346,6 +347,8 @@ import {
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
 /** Demo, or a household member who isn't allowed to change the budget. */
+/** Average monthly bills on the Cal card, reported by "Bills on your card". */
+const cardBillsMonthly = ref(0);
 const budgetLocked = computed(() => auth.readOnly || !auth.canEditBudget);
 const homeData = useHomeDataStore();
 const householdData = useHouseholdDataStore();

@@ -576,6 +576,7 @@ const categoryCompareContext = computed((): CategoryCompareContext | null => {
       cycleDay: cycleDay.value,
       cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
       referenceDate: refDate.value,
+      throughDay: summaryPlan.value?.byThisDay?.day ?? null,
     });
   }
   const sc = statementCompare.value;

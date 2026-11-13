@@ -271,6 +271,7 @@ const topCategories = computed(() => {
         cycleDay: cycleDay.value,
         cycleStart: start,
         referenceDate: refDate.value,
+        throughDay: summaryPlan.value?.byThisDay?.day ?? null,
       })
     : null;
   return rows.map((c) => {

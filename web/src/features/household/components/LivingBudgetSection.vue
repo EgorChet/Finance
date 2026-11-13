@@ -47,11 +47,12 @@
           </li>
         </ul>
 
-        <template v-if="monthlyBills > 0">
+        <template v-if="monthlyBills > 0 || cardBills > 0">
           <p class="bx-bar-label">Where it goes each month</p>
           <div class="bx-bar" aria-hidden="true">
             <span :style="{ width: `${billsPct}%`, background: 'var(--warning)' }" />
-            <span :style="{ width: `${100 - billsPct}%`, background: 'var(--success)' }" />
+            <span :style="{ width: `${cardBillsPct}%`, background: 'var(--accent)' }" />
+            <span :style="{ width: `${Math.max(0, 100 - billsPct - cardBillsPct)}%`, background: 'var(--success)' }" />
           </div>
           <ul class="bx-legend">
             <li>
@@ -62,9 +63,14 @@
                 <i style="background: var(--warning)" /><span class="bx-legend-name">Recurring bills</span><b>{{ formatIlsWhole(monthlyBills) }}</b>
               </span>
             </li>
+            <li v-if="cardBills > 0">
+              <span class="bx-legend-item">
+                <i style="background: var(--accent)" /><span class="bx-legend-name">Bills on your card (avg)</span><b>~{{ formatIlsWhole(cardBills) }}</b>
+              </span>
+            </li>
             <li>
               <span class="bx-legend-item">
-                <i style="background: var(--success)" /><span class="bx-legend-name">Left for everything else</span><b>{{ formatIlsWhole(Math.max(0, segmentTotalCap(headlineSegment.seg) - monthlyBills)) }}</b>
+                <i style="background: var(--success)" /><span class="bx-legend-name">Left for everyday</span><b>{{ formatIlsWhole(Math.max(0, segmentTotalCap(headlineSegment.seg) - monthlyBills - cardBills)) }}</b>
               </span>
             </li>
           </ul>
@@ -278,6 +284,8 @@ const props = withDefaults(
     /** Saves pending changes; when given, the sheet stays open on failure and shows saveError. */
     persist?: () => Promise<boolean>;
     saveError?: string;
+    /** Bills on the Cal card per month on average (2-monthly bills count half), from "Bills on your card". */
+    cardBills?: number;
   }>(),
   {
     readonly: false,
@@ -286,6 +294,7 @@ const props = withDefaults(
     referenceYm: undefined,
     persist: undefined,
     saveError: "",
+    cardBills: 0,
   },
 );
 
@@ -464,6 +473,12 @@ const monthlyBills = computed(() => {
   return chargesForMonth(ym, props.configuredCharges)
     .filter(isMonthlyCharge)
     .reduce((s, c) => s + c.amount, 0);
+});
+
+const cardBillsPct = computed(() => {
+  const head = headlineSegment.value?.seg;
+  const total = head ? segmentTotalCap(head) : 0;
+  return total > 0 ? Math.min(100 - billsPct.value, (props.cardBills / total) * 100) : 0;
 });
 
 const billsPct = computed(() => {
