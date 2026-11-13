@@ -318,16 +318,11 @@ const byDay = computed(() => {
   if (!b || props.plan.dayIndex < 1) return null;
   const n = b.past.length + 1;
   const record = b.everydayRank === 1 || b.totalRank === 1;
-  const d = b.day;
-  // Short chip; the full comparison (and the data date) is in the details sheet.
-  // When the card data is older than today, name its date so it can't clash with "Day N of 30".
-  const when = b.dataAsOf
-    ? `by ${new Date(`${b.dataAsOf}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
-    : `by day ${d}`;
+  // Short chip: which day and the full comparison are in the details sheet.
   const stale = b.dataAgeDays >= 3 ? " ⚠️" : "";
-  if (b.everydayRank === 1) return { record, line: `🔺 Record ${when} · ${whole(b.everyday)}${stale}` };
-  if (b.totalRank === 1) return { record, line: `🔺 Record ${when} incl. bills${stale}` };
-  return { record, line: `${ordinal(b.everydayRank)} of ${n} cycles ${when}${stale}` };
+  if (b.everydayRank === 1) return { record, line: `🔺 Record ${whole(b.everyday)}${stale}` };
+  if (b.totalRank === 1) return { record, line: `🔺 Record incl. bills${stale}` };
+  return { record, line: `${ordinal(b.everydayRank)} of ${n} cycles${stale}` };
 });
 
 const compareRows = computed(() => {
