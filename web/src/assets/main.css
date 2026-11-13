@@ -4732,3 +4732,18 @@ table.rules select {
   width: fit-content;
   margin: 0 0 0.75rem auto;
 }
+
+.demo-banner--edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  border-radius: 12px;
+}
+
+.demo-banner-actions {
+  display: inline-flex;
+  gap: 0.75rem;
+  white-space: nowrap;
+}

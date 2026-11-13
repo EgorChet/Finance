@@ -6,9 +6,9 @@ export function parseReferenceDate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** "Today" for the screens. The demo household is generated up to the real today, so it's today too. */
 export function referenceDate(isDemo: boolean, demoAsOf: string | null): Date {
   if (isDemo && demoAsOf) return parseReferenceDate(demoAsOf);
-  if (isDemo) return parseReferenceDate(DEMO_AS_OF);
   return new Date();
 }
 

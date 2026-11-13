@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
-import { authStatus, fetchAuthMe, login as apiLogin } from "@/shared/api/client";
+import { ref, computed, watch } from "vue";
+import { authStatus, fetchAuthMe, login as apiLogin, setDemoActive } from "@/shared/api/client";
 import { hydratePaceSettings } from "@/shared/settings/paceSettingsSync";
 import type { HouseholdUserId } from "@/shared/types";
 import {
@@ -25,11 +25,14 @@ export const useAuthStore = defineStore("auth", () => {
   const householdUsers = ref(DEFAULT_HOUSEHOLD_USERS);
   const userLabel = ref(userId.value ? labelForUser(userId.value) : "");
 
+  // The demo is answered in the browser; its edits stay on this device.
+  watch(isDemo, (demo) => setDemoActive(demo), { immediate: true });
+
   const isAuthenticated = computed(() => Boolean(token.value) && !isDemo.value);
-  /** Both household members can label, split, exclude, upload and sync. */
-  const canEdit = computed(() => !isDemo.value);
+  /** Both household members can label, split, exclude, upload and sync — and anyone can try it all in the demo. */
+  const canEdit = computed(() => true);
   /** The budget (periods, recurring and one-time charges) is Egor's; the API enforces this too. */
-  const canEditBudget = computed(() => !isDemo.value && userId.value !== "julia");
+  const canEditBudget = computed(() => isDemo.value || userId.value !== "julia");
   /** Hide or disable every edit control: demo data only. */
   const readOnly = computed(() => !canEdit.value);
 

@@ -1,6 +1,6 @@
 <template>
   <div class="md">
-    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — names are read-only.") }}</div>
+    
     <AppLoader v-if="loading" :title="t('Loading merchants')" />
     <template v-else>
       <p v-if="statusMessage" class="md-status" :class="{ 'md-status--error': statusIsError }">{{ statusMessage }}</p>

@@ -1,9 +1,6 @@
 <template>
   <div class="home-page">
-    <div v-if="auth.isDemo" class="demo-banner">
-      {{ t("Demo household — sample portfolio and spending.") }}
-      <button type="button" class="demo-banner-link" @click="goSignIn">{{ t("Sign in for your real data") }}</button>.
-    </div>
+    <DemoBanner />
     <header class="today-head">
       <h2 class="page-title">{{ t("Today") }}</h2>
       <span class="today-date">{{ todayLabel }}<template v-if="cycleLabel"> · {{ tr(cycleLabel) }}</template></span>
@@ -83,6 +80,7 @@
 </template>
 
 <script setup lang="ts">
+import DemoBanner from "@/shared/components/DemoBanner.vue";
 import { catName, dateTag, t, tr } from "@/shared/i18n";
 import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";

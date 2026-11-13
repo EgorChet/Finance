@@ -177,7 +177,10 @@
               </div>
 
               <div v-if="auth.isDemo" class="mobile-nav-account-card">
-                <p class="mobile-nav-demo-note">{{ t("You're viewing demo data. Sign in to use your own statements.") }}</p>
+                <p class="mobile-nav-demo-note">{{ t("Demo household — try anything: edits stay in this browser only.") }}</p>
+                <button type="button" class="mobile-nav-action btn" @click="onResetDemo">
+                  {{ t("Reset demo") }}
+                </button>
                 <button type="button" class="mobile-nav-action btn mobile-nav-action--accent" @click="goLogin">
                   {{ t("Sign in") }}
                 </button>
@@ -409,6 +412,7 @@ import { goToSignIn } from "@/features/auth/utils/signIn";
 import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
 import kaspaLogo from "@/assets/kaspa.png";
+import { resetDemoAndReload } from "@/shared/demo/reset";
 import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
 
 /** The switch shows once every screen is translated. */
@@ -997,6 +1001,11 @@ function logout() {
   closeNav();
   auth.logout();
   router.push("/");
+}
+
+function onResetDemo() {
+  closeNav();
+  void resetDemoAndReload();
 }
 
 function goLogin() {

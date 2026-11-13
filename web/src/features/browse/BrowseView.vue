@@ -1,6 +1,6 @@
 <template>
   <div class="find">
-    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — sample transactions only.") }}</div>
+    <DemoBanner />
     <h2 class="page-title">{{ t("Transactions") }}</h2>
     <div class="seg" role="tablist" :aria-label="t('Transactions')">
       <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': view === 'charges' }" :aria-selected="view === 'charges'" @click="setView('charges')">
@@ -137,6 +137,7 @@
 </template>
 
 <script setup lang="ts">
+import DemoBanner from "@/shared/components/DemoBanner.vue";
 import { catName, t, tr } from "@/shared/i18n";
 import { knownMerchantName, merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
