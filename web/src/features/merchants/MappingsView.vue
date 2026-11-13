@@ -1,341 +1,292 @@
 <template>
-  <div>
-    <div v-if="auth.isDemo" class="demo-banner">Demo mode — rules are read-only.</div>
-    <h2 v-if="!embedded" class="page-title">Merchant mappings</h2>
-    <AppLoader
-      v-if="loading"
-      title="Loading merchant mappings"
-      subtitle="Fetching your saved labels and categories"
-    />
+  <div class="md">
+    <div v-if="auth.isDemo" class="demo-banner">Demo mode — names are read-only.</div>
+    <AppLoader v-if="loading" title="Loading merchants" />
     <template v-else>
-      <div v-if="statusMessage" class="demo-banner" :class="{ 'import-error': statusIsError }">
-        {{ statusMessage }}
-      </div>
-      <div class="mappings-toolbar">
-        <div class="mappings-toolbar-row">
-          <input
-            v-model="searchQuery"
-            class="input mappings-search"
-            type="search"
-            placeholder="Search Hebrew, English, or category"
-            autocomplete="off"
-          />
-          <template v-if="!auth.readOnly">
-            <button type="button" class="btn" @click="exportJson">Export</button>
-            <button type="button" class="btn" :disabled="importing" @click="importInput?.click()">
-              {{ importing ? "Importing…" : "Import" }}
-            </button>
-            <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
-          </template>
-        </div>
-        <p class="mappings-search-meta">
-          <template v-if="searchQuery.trim()">
-            {{ filteredRows.length }} of {{ rows.length }} mappings
-          </template>
-          <template v-else>{{ rows.length }} mappings</template>
-        </p>
-      </div>
-      <div v-if="filteredRows.length" class="mappings-list">
-        <article v-for="row in filteredRows" :key="row.Hebrew" class="mappings-card">
-          <component
-            :is="auth.readOnly ? 'div' : 'button'"
-            :type="auth.readOnly ? undefined : 'button'"
-            class="list-row"
-            :class="{ 'row-tappable': !auth.readOnly }"
-            :disabled="!auth.readOnly && !!savingHebrew"
-            @click="!auth.readOnly && startEdit(row.Hebrew)"
-          >
-            <div class="list-row__main list-row__main--inline">
-              <span v-if="showHebrew(row)" class="mappings-row-hebrew" dir="rtl">{{ row.Hebrew }}</span>
-              <span class="list-row__label">{{ primaryLabel(row) }}</span>
-              <span v-if="row.Category" class="mappings-category-tag">{{ row.Category }}</span>
-            </div>
-            <span v-if="!auth.readOnly" class="row-chevron" aria-hidden="true" />
-          </component>
-        </article>
-      </div>
-      <p v-else-if="rows.length" class="mappings-empty">No mappings match your search.</p>
+      <p v-if="statusMessage" class="md-status" :class="{ 'md-status--error': statusIsError }">{{ statusMessage }}</p>
 
-      <SheetEditor
-        :open="!!editingRow"
-        title="Edit mapping"
-        :busy="!!editingRow && savingHebrew === editingRow.Hebrew"
-        :error="statusIsError ? statusMessage : ''"
-        @save="editingRow && doneEdit(editingRow)"
-        @cancel="editingRow && cancelEdit(editingRow.Hebrew)"
-      >
-        <template v-if="editingRow">
-          <div class="sheet-field">
-            <span class="sheet-field__label">Name on the statement</span>
-            <span class="mappings-sheet-hebrew" dir="rtl">{{ editingRow.Hebrew }}</span>
+      <input v-model="searchQuery" class="input md-search" type="search" placeholder="Search merchants" autocomplete="off" />
+
+      <div class="md-controls">
+        <div class="seg md-period" role="tablist" aria-label="Period">
+          <button
+            v-for="p in PERIODS"
+            :key="p.id"
+            type="button"
+            class="seg-btn"
+            :class="{ 'seg-btn--on': period === p.id }"
+            @click="period = p.id"
+          >
+            {{ p.label }}
+          </button>
+        </div>
+        <div class="md-sorts" role="tablist" aria-label="Sort">
+          <button
+            v-for="s in SORTS"
+            :key="s.id"
+            type="button"
+            class="find-chip"
+            :class="{ 'find-chip--on': sort === s.id }"
+            @click="sort = s.id"
+          >
+            {{ s.label }}
+          </button>
+        </div>
+      </div>
+
+      <p class="md-summary">
+        {{ shown.length }} {{ shown.length === 1 ? "merchant" : "merchants" }} · {{ formatIlsWhole(shownTotal) }}
+      </p>
+
+      <ul v-if="shown.length" class="bx-list md-list">
+        <li v-for="(m, i) in shown" :key="m.hebrew">
+          <button type="button" class="bx-row md-row" @click="open(m)">
+            <span v-if="sort === 'spent' || sort === 'visits'" class="md-rank">{{ i + 1 }}</span>
+            <MerchantIcon :merchant-he="m.hebrew" :merchant-en="m.english" :fallback="categoryIcon(m.category)" />
+            <span class="bx-row-body">
+              <span class="bx-row-top">
+                <span class="bx-row-name">{{ m.name }}</span>
+                <span class="bx-row-amount">{{ formatIlsWhole(m.total) }}</span>
+              </span>
+              <span class="bx-row-meta">
+                <span>{{ m.count }} {{ m.count === 1 ? "visit" : "visits" }} · {{ shortDate(m.last) }} · {{ m.category }}</span>
+                <span v-if="m.count > 1">avg {{ formatIlsWhole(m.total / m.count) }}</span>
+              </span>
+            </span>
+          </button>
+        </li>
+      </ul>
+      <p v-else class="bx-empty-line">No merchants match.</p>
+
+      <div v-if="!auth.readOnly" class="md-tools">
+        <button type="button" class="bh-link" @click="exportJson">Export names</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="bh-link" :disabled="importing" @click="importInput?.click()">
+          {{ importing ? "Importing…" : "Import names" }}
+        </button>
+        <input ref="importInput" type="file" accept=".json,application/json" hidden @change="importJson" />
+      </div>
+    </template>
+
+    <BottomSheet :open="!!selected" @close="selected = null">
+      <template v-if="selected">
+        <div class="md-sheet-head">
+          <MerchantIcon :merchant-he="selected.hebrew" :merchant-en="selected.english" :fallback="categoryIcon(selected.category)" />
+          <div>
+            <p class="md-sheet-name">{{ selected.name }}</p>
+            <p v-if="selected.hebrew !== selected.name" class="md-sheet-he" dir="rtl" lang="he">{{ selected.hebrew }}</p>
           </div>
+        </div>
+        <div class="bh-stats md-sheet-stats">
+          <div><span>Spent</span><strong>{{ formatIlsWhole(selected.total) }}</strong></div>
+          <div><span>Visits</span><strong>{{ selected.count }}</strong></div>
+          <div><span>Average</span><strong>{{ formatIlsWhole(selected.total / Math.max(1, selected.count)) }}</strong></div>
+        </div>
+        <p class="md-sheet-meta">
+          First {{ shortDate(selected.first) }} · last {{ shortDate(selected.last) }}<template v-if="periodLabel"> · {{ periodLabel }}</template>
+        </p>
+
+        <template v-if="!auth.readOnly">
           <label class="sheet-field">
             <span class="sheet-field__label">English name</span>
-            <input v-model="editingRow.English" class="input" placeholder="English name" enterkeyhint="done" />
+            <input v-model="draftEnglish" class="input" :placeholder="selected.name" enterkeyhint="done" />
           </label>
           <label class="sheet-field">
             <span class="sheet-field__label">Category</span>
-            <CategorySelect
-              v-model="editingRow.Category"
-              :options="categories"
-              allow-empty
-              empty-label="Uncategorized"
-            />
+            <CategorySelect v-model="draftCategory" :options="CATEGORY_PICKLIST" allow-empty empty-label="Uncategorized" />
           </label>
+          <button type="button" class="btn btn-primary md-sheet-save" :disabled="saving || !dirty" @click="save">
+            {{ saving ? "Saving…" : "Save" }}
+          </button>
         </template>
-      </SheetEditor>
-    </template>
+        <button type="button" class="btn md-sheet-charges" @click="seeCharges(selected)">See all charges ›</button>
+      </template>
+    </BottomSheet>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { saveRuleEntry, saveRules } from "@/shared/api/client";
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { fetchReport, saveRuleEntry, saveRules } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
+import BottomSheet from "@/shared/components/BottomSheet.vue";
 import CategorySelect from "@/shared/components/CategorySelect.vue";
-import SheetEditor from "@/shared/components/SheetEditor.vue";
+import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { invalidateRulesDataCaches } from "@/shared/stores/invalidateCaches";
 import { useRulesDataStore } from "@/shared/stores/viewData";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
-import type { MerchantRow } from "@/shared/types";
+import type { Transaction } from "@/shared/types";
+import { formatIlsWhole } from "@/shared/utils/format";
+import { effectiveSpend } from "@/shared/utils/transaction";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import { knownMerchantName, merchantDisplayName } from "@/shared/utils/merchantNames";
 
-withDefaults(
-  defineProps<{
-    embedded?: boolean;
-  }>(),
-  { embedded: false },
-);
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false });
 
-const categories = CATEGORY_PICKLIST;
+type Rule = { english: string; category?: string | null };
+type Merchant = {
+  hebrew: string;
+  english: string;
+  name: string;
+  category: string;
+  total: number;
+  count: number;
+  first: string;
+  last: string;
+};
+
+const PERIODS = [
+  { id: "3m", label: "3 months", months: 3 },
+  { id: "12m", label: "12 months", months: 12 },
+  { id: "all", label: "All", months: 0 },
+] as const;
+const SORTS = [
+  { id: "spent", label: "Most spent" },
+  { id: "visits", label: "Most visits" },
+  { id: "recent", label: "Recent" },
+  { id: "az", label: "A–Z" },
+] as const;
 
 const auth = useAuthStore();
+const router = useRouter();
 const rulesData = useRulesDataStore();
-const rows = ref<MerchantRow[]>([]);
+
 const loading = ref(true);
-const savedSnapshot = ref("{}");
-const savingHebrew = ref<string | null>(null);
-const importing = ref(false);
-const importInput = ref<HTMLInputElement | null>(null);
+const transactions = ref<Transaction[]>([]);
+const rules = ref<Record<string, Rule>>({});
+const searchQuery = ref("");
+const period = ref<(typeof PERIODS)[number]["id"]>("12m");
+const sort = ref<(typeof SORTS)[number]["id"]>("spent");
 const statusMessage = ref("");
 const statusIsError = ref(false);
-const searchQuery = ref("");
-const editingHebrew = ref<string | null>(null);
-const matchedHebrewKeys = ref<string[] | null>(null);
-
-let statusTimer: ReturnType<typeof setTimeout> | null = null;
-
-function labelsMatch(hebrew: string, english: string): boolean {
-  const h = hebrew.trim().toLowerCase();
-  const e = english.trim().toLowerCase();
-  return h.length > 0 && e.length > 0 && h === e;
-}
-
-function showHebrew(row: MerchantRow): boolean {
-  const h = row.Hebrew.trim();
-  if (!h) return false;
-  if (!row.English.trim()) return true;
-  return !labelsMatch(row.Hebrew, row.English);
-}
-
-function primaryLabel(row: MerchantRow): string {
-  return row.English.trim() || row.Hebrew.trim() || "—";
-}
-
-function rowMatchesQuery(row: MerchantRow, q: string): boolean {
-  return (
-    row.Hebrew.toLowerCase().includes(q) ||
-    (row.English || "").toLowerCase().includes(q) ||
-    (row.Category || "").toLowerCase().includes(q)
-  );
-}
-
-function refreshSearchMatches() {
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) {
-    matchedHebrewKeys.value = null;
-    return;
-  }
-  matchedHebrewKeys.value = rows.value.filter((row) => rowMatchesQuery(row, q)).map((row) => row.Hebrew);
-}
-
-watch(searchQuery, refreshSearchMatches);
-
-const editingRow = computed<MerchantRow | null>(() => {
-  if (auth.readOnly || !editingHebrew.value) return null;
-  return rows.value.find((row) => row.Hebrew === editingHebrew.value) ?? null;
-});
-
-const filteredRows = computed(() => {
-  let list: MerchantRow[];
-  if (!matchedHebrewKeys.value) {
-    list = rows.value;
-  } else {
-    const keys = new Set(matchedHebrewKeys.value);
-    list = rows.value.filter((row) => keys.has(row.Hebrew));
-  }
-  const editing = editingHebrew.value;
-  if (editing && !list.some((row) => row.Hebrew === editing)) {
-    const pinned = rows.value.find((row) => row.Hebrew === editing);
-    if (pinned) list = [pinned, ...list];
-  }
-  return list;
-});
-
-type RuleEntry = { english: string; category?: string };
-
-function rulesFromRows() {
-  const rules: Record<string, RuleEntry> = {};
-  for (const row of rows.value) {
-    rules[row.Hebrew] = {
-      english: row.English.trim(),
-      category: row.Category || undefined,
-    };
-  }
-  return rules;
-}
-
-function rowsFromRules(rules: Record<string, { english: string; category?: string | null }>) {
-  return Object.entries(rules)
-    .map(([Hebrew, rule]) => ({
-      Hebrew,
-      English: rule.english || "",
-      Category: rule.category || "",
-    }))
-    .sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
-}
-
-function syncSnapshot() {
-  const rules = rulesFromRows();
-  const sorted: Record<string, RuleEntry> = {};
-  for (const key of Object.keys(rules).sort()) {
-    sorted[key] = rules[key]!;
-  }
-  savedSnapshot.value = JSON.stringify(sorted);
-}
-
-function savedEntry(hebrew: string): RuleEntry | undefined {
-  const saved = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
-  return saved[hebrew];
-}
-
-function rowEntry(row: MerchantRow): RuleEntry {
-  return { english: row.English.trim(), category: row.Category || undefined };
-}
-
-function rowIsDirty(hebrew: string): boolean {
-  const row = rows.value.find((r) => r.Hebrew === hebrew);
-  if (!row) return false;
-  const prev = savedEntry(hebrew);
-  const next = rowEntry(row);
-  if (!prev) return true;
-  return prev.english !== next.english || (prev.category || undefined) !== next.category;
-}
-
-function restoreRow(hebrew: string) {
-  const row = rows.value.find((r) => r.Hebrew === hebrew);
-  const prev = savedEntry(hebrew);
-  if (!row || !prev) return;
-  row.English = prev.english;
-  row.Category = prev.category || "";
-}
+const importing = ref(false);
+const importInput = ref<HTMLInputElement | null>(null);
+const selected = ref<Merchant | null>(null);
+const draftEnglish = ref("");
+const draftCategory = ref("");
+const saving = ref(false);
 
 function setStatus(message: string, isError = false) {
   statusMessage.value = message;
   statusIsError.value = isError;
-  if (statusTimer) clearTimeout(statusTimer);
-  if (!isError && message) {
-    statusTimer = setTimeout(() => {
-      statusMessage.value = "";
-    }, 2500);
-  }
+  if (!isError && message) setTimeout(() => (statusMessage.value = ""), 2500);
 }
 
-async function persistRow(hebrew: string): Promise<boolean> {
-  const row = rows.value.find((r) => r.Hebrew === hebrew);
-  if (!row || auth.readOnly) return true;
-  if (!rowIsDirty(hebrew)) return true;
-
-  const token = auth.token || undefined;
-  const entry = { hebrew, english: row.English.trim(), category: row.Category || undefined };
-  savingHebrew.value = hebrew;
-  try {
-    const result = await saveRuleEntry(entry, token);
-    if (!result.ok) throw new Error("Server did not confirm save.");
-    const snap = JSON.parse(savedSnapshot.value || "{}") as Record<string, RuleEntry>;
-    snap[hebrew] = { english: entry.english, category: entry.category };
-    savedSnapshot.value = JSON.stringify(snap, Object.keys(snap).sort());
-    return true;
-  } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Save failed", true);
-    return false;
-  } finally {
-    if (savingHebrew.value === hebrew) savingHebrew.value = null;
-  }
+function shortDate(iso: string): string {
+  return new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
 }
 
-async function load(options: { background?: boolean; force?: boolean } = {}) {
-  const demo = auth.isDemo;
-  const token = auth.token || undefined;
-  const cached = !options.force && !options.background && rulesData.peek(demo, token);
+const periodLabel = computed(() => PERIODS.find((p) => p.id === period.value)?.label ?? "");
 
-  if (cached) {
-    rows.value = rowsFromRules(cached);
-    syncSnapshot();
-    refreshSearchMatches();
-    loading.value = false;
-    void load({ background: true });
-    return;
-  }
+const fromDate = computed(() => {
+  const months = PERIODS.find((p) => p.id === period.value)?.months ?? 0;
+  if (!months) return "";
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 10);
+});
 
-  if (!options.background) {
-    loading.value = true;
-    editingHebrew.value = null;
-    setStatus("");
-  }
-  try {
-    const rules = await rulesData.load(demo, token, options);
-    rows.value = rowsFromRules(rules);
-    syncSnapshot();
-    refreshSearchMatches();
-  } catch (e) {
-    if (!options.background) {
-      setStatus(e instanceof Error ? e.message : "Could not load merchant rules", true);
-      syncSnapshot();
+/** One row per merchant (by the name on the statement), from the charges in the period. */
+const merchants = computed((): Merchant[] => {
+  const by = new Map<string, Merchant & { cats: Map<string, number> }>();
+  for (const tx of transactions.value) {
+    // Charges added under Budget (car loan, rent…) aren't shops.
+    if (tx.notes?.startsWith("fixed_charge:")) continue;
+    const amount = effectiveSpend(tx);
+    if (!(amount > 0)) continue;
+    const date = tx.date.slice(0, 10);
+    if (fromDate.value && date < fromDate.value) continue;
+    const hebrew = tx.merchant_he.trim();
+    if (!hebrew) continue;
+    let m = by.get(hebrew);
+    if (!m) {
+      m = { hebrew, english: "", name: "", category: "", total: 0, count: 0, first: date, last: date, cats: new Map() };
+      by.set(hebrew, m);
     }
+    m.total += amount;
+    m.count += 1;
+    if (date < m.first) m.first = date;
+    if (date >= m.last) {
+      m.last = date;
+      if (tx.merchant_en) m.english = tx.merchant_en;
+    }
+    const cat = tx.category_en || "Uncategorized";
+    m.cats.set(cat, (m.cats.get(cat) ?? 0) + 1);
+  }
+  return [...by.values()].map(({ cats, ...m }) => {
+    const rule = rules.value[m.hebrew];
+    const english = rule?.english?.trim() || m.english;
+    return {
+      ...m,
+      english,
+      name: merchantDisplayName({ merchant_he: m.hebrew, merchant_en: english }),
+      category: rule?.category || [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || "Uncategorized",
+    };
+  });
+});
+
+const shown = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  const list = q
+    ? merchants.value.filter((m) =>
+        `${m.name} ${m.hebrew} ${m.english} ${m.category} ${knownMerchantName(m.hebrew) ?? ""}`.toLowerCase().includes(q),
+      )
+    : merchants.value;
+  const sorted = [...list];
+  if (sort.value === "spent") sorted.sort((a, b) => b.total - a.total);
+  else if (sort.value === "visits") sorted.sort((a, b) => b.count - a.count || b.total - a.total);
+  else if (sort.value === "recent") sorted.sort((a, b) => b.last.localeCompare(a.last));
+  else sorted.sort((a, b) => a.name.localeCompare(b.name));
+  return sorted;
+});
+
+const shownTotal = computed(() => shown.value.reduce((s, m) => s + m.total, 0));
+
+function open(m: Merchant) {
+  selected.value = m;
+  const rule = rules.value[m.hebrew];
+  draftEnglish.value = rule?.english?.trim() || (m.name !== m.hebrew ? m.name : "");
+  draftCategory.value = rule?.category || (m.category === "Uncategorized" ? "" : m.category);
+}
+
+const dirty = computed(() => {
+  const m = selected.value;
+  if (!m) return false;
+  const rule = rules.value[m.hebrew];
+  return (
+    draftEnglish.value.trim() !== (rule?.english?.trim() ?? "") ||
+    (draftCategory.value || "") !== (rule?.category || "")
+  );
+});
+
+async function save() {
+  const m = selected.value;
+  if (!m || auth.readOnly) return;
+  saving.value = true;
+  try {
+    const entry = { hebrew: m.hebrew, english: draftEnglish.value.trim(), category: draftCategory.value || undefined };
+    const res = await saveRuleEntry(entry, auth.token || undefined);
+    if (!res.ok) throw new Error("Server did not confirm save.");
+    rules.value = { ...rules.value, [m.hebrew]: { english: entry.english, category: entry.category } };
+    invalidateRulesDataCaches();
+    selected.value = null;
+    setStatus(`Saved ${entry.english || m.name}.`);
+  } catch (e) {
+    setStatus(e instanceof Error ? e.message : "Could not save", true);
   } finally {
-    if (!options.background) loading.value = false;
+    saving.value = false;
   }
 }
 
-async function startEdit(hebrew: string) {
-  if (editingHebrew.value && editingHebrew.value !== hebrew) {
-    const ok = await persistRow(editingHebrew.value);
-    if (!ok) return;
-  }
-  if (statusIsError.value) setStatus("");
-  editingHebrew.value = hebrew;
-  const row = rows.value.find((r) => r.Hebrew === hebrew);
-  if (row) row.Category = row.Category || "";
-}
-
-function cancelEdit(hebrew: string) {
-  if (statusIsError.value) setStatus("");
-  restoreRow(hebrew);
-  editingHebrew.value = null;
-  refreshSearchMatches();
-}
-
-async function doneEdit(row: MerchantRow) {
-  const ok = await persistRow(row.Hebrew);
-  if (!ok) return;
-  editingHebrew.value = null;
-  refreshSearchMatches();
-  setStatus("Saved.");
+function seeCharges(m: Merchant) {
+  selected.value = null;
+  void router.push({ name: "browse", query: { q: m.hebrew } });
 }
 
 function exportJson() {
-  const blob = new Blob([JSON.stringify(rulesFromRows(), null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(rules.value, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "merchant_rules.json";
@@ -347,52 +298,43 @@ async function importJson(e: Event) {
   const file = input.files?.[0];
   input.value = "";
   if (!file || auth.readOnly) return;
-
   importing.value = true;
-  editingHebrew.value = null;
-  setStatus("");
   try {
-    const imported = JSON.parse(await file.text()) as Record<string, { english: string; category?: string }>;
+    const imported = JSON.parse(await file.text()) as Record<string, Rule>;
     if (!imported || typeof imported !== "object" || Array.isArray(imported)) {
       throw new Error("JSON must be an object keyed by Hebrew merchant name.");
     }
-
-    let added = 0;
-    let updated = 0;
+    const next: Record<string, Rule> = { ...rules.value };
     for (const [he, rule] of Object.entries(imported)) {
-      const hebrew = he.trim();
-      if (!hebrew || !rule || typeof rule !== "object") continue;
-      const english = typeof rule.english === "string" ? rule.english.trim() : "";
-      const category = typeof rule.category === "string" ? rule.category : "";
-      const existing = rows.value.find((r) => r.Hebrew === hebrew);
-      if (existing) {
-        existing.English = english;
-        existing.Category = category;
-        updated += 1;
-      } else {
-        rows.value.push({ Hebrew: hebrew, English: english, Category: category });
-        added += 1;
-      }
+      if (!he.trim() || !rule || typeof rule !== "object") continue;
+      next[he.trim()] = {
+        english: typeof rule.english === "string" ? rule.english.trim() : "",
+        category: typeof rule.category === "string" ? rule.category : undefined,
+      };
     }
-
-    rows.value.sort((a, b) => a.Hebrew.localeCompare(b.Hebrew));
-    refreshSearchMatches();
-    setStatus(`Imported ${Object.keys(imported).length} rules (${added} new, ${updated} updated). Saving…`);
-
-    const result = await saveRules(rulesFromRows(), auth.token || undefined);
+    const result = await saveRules(next as never, auth.token || undefined);
     if (!result.saved) throw new Error("Server did not confirm save.");
     invalidateRulesDataCaches();
-    const rules = await rulesData.load(false, auth.token || undefined, { force: true });
-    rows.value = rowsFromRules(rules);
-    syncSnapshot();
-    refreshSearchMatches();
-    setStatus(`Imported ${added + updated} mapping${added + updated === 1 ? "" : "s"}.`);
-  } catch (e) {
-    setStatus(e instanceof Error ? e.message : "Import failed", true);
+    rules.value = next;
+    setStatus(`Imported ${Object.keys(imported).length} names.`);
+  } catch (err) {
+    setStatus(err instanceof Error ? err.message : "Import failed", true);
   } finally {
     importing.value = false;
   }
 }
 
-onMounted(load);
+onMounted(async () => {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  try {
+    const [report, saved] = await Promise.all([fetchReport(demo, null, token), rulesData.load(demo, token)]);
+    transactions.value = report.transactions;
+    rules.value = saved as Record<string, Rule>;
+  } catch (e) {
+    setStatus(e instanceof Error ? e.message : "Could not load merchants", true);
+  } finally {
+    loading.value = false;
+  }
+});
 </script>
