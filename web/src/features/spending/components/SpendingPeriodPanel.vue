@@ -1,125 +1,107 @@
 <template>
-  <section class="spending-period">
-    <p class="spending-period-lead">
-      {{ analysis.current.label }}
-      <span class="spending-period-lead-sep">·</span>
-      {{ formatRange(analysis.current) }}
-      <span class="spending-period-lead-sep">·</span>
-      vs {{ analysis.prior.label.toLowerCase() }}
-    </p>
+  <section class="pd">
+    <div class="pd-hero">
+      <div class="pd-hero-top">
+        <span class="pd-hero-label">{{ analysis.current.label }}</span>
+        <span class="pd-hero-range">{{ formatRange(analysis.current) }}</span>
+      </div>
+      <p class="pd-hero-value">{{ whole(analysis.currentTotal) }}</p>
+      <p class="pd-hero-sub">
+        {{ whole(analysis.avgPerMonth) }} a month on average · {{ analysis.transactionCount.toLocaleString() }} charges
+      </p>
+      <p v-if="analysis.priorComparable && totalTrend" class="pd-chip" :class="`pd-chip--${totalTrend.cls}`">
+        {{ totalTrend.text }}
+      </p>
+      <p v-else-if="!analysis.priorComparable" class="pd-hero-note">
+        No comparison — the statements don't reach far enough back.
+      </p>
 
-    <div class="spending-period-metrics">
-      <div class="spending-period-metric spending-period-metric--hero">
-        <span class="spending-period-metric-label">Total spent</span>
-        <span class="spending-period-metric-value">{{ formatIls(analysis.currentTotal) }}</span>
-        <span class="spending-period-metric-sub" :class="trendClass(analysis.totalDelta)">
-          {{ formatPeriodDelta(analysis.totalDelta, analysis.totalDeltaPct) }} vs prior period
-        </span>
-      </div>
-      <div class="spending-period-metric">
-        <span class="spending-period-metric-label">Avg / month</span>
-        <span class="spending-period-metric-value spending-period-metric-value--sm">
-          {{ formatIls(analysis.avgPerMonth) }}
-        </span>
-        <span class="spending-period-metric-sub" :class="trendClass(analysis.avgPerMonth - analysis.priorAvgPerMonth)">
-          was {{ formatIls(analysis.priorAvgPerMonth) }}
-        </span>
-      </div>
-      <div class="spending-period-metric">
-        <span class="spending-period-metric-label">Charges</span>
-        <span class="spending-period-metric-value spending-period-metric-value--sm">
-          {{ analysis.transactionCount.toLocaleString() }}
-        </span>
-        <span class="spending-period-metric-sub">in this window</span>
+      <div class="bh-stats">
+        <div>
+          <span>Everyday</span>
+          <strong>{{ whole(analysis.everyday) }}</strong>
+        </div>
+        <div>
+          <span>Bills &amp; fixed</span>
+          <strong>{{ whole(analysis.fixed) }}</strong>
+        </div>
+        <div>
+          <span>Months</span>
+          <strong>{{ analysis.monthsWithData }}</strong>
+        </div>
       </div>
     </div>
 
-    <MonthlyTrendChart v-if="analysis.monthlyTotals.length > 1" :summary="chartSummary" />
+    <MonthBars v-if="monthItems.length > 1" :items="monthItems" />
 
-    <div class="spending-period-grid">
-      <section class="spending-period-card">
-        <h3 class="spending-period-card-title">Top categories</h3>
-        <ul v-if="topCategories.length" class="spending-period-list">
-          <li v-for="row in topCategories" :key="row.category" class="spending-period-row">
-            <div class="spending-period-row-main">
-              <span class="spending-period-row-label">{{ row.category }}</span>
-              <span class="spending-period-row-meta">{{ row.sharePct }}% of spend</span>
-            </div>
-            <div class="spending-period-row-values">
-              <span class="spending-period-row-amount">{{ formatIls(row.current) }}</span>
-              <span class="spending-period-row-delta" :class="trendClass(row.delta)">
-                {{ formatPeriodDelta(row.delta, row.deltaPct) }}
-              </span>
-            </div>
-          </li>
-        </ul>
-        <p v-else class="spending-period-empty">No categorized spending in this period.</p>
-      </section>
-
-      <section v-if="trendingUp.length" class="spending-period-card">
-        <h3 class="spending-period-card-title">Spending up</h3>
-        <ul class="spending-period-list">
-          <li v-for="row in trendingUp" :key="`up-${row.category}`" class="spending-period-row">
-            <span class="spending-period-row-label">{{ row.category }}</span>
-            <span class="spending-period-row-delta spending-period-trend--up">
-              +{{ formatIls(row.delta) }}
+    <section class="pd-card">
+      <h3 class="pd-card-title">Where it went</h3>
+      <ul v-if="topCategories.length" class="pd-cats">
+        <li v-for="row in topCategories" :key="row.category" class="pd-cat">
+          <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(row.category) }}</span>
+          <span class="pd-cat-body">
+            <span class="pd-cat-top">
+              <span class="pd-cat-name">{{ row.category }}</span>
+              <b>{{ whole(row.current) }}</b>
             </span>
-          </li>
-        </ul>
-      </section>
-
-      <section v-if="trendingDown.length" class="spending-period-card">
-        <h3 class="spending-period-card-title">Spending down</h3>
-        <ul class="spending-period-list">
-          <li v-for="row in trendingDown" :key="`down-${row.category}`" class="spending-period-row">
-            <span class="spending-period-row-label">{{ row.category }}</span>
-            <span class="spending-period-row-delta spending-period-trend--down">
-              {{ formatIls(row.delta) }}
+            <span class="pd-cat-track"><span :style="{ width: `${row.barPct}%` }" /></span>
+            <span class="pd-cat-meta">
+              <span>{{ Math.round(row.sharePct) }}% of spending</span>
+              <span v-if="row.trend" :class="`pd-trend--${row.trend.cls}`">{{ row.trend.text }}</span>
             </span>
-          </li>
-        </ul>
-      </section>
-    </div>
+          </span>
+        </li>
+      </ul>
+      <p v-else class="bx-empty-line">No spending in this period.</p>
+    </section>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import MonthlyTrendChart from "@/features/spending/components/MonthlyTrendChart.vue";
-import { formatIls } from "@/shared/utils/format";
-import {
-  categoriesTrendingDown,
-  categoriesTrendingUp,
-  formatPeriodDelta,
-  type SpendingPeriodAnalysis,
-} from "@/features/spending/utils/spendingPeriod";
+import { formatIlsWhole } from "@/shared/utils/format";
+import { categoryIcon } from "@/features/spending/utils/categoryIcons";
+import MonthBars from "@/features/spending/components/MonthBars.vue";
+import type { SpendingPeriodAnalysis } from "@/features/spending/utils/spendingPeriod";
 
-const props = defineProps<{
-  analysis: SpendingPeriodAnalysis;
-}>();
+const props = defineProps<{ analysis: SpendingPeriodAnalysis }>();
 
-const topCategories = computed(() => props.analysis.categories.filter((r) => r.current > 0).slice(0, 8));
-const trendingUp = computed(() => categoriesTrendingUp(props.analysis.categories).slice(0, 6));
-const trendingDown = computed(() => categoriesTrendingDown(props.analysis.categories).slice(0, 6));
+const whole = (n: number) => formatIlsWhole(n);
 
-const chartSummary = computed(() =>
-  props.analysis.monthlyTotals.map((m) => ({ month: m.label, total: m.total })),
+/** Changes under ₪50 or 5% are noise. */
+function trend(delta: number, base: number): { text: string; cls: "up" | "down" } | null {
+  if (Math.abs(delta) < 50 || (base > 0 && Math.abs(delta) / base < 0.05)) return null;
+  const pct = base > 0 ? ` (${Math.round((Math.abs(delta) / base) * 100)}%)` : "";
+  return delta > 0 ? { text: `▲ ${whole(delta)}${pct}`, cls: "up" } : { text: `▼ ${whole(-delta)}${pct}`, cls: "down" };
+}
+
+const totalTrend = computed(() => {
+  const a = props.analysis;
+  const t = trend(a.totalDelta, a.priorTotal);
+  if (!t) return { text: `About the same as the ${a.prior.label.toLowerCase()}`, cls: "flat" };
+  return { text: `${t.text} vs the ${a.prior.label.toLowerCase()}`, cls: t.cls };
+});
+
+const topCategories = computed(() => {
+  const rows = props.analysis.categories.filter((r) => r.current > 0).slice(0, 10);
+  const max = Math.max(1, ...rows.map((r) => r.current));
+  return rows.map((r) => ({
+    ...r,
+    barPct: Math.max(2, Math.round((r.current / max) * 100)),
+    trend: props.analysis.priorComparable ? trend(r.delta, r.prior) : null,
+  }));
+});
+
+const monthItems = computed(() =>
+  props.analysis.monthlyTotals.map((m) => {
+    const [y, mo] = m.key.split("-").map(Number);
+    return { key: m.key, label: new Date(y, mo - 1, 1).toLocaleDateString("en-GB", { month: "short" }), total: m.total };
+  }),
 );
 
 function formatRange(window: { start: string; end: string }): string {
   const fmt = (iso: string) =>
-    parseIsoDate(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   return `${fmt(window.start)} – ${fmt(window.end)}`;
-}
-
-function parseIsoDate(dateStr: string): Date {
-  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function trendClass(delta: number): string {
-  if (delta > 50) return "spending-period-trend--up";
-  if (delta < -50) return "spending-period-trend--down";
-  return "spending-period-trend--flat";
 }
 </script>

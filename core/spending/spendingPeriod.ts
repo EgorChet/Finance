@@ -2,6 +2,7 @@ import type { Transaction } from "../types.js";
 import { rollupCategory } from "../categories.js";
 import { formatIls, roundMoney } from "../utils/format.js";
 import { effectiveSpend } from "../utils/transaction.js";
+import { spendingSplit } from "./budgetPlan.js";
 
 export type SpendingPeriodMode = "ytd" | "rolling12";
 
@@ -39,6 +40,14 @@ export interface SpendingPeriodAnalysis {
   monthlyTotals: MonthlyPeriodTotal[];
   categories: CategoryPeriodRow[];
   transactionCount: number;
+  /** Calendar months in the window that have any charges (statements don't cover every month). */
+  monthsWithData: number;
+  priorMonthsWithData: number;
+  /** The prior window has enough data for "vs before" to mean something. */
+  priorComparable: boolean;
+  /** Same split as the budget card. */
+  everyday: number;
+  fixed: number;
 }
 
 const CATEGORY_TREND_THRESHOLD = 50;
@@ -188,6 +197,10 @@ export function analyzeSpendingPeriod(
   const priorTotal = sumTransactions(priorTxs);
   const currentMap = categoryMap(currentTxs);
   const priorMap = categoryMap(priorTxs);
+  const monthsWithData = new Set(currentTxs.map((tx) => tx.date.slice(0, 7))).size;
+  const priorMonthsWithData = new Set(priorTxs.map((tx) => tx.date.slice(0, 7))).size;
+  const priorComparable = priorTotal > 0 && priorMonthsWithData >= Math.max(1, monthsWithData * 0.75);
+  const split = spendingSplit(currentTxs);
 
   return {
     mode,
@@ -197,11 +210,17 @@ export function analyzeSpendingPeriod(
     priorTotal,
     totalDelta: roundMoney(currentTotal - priorTotal),
     totalDeltaPct: deltaPct(currentTotal, priorTotal),
-    avgPerMonth: roundMoney(currentTotal / monthsInWindow(current)),
-    priorAvgPerMonth: roundMoney(priorTotal / monthsInWindow(prior)),
+    // Per month with data: a window the statements only partly cover isn't padded with zeros.
+    avgPerMonth: roundMoney(currentTotal / Math.max(1, monthsWithData || monthsInWindow(current))),
+    priorAvgPerMonth: roundMoney(priorTotal / Math.max(1, priorMonthsWithData || monthsInWindow(prior))),
     monthlyTotals: monthlyTotals(transactions, current),
     categories: buildCategoryRows(currentMap, priorMap, currentTotal),
     transactionCount: currentTxs.length,
+    monthsWithData,
+    priorMonthsWithData,
+    priorComparable,
+    everyday: split.everyday,
+    fixed: split.fixed,
   };
 }
 
