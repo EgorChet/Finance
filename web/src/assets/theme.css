@@ -3888,6 +3888,44 @@ body {
 }
 
 /* ── Budget hero: by this day, cycle by cycle ── */
+.bh-tight-strip {
+  margin: 0.4rem 0 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.bh-tight {
+  margin: 0 0 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-alt));
+}
+
+.bh-tight-title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+
+.bh-tight-text {
+  margin: 0 0 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.bh-tight-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .bh-chips {
   display: flex;
   flex-wrap: wrap;

@@ -27,6 +27,7 @@
       <p class="bh-value">{{ whole(plan.moneyLeft) }}</p>
     </template>
     <p class="bh-sub">{{ subline }}</p>
+    <p v-if="tight" class="bh-tight-strip">⚠️ ~{{ whole(tight.shortBy) }} short of what you usually spend · tap for a plan</p>
 
     <div class="bh-chart-wrap">
       <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
@@ -106,6 +107,34 @@
           <button ref="closeBtn" type="button" class="btn bh-sheet-close" @click="sheetOpen = false">Done</button>
         </header>
         <p class="bh-sheet-lead">{{ explanation }}</p>
+
+        <section v-if="tight" class="bh-tight">
+          <p class="bh-tight-title">Getting back on track</p>
+          <p class="bh-tight-text">
+            After bills you have <b>{{ whole(tight.freeLeft) }}</b> for {{ plan.daysLeft }} {{ plan.daysLeft === 1 ? "day" : "days" }}.
+            You usually spend about <b>{{ whole(tight.needAhead) }}</b> on everyday things in that time —
+            <b>{{ whole(tight.shortBy) }}</b> more than you have.
+          </p>
+          <ul class="bh-tight-list">
+            <li v-if="tight.homeDays != null">
+              🏠 <b>{{ tight.homeDays }} stay-home {{ tight.homeDays === 1 ? "day" : "days" }}</b> — groceries and essentials only.
+              A normal day has ~{{ whole(tight.pausablePerDay) }} of eating out, coffee and shopping, so that closes the gap.
+            </li>
+            <li v-else-if="tight.homeAllDaysSaving > 0">
+              🏠 <b>Groceries and essentials only</b> for the rest of the cycle saves ~{{ whole(tight.homeAllDaysSaving) }} —
+              not the whole {{ whole(tight.shortBy) }}, so it needs a top-up too.
+            </li>
+            <li v-if="tight.cuts.length">
+              ⏸ <b>Biggest to pause:</b>
+              {{ tight.cuts.map((c) => `${c.category.toLowerCase()} ~${whole(c.usualAhead)}`).join(", ") }}
+              (usual for the days left).
+            </li>
+            <li>
+              💰 Covering it from savings? Add a <b>{{ whole(topUpSuggestion) }}</b> top-up for this month under
+              <RouterLink class="bh-link" to="/app/household#living-budget" @click="sheetOpen = false">Budget ›</RouterLink>
+            </li>
+          </ul>
+        </section>
 
         <ul class="bh-rows">
           <li><span>Budget this cycle</span><strong>{{ whole(plan.budget) }}</strong></li>
@@ -188,6 +217,8 @@ const subline = computed(() => {
   if (p.moneyLeft < 0) return `Budget was ${whole(p.budget)}`;
   if (p.daysLeft === 0) return `of ${whole(p.budget)}`;
   const days = `${p.daysLeft} ${p.daysLeft === 1 ? "day" : "days"} left`;
+  // On a tight cycle "under plan" vs a scaled-down pace misleads; the strip below says the real gap.
+  if (p.tight) return days;
   if (Math.abs(p.buffer) < 1) return `Right on plan · ${days}`;
   return `${whole(Math.abs(p.buffer))} ${p.buffer > 0 ? "under" : "over"} plan · ${days}`;
 });
@@ -203,6 +234,10 @@ const billRows = computed(() =>
     amount: r.amount,
   })),
 );
+
+const tight = computed(() => (props.plan.daysLeft > 0 ? props.plan.tight : null));
+/** Gap rounded up to the next ₪100. */
+const topUpSuggestion = computed(() => (tight.value ? Math.ceil(tight.value.shortBy / 100) * 100 : 0));
 
 /** Money already promised to charges that haven't gone through yet. */
 const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));

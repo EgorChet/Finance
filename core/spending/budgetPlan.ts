@@ -34,6 +34,7 @@ import {
 import { effectiveSpend } from "../utils/transaction.js";
 import { roundMoney } from "../utils/format.js";
 import { billingCycleProgress, getBillingCycle } from "./pace.js";
+import { tightCycleAdvice, type TightCycleAdvice } from "./tightCycle.js";
 import { configuredChargesForCycle, type ConfiguredCharge } from "../household/fixedCharges.js";
 
 export type BudgetPlanTone = "good" | "warn" | "bad";
@@ -74,6 +75,8 @@ export interface BudgetPlan {
   upcomingReserve: number;
   /** Every regular charge and where it stands this cycle (charged / set aside / later). */
   regularCharges: RegularChargeStatus[];
+  /** Set when the free money is clearly below what you usually spend: the gap and a way back. */
+  tight: TightCycleAdvice | null;
   flexBudget: number;
   flexSpent: number;
   flexLeft: number;
@@ -440,6 +443,18 @@ export function computeBudgetPlan(
   const planShareAt = (day: number) => curveAt(curve, day / cycleLength);
 
   const plannedSoFar = roundMoney(flexBudget * planShareAt(dayIndex - 1));
+  const tight = cycle.history?.length
+    ? tightCycleAdvice(cycle.history, {
+        cycleStart: start,
+        cycleDay: cycle.cycleDay,
+        isFlexible: (tx) => isFlexibleTransaction(tx, undefined, rules),
+        flexLeft,
+        daysLeft,
+        cycleLength,
+        shareSoFar: planShareAt(dayIndex - 1),
+        maxCycles: CURVE_CYCLES,
+      })
+    : null;
   const expectedAhead = roundMoney(flexBudget - plannedSoFar);
   const buffer = roundMoney(plannedSoFar - flexSpent);
   const planPerDay = cycleLength > 0 ? roundMoney(flexBudget / cycleLength) : 0;
@@ -464,6 +479,14 @@ export function computeBudgetPlan(
   } else {
     tone = "bad";
     status = "Slow down";
+  }
+
+  // A tight cycle is never green: the scaled "usual pace" can look fine while the free money is
+  // far below what you normally live on. Red when you're short by over a quarter of the usual.
+  if (tight && tone !== "bad") {
+    const severe = tight.shortBy > tight.needAhead * 0.25;
+    tone = severe ? "bad" : "warn";
+    status = "Tight cycle";
   }
 
   // Daily series for the chart.
@@ -559,6 +582,7 @@ export function computeBudgetPlan(
     vaadReserve,
     upcomingReserve,
     regularCharges,
+    tight,
     flexBudget,
     flexSpent,
     flexLeft,
