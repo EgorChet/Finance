@@ -483,9 +483,8 @@ export function computeBudgetPlan(
 
   // A tight cycle is never green: the scaled "usual pace" can look fine while the free money is
   // far below what you normally live on. Red when you're short by over a quarter of the usual.
-  if (tight && tone !== "bad") {
-    const severe = tight.shortBy > tight.needAhead * 0.25;
-    tone = severe ? "bad" : "warn";
+  if (tight && moneyLeft >= 0 && flexLeft >= 0) {
+    if (tone !== "bad") tone = tight.shortBy > tight.needAhead * 0.25 ? "bad" : "warn";
     status = "Tight cycle";
   }
 
