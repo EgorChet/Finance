@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import { useAdjustChargeState } from "@/shared/composables/useAdjustCharge";
 import { formatIls, roundMoney } from "@/shared/utils/format";
@@ -67,7 +68,7 @@ const error = ref("");
 const merchantLabel = computed(() => {
   const tx = state.transaction;
   if (!tx) return "";
-  return tx.merchant_en || tx.merchant_he;
+  return merchantDisplayName(tx);
 });
 
 const previewNet = computed(() => {

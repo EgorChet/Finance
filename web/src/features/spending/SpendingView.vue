@@ -156,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
@@ -587,7 +588,7 @@ async function afterSpendOverrideChange() {
 
 async function excludeTransaction(tx: Transaction) {
   if (auth.readOnly) return;
-  const label = `${formatIls(tx.charge_amount)} · ${tx.merchant_en || tx.merchant_he}`;
+  const label = `${formatIls(tx.charge_amount)} · ${merchantDisplayName(tx)}`;
   const ok = await confirm({
     title: "Exclude transaction?",
     message: `Exclude ${label} from your totals?\n\nYou can restore it anytime from the Excluded tab.`,

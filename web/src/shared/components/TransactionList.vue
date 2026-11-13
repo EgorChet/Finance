@@ -165,6 +165,7 @@ import { formatChargeAmount, formatIls, formatIlsWhole, formatTransactionDate, m
 import { categoryIcon } from "@/features/spending/utils/categoryIcons";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import { CATEGORY_PICKLIST } from "@/shared/categories";
 import { friendlyError } from "@/shared/utils/friendlyError";
@@ -250,8 +251,8 @@ const sorted = computed(() => {
     if (sortKey.value === "category") {
       return dir * (a.category_en || "").localeCompare(b.category_en || "");
     }
-    const ma = a.merchant_en || a.merchant_he;
-    const mb = b.merchant_en || b.merchant_he;
+    const ma = merchantDisplayName(a);
+    const mb = merchantDisplayName(b);
     return dir * ma.localeCompare(mb);
   });
   return txs;
@@ -279,7 +280,7 @@ const visibleRows = computed(() => {
     key: transactionRowKey(t),
     tx: t,
     dateLabel: formatChargeDate(t),
-    merchant: t.merchant_en || t.merchant_he,
+    merchant: merchantDisplayName(t),
     category: t.category_en || "Uncategorized",
     icon: categoryIcon(t.category_en || "Uncategorized"),
     metaLabel: rowMeta(t),

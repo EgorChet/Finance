@@ -153,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import { knownMerchantName } from "@/shared/utils/merchantNames";
 import { computed, onMounted, ref, watch } from "vue";
 import { confirmReview, fetchLabelHints, fetchReviewSuggestion, resetReviewProgress, type LabelHints } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
@@ -201,6 +202,9 @@ function englishFor(item: ReviewQueueItem): string {
   const stored = item.transaction.merchant_en?.trim() || "";
   if (stored && !looksHebrew(stored) && stored !== item.transaction.merchant_he.trim()) return stored;
   if (!looksHebrew(item.transaction.merchant_he)) return item.transaction.merchant_he.trim();
+  // A known English name (chains, easy translations) — confirm with one tap.
+  const known = knownMerchantName(item.transaction.merchant_he);
+  if (known) return known;
   return suggestionCache.get(item.transaction.merchant_he.trim()) ?? "";
 }
 
