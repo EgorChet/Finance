@@ -184,6 +184,8 @@ const NAMES: [RegExp, string][] = [
  * "ארקפה ביג גלילות", "ARCAFFE RAANANA" → "Arcaffe". Tested on "merchant_he merchant_en".
  */
 const CANONICAL: [RegExp, string][] = [
+  // Saved under an odd label ("Super Agamim (Belarus)"); מרכולית = minimarket.
+  [/מרכולית אגמים/, "Agamim Minimarket"],
   [/arcaffe|ארקפה/i, "Arcaffe"],
   [/\baroma\b|ארומה/i, "Aroma"],
   [/roladin|רולדין/i, "Roladin"],
