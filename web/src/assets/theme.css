@@ -4525,14 +4525,19 @@ button.topup-item {
   background: color-mix(in srgb, var(--text) 9%, transparent);
 }
 
-/* Merchant logo inside the round row icon. */
-.tx-row-icon--logo {
-  background: #fff;
-  overflow: hidden;
+/* Merchant brand mark inside the round row icon (bundled, nothing loads from outside). */
+.tx-row-icon--brand {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  /* Black logos (Zara, Cursor, Nike) stay visible on the dark theme. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent);
 }
 
-.tx-row-icon--logo img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
+.tx-row-icon-text {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.tx-row-icon-text--long {
+  font-size: 0.7rem;
 }
