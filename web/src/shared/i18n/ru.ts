@@ -561,6 +561,11 @@ export const RU: Record<string, string> = {
   "Enter a name for the charge.": "Введите название платежа.",
   "Pick a date.": "Выберите дату.",
   "Active": "Действует",
+  "Demo household — try anything: edits stay in this browser only.": "Демо-семья — пробуйте что угодно: изменения сохраняются только в этом браузере.",
+  "Reset demo": "Сбросить демо",
+  "Reset the demo?": "Сбросить демо?",
+  "Everything you changed in the demo goes back to the original sample data.": "Все изменения в демо вернутся к исходным примерным данным.",
+  "Not available in the demo — sign in to upload or sync your own statements.": "В демо недоступно — войдите, чтобы загружать или синхронизировать свои выписки.",
   // @end-ui
 };
 

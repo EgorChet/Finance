@@ -12,9 +12,7 @@
     @dismiss="error = ''"
   />
   <template v-else-if="report || reportLoading || overviewPeriod">
-    <div v-if="auth.isDemo" class="demo-banner demo-banner-showcase">
-      <strong>{{ t("Demo household") }}</strong> — {{ t("9 months of sample Visa spending (~₪19k/cycle), live pace, categories & partial snapshot. Sign in to use your real Leumi exports.") }}
-    </div>
+    <DemoBanner />
     <header class="overview-page-header">
       <h2 class="overview-page-title">{{ t("Spending overview") }}</h2>
       <div class="pill-row overview-page-periods">
@@ -156,6 +154,7 @@
 </template>
 
 <script setup lang="ts">
+import DemoBanner from "@/shared/components/DemoBanner.vue";
 import { t, tr } from "@/shared/i18n";
 import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { friendlyError } from "@/shared/utils/friendlyError";

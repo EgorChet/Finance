@@ -1,6 +1,6 @@
 <template>
   <div class="rv">
-    <div v-if="auth.isDemo" class="demo-banner">{{ t("Demo mode — sample queue only. Sign in to label your real charges.") }}</div>
+    
 
     <AppLoader v-if="loading" variant="card" :title="t('Loading queue')" :subtitle="t('Finding charges that still need a label')" />
 

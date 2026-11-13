@@ -1,8 +1,6 @@
 <template>
   <div>
-    <div v-if="auth.isDemo" class="demo-banner">
-      Demo mode — household settings are read-only. Sign in to manage your budget and charges.
-    </div>
+    <DemoBanner />
     <header class="bx-page-head">
       <h2 class="page-title">{{ t("Budget") }}</h2>
       <p v-if="!auth.isDemo && !auth.canEditBudget" class="bx-locked">🔒 {{ t("Only Egor can change the budget") }}</p>
@@ -290,6 +288,7 @@
 </template>
 
 <script setup lang="ts">
+import DemoBanner from "@/shared/components/DemoBanner.vue";
 import { catName, t, tr } from "@/shared/i18n";
 import type { BudgetPlan } from "@core/spending/budgetPlan";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";

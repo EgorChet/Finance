@@ -9,7 +9,33 @@ import type {
 } from "@/shared/types";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 
+import { demoRequest } from "@/shared/demo/backend";
+
 const BASE = import.meta.env.VITE_API_URL || "";
+
+/** In the demo every call is answered in the browser (edits stay on this device). */
+let demoActive = (() => {
+  try {
+    return !localStorage.getItem("finance_auth_token");
+  } catch {
+    return true;
+  }
+})();
+export function setDemoActive(active: boolean): void {
+  demoActive = active;
+}
+export function isDemoActive(): boolean {
+  return demoActive;
+}
+
+/** Async so screens see the same timing as a real request. */
+async function viaDemo<T>(method: string, url: string, body?: unknown): Promise<T | undefined> {
+  if (!demoActive) return undefined;
+  const hit = demoRequest(method, url, body);
+  if (!hit) return undefined;
+  await Promise.resolve();
+  return hit.data as T;
+}
 
 function prefix(demo: boolean): string {
   return demo ? `${BASE}/api/demo` : `${BASE}/api`;
@@ -33,12 +59,16 @@ function headers(token?: string): HeadersInit {
 }
 
 async function get<T>(url: string, token?: string): Promise<T> {
+  const demo = await viaDemo<T>("GET", url);
+  if (demo !== undefined) return demo;
   const res = await fetch(url, { headers: headers(token) });
   if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<T>;
 }
 
 async function post<T>(url: string, body?: unknown, token?: string): Promise<T> {
+  const demo = await viaDemo<T>("POST", url, body);
+  if (demo !== undefined) return demo;
   const res = await fetch(url, {
     method: "POST",
     headers: headers(token),
@@ -49,6 +79,8 @@ async function post<T>(url: string, body?: unknown, token?: string): Promise<T> 
 }
 
 async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
+  const demo = await viaDemo<T>("PUT", url, body);
+  if (demo !== undefined) return demo;
   const res = await fetch(url, {
     method: "PUT",
     headers: headers(token),
@@ -59,6 +91,8 @@ async function put<T>(url: string, body: unknown, token?: string): Promise<T> {
 }
 
 async function del<T>(url: string, token?: string): Promise<T> {
+  const demo = await viaDemo<T>("DELETE", url);
+  if (demo !== undefined) return demo;
   const res = await fetch(url, { method: "DELETE", headers: headers(token) });
   if (!res.ok) throw new Error(await readApiError(res));
   return res.json() as Promise<T>;
@@ -289,6 +323,7 @@ export async function fetchMarketSnapshot(demo: boolean, token?: string, force =
 
 /** Server-side wake — fallback when analyzer is on internal network. */
 export async function warmAnalyzerService(token?: string) {
+  if (demoActive) return { ready: true };
   const res = await fetch(`${prefix(false)}/warm-analyzer`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
@@ -330,6 +365,7 @@ export async function startUploadJob(
   form.append("file", file);
   form.append("auto_translate", String(autoTranslate));
   form.append("statement_type", statementType);
+  if (demoActive) demoRequest("POST", `${prefix(false)}/upload/jobs`);
   let res: Response;
   try {
     res = await fetch(`${prefix(false)}/upload/jobs`, {
