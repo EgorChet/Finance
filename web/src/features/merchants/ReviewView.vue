@@ -9,7 +9,19 @@
         <template v-if="queue.length">
           <p class="rv-hero-value">{{ queue.length }}</p>
           <p class="rv-hero-label">{{ queue.length === 1 ? "merchant needs" : "merchants need" }} a name and category</p>
-          <button v-if="!auth.readOnly || auth.isDemo" type="button" class="btn btn-primary rv-hero-cta" @click="openAt(0)">
+          <button
+            v-if="!auth.readOnly && knownItems.length"
+            type="button"
+            class="btn btn-primary rv-hero-cta"
+            :disabled="bulkSaving"
+            @click="saveAllKnown"
+          >
+            {{ bulkSaving ? `Saving ${bulkDone} of ${knownItems.length}…` : `Save all ${knownItems.length} known names` }}
+          </button>
+          <p v-if="!auth.readOnly && knownItems.length" class="rv-hero-sub">
+            Chains and easy translations I'm sure about — the rest stay here for you.
+          </p>
+          <button v-if="!auth.readOnly || auth.isDemo" type="button" class="btn rv-hero-cta" @click="openAt(0)">
             Start labelling
           </button>
         </template>
@@ -153,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-import { knownMerchantName } from "@/shared/utils/merchantNames";
+import { suggestedEnglishName } from "@/shared/utils/merchantNames";
 import { computed, onMounted, ref, watch } from "vue";
 import { confirmReview, fetchLabelHints, fetchReviewSuggestion, resetReviewProgress, type LabelHints } from "@/shared/api/client";
 import AppLoader from "@/shared/components/AppLoader.vue";
@@ -196,14 +208,14 @@ const looksHebrew = (text: string) => HEBREW_RE.test(text);
 
 /** English name we already know without translating (saved label or a non-Hebrew statement name). */
 function englishFor(item: ReviewQueueItem): string {
+  // One name per brand (canonical chains, known translations, tidied Latin names).
+  const known = suggestedEnglishName(item.transaction.merchant_he, item.transaction.merchant_en);
+  if (known) return known;
   const suggested = item.display_english?.trim() || "";
   if (suggested && !looksHebrew(suggested)) return suggested;
   const stored = item.transaction.merchant_en?.trim() || "";
   if (stored && !looksHebrew(stored) && stored !== item.transaction.merchant_he.trim()) return stored;
   if (!looksHebrew(item.transaction.merchant_he)) return item.transaction.merchant_he.trim();
-  // A known English name (chains, easy translations) — confirm with one tap.
-  const known = knownMerchantName(item.transaction.merchant_he);
-  if (known) return known;
   return suggestionCache.get(item.transaction.merchant_he.trim()) ?? "";
 }
 
@@ -347,6 +359,51 @@ function skip() {
   }
   index.value += 1;
   void loadSuggestionForCurrent();
+}
+
+/** Merchants whose English name we know for sure (one per store). */
+const knownItems = computed(() => {
+  const seen = new Set<string>();
+  return queue.value.filter((item) => {
+    const he = item.transaction.merchant_he.trim();
+    if (seen.has(he)) return false;
+    const name = suggestedEnglishName(item.transaction.merchant_he, item.transaction.merchant_en);
+    if (!name) return false;
+    seen.add(he);
+    return true;
+  });
+});
+const bulkSaving = ref(false);
+const bulkDone = ref(0);
+
+/** Save every known name as the merchant's label (keeps its category); unsure ones stay in the list. */
+async function saveAllKnown() {
+  if (auth.readOnly || bulkSaving.value) return;
+  bulkSaving.value = true;
+  bulkDone.value = 0;
+  const items = [...knownItems.value];
+  try {
+    for (const item of items) {
+      const cat = item.transaction.category_en;
+      const res = await confirmReview(
+        {
+          hebrew: item.transaction.merchant_he,
+          english: suggestedEnglishName(item.transaction.merchant_he, item.transaction.merchant_en),
+          category: cat && cat !== "Uncategorized" ? cat : undefined,
+          mark_all_merchant: true,
+          keys: [item.key],
+        },
+        auth.token || undefined,
+      );
+      reviewedCount.value = res.reviewed_count;
+      bulkDone.value += 1;
+      savedThisSession.value += 1;
+      queue.value = queue.value.filter((q) => q.transaction.merchant_he !== item.transaction.merchant_he);
+    }
+    invalidateRulesDataCaches();
+  } finally {
+    bulkSaving.value = false;
+  }
 }
 
 async function save() {

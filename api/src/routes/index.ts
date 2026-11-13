@@ -661,8 +661,12 @@ router.get("/review/suggest", async (req, res) => {
     res.json({ english: fromRules });
     return;
   }
-  const english = await translateMerchant(hebrew);
-  res.json({ english });
+  // The analyzer may be asleep or down: no translation is fine, crashing the API is not.
+  try {
+    res.json({ english: await translateMerchant(hebrew) });
+  } catch {
+    res.json({ english: "" });
+  }
 });
 
 /** Translation, context and Totoshka's guess (if it has made one) for labelling one merchant. */

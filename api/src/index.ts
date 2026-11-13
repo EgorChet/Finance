@@ -71,3 +71,8 @@ app.use("/api", requireAuthOrAssistant, apiRoutes);
 app.listen(PORT, () => {
   console.log(`Finance API listening on http://127.0.0.1:${PORT}`);
 });
+
+// One failed async route (e.g. the analyzer unreachable) must not take the whole API down.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (kept running):", reason);
+});

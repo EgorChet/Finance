@@ -170,7 +170,106 @@ const NAMES: [RegExp, string][] = [
   [/עברי בפארק/, "Ivri BaPark"],
   [/טאטי/, "Tati"],
   [/פינה לב המושבה/, "Pina Lev HaMoshava"],
+  [/אילונה שוורץ/, "Ilona Schwartz"],
+  [/אלירן גולסטניפר/, "Eliran Golstnifer"],
+  [/הדר ניהול בתי קפה/, "Hadar Cafe Management"],
+  [/הלנה בנמל/, "Helena (Caesarea port)"],
+  [/צאנג בה/, "Chang Ba"],
+  [/קניונית על הדרך/, "Kenyonit Al HaDerech"],
+  [/רבקה - קיסריה/, "Rivka (Caesarea)"],
 ];
+
+/**
+ * One name per brand, whatever the statement wrote (branch, legal name, payment code, capitals):
+ * "ארקפה ביג גלילות", "ARCAFFE RAANANA" → "Arcaffe". Tested on "merchant_he merchant_en".
+ */
+const CANONICAL: [RegExp, string][] = [
+  [/arcaffe|ארקפה/i, "Arcaffe"],
+  [/\baroma\b|ארומה/i, "Aroma"],
+  [/roladin|רולדין/i, "Roladin"],
+  [/benedict|בנדיקט/i, "Benedict"],
+  [/jorno|ג'ורנו/i, "Jorno Bakery"],
+  [/landwer|לנדוור/i, "Landwer Cafe"],
+  [/super-?pharm|סופר ?פארם(?! אונליין)/i, "Super-Pharm"],
+  [/good ?pharm|גוד פארם/i, "Good Pharm"],
+  [/tiv ?taam|טיב טעם(?! אונליין)/i, "Tiv Taam"],
+  [/apple\.com|^apple\b/i, "Apple"],
+  [/openai|chatgpt/i, "ChatGPT (OpenAI)"],
+  [/anthropic/i, "Claude (Anthropic)"],
+  [/cursor/i, "Cursor"],
+  [/netflix/i, "Netflix"],
+  [/iherb/i, "iHerb"],
+  [/midjourney/i, "Midjourney"],
+  [/render\.com/i, "Render"],
+  [/\baws\b/i, "AWS"],
+  [/yango/i, "Yango"],
+  [/\bgett\b/i, "Gett"],
+  [/paybox/i, "PayBox"],
+  [/temu/i, "Temu"],
+  [/aliexpress/i, "AliExpress"],
+  [/booking\.c/i, "Booking.com"],
+  [/\bpaul\b/i, "PAUL"],
+  [/\blidl\b/i, "Lidl"],
+  [/\bel al\b/i, "El Al"],
+  [/airalo/i, "Airalo (eSIM)"],
+  [/farfetch/i, "Farfetch"],
+  [/rossignol/i, "Rossignol"],
+  [/drivalia/i, "Drivalia (car rental)"],
+  [/freeletics/i, "Freeletics"],
+  [/duet pro/i, "Duet Pro"],
+  [/bandcamp/i, "Bandcamp"],
+  [/concertplace/i, "ConcertPlace"],
+  [/rentalcars/i, "Rentalcars.com"],
+  [/yollacalls/i, "Yolla Calls"],
+  [/show4me/i, "Show4me"],
+  [/myprotein/i, "Myprotein"],
+  [/lagarder/i, "Lagardère Travel Retail"],
+  [/\bitx\b/i, "Inditex (Zara group)"],
+  [/oysho/i, "Oysho"],
+  [/happicerie/i, "Happicerie"],
+  [/benjamins bakery/i, "Benjamin's Bakery"],
+  [/avo cafe/i, "Avo Cafe"],
+  [/spareeat/i, "SpareEat"],
+  [/restorant levant/i, "Restaurant Levant"],
+  [/magazin alkohol/i, "Liquor store"],
+  [/duty free market/i, "Duty Free Market"],
+  [/hotel & resorts hmc/i, "HMC Hotels & Resorts"],
+  [/bulgarian embassy/i, "Bulgarian Embassy"],
+  [/burgas pharma/i, "Burgas Pharma"],
+  [/farma vita/i, "Farma Vita"],
+  [/emerald hospitality/i, "Emerald Hospitality"],
+  [/amrest kofi/i, "AmRest Coffee"],
+  [/cafe mikva/i, "Cafe Mikva"],
+  [/pate&pufe/i, "Pate & Pufe Lounge"],
+  // Latin names that come out of the Hebrew statement reversed
+  [/ihsus eniw/i, "Wine Sushi"],
+  [/yrrebeniw/i, "Wineberry"],
+  [/tekram doof/i, "Food Market"],
+];
+
+/** Words kept in capitals when tidying an ALL-CAPS name. */
+const KEEP_CAPS = new Set(["BIT", "KFC", "AWS", "COS", "KSP", "HOT", "BBQ", "TV", "USA", "UK", "EU", "IKEA"]);
+
+/** "GO MOBILE" → "Go Mobile", "DELI VINO EOOD" → "Deli Vino", "SHOW4ME COM" → "Show4me". */
+function tidyLatin(name: string): string {
+  let n = name.replace(/\s+(EOOD|OOD|LTD\.?|INC\.?|LLC|SAS|GMBH|B\.?V\.?|PVT)\b\.?/gi, "").replace(/^[A-Z]{2,4}\*/, "").trim();
+  const allCaps = n === n.toUpperCase() && /[A-Z]{3}/.test(n);
+  const allLower = n === n.toLowerCase() && /[a-z]{3}/.test(n) && !/\.(com|net|io)\b/.test(n);
+  if (allCaps || allLower) {
+    n = n
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => (KEEP_CAPS.has(w.toUpperCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" ");
+  }
+  return n || name;
+}
+
+/** The brand's one name when we recognise it (chains, subscriptions, known places), else null. */
+export function canonicalMerchantName(merchantHe: string | null | undefined, merchantEn?: string | null): string | null {
+  const text = `${merchantHe ?? ""} ${merchantEn ?? ""}`;
+  return CANONICAL.find(([re]) => re.test(text))?.[1] ?? null;
+}
 
 const HEBREW_RE = /[֐-׿]/;
 const cache = new Map<string, string | null>();
@@ -186,9 +285,24 @@ export function knownMerchantName(merchantHe: string | null | undefined): string
   return name;
 }
 
-/** The name to show for a charge: its English name, a known translation, or the Hebrew. */
+/**
+ * The name to show for a charge — the same for every branch and spelling of a brand:
+ * a canonical brand name, else its English name (tidied), else a known translation, else the
+ * Hebrew. A Latin-only statement name is tidied too ("GO MOBILE" → "Go Mobile").
+ */
 export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: string | null }): string {
+  const canonical = canonicalMerchantName(tx.merchant_he, tx.merchant_en);
+  if (canonical) return canonical;
   const en = tx.merchant_en?.trim();
-  if (en && !HEBREW_RE.test(en)) return en;
-  return knownMerchantName(tx.merchant_he) ?? (en || tx.merchant_he);
+  if (en && !HEBREW_RE.test(en)) return tidyLatin(en);
+  const known = knownMerchantName(tx.merchant_he);
+  if (known) return known;
+  if (!HEBREW_RE.test(tx.merchant_he)) return tidyLatin(tx.merchant_he.trim());
+  return en || tx.merchant_he;
+}
+
+/** English name to offer in Review: canonical / known / tidied Latin, or "" when we'd be guessing. */
+export function suggestedEnglishName(merchantHe: string, merchantEn?: string | null): string {
+  const name = merchantDisplayName({ merchant_he: merchantHe, merchant_en: merchantEn });
+  return HEBREW_RE.test(name) ? "" : name;
 }
