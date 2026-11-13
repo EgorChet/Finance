@@ -39,7 +39,11 @@
 
       <div v-if="queue.length" class="rv-list">
         <button v-for="(item, i) in queue" :key="item.key" type="button" class="rv-row" @click="openAt(i)">
-          <span class="tx-row-icon" aria-hidden="true">{{ categoryIcon(item.transaction.category_en || "Uncategorized") }}</span>
+          <MerchantIcon
+            :merchant-he="item.transaction.merchant_he"
+            :merchant-en="item.transaction.merchant_en"
+            :fallback="categoryIcon(item.transaction.category_en || 'Uncategorized')"
+          />
           <span class="rv-row-body">
             <span class="rv-row-top">
               <span class="rv-row-name">{{ rowTitle(item) }}</span>
@@ -154,6 +158,7 @@ import { confirmReview, fetchLabelHints, fetchReviewSuggestion, resetReviewProgr
 import AppLoader from "@/shared/components/AppLoader.vue";
 import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import BottomSheet from "@/shared/components/BottomSheet.vue";
+import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import CategoryGrid from "@/shared/components/CategoryGrid.vue";
 import { useAuthStore } from "@/shared/stores/auth";
 import { invalidateRulesDataCaches } from "@/shared/stores/invalidateCaches";
