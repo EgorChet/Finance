@@ -194,6 +194,8 @@ const props = withDefaults(
     defaultLimit?: number;
     paginated?: boolean;
     statementBilling?: string | null;
+    /** Live cycle's first day: charges dated before it are marked "bought before the cycle". */
+    cycleStart?: string | null;
     showSort?: boolean;
     excludeable?: boolean;
     adjustable?: boolean;
@@ -206,6 +208,7 @@ const props = withDefaults(
     defaultLimit: 25,
     paginated: false,
     statementBilling: null,
+    cycleStart: null,
     showSort: true,
     excludeable: false,
     adjustable: false,
@@ -338,7 +341,9 @@ function rowMeta(t: Transaction): string {
   if (sortKey.value !== "date") parts.push(formatTransactionDate(t.date));
   if (props.showCategory) parts.push(catName(t.category_en || "Uncategorized"));
   const billMonth = tr(t.billing_month || props.statementBilling);
-  if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(i18n("billed {month}", { month: billMonth }));
+  if (props.cycleStart && t.date.slice(0, 10) < props.cycleStart && !t.notes?.startsWith("fixed_charge:")) {
+    parts.push(i18n("bought before the cycle, charged in it"));
+  } else if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(i18n("billed {month}", { month: billMonth }));
   if (props.adjustable && !t.category_override && isBitTransfer(t)) parts.push(i18n("tap to say what it was for"));
   return parts.join(" · ");
 }

@@ -218,7 +218,7 @@ export const COMMITTED_LABELS: Record<CommittedKind, string> = {
   standingOrder: "Standing orders",
   installment: "Installments",
   arnona: "Arnona",
-  earlier: "Charges from earlier dates",
+  earlier: "Bought before the cycle, charged in it",
 };
 
 export function isInstallmentTransaction(tx: Transaction): boolean {
