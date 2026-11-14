@@ -140,3 +140,45 @@ export function tightCycleAdvice(
       .slice(0, 3),
   };
 }
+
+export interface TightStreak {
+  /** Full days in a row, up to the last synced day, spent at or under `limit`. */
+  days: number;
+  /** Average everyday spending on those days. */
+  avgPerDay: number;
+  /** The daily amount they were compared with (what you can spend per day now). */
+  limit: number;
+  /** More days like these that close the gap; null when they don't save anything vs a normal day. */
+  daysToClose: number | null;
+}
+
+/**
+ * Good news inside a tight cycle: the last few days were under the daily amount. Counts back
+ * from the last full day the card data covers; stops at the first day over the limit.
+ */
+export function tightStreak(
+  actualByDay: number[],
+  lastFullDay: number,
+  limit: number,
+  usualPerDay: number,
+  shortBy: number,
+): TightStreak | null {
+  if (!(limit > 0) || lastFullDay < 1) return null;
+  let days = 0;
+  let sum = 0;
+  for (let d = Math.min(lastFullDay, actualByDay.length); d >= 1; d--) {
+    const daily = (actualByDay[d - 1] ?? 0) - (d > 1 ? actualByDay[d - 2] ?? 0 : 0);
+    if (daily > limit) break;
+    days += 1;
+    sum += daily;
+  }
+  if (!days) return null;
+  const avgPerDay = roundMoney(sum / days);
+  const saving = usualPerDay - avgPerDay;
+  return {
+    days,
+    avgPerDay,
+    limit: roundMoney(limit),
+    daysToClose: saving > 1 && shortBy > 0 ? Math.ceil(shortBy / saving) : null,
+  };
+}
