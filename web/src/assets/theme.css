@@ -4911,3 +4911,18 @@ button.topup-item {
   opacity: 0;
   transform: translate(-50%, 10px);
 }
+
+/* Transactions → Categories: rows are buttons that open that category's charges. */
+.find-cats {
+  margin-top: 0.25rem;
+}
+
+.find-cat {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
