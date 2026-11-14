@@ -97,6 +97,7 @@
           title=""
           show-category
           :statement-billing="statementBilling"
+          :cycle-start="liveCycleStartIso"
           :excludeable="!auth.readOnly"
           :adjustable="!auth.readOnly"
           :excluding-key="excludingKey"
@@ -351,6 +352,12 @@ const liveCycleStartDate = computed(() => {
   if (!isLiveTransactionView.value) return undefined;
   const [y, m, d] = cycleStartForDate(refDate.value, cycleDay.value).split("-").map(Number);
   return new Date(y, m - 1, d);
+});
+
+/** Live cycle's first day (YYYY-MM-DD): earlier-dated charges on it get a note. */
+const liveCycleStartIso = computed(() => {
+  const d = liveCycleStartDate.value;
+  return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : null;
 });
 
 const periodTransactions = computed(() => {

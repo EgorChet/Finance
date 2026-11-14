@@ -230,7 +230,7 @@ export const RU: Record<string, string> = {
   "Standing orders": "Постоянные поручения",
   "Installments": "Рассрочки",
   "Arnona": "Арнона",
-  "Charges from earlier dates": "Покупки прошлых дат",
+  "Bought before the cycle, charged in it": "Куплено до начала цикла, списано в нём",
   "HOT mobile": "HOT Мобайл",
   "Bezeq": "Безек",
   "Hairdresser (BIT ₪120)": "Парикмахер (BIT ₪120)",
@@ -575,6 +575,7 @@ export const RU: Record<string, string> = {
   "Changed to {name}": "Изменено: {name}",
   "Undo": "Отменить",
   "Any category": "Любая категория",
+  "bought before the cycle, charged in it": "куплено до начала цикла, списано в нём",
   // @end-ui
 };
 

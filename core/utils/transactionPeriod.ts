@@ -96,7 +96,9 @@ export function filterTransactionsByPeriod(
       return inRange(dateIso, weekStart, ref);
     }
     if (liveCycleStart) {
-      return inRange(dateIso, liveCycleStart, ref);
+      // Everything on this cycle's statement — also purchases made a day or two before the
+      // 10th that the bank put on this cycle (otherwise they'd show in neither cycle).
+      return dateIso <= todayIso;
     }
     return inRange(dateIso, monthStart, ref);
   });
