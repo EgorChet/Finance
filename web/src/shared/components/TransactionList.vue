@@ -341,6 +341,11 @@ function rowMeta(t: Transaction): string {
   if (sortKey.value !== "date") parts.push(formatTransactionDate(t.date));
   if (props.showCategory) parts.push(catName(t.category_en || "Uncategorized"));
   const billMonth = tr(t.billing_month || props.statementBilling);
+  // Entered by hand under Budget (Cibus, car loan, one-off charges): not from the card statement.
+  if (t.notes?.startsWith("fixed_charge:")) {
+    parts.push(i18n("added by you · not on the card"));
+    return parts.join(" · ");
+  }
   if (props.cycleStart && t.date.slice(0, 10) < props.cycleStart && !t.notes?.startsWith("fixed_charge:")) {
     parts.push(i18n("bought before the cycle, charged in it"));
   } else if (billMonth && monthLabelFromIso(t.date) !== billMonth) parts.push(i18n("billed {month}", { month: billMonth }));
