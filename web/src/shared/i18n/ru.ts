@@ -582,6 +582,10 @@ export const RU: Record<string, string> = {
   "One statement month": "Один месяц выписки",
   "~{amount}/mo": "~{amount}/мес",
   "added by you · not on the card": "добавлено вами · не по карте",
+  "Doing well: the last {n} {n|day|days} you kept under {limit} a day (about {avg} a day).": "Хорошо держитесь: {n} {n|последний день|последних дня|последних дней} вы тратили меньше {limit} в день (около {avg} в день).",
+  "Keep it up — about {n} more {n|day|days} like this and you're back on track.": "Так держать — ещё примерно {n} {n|такой день|таких дня|таких дней}, и вы вернётесь в план.",
+  "Keep it up.": "Так держать.",
+  "{n} {n|day|days} on track": "{n} {n|день|дня|дней} в плане",
   // @end-ui
 };
 

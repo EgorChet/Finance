@@ -73,7 +73,8 @@
       </button>
     </div>
 
-    <div v-if="byDay || setAsideLine" class="bh-chips">
+    <div v-if="byDay || setAsideLine || streak" class="bh-chips">
+      <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
       <span v-if="byDay" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
       <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
     </div>
@@ -118,6 +119,13 @@
 
         <section v-if="tight" class="bh-tight">
           <p class="bh-tight-title">{{ t("Getting back on track") }}</p>
+          <p v-if="streak" class="bh-tight-good">
+            👍 {{ t("Doing well: the last {n} {n|day|days} you kept under {limit} a day (about {avg} a day).", { n: streak.days, limit: whole(streak.limit), avg: whole(streak.avgPerDay) }) }}
+            <template v-if="streak.daysToClose != null">
+              {{ t("Keep it up — about {n} more {n|day|days} like this and you're back on track.", { n: streak.daysToClose }) }}
+            </template>
+            <template v-else>{{ t("Keep it up.") }}</template>
+          </p>
           <p class="bh-tight-text">
             {{ t("After bills and what you've spent so far, you have {free} left for {n} {n|day|days}.", { free: whole(tight.freeLeft), n: plan.daysLeft }) }}
             {{ t("You usually spend about {need} on everyday things in that time — {short} more than you have.", { need: whole(tight.needAhead), short: whole(tight.shortBy) }) }}
@@ -213,6 +221,7 @@
 import { catName, isRu, t, tr } from "@/shared/i18n";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { BudgetPlan } from "@/features/spending/utils/budgetPlan";
+import { tightStreak } from "@core/spending/tightCycle";
 import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 
 const props = defineProps<{
@@ -259,6 +268,18 @@ const billRows = computed(() =>
 );
 
 const tight = computed(() => (props.plan.daysLeft > 0 ? props.plan.tight : null));
+
+/**
+ * Doing well inside a tight cycle: the last full days (before the day of the last sync, which
+ * is still incomplete) were under what you can spend per day now.
+ */
+const streak = computed(() => {
+  const p = props.plan;
+  const tc = tight.value;
+  if (!tc) return null;
+  const lastFull = (p.byThisDay?.day ?? p.dayIndex) - 1;
+  return tightStreak(p.actualByDay, lastFull, p.perDayLeft, tc.usualPerDay, tc.shortBy);
+});
 /** Gap rounded up to the next ₪100. */
 const topUpSuggestion = computed(() => (tight.value ? Math.ceil(tight.value.shortBy / 100) * 100 : 0));
 

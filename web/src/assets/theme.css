@@ -4926,3 +4926,19 @@ button.topup-item {
   text-align: left;
   cursor: pointer;
 }
+
+/* Tight cycle, but the last days were under the daily amount. */
+.bh-tight-good {
+  margin: 0 0 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.bh-chip--good {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
