@@ -19,7 +19,8 @@ function readSaved(): Locale {
   } catch {
     /* private mode */
   }
-  return "en";
+  // Russian unless English was chosen on this device.
+  return "ru";
 }
 
 export const locale = ref<Locale>(readSaved());

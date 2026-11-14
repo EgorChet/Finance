@@ -213,7 +213,7 @@ export const RU: Record<string, string> = {
   "On track": "Всё по плану",
   "Slow down a little": "Чуть притормозите",
   "Slow down": "Притормозите",
-  "Tight cycle": "Тесный цикл",
+  "Tight cycle": "Денег впритык",
   "Right on plan": "Точно по плану",
   "On pace": "В темпе",
   "Under pace": "Ниже темпа",
