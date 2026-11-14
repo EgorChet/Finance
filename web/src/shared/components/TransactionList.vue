@@ -93,12 +93,20 @@
           {{ formatChargeAmount(categoryRow.tx) }} · {{ formatTransactionDate(categoryRow.tx.date) }}
           <template v-if="isBitTransfer(categoryRow.tx)"> · {{ t("e.g. paying someone back for dinner → Eating out") }}</template>
         </p>
-        <CategoryPicker :model-value="categoryRow.category" :options="CATEGORY_PICKLIST" :suggestions="categorySuggestions" @pick="pickCategory" />
+        <CategoryPicker v-model="draftCategory" :options="CATEGORY_PICKLIST" :suggestions="categorySuggestions" />
         <p v-if="categoryError" class="tx-cat-error">{{ categoryError }}</p>
       </template>
-      <template v-if="categoryRow?.tx.category_override" #footer>
-        <button type="button" class="btn" :disabled="savingCategory" @click="pickCategory(null)">
+      <template v-if="categoryRow" #footer>
+        <button v-if="categoryRow.tx.category_override" type="button" class="btn" :disabled="savingCategory" @click="pickCategory(null)">
           {{ t("Back to {name}", { name: categoryRow.tx.category_original ? catName(categoryRow.tx.category_original) : t("the store's category") }) }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="savingCategory || !draftCategory || draftCategory === categoryRow.category"
+          @click="pickCategory(draftCategory)"
+        >
+          {{ savingCategory ? t("Saving…") : t("Save") }}
         </button>
       </template>
     </BottomSheet>
@@ -364,8 +372,11 @@ const categorySuggestions = computed(() =>
 const savingCategory = ref(false);
 const categoryError = ref("");
 
+const draftCategory = ref("");
+
 function openCategory() {
   categoryRow.value = sheetRow.value;
+  draftCategory.value = sheetRow.value?.category ?? "";
   categoryError.value = "";
   closeSheet();
 }

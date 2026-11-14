@@ -25,11 +25,14 @@
           <p class="rv-sheet-meta">{{ formatTransactionDate(current.date) }} · {{ t("what was it for?") }}</p>
         </div>
       </template>
-      <CategoryPicker v-if="current" :model-value="''" :options="BIT_OPTIONS" :suggestions="suggestions" @pick="pick" />
+      <CategoryPicker v-if="current" v-model="draft" :options="BIT_OPTIONS" :suggestions="suggestions" />
       <p v-if="error" class="tx-cat-error">{{ error }}</p>
       <template #footer>
         <button type="button" class="btn" :disabled="saving" @click="next">{{ t("Skip") }}</button>
         <button type="button" class="btn" :disabled="saving" @click="pick('BIT')">{{ t("Keep as BIT") }}</button>
+        <button type="button" class="btn btn-primary" :disabled="saving || !draft" @click="pick(draft)">
+          {{ saving ? t("Saving…") : unsorted.length > 1 ? t("Save & next") : t("Save") }}
+        </button>
       </template>
     </BottomSheet>
   </section>
@@ -92,6 +95,10 @@ async function load() {
     transactions.value = [];
   }
 }
+
+/** Picked in the list, saved only with the Save button. */
+const draft = ref("");
+watch(current, () => (draft.value = ""));
 
 function start() {
   error.value = "";
