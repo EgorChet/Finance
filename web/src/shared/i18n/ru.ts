@@ -576,6 +576,11 @@ export const RU: Record<string, string> = {
   "Undo": "Отменить",
   "Any category": "Любая категория",
   "bought before the cycle, charged in it": "куплено до начала цикла, списано в нём",
+  "Last 30 days": "Последние 30 дней",
+  "Last 3 months": "Последние 3 месяца",
+  "All time": "За всё время",
+  "One statement month": "Один месяц выписки",
+  "~{amount}/mo": "~{amount}/мес",
   // @end-ui
 };
 
