@@ -45,15 +45,6 @@
             <button v-if="view === 'charges'" type="button" class="find-chip" :class="{ 'find-chip--on': amountActive }" @click="openAmount">
               {{ amountChipLabel }} <span aria-hidden="true">▾</span>
             </button>
-            <button
-              type="button"
-              class="find-chip"
-              :class="{ 'find-chip--on': includeRecurring }"
-              :aria-pressed="includeRecurring"
-              @click="includeRecurring = !includeRecurring"
-            >
-              {{ includeRecurring ? "✓ " : "" }}{{ t("Added charges") }}
-            </button>
             <button v-if="hasActiveFilters" type="button" class="find-chip find-chip--clear" @click="clearFilters">
               {{ t("Clear") }}
             </button>
@@ -192,8 +183,6 @@ import { adjustCharge } from "@/shared/composables/useAdjustCharge";
 import type { MonthItem, Transaction } from "@/shared/types";
 import { CATEGORY_PICKLIST, rollupCategory } from "@/shared/categories";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
-import { loadBrowseIncludeRecurring, saveBrowseIncludeRecurring } from "@/features/browse/utils/browsePreferences";
-import { isSystemRecurringTransaction } from "@/features/household/utils/householdBudget";
 import { effectiveSpend } from "@/shared/utils/transaction";
 import { transactionKey } from "@/shared/utils/transactionKey";
 import { invalidateSpendingDataCaches } from "@/shared/stores/invalidateCaches";
@@ -296,11 +285,6 @@ const maxAmount = ref("");
 const excludingKey = ref<string | null>(null);
 const adjustingKey = ref<string | null>(null);
 const adjustmentsData = useAdjustmentsDataStore();
-const includeRecurring = ref(loadBrowseIncludeRecurring());
-
-watch(includeRecurring, (value) => {
-  saveBrowseIncludeRecurring(value);
-});
 
 const categoryOptions = CATEGORY_PICKLIST;
 
@@ -323,7 +307,6 @@ const filteredTransactions = computed(() => {
   const listFilters = view.value !== "categories";
 
   return allTransactions.value.filter((tx) => {
-    if (!includeRecurring.value && isSystemRecurringTransaction(tx)) return false;
     if (from && tx.date.slice(0, 10) < from) return false;
     if (!listFilters) return true;
     if (q) {
@@ -368,10 +351,8 @@ const periodMonths = computed(() => {
   if (selectedMonth.value) return 1;
   const fixed = PERIODS.find((p) => p.id === period.value)?.months ?? 0;
   if (fixed) return fixed;
-  const dates = allTransactions.value.map((tx) => tx.date.slice(0, 10)).sort();
-  if (dates.length < 2) return 1;
-  const days = (new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / 86400000;
-  return Math.max(1, days / 30.4);
+  // All time: one month per statement.
+  return Math.max(1, months.value.length);
 });
 
 /** Categories of the period, biggest first, each with its share of the spending. */

@@ -581,6 +581,7 @@ export const RU: Record<string, string> = {
   "All time": "За всё время",
   "One statement month": "Один месяц выписки",
   "~{amount}/mo": "~{amount}/мес",
+  "added by you · not on the card": "добавлено вами · не по карте",
   // @end-ui
 };
 
