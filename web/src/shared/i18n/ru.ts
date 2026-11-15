@@ -586,6 +586,7 @@ export const RU: Record<string, string> = {
   "Keep it up — about {n} more {n|day|days} like this and you're back on track.": "Так держать — ещё примерно {n} {n|такой день|таких дня|таких дней}, и вы вернётесь в план.",
   "Keep it up.": "Так держать.",
   "{n} {n|day|days} on track": "{n} {n|день|дня|дней} в плане",
+  "+{n} more": "ещё {n}",
   // @end-ui
 };
 
