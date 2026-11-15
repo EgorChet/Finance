@@ -20,7 +20,9 @@
       <section v-for="group in groups" :key="group.key" class="tx-group">
         <header v-if="group.label" class="tx-group-head">
           <span>{{ group.label }}</span>
-          <span class="tx-group-total">{{ formatIlsWhole(group.total) }}</span>
+          <span class="tx-group-total">
+            <small v-if="group.hidden" class="tx-group-more">{{ t("+{n} more", { n: group.hidden }) }} · </small>{{ formatIlsWhole(group.total) }}
+          </span>
         </header>
         <component
           :is="hasActions ? 'button' : 'div'"
@@ -307,18 +309,26 @@ const visibleRows = computed(() => {
 /** Grouped by day when sorted by date; one flat group otherwise. */
 const groups = computed(() => {
   const rows = visibleRows.value;
-  if (sortKey.value !== "date") return [{ key: "all", label: "", total: 0, rows }];
-  const out: { key: string; label: string; total: number; rows: typeof rows }[] = [];
+  if (sortKey.value !== "date") return [{ key: "all", label: "", total: 0, hidden: 0, rows }];
+  // The day's total counts every charge of that day, also the ones below "Show all".
+  const dayTotals = new Map<string, number>();
+  const dayCounts = new Map<string, number>();
+  for (const tx of sorted.value) {
+    const day = tx.date.slice(0, 10);
+    dayTotals.set(day, (dayTotals.get(day) ?? 0) + effectiveSpend(tx));
+    dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
+  }
+  const out: { key: string; label: string; total: number; hidden: number; rows: typeof rows }[] = [];
   for (const row of rows) {
     const day = row.tx.date.slice(0, 10);
     let g = out[out.length - 1];
     if (!g || g.key !== day) {
-      g = { key: day, label: dayLabel(day), total: 0, rows: [] };
+      g = { key: day, label: dayLabel(day), total: dayTotals.get(day) ?? 0, hidden: 0, rows: [] };
       out.push(g);
     }
     g.rows.push(row);
-    g.total += effectiveSpend(row.tx);
   }
+  for (const g of out) g.hidden = Math.max(0, (dayCounts.get(g.key) ?? 0) - g.rows.length);
   return out;
 });
 

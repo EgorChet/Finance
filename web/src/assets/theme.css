@@ -4942,3 +4942,9 @@ button.topup-item {
   background: color-mix(in srgb, var(--success) 18%, transparent);
   color: var(--success);
 }
+
+.tx-group-more {
+  font-size: 0.78em;
+  font-weight: 500;
+  color: var(--text-faint);
+}
