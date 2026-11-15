@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { confirmReview, fetchReviewQueue, fetchRules } from "@/shared/api/client";
-import { canonicalMerchantName } from "@/shared/utils/merchantNames";
+import { brandCategory, canonicalMerchantName } from "@/shared/utils/merchantNames";
 import type { ReviewQueueItem } from "@/shared/types";
 import type { CacheLoadOptions } from "@/shared/stores/createCachedStore";
 
@@ -84,6 +84,10 @@ async function autoNameKnownBrands(
     const cats = brand ? byName.get(brand.toLowerCase()) : undefined;
     if (brand && cats) {
       category = [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    } else if (brand && brandCategory(brand)) {
+      // A brand we know for sure (Grok, Google Cloud, Apple…): its own name and usual category.
+      const own = item.transaction.category_en;
+      category = own && own !== "Uncategorized" ? own : brandCategory(brand);
     } else {
       // Same store, new reference code: reuse the name and category saved for it.
       const base = merchantBase(he);
