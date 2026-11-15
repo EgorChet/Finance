@@ -283,6 +283,36 @@ function tidyLatin(name: string): string {
   return n || name;
 }
 
+/** Category for brands where there's no doubt, so a new one can be saved without asking. */
+const BRAND_CATEGORY: Record<string, string> = {
+  Apple: "Subscriptions",
+  "ChatGPT (OpenAI)": "Subscriptions",
+  "Claude (Anthropic)": "Subscriptions",
+  "Grok (xAI)": "Subscriptions",
+  "Google Cloud": "Subscriptions",
+  Cursor: "Subscriptions",
+  Netflix: "Subscriptions",
+  Midjourney: "Subscriptions",
+  Render: "Subscriptions",
+  AWS: "Subscriptions",
+  "Airalo (eSIM)": "Tourism",
+  "Booking.com": "Tourism",
+  "El Al": "Tourism",
+  Yango: "Transport",
+  Gett: "Transport",
+  Arcaffe: "Coffee",
+  Aroma: "Coffee",
+  Roladin: "Coffee",
+  "Landwer Cafe": "Coffee",
+  "Jorno Bakery": "Coffee",
+  "Tiv Taam": "Groceries",
+  Lidl: "Groceries",
+};
+
+export function brandCategory(brand: string): string | null {
+  return BRAND_CATEGORY[brand] ?? null;
+}
+
 /** The brand's one name when we recognise it (chains, subscriptions, known places), else null. */
 export function canonicalMerchantName(merchantHe: string | null | undefined, merchantEn?: string | null): string | null {
   const text = `${merchantHe ?? ""} ${merchantEn ?? ""}`;
