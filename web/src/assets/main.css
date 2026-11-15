@@ -4747,3 +4747,11 @@ table.rules select {
   gap: 0.75rem;
   white-space: nowrap;
 }
+
+.mobile-nav-action-hint {
+  display: block;
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-faint);
+}
