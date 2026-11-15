@@ -62,7 +62,8 @@ export interface RegularChargeSettings {
 export const DEFAULT_REGULAR_CHARGES: readonly RegularChargeRule[] = [
   { id: "vaad", name: "Vaad bayit", pattern: /ועד\s*ה?בית|vaad\s*(ha)?bayit/i, everyMonths: 1, defaultAmount: 454, estimate: "median" },
   { id: "chatgpt", name: "ChatGPT", pattern: /openai|chatgpt/i, minAmount: 250, everyMonths: 1, defaultAmount: 370, estimate: "median" },
-  { id: "cursor", name: "Cursor", pattern: /cursor/i, minAmount: 100, everyMonths: 1, defaultAmount: 185, estimate: "median" },
+  // Was Cursor; the same slot is now Grok (xAI). Old Cursor charges still teach the rhythm; the amount follows the latest bill.
+  { id: "cursor", name: "Grok (xAI)", pattern: /cursor|grok|\bx\.?ai\b/i, minAmount: 50, everyMonths: 1, defaultAmount: 185, estimate: "last" },
   { id: "bezeq", name: "Bezeq", pattern: /בזק|bezeq/i, everyMonths: 1, defaultAmount: 160, estimate: "median" },
   { id: "hot", name: "HOT mobile", pattern: /הוט\s*מובייל|hot\s*mobile/i, everyMonths: 1, defaultAmount: 120, estimate: "median" },
   { id: "anthropic", name: "Claude (Anthropic)", pattern: /anthropic/i, everyMonths: 1, defaultAmount: 60, estimate: "median" },
