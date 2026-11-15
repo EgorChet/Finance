@@ -18,6 +18,22 @@ function reviewCacheKey(demo: boolean, token: string | undefined, opts: ReviewQu
 }
 
 /**
+ * The statement name without the parts that change every time: reference codes that mix
+ * letters and digits ("Z525LT"), phone numbers and country tails. "GOOGLE*CLOUD Z525LT" and
+ * "Google*cloud K19XQ2" both become "GOOGLE*CLOUD".
+ */
+export function merchantBase(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/\+?\d[\d\s-]{6,}\d/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !(/[A-Z]/.test(w) && /\d/.test(w)) && !/^\d+$/.test(w))
+    .join(" ")
+    .replace(/\s+(US|IE|IL|GB|NL|LU|SG)$/, "")
+    .trim();
+}
+
+/**
  * A new spelling of a brand you've already named ("APPLE.COM/BILL ITUNES.COM IE" after
  * "APPLE.COM/BILL") is saved straight away with the same name and category, so it never waits
  * in "To label". Only brands we're sure about (canonical names) and only when a saved one exists.
@@ -41,15 +57,42 @@ async function autoNameKnownBrands(
     if (r.category) cats.set(r.category, (cats.get(r.category) ?? 0) + 1);
     byName.set(name, cats);
   }
+  // Saved names by their stable part, for stores whose statement name carries a changing code.
+  const byBase = new Map<string, Map<string, { english: string; category?: string | null; n: number }>>();
+  for (const [he, r] of Object.entries(rules)) {
+    const base = merchantBase(he);
+    if (!base || base === he.toUpperCase().trim() || !r.english?.trim()) continue;
+    const names = byBase.get(base) ?? new Map();
+    const cur = names.get(r.english) ?? { english: r.english, category: r.category, n: 0 };
+    cur.n += 1;
+    names.set(r.english, cur);
+    byBase.set(base, names);
+  }
+  // Also the plain names themselves (the first saved spelling may have had no code).
+  for (const [he, r] of Object.entries(rules)) {
+    const base = merchantBase(he);
+    if (!base || !r.english?.trim() || byBase.has(base)) continue;
+    byBase.set(base, new Map([[r.english, { english: r.english, category: r.category, n: 1 }]]));
+  }
   const done = new Set<string>();
   let reviewed = bundle.reviewed_count;
   for (const item of bundle.queue as ReviewQueueItem[]) {
     const he = item.transaction.merchant_he;
     if (done.has(he)) continue;
-    const brand = canonicalMerchantName(he, item.transaction.merchant_en);
+    let brand = canonicalMerchantName(he, item.transaction.merchant_en);
+    let category: string | null | undefined;
     const cats = brand ? byName.get(brand.toLowerCase()) : undefined;
-    if (!brand || !cats) continue;
-    const category = [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (brand && cats) {
+      category = [...cats.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    } else {
+      // Same store, new reference code: reuse the name and category saved for it.
+      const base = merchantBase(he);
+      const saved = base.length >= 4 ? byBase.get(base) : undefined;
+      const best = saved ? [...saved.values()].sort((a, b) => b.n - a.n)[0] : undefined;
+      if (!best) continue;
+      brand = best.english;
+      category = best.category;
+    }
     try {
       const res = await confirmReview(
         { hebrew: he, english: brand, category: category ?? undefined, mark_all_merchant: true, keys: [item.key] },

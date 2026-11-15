@@ -213,6 +213,7 @@ const CANONICAL: [RegExp, string][] = [
   [/openai|chatgpt/i, "ChatGPT (OpenAI)"],
   [/anthropic/i, "Claude (Anthropic)"],
   [/grok|\bx\.?ai\b/i, "Grok (xAI)"],
+  [/google\s*\*\s*cloud/i, "Google Cloud"],
   [/cursor/i, "Cursor"],
   [/netflix/i, "Netflix"],
   [/iherb/i, "iHerb"],
