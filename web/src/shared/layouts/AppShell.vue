@@ -263,6 +263,16 @@
                 </button>
 
                 <button
+                  v-if="auth.isAuthenticated && auth.token"
+                  type="button"
+                  class="mobile-nav-action btn"
+                  @click="copyAccessKey"
+                >
+                  {{ t("Copy access key") }}
+                  <span class="mobile-nav-action-hint">{{ apiHost }}</span>
+                </button>
+
+                <button
                   v-if="auth.authRequired && auth.isAuthenticated"
                   type="button"
                   class="mobile-nav-action btn mobile-nav-action--danger"
@@ -415,6 +425,7 @@ import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/uti
 import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
 import kaspaLogo from "@/assets/kaspa.png";
 import { resetDemoAndReload } from "@/shared/demo/reset";
+import { showToast } from "@/shared/composables/useToast";
 import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
 
 /** The switch shows once every screen is translated. */
@@ -1003,6 +1014,20 @@ function logout() {
   closeNav();
   auth.logout();
   router.push("/");
+}
+
+/** API address shown under "Copy access key" (not secret). */
+const apiHost = (import.meta.env.VITE_API_URL || window.location.origin).replace(/^https?:\/\//, "");
+
+/** Copies this device's sign-in key, e.g. to let Claude read the data for an analysis. */
+async function copyAccessKey() {
+  if (!auth.token) return;
+  try {
+    await navigator.clipboard.writeText(auth.token);
+    showToast(t("Access key copied — valid for 30 days. Paste it only into a secure form."));
+  } catch {
+    window.prompt(t("Copy the access key:"), auth.token);
+  }
 }
 
 function onResetDemo() {

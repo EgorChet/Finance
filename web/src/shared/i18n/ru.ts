@@ -587,6 +587,9 @@ export const RU: Record<string, string> = {
   "Keep it up.": "Так держать.",
   "{n} {n|day|days} on track": "{n} {n|день|дня|дней} в плане",
   "+{n} more": "ещё {n}",
+  "Copy access key": "Скопировать ключ доступа",
+  "Access key copied — valid for 30 days. Paste it only into a secure form.": "Ключ скопирован — действует 30 дней. Вставляйте его только в защищённую форму.",
+  "Copy the access key:": "Скопируйте ключ доступа:",
   // @end-ui
 };
 
