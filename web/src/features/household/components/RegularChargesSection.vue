@@ -101,7 +101,7 @@ const emit = defineEmits<{ saved: [string]; monthly: [number]; plan: [BudgetPlan
 const BILL_MARKS: Record<string, { he?: string; category: string }> = {
   vaad: { he: "ועד הבית", category: "Housing" },
   chatgpt: { he: "OPENAI", category: "Subscriptions" },
-  cursor: { he: "CURSOR", category: "Subscriptions" },
+  cursor: { he: "GROK XAI", category: "Subscriptions" },
   bezeq: { he: "בזק", category: "Subscriptions" },
   hot: { he: "הוט מובייל", category: "Subscriptions" },
   anthropic: { he: "ANTHROPIC", category: "Subscriptions" },

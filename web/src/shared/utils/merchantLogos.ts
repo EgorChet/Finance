@@ -133,6 +133,7 @@ const BRANDS: [RegExp, Mark][] = [
   [/apple/i, { icon: "apple" }],
   [/openai|chatgpt/i, { text: "AI", bg: "#10A37F", domain: "openai.com" }],
   [/anthropic|claude/i, { icon: "claude" }],
+  [/grok|\bx\.?ai\b/i, { text: "xAI", bg: "#000000" }],
   [/cursor/i, { icon: "cursor" }],
   [/\baws\b|amazon web services/i, { text: "aws", bg: "#232F3E", fg: "#FF9900", domain: "aws.amazon.com" }],
   [/amazon|amzn/i, { text: "a", bg: "#FF9900", fg: "#1A1A1A", domain: "amazon.com" }],
