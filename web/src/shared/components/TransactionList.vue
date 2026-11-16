@@ -78,6 +78,10 @@
                 <span class="tx-sheet-action-title">{{ t(sheetRow.adjustLabel) }}</span>
                 <span class="tx-sheet-action-hint">{{ t("Someone paid you back for part of it") }}</span>
               </button>
+              <button v-if="adjustable && isHold(sheetRow.tx)" type="button" class="tx-sheet-action" @click="openHold">
+                <span class="tx-sheet-action-title">{{ t("It's a hold — less will be charged") }}</span>
+                <span class="tx-sheet-action-hint">{{ t("EV Edge, Pango and the like block an amount but charge less or nothing") }}</span>
+              </button>
               <button v-if="excludeable" type="button" class="tx-sheet-action" @click="runSheet('exclude')">
                 <span class="tx-sheet-action-title">{{ t("Exclude from spending") }}</span>
                 <span class="tx-sheet-action-hint">{{ t("Not a real expense, e.g. a transfer or a refund pair") }}</span>
@@ -109,6 +113,24 @@
           @click="pickCategory(draftCategory)"
         >
           {{ savingCategory ? t("Saving…") : t("Save") }}
+        </button>
+      </template>
+    </BottomSheet>
+
+    <BottomSheet :open="!!holdRow" :title="holdRow ? holdRow.merchant : ''" @close="holdRow = null">
+      <template v-if="holdRow">
+        <p class="tx-cat-meta">
+          {{ t("Blocked now: {amount}. How much will really be charged?", { amount: formatIls(holdRow.tx.charge_amount) }) }}
+        </p>
+        <div class="find-presets">
+          <button type="button" class="find-chip" :class="{ 'find-chip--on': holdAmount === 0 }" @click="holdAmount = 0">{{ t("Nothing (₪0)") }}</button>
+        </div>
+        <SheetAmountInput v-model="holdAmount" :label="t('Will be charged')" placeholder="0" />
+        <p v-if="holdError" class="tx-cat-error">{{ holdError }}</p>
+      </template>
+      <template v-if="holdRow" #footer>
+        <button type="button" class="btn btn-primary" :disabled="holdSaving || holdAmount >= holdRow.tx.charge_amount" @click="saveHold">
+          {{ holdSaving ? t("Saving…") : t("Save") }}
         </button>
       </template>
     </BottomSheet>
@@ -184,6 +206,13 @@ import { friendlyError } from "@/shared/utils/friendlyError";
 import { isBitTransfer, saveChargeCategory } from "@/shared/composables/useChargeCategory";
 import { effectiveSpend } from "@/shared/utils/transaction";
 import { transactionRowKey } from "@/shared/utils/transaction";
+import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
+import { addExclusion, removeAdjustment, removeExclusion, upsertAdjustment } from "@/shared/api/client";
+import { useAuthStore } from "@/shared/stores/auth";
+import { useAdjustmentsDataStore, useExclusionsDataStore } from "@/shared/stores/viewData";
+import { invalidateSpendingDataCaches } from "@/shared/stores/invalidateCaches";
+import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
+import { transactionKey } from "@/shared/utils/transactionKey";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
 
@@ -301,7 +330,9 @@ const visibleRows = computed(() => {
     amount: t.effective_amount ?? t.charge_amount,
     adjustLabel: t.reimbursement ? "Edit split" : "Split",
     reimbursementLabel: t.reimbursement
-      ? i18n("{total} − {back} back", { total: formatIls(t.charge_amount), back: formatIls(t.reimbursement) })
+      ? t.reimbursement_note?.startsWith(HOLD_NOTE)
+        ? i18n("hold {total} · counted as {amount}", { total: formatIls(t.charge_amount), amount: formatIls(t.charge_amount - t.reimbursement) })
+        : i18n("{total} − {back} back", { total: formatIls(t.charge_amount), back: formatIls(t.reimbursement) })
       : null,
   }));
 });
@@ -393,6 +424,67 @@ const savingCategory = ref(false);
 const categoryError = ref("");
 
 const draftCategory = ref("");
+
+// ── Holds: a pending charge that will really be smaller (EV charging, parking) or nothing ──
+const HOLD_NOTE = "Hold";
+const holdRow = ref<TxRow | null>(null);
+const holdAmount = ref(0);
+const holdSaving = ref(false);
+const holdError = ref("");
+
+/** Still being received (קליטה) or an estimated amount — the real charge may differ. */
+function isHold(tx: Transaction): boolean {
+  return tx.charge_amount > 0 && (tx.charge_estimated === true || /קליטה/.test(`${tx.notes ?? ""} ${tx.transaction_type_he ?? ""}`));
+}
+
+function openHold() {
+  holdRow.value = sheetRow.value;
+  holdAmount.value = 0;
+  holdError.value = "";
+  closeSheet();
+}
+
+async function saveHold() {
+  const row = holdRow.value;
+  if (!row || holdSaving.value) return;
+  const tx = row.tx;
+  const real = Math.max(0, Math.round(holdAmount.value * 100) / 100);
+  const token = useAuthStore().token || undefined;
+  holdSaving.value = true;
+  holdError.value = "";
+  try {
+    if (real <= 0) {
+      await addExclusion({ transaction: tx, note: `${HOLD_NOTE} — won't be charged` }, token);
+    } else {
+      await upsertAdjustment({ transaction: tx, reimbursement: Math.round((tx.charge_amount - real) * 100) / 100, note: `${HOLD_NOTE} — expected ₪${real}` }, token);
+    }
+    holdRow.value = null;
+    useAdjustmentsDataStore().invalidate();
+    useExclusionsDataStore().invalidate();
+    invalidateSpendingDataCaches();
+    emitSpendingRefresh();
+    const key = transactionKey(tx);
+    showToast(
+      real <= 0 ? t("Not counted: {name} {amount}", { name: row.merchant, amount: formatIls(tx.charge_amount) }) : t("Counted as {amount}", { amount: formatIls(real) }),
+      {
+        label: t("Undo"),
+        run: () => {
+          const undo = real <= 0 ? removeExclusion(key, token) : removeAdjustment(key, token);
+          void undo.then(() => {
+            useAdjustmentsDataStore().invalidate();
+            useExclusionsDataStore().invalidate();
+            invalidateSpendingDataCaches();
+            emitSpendingRefresh();
+          });
+        },
+      },
+    );
+  } catch (e) {
+    holdError.value = friendlyError(e);
+  } finally {
+    holdSaving.value = false;
+  }
+}
 
 function openCategory() {
   categoryRow.value = sheetRow.value;

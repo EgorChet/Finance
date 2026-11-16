@@ -136,6 +136,7 @@ export const DEMO_RULES: MerchantRules = {
   "סופרגז": { english: "Supergas", category: "Housing" },
   "הראל ביטוח": { english: "Harel Insurance", category: "Government & Institutions" },
   "ELAL": { english: "El Al", category: "Tourism" },
+  "EV EDGE": { english: "EV Edge (charging)", category: "Transport" },
   "BOOKING.COM": { english: "Booking.com", category: "Tourism" },
   "ALIEXPRESS": { english: "AliExpress", category: "Home & Living" },
   "איקאה ספה": { english: "IKEA", category: "Home & Furniture" },
@@ -250,6 +251,8 @@ export function buildDemoStatements(today: string): DemoStatement[] {
     if (k <= 5) {
       txs.push(tx(cycleDate(addMonths(open, -5), 9), "איקאה ספה", 690, { transaction_type_he: "תשלומים", notes: `תשלום ${6 - k} מתוך 6` }));
     }
+    // EV charging holds an amount first; the real charge comes later (pending: "being received").
+    if (k === 0) txs.push(tx(addDays(today, -1), "EV EDGE", 175, { notes: "עסקה בקליטה" }));
     // A transfer between own accounts (excluded by default).
     if (k === 1) txs.push(tx(cycleDate(start, 15), "העברה לחשבון", 1500, { transaction_type_he: "העברה" }));
     const billing = addMonths(start, 1);
