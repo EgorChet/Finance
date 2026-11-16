@@ -595,6 +595,8 @@ export const RU: Record<string, string> = {
   "One day less": "На день меньше",
   "One day more": "На день больше",
   "preview": "прогноз",
+  "No longer set aside: {name} {amount} — the bill is over 2 weeks late": "Больше не откладываем: {name} {amount} — счёт опаздывает больше 2 недель",
+  "Now set aside: {name} {amount}": "Теперь откладываем: {name} {amount}",
   // @end-ui
 };
 

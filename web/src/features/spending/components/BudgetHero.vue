@@ -34,6 +34,9 @@
     </template>
     <p class="bh-sub">{{ subline }}</p>
     <p v-if="ahead" class="bh-preview-note">{{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}</p>
+    <p v-for="c in previewChanges" :key="c.label" class="bh-preview-note bh-preview-change">
+      {{ c.released ? t("No longer set aside: {name} {amount} — the bill is over 2 weeks late", { name: c.label, amount: whole(c.amount) }) : t("Now set aside: {name} {amount}", { name: c.label, amount: whole(c.amount) }) }}
+    </p>
 
     <div class="bh-chart-wrap">
       <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
@@ -256,6 +259,20 @@ const preview = computed((): BudgetPlan | null => {
   // "Today" in the plan's own terms (the demo's clock too), moved `ahead` days on.
   return props.planAt(new Date(y, m - 1, d + props.plan.dayIndex - 1 + ahead.value));
 });
+/** Set-asides that appear or disappear between today and the previewed day (so a jump is explained). */
+const previewChanges = computed(() => {
+  const p = preview.value;
+  if (!p) return [];
+  const base = (rows: BudgetPlan["committedRows"]) =>
+    new Map(rows.filter((r) => r.kind === "upcoming").map((r) => [r.label.replace(/\s*\(.*\)\s*$/, ""), r.amount]));
+  const before = base(props.plan.committedRows);
+  const after = base(p.committedRows);
+  const out: { label: string; amount: number; released: boolean }[] = [];
+  for (const [label, amount] of before) if (!after.has(label)) out.push({ label: tr(label), amount, released: true });
+  for (const [label, amount] of after) if (!before.has(label)) out.push({ label: tr(label), amount, released: false });
+  return out;
+});
+
 /** What the card shows: today's plan, or the preview. */
 const shown = computed(() => preview.value ?? props.plan);
 const closeBtn = ref<HTMLButtonElement | null>(null);
