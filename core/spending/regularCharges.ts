@@ -15,8 +15,10 @@
  * - Hairdresser and nails have no fixed rhythm: set aside every cycle until they come.
  * - Only charges seen on the card at least once are set aside (a new subscription starts
  *   being held after its first charge).
- * - A bill more than 14 days past its expected date is released ("missed"); if it still
- *   comes, it's simply charged then.
+ * - A subscription more than 14 days past its expected date is released ("missed"); if it
+ *   still comes, it's simply charged then. Arnona, electricity, water and gas are never
+ *   released: they always come, sometimes a month late, so the money stays set aside until
+ *   the charge posts (or you switch the line off).
  *
  * Egor can switch a line off or fix its amount under Budget (overrides).
  * Built from his Cal statements (Nov 2026): arnona / electricity / water every 2 months
@@ -42,6 +44,8 @@ export interface RegularChargeRule {
   everyMonths: 1 | 2;
   /** Also set aside when expected up to this many days after the cycle ends (bill wanders around the start). */
   earlyWindowDays?: number;
+  /** Utilities: never cancelled, only late — stays set aside until it's charged. */
+  alwaysComes?: boolean;
   /** No fixed rhythm (hairdresser, nails): set aside every cycle until it comes. */
   irregular?: boolean;
   /** Used until there's history, or when you set an amount by hand. */
@@ -83,10 +87,10 @@ export const DEFAULT_REGULAR_CHARGES: readonly RegularChargeRule[] = [
   { id: "apple", name: "Apple", pattern: /apple\.com/i, exactAmount: 39.9, everyMonths: 1, defaultAmount: 39.9, estimate: "last" },
   { id: "hairdresser", name: "Hairdresser (BIT ₪120)", pattern: /\bBIT\b/, exactAmount: 120, everyMonths: 1, irregular: true, defaultAmount: 120, estimate: "last" },
   { id: "nails", name: "Nails (PayBox ₪220)", pattern: /paybox|פייבוקס/i, exactAmount: 220, everyMonths: 1, irregular: true, defaultAmount: 220, estimate: "last" },
-  { id: "arnona", name: "Arnona", pattern: /עיריית|ארנונה|arnona|municipality/i, minAmount: 300, everyMonths: 2, defaultAmount: 1550, estimate: "last" },
-  { id: "electricity", name: "Electricity", pattern: /חברת\s*החשמל|israel\s*electric/i, everyMonths: 2, defaultAmount: 500, estimate: "seasonal" },
-  { id: "water", name: "Water", pattern: /מי\s*נתניה|תאגיד\s*המים|water\s*corp/i, everyMonths: 2, defaultAmount: 300, estimate: "average" },
-  { id: "gas", name: "Gas", pattern: /סופרגז|אמישראגז|פזגז|דורגז|supergas|amisragas/i, everyMonths: 2, defaultAmount: 330, estimate: "average" },
+  { id: "arnona", alwaysComes: true, name: "Arnona", pattern: /עיריית|ארנונה|arnona|municipality/i, minAmount: 300, everyMonths: 2, defaultAmount: 1550, estimate: "last" },
+  { id: "electricity", alwaysComes: true, name: "Electricity", pattern: /חברת\s*החשמל|israel\s*electric/i, everyMonths: 2, defaultAmount: 500, estimate: "seasonal" },
+  { id: "water", alwaysComes: true, name: "Water", pattern: /מי\s*נתניה|תאגיד\s*המים|water\s*corp/i, everyMonths: 2, defaultAmount: 300, estimate: "average" },
+  { id: "gas", alwaysComes: true, name: "Gas", pattern: /סופרגז|אמישראגז|פזגז|דורגז|supergas|amisragas/i, everyMonths: 2, defaultAmount: 330, estimate: "average" },
 ];
 
 /** The built-in list plus the bills you confirmed from suggestions (switched-off ones included). */
@@ -285,11 +289,11 @@ export function regularChargesForCycle(
     const expected = nextDate(past, rule.everyMonths);
     const est = estimateAmount(rule, past, expected);
     // Not come for a whole extra period → stopped (cancelled subscription, nails on a break).
-    if (expected < addMonths(cycleStart, -rule.everyMonths)) {
+    if (!rule.alwaysComes && expected < addMonths(cycleStart, -rule.everyMonths)) {
       return { ...base, state: "unknown" as const, amount: est.amount, date: expected, late: true, basis: est.basis };
     }
     // Too late to still be coming — release the money; if it does come, it's just charged.
-    if (today && expected < today && daysApart(expected, today) > LATE_RELEASE_DAYS) {
+    if (!rule.alwaysComes && today && expected < today && daysApart(expected, today) > LATE_RELEASE_DAYS) {
       return { ...base, state: "missed" as const, amount: est.amount, date: expected, late: true, basis: est.basis };
     }
     const dueBy = rule.earlyWindowDays ? addDays(cycleEnd, rule.earlyWindowDays) : cycleEnd;

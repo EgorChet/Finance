@@ -94,3 +94,22 @@ test("history keeps two identical charges from one statement, drops copies from 
   assert.equal(merged.filter((t) => t.merchant_he === "EV EDGE").length, 2);
   assert.equal(merged.length, 3);
 });
+
+test("a late utility bill stays set aside until it's charged; a late subscription is released after 14 days", () => {
+  const rules = resolveRegularCharges().filter((r) => r.id === "water" || r.id === "bezeq");
+  const history = [
+    tx("2026-05-10", "מי נתניה", 190), tx("2026-07-12", "מי נתניה", 400), tx("2026-09-10", "מי נתניה", 320),
+    tx("2026-08-20", "בזק", 160), tx("2026-09-20", "בזק", 160), tx("2026-10-20", "בזק", 160),
+  ];
+  // Water was expected ≈ 10 Nov; it's 5 Dec and still nothing. Bezeq was expected 20 Nov.
+  const dec5 = regularChargesForCycle(rules, [], history, "2026-11-10", "2026-12-09", "2026-12-05");
+  assert.equal(dec5.find((r) => r.id === "water")?.state, "due");
+  assert.equal(dec5.find((r) => r.id === "bezeq")?.state, "missed");
+  // Next cycle, a month late: water is still held (and marked late).
+  const dec20 = regularChargesForCycle(rules, [], history, "2026-12-10", "2027-01-09", "2026-12-20");
+  const water = dec20.find((r) => r.id === "water");
+  assert.deepEqual([water?.state, water?.late], ["due", true]);
+  // Once it posts, it's simply charged and the next one moves two months on from it.
+  const paid = regularChargesForCycle(rules, [tx("2026-12-21", "מי נתניה", 350)], history, "2026-12-10", "2027-01-09", "2026-12-22");
+  assert.equal(paid.find((r) => r.id === "water")?.state, "posted");
+});
