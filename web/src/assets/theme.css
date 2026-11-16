@@ -4992,3 +4992,7 @@ button.topup-item {
   outline: 2px dashed color-mix(in srgb, currentColor 35%, transparent);
   outline-offset: -2px;
 }
+
+.bh-preview-change {
+  font-weight: 500;
+}
