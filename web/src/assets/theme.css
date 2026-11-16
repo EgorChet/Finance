@@ -3916,11 +3916,36 @@ body {
   line-height: 1.45;
 }
 
+.bh-main {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.bh-main-figure {
+  flex: 0 0 auto;
+}
+
+.bh-main .bh-value {
+  white-space: nowrap;
+}
+
+/* Status chips: a small column on the right of the big number. */
 .bh-chips {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-bottom: 0.35rem;
+}
+
+.bh-chips .bh-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bh-chip {

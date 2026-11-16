@@ -20,18 +20,28 @@
       </span>
     </div>
 
-    <template v-if="shown.moneyLeft >= 0 && shown.daysLeft > 0">
-      <p class="bh-label">{{ t("You can spend") }}</p>
-      <p class="bh-value">{{ whole(shown.perDayLeft) }}<span class="bh-unit">{{ t("/day") }}</span></p>
-    </template>
-    <template v-else-if="shown.moneyLeft < 0">
-      <p class="bh-label">{{ t("Over budget by") }}</p>
-      <p class="bh-value">{{ whole(-shown.moneyLeft) }}</p>
-    </template>
-    <template v-else>
-      <p class="bh-label">{{ t("Left at the end") }}</p>
-      <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
-    </template>
+    <!-- The big number on the left; the small status chips stacked on the right, so they take no extra height. -->
+    <div class="bh-main">
+      <div class="bh-main-figure">
+        <template v-if="shown.moneyLeft >= 0 && shown.daysLeft > 0">
+          <p class="bh-label">{{ t("You can spend") }}</p>
+          <p class="bh-value">{{ whole(shown.perDayLeft) }}<span class="bh-unit">{{ t("/day") }}</span></p>
+        </template>
+        <template v-else-if="shown.moneyLeft < 0">
+          <p class="bh-label">{{ t("Over budget by") }}</p>
+          <p class="bh-value">{{ whole(-shown.moneyLeft) }}</p>
+        </template>
+        <template v-else>
+          <p class="bh-label">{{ t("Left at the end") }}</p>
+          <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
+        </template>
+      </div>
+      <div v-if="byDay || setAsideLine || streak" class="bh-chips">
+        <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
+        <span v-if="byDay && !ahead" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
+        <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
+      </div>
+    </div>
     <p class="bh-sub">{{ subline }}</p>
     <p v-if="ahead" class="bh-preview-note">
       {{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}
@@ -84,12 +94,6 @@
       >
         {{ zoomed ? t("Whole cycle") : t("Zoom in") }}
       </button>
-    </div>
-
-    <div v-if="byDay || setAsideLine || streak" class="bh-chips">
-      <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
-      <span v-if="byDay && !ahead" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
-      <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
     </div>
 
     <div class="bh-budget">
