@@ -75,43 +75,19 @@
       v-if="showSummaryMetrics"
       :report="report"
       :living-budget="monthLivingBudget"
-      :hide-living-budget="selectedMonth === null"
+      :hide-living-budget="selectedMonth === null || !!summaryPlan"
       :retrospective="budgetRetrospective"
-      :plan="summaryPlan"
-      :plan-at="planAt"
+      :plan="null"
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
       :budget-extras="budgetExtras"
     />
+    <RouterLink v-if="summaryPlan" class="sp-today-link" to="/app/home">
+      {{ t("Today's budget, daily amount and preview are on Today ›") }}
+    </RouterLink>
     <PendingCycleCard v-if="isPendingCycleSelected && selectedCycleStart" :cycle-start="selectedCycleStart" />
-    <template v-if="showTransactions && isLiveTransactionView">
-      <section class="tx-section">
-        <h3 class="tx-section-title">{{ t("Charges") }}</h3>
-        <TransactionPeriodPicker v-model="txPeriod" />
-        <p v-if="!periodTransactions.length" class="tx-period-empty">
-          {{ t("No charges for {period}.", { period: periodLabel }) }}
-        </p>
-        <TransactionList
-          v-else
-          :transactions="periodTransactions"
-          title=""
-          show-category
-          :statement-billing="statementBilling"
-          :cycle-start="liveCycleStartIso"
-          :excludeable="!auth.readOnly"
-          :adjustable="!auth.readOnly"
-          :excluding-key="excludingKey"
-          :adjusting-key="adjustingKey"
-          :show-sort="false"
-          :default-limit="50"
-          @exclude="excludeTransaction"
-          @adjust="adjustTransaction"
-        />
-      </section>
-    </template>
     <template v-if="showCategoryExplorer">
-    <BitSortCard v-if="!auth.readOnly" :transactions="report.transactions" />
     <CategoryAccordion
       v-model:expanded-keys="expandedCategoryKeys"
       :categories="displayCategories"
@@ -128,26 +104,7 @@
       @adjust="adjustTransaction"
     />
     </template>
-    <template v-if="showTransactions && !isLiveTransactionView">
-      <section class="tx-section tx-section--after-categories">
-        <h3 class="section-title">{{ t("Charges") }}</h3>
-        <p class="tx-period-empty">{{ pastChargesHint }}</p>
-        <TransactionList
-          :transactions="periodTransactions"
-          title=""
-          show-category
-          paginated
-          :statement-billing="statementBilling"
-          :excludeable="!auth.readOnly"
-          :adjustable="!auth.readOnly"
-          :excluding-key="excludingKey"
-          :adjusting-key="adjustingKey"
-          :default-limit="25"
-          @exclude="excludeTransaction"
-          @adjust="adjustTransaction"
-        />
-      </section>
-    </template>
+    <RouterLink v-if="showCategoryExplorer" class="bh-link sp-all-charges" :to="{ name: 'browse' }">{{ t("All charges of this period in Operations ›") }}</RouterLink>
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       {{ t("Category breakdown and transactions will appear once this cycle’s statement is uploaded.") }}
     </p>
@@ -164,9 +121,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { addExclusion, deleteStatementMonth, fetchMonths, fetchReport, upsertAdjustment } from "@/shared/api/client";
 import CategoryAccordion from "@/features/spending/components/CategoryAccordion.vue";
-import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import TransactionList from "@/shared/components/TransactionList.vue";
-import TransactionPeriodPicker from "@/shared/components/TransactionPeriodPicker.vue";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import ErrorBanner from "@/shared/components/ErrorBanner.vue";
 import MonthPicker from "@/features/spending/components/MonthPicker.vue";

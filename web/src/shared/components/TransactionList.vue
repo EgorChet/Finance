@@ -213,6 +213,7 @@ import { useAdjustmentsDataStore, useExclusionsDataStore } from "@/shared/stores
 import { invalidateSpendingDataCaches } from "@/shared/stores/invalidateCaches";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { transactionKey } from "@/shared/utils/transactionKey";
+import { HOLD_NOTE, isHold } from "@/shared/utils/holds";
 
 type SortKey = "date" | "merchant" | "category" | "amount";
 
@@ -426,16 +427,11 @@ const categoryError = ref("");
 const draftCategory = ref("");
 
 // ── Holds: a pending charge that will really be smaller (EV charging, parking) or nothing ──
-const HOLD_NOTE = "Hold";
 const holdRow = ref<TxRow | null>(null);
 const holdAmount = ref(0);
 const holdSaving = ref(false);
 const holdError = ref("");
 
-/** Still being received (קליטה) or an estimated amount — the real charge may differ. */
-function isHold(tx: Transaction): boolean {
-  return tx.charge_amount > 0 && (tx.charge_estimated === true || /קליטה/.test(`${tx.notes ?? ""} ${tx.transaction_type_he ?? ""}`));
-}
 
 function openHold() {
   holdRow.value = sheetRow.value;

@@ -39,26 +39,6 @@
           <BitSortCard v-if="!auth.readOnly" :transactions="spendingReport.transactions" />
         </section>
 
-        <section v-if="topCategories.length" class="today-section">
-          <div class="bx-list-head today-list-head">
-            <h3 class="today-title">{{ t("This cycle") }}</h3>
-            <RouterLink class="today-more" :to="overviewLink">{{ t("All categories ›") }}</RouterLink>
-          </div>
-          <div class="bx-list">
-            <RouterLink v-for="c in topCategories" :key="c.name" :to="overviewLink" class="bx-row today-link">
-              <CategoryIcon :category="c.name" />
-              <span class="bx-row-body">
-                <span class="bx-row-top">
-                  <span class="bx-row-name">{{ catName(c.name) }}</span>
-                  <span class="bx-row-amount">{{ formatIlsWhole(c.total) }}</span>
-                </span>
-                <span class="bx-row-meta">
-                  <span :class="`cat-row-compare cat-row-compare--${c.tone}`">{{ c.line || t("{n} {n|charge|charges}", { n: c.count }) }}</span>
-                </span>
-              </span>
-            </RouterLink>
-          </div>
-        </section>
 
         <section v-if="spendingReport.transactions.length" class="today-section">
           <div class="bx-list-head today-list-head">
@@ -83,7 +63,6 @@
 <script setup lang="ts">
 import DemoBanner from "@/shared/components/DemoBanner.vue";
 import { catName, dateTag, t, tr } from "@/shared/i18n";
-import CategoryIcon from "@/shared/components/CategoryIcon.vue";
 import { friendlyError } from "@/shared/utils/friendlyError";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -95,13 +74,8 @@ import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { formatIlsWhole } from "@/shared/utils/format";
 import { isBitTransfer } from "@/shared/composables/useChargeCategory";
-import {
-  buildCategoryCompareContext,
-  categoryCompareLine,
-  categoryCompareTone,
-  computeCategoryCompareFromContext,
-} from "@/features/spending/utils/categoryCompare";
-import { rollupCategoriesForDisplay } from "@/shared/categories";
+import { isHold, isSettledHold } from "@/shared/utils/holds";
+import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAuthStore } from "@/shared/stores/auth";
 import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/homeData";
@@ -258,6 +232,18 @@ const todoItems = computed(() => {
       to: { name: "browse", query: { view: "merchants" } },
     });
   }
+  // Pending charges that may be holds (EV charging, parking): say how much will really be charged.
+  const holds = (spendingReport.value?.transactions ?? []).filter((tx) => isHold(tx) && !isSettledHold(tx)).slice(0, 3);
+  for (const tx of holds) {
+    items.push({
+      key: `hold-${tx.date}-${tx.merchant_he}-${tx.charge_amount}`,
+      icon: "⏳",
+      title: merchantDisplayName(tx),
+      sub: t("Still pending — if it's a hold, tap it and say how much will be charged"),
+      amount: formatIlsWhole(tx.charge_amount),
+      to: { name: "browse", query: { q: merchantDisplayName(tx) } },
+    });
+  }
   for (const row of summaryPlan.value?.committedRows ?? []) {
     // Only one-off charges are news; monthly bills come every month.
     if (row.kind !== "upcoming" || !row.oneTimeDate) continue;
@@ -271,34 +257,6 @@ const todoItems = computed(() => {
     });
   }
   return items;
-});
-
-/** Top categories of the open cycle with the same "vs usual" line as Spending. */
-const topCategories = computed(() => {
-  const report = spendingReport.value;
-  if (!report) return [];
-  const rows = rollupCategoriesForDisplay(report.by_category).slice(0, 4);
-  const start = activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value);
-  const ctx = showPaceHealth.value
-    ? buildCategoryCompareContext(paceReport.value?.transactions ?? [], {
-        cycleDay: cycleDay.value,
-        cycleStart: start,
-        referenceDate: refDate.value,
-        throughDay: summaryPlan.value?.byThisDay?.day ?? null,
-      })
-    : null;
-  return rows.map((c) => {
-    const result = ctx
-      ? computeCategoryCompareFromContext(ctx, report.transactions, { kind: "rollup", category: c.category_en }, c.category_en)
-      : null;
-    return {
-      name: c.category_en,
-      total: c.total,
-      count: c.count,
-      line: categoryCompareLine(result),
-      tone: categoryCompareTone(result),
-    };
-  });
 });
 
 async function loadToLabel() {
