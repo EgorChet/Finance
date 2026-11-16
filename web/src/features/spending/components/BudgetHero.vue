@@ -11,7 +11,13 @@
   >
     <div class="bh-top">
       <span class="bh-pill"><span class="bh-dot" />{{ t(shown.status) }}</span>
-      <span class="bh-day">{{ t("Day {n} of {total}", { n: shown.dayIndex, total: shown.cycleLength }) }}<template v-if="ahead"> · {{ t("preview") }}</template></span>
+      <span v-if="!planAt || maxAhead === 0" class="bh-day">{{ t("Day {n} of {total}", { n: shown.dayIndex, total: shown.cycleLength }) }}</span>
+      <!-- Step ahead to see the card on a later day if nothing more is spent (up to 14 days). -->
+      <span v-else class="bh-day bh-day-step" :class="{ 'bh-day-step--on': ahead > 0 }" @click.stop @keydown.stop>
+        <button type="button" class="bh-step" :disabled="ahead === 0" :aria-label="t('One day less')" @click="ahead--">‹</button>
+        <span :title="t('What if I spend nothing?')">{{ t("Day {n} of {total}", { n: shown.dayIndex, total: shown.cycleLength }) }}</span>
+        <button type="button" class="bh-step" :disabled="ahead >= maxAhead" :aria-label="t('One day more')" @click="ahead++">›</button>
+      </span>
     </div>
 
     <template v-if="shown.moneyLeft >= 0 && shown.daysLeft > 0">
@@ -27,15 +33,7 @@
       <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
     </template>
     <p class="bh-sub">{{ subline }}</p>
-
-    <!-- What the card would say after N more days with no spending (up to 14). -->
-    <div v-if="planAt && maxAhead > 0" class="bh-sim" @click.stop @keydown.stop>
-      <button type="button" class="bh-sim-btn" :disabled="ahead === 0" :aria-label="t('One day less')" @click="ahead--">−</button>
-      <span class="bh-sim-label">
-        {{ ahead ? t("In {n} {n|day|days}, spending nothing", { n: ahead }) : t("What if I spend nothing?") }}
-      </span>
-      <button type="button" class="bh-sim-btn" :disabled="ahead >= maxAhead" :aria-label="t('One day more')" @click="ahead++">+</button>
-    </div>
+    <p v-if="ahead" class="bh-preview-note">{{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}</p>
 
     <div class="bh-chart-wrap">
       <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
