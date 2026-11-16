@@ -599,6 +599,14 @@ export const RU: Record<string, string> = {
   "Now set aside: {name} {amount}": "Теперь откладываем: {name} {amount}",
   "Back to today": "К сегодня",
   "Assumes these bills come as expected: {names}": "Считаем, что эти счета придут как ожидается: {names}",
+  "It's a hold — less will be charged": "Это резерв — спишут меньше",
+  "EV Edge, Pango and the like block an amount but charge less or nothing": "EV Edge, Pango и т.п. блокируют сумму, а списывают меньше или ничего",
+  "Blocked now: {amount}. How much will really be charged?": "Сейчас заблокировано {amount}. Сколько спишут на самом деле?",
+  "Nothing (₪0)": "Ничего (₪0)",
+  "Will be charged": "Спишут",
+  "Not counted: {name} {amount}": "Не учитываем: {name} {amount}",
+  "Counted as {amount}": "Учитываем как {amount}",
+  "hold {total} · counted as {amount}": "резерв {total} · учитываем {amount}",
   // @end-ui
 };
 
