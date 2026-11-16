@@ -74,8 +74,6 @@ import BitSortCard from "@/features/merchants/BitSortCard.vue";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { formatIlsWhole } from "@/shared/utils/format";
 import { isBitTransfer } from "@/shared/composables/useChargeCategory";
-import { isHold, isSettledHold } from "@/shared/utils/holds";
-import { merchantDisplayName } from "@/shared/utils/merchantNames";
 import { onSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { useAuthStore } from "@/shared/stores/auth";
 import { type HomeDataBundle, useHomeDataStore } from "@/features/home/stores/homeData";
@@ -230,18 +228,6 @@ const todoItems = computed(() => {
       title: t("{n} {n|merchant needs|merchants need} a name", { n: toLabelCount.value }),
       sub: t("Label them so categories stay right"),
       to: { name: "browse", query: { view: "merchants" } },
-    });
-  }
-  // Pending charges that may be holds (EV charging, parking): say how much will really be charged.
-  const holds = (spendingReport.value?.transactions ?? []).filter((tx) => isHold(tx) && !isSettledHold(tx)).slice(0, 3);
-  for (const tx of holds) {
-    items.push({
-      key: `hold-${tx.date}-${tx.merchant_he}-${tx.charge_amount}`,
-      icon: "⏳",
-      title: merchantDisplayName(tx),
-      sub: t("Still pending — if it's a hold, tap it and say how much will be charged"),
-      amount: formatIlsWhole(tx.charge_amount),
-      to: { name: "browse", query: { q: merchantDisplayName(tx) } },
     });
   }
   for (const row of summaryPlan.value?.committedRows ?? []) {
