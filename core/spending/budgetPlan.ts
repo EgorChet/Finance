@@ -476,6 +476,7 @@ export function computeBudgetPlan(
   const covered = rulesCoveredByConfigured(rules, configuredChargesForCycle(start, cycle.configuredCharges ?? [], end));
   let vaadReserve = 0;
   for (const r of regularCharges) {
+    if (covered.has(r.id)) r.coveredByBudget = true;
     if (r.state !== "due" || !(r.amount > 0) || covered.has(r.id)) continue;
     if (r.id === "vaad") vaadReserve += r.amount;
     else upcomingReserve += r.amount;
@@ -611,7 +612,9 @@ export function computeBudgetPlan(
         const amt = effectiveSpend(tx);
         if (!(amt > 0)) continue;
         const day = daysBetween(startDate, parseIsoDate(tx.date)) + 1;
-        if (day > compareDay) continue;
+        // Past cycles are counted by purchase date, days 1..N — so is this one. Rows dated before
+        // the cycle (yesterday's purchases, old installments) belong to earlier cycles there.
+        if (day < 1 || day > compareDay) continue;
         total += amt;
         if (isFlexibleTransaction(tx, undefined, rules)) everyday += amt;
       }

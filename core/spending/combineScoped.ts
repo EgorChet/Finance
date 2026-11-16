@@ -1,5 +1,5 @@
 import type { SpendingReport, Transaction } from "../types.js";
-import { dedupeTransactionSnapshots, effectiveSpend } from "../utils/transaction.js";
+import { dedupeAcrossSnapshots, effectiveSpend } from "../utils/transaction.js";
 import { monthLabelFromIso, roundMoney } from "../utils/format.js";
 
 /**
@@ -13,13 +13,14 @@ export function combineScopedReports(reports: SpendingReport[]): SpendingReport 
   );
   if (ordered.length === 1) return ordered[0];
 
-  const txs: Transaction[] = [];
+  const groups: Transaction[][] = [];
   for (const r of ordered) {
     const billing = r.metadata.billing_date as string | undefined;
     const label = billing ? monthLabelFromIso(billing) : undefined;
-    for (const tx of r.transactions) txs.push({ ...tx, billing_month: tx.billing_month || label });
+    groups.push(r.transactions.map((tx) => ({ ...tx, billing_month: tx.billing_month || label })));
   }
-  const deduped = dedupeTransactionSnapshots(txs);
+  // Twins inside one statement are both kept (they used to collapse into one in the history).
+  const deduped = dedupeAcrossSnapshots(groups);
   deduped.sort((a, b) => b.date.localeCompare(a.date));
 
   const byCat = new Map<string, { he: string | null; total: number; count: number }>();

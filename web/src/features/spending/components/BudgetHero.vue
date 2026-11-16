@@ -276,7 +276,7 @@ const preview = computed((): BudgetPlan | null => {
   const arrived: Transaction[] = [];
   for (const r of props.plan.regularCharges) {
     // No expected date (hairdresser, nails come whenever): keep them set aside.
-    if (r.state !== "due" || !(r.amount > 0) || !r.date) continue;
+    if (r.state !== "due" || !(r.amount > 0) || !r.date || r.coveredByBudget) continue;
     const date = r.date >= tomorrow ? r.date : tomorrow;
     if (date > until) continue;
     arrived.push({
