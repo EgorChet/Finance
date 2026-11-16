@@ -405,11 +405,11 @@ const byDay = computed(() => {
   const b = shown.value.byThisDay;
   if (!b || shown.value.dayIndex < 1) return null;
   const n = b.past.length + 1;
-  const record = b.everydayRank === 1 || b.totalRank === 1;
+  // Only everyday spending can be a "record": bills are planned and already taken off the budget.
+  const record = b.everydayRank === 1;
   // Short chip: which day and the full comparison are in the details sheet.
   const stale = b.dataAgeDays >= 3 ? " ⚠️" : "";
   if (b.everydayRank === 1) return { record, line: `🔺 ${t("Record {amount}", { amount: whole(b.everyday) })}${stale}` };
-  if (b.totalRank === 1) return { record, line: `🔺 ${t("Record incl. bills")}${stale}` };
   return { record, line: `${t("{ord} of {n} cycles", { ord: ordinal(b.everydayRank), n })}${stale}` };
 });
 
