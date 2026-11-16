@@ -262,7 +262,9 @@ export function regularChargesForCycle(
   const inCycle = new Set(cycleTransactions);
 
   return rules.map((rule) => {
-    const mine = all.filter((tx) => matchRegularCharge(tx, [rule]));
+    // The first rule that fits owns the charge (Apple ₪39.9 stays with Apple even when another
+    // Apple subscription was confirmed as its own bill) — same as the card counts it.
+    const mine = all.filter((tx) => matchRegularCharge(tx, rules)?.id === rule.id);
     const posted = mine.filter((tx) => inCycle.has(tx) || (tx.date.slice(0, 10) >= cycleStart && tx.date.slice(0, 10) <= cycleEnd));
     const base = { id: rule.id, name: rule.name, everyMonths: rule.everyMonths };
     if (posted.length) {

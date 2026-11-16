@@ -85,3 +85,17 @@ test("saying yes makes it a bill: set aside when due, and its charges stop count
   // Another shop whose name merely contains the word isn't swept in.
   assert.equal(committedKind(tx("2026-11-25", "Insurance Cafe", 30), "2026-11-10", rules), null);
 });
+
+test("a second subscription from the same name (Apple ₪69.9 next to ₪39.9) keeps its own dates and amount", () => {
+  const overrides = { "custom:APPLE.COM/BILL": { custom: { name: "Apple", merchant: "APPLE.COM/BILL" } } };
+  const rules = resolveRegularCharges(overrides);
+  const history = ["2026-08", "2026-09", "2026-10"].flatMap((ym) => [
+    tx(`${ym}-15`, "APPLE.COM/BILL", 69.9, STANDING),
+    tx(`${ym}-30`, "APPLE.COM/BILL", 39.9, STANDING),
+  ]);
+  const st = regularChargesForCycle(rules, [], history, "2026-11-10", "2026-12-09", "2026-11-11");
+  const small = st.find((r) => r.id === "apple");
+  const big = st.find((r) => r.id === "custom:APPLE.COM/BILL");
+  assert.deepEqual([small?.amount, small?.date], [39.9, "2026-11-30"]);
+  assert.deepEqual([big?.amount, big?.date], [70, "2026-11-15"]);
+});
