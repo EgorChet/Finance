@@ -18,4 +18,6 @@ node_modules/
 api/dist/
 web/dist/
 *.tsbuildinfo
-.claude/
+.claude/*
+# Shared permission rules for Claude Code sessions on this repo
+!.claude/settings.json
