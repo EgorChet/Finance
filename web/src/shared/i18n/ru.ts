@@ -598,6 +598,7 @@ export const RU: Record<string, string> = {
   "No longer set aside: {name} {amount} — the bill is over 2 weeks late": "Больше не откладываем: {name} {amount} — счёт опаздывает больше 2 недель",
   "Now set aside: {name} {amount}": "Теперь откладываем: {name} {amount}",
   "Back to today": "К сегодня",
+  "Assumes these bills come as expected: {names}": "Считаем, что эти счета придут как ожидается: {names}",
   // @end-ui
 };
 

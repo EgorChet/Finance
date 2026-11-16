@@ -88,7 +88,14 @@ function hasFixedAmount(rule: RegularChargeRule): boolean {
   return (rule as { fixedAmount?: boolean }).fixedAmount === true;
 }
 
+/** Notes on a made-up charge for a regular bill (the budget card's day-ahead preview). */
+export const PREVIEW_REGULAR_NOTE = "preview_regular:";
+
 export function matchRegularCharge(tx: Transaction, rules: readonly RegularChargeRule[]): RegularChargeRule | null {
+  if (tx.notes?.startsWith(PREVIEW_REGULAR_NOTE)) {
+    const id = tx.notes.slice(PREVIEW_REGULAR_NOTE.length);
+    return rules.find((r) => r.id === id) ?? null;
+  }
   // Charges you entered under Budget are merged in as their own rows — never mistake them for a card charge.
   if (tx.notes?.startsWith("fixed_charge:")) return null;
   const amount = effectiveSpend(tx);

@@ -37,8 +37,8 @@
       {{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}
       <button type="button" class="bh-today-btn" @click.stop="ahead = 0" @keydown.stop>{{ t("Back to today") }}</button>
     </p>
-    <p v-for="c in previewChanges" :key="c.label" class="bh-preview-note bh-preview-change">
-      {{ c.released ? t("No longer set aside: {name} {amount} — the bill is over 2 weeks late", { name: c.label, amount: whole(c.amount) }) : t("Now set aside: {name} {amount}", { name: c.label, amount: whole(c.amount) }) }}
+    <p v-if="arrivedNames.length" class="bh-preview-note bh-preview-change">
+      {{ t("Assumes these bills come as expected: {names}", { names: arrivedNames.join(", ") }) }}
     </p>
 
     <div class="bh-chart-wrap">
@@ -235,12 +235,14 @@ import { catName, isRu, t, tr } from "@/shared/i18n";
 import { computed, nextTick, onUnmounted, ref, watch } from "vue";
 import type { BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import { tightStreak } from "@core/spending/tightCycle";
+import { PREVIEW_REGULAR_NOTE } from "@core/spending/regularCharges";
+import type { Transaction } from "@/shared/types";
 import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 
 const props = defineProps<{
   plan: BudgetPlan;
   /** Recomputes the plan for another day; enables the "spend nothing for N days" preview. */
-  planAt?: ((ref: Date) => BudgetPlan | null) | null;
+  planAt?: ((ref: Date, extra?: Transaction[]) => BudgetPlan | null) | null;
   /** This month's extra money, each addition separately. */
   extras?: { extra: number; note?: string }[];
   everydayEnabled?: boolean;
@@ -260,20 +262,41 @@ const preview = computed((): BudgetPlan | null => {
   if (!ahead.value || !props.planAt) return null;
   const [y, m, d] = props.plan.cycleStart.split("-").map(Number);
   // "Today" in the plan's own terms (the demo's clock too), moved `ahead` days on.
-  return props.planAt(new Date(y, m - 1, d + props.plan.dayIndex - 1 + ahead.value));
+  const todayDate = new Date(y, m - 1, d + props.plan.dayIndex - 1);
+  const target = new Date(y, m - 1, d + props.plan.dayIndex - 1 + ahead.value);
+  const iso = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const tomorrow = iso(new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate() + 1));
+  const until = iso(target);
+  // Bills expected by then are assumed to arrive on their date for the amount set aside
+  // (a late one: tomorrow) — spending nothing doesn't stop bills from coming.
+  const arrived: Transaction[] = [];
+  for (const r of props.plan.regularCharges) {
+    // No expected date (hairdresser, nails come whenever): keep them set aside.
+    if (r.state !== "due" || !(r.amount > 0) || !r.date) continue;
+    const date = r.date >= tomorrow ? r.date : tomorrow;
+    if (date > until) continue;
+    arrived.push({
+      date,
+      merchant_he: r.name,
+      merchant_en: r.name,
+      amount: r.amount,
+      charge_amount: r.amount,
+      transaction_type_he: "",
+      category_he: null,
+      category_en: "Subscriptions",
+      notes: `${PREVIEW_REGULAR_NOTE}${r.id}`,
+      merchant_known: true,
+    });
+  }
+  return props.planAt(target, arrived);
 });
-/** Set-asides that appear or disappear between today and the previewed day (so a jump is explained). */
-const previewChanges = computed(() => {
+/** Bills the preview assumes have come by then (names, for the note under the figure). */
+const arrivedNames = computed(() => {
   const p = preview.value;
   if (!p) return [];
-  const base = (rows: BudgetPlan["committedRows"]) =>
-    new Map(rows.filter((r) => r.kind === "upcoming").map((r) => [r.label.replace(/\s*\(.*\)\s*$/, ""), r.amount]));
-  const before = base(props.plan.committedRows);
-  const after = base(p.committedRows);
-  const out: { label: string; amount: number; released: boolean }[] = [];
-  for (const [label, amount] of before) if (!after.has(label)) out.push({ label: tr(label), amount, released: true });
-  for (const [label, amount] of after) if (!before.has(label)) out.push({ label: tr(label), amount, released: false });
-  return out;
+  return p.regularCharges
+    .filter((r) => r.state === "posted" && props.plan.regularCharges.some((b) => b.id === r.id && b.state === "due"))
+    .map((r) => tr(r.name).replace(/\s*\(.*\)\s*$/, ""));
 });
 
 /** What the card shows: today's plan, or the preview. */
