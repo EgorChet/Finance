@@ -9,6 +9,25 @@
     <p class="bx-section-note">
       {{ t("Bills due this cycle are set aside until they're charged; \"Next cycle\" ones aren't counted yet. Amounts are learned from your statements.") }}
     </p>
+    <div v-if="!readonly && suggestions.length" class="rc-suggest">
+      <p class="rc-suggest-title">{{ t("New regular bill?") }}</p>
+      <div v-for="sg in suggestions" :key="sg.key" class="rc-suggest-row">
+        <MerchantIcon :merchant-he="sg.merchant" category="Subscriptions" />
+        <span class="bx-row-body">
+          <span class="bx-row-top">
+            <span class="bx-row-name">{{ tr(sg.name) }}</span>
+            <span class="bx-row-amount">~{{ formatIlsWhole(sg.amount) }}</span>
+          </span>
+          <span class="bx-row-meta">
+            <span>{{ t("{n} cycles in a row, around the {day}th", { n: sg.cycles, day: sg.day }) }}</span>
+          </span>
+          <span class="rc-suggest-actions">
+            <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="answer(sg, true)">{{ t("Yes, set it aside") }}</button>
+            <button type="button" class="btn btn-sm" :disabled="saving" @click="answer(sg, false)">{{ t("No, not regular") }}</button>
+          </span>
+        </span>
+      </div>
+    </div>
     <div class="bx-list">
       <component
         :is="readonly ? 'div' : 'button'"
@@ -20,7 +39,7 @@
         :disabled="!readonly && saving"
         @click="!readonly && startEdit(row.id)"
       >
-        <MerchantIcon :merchant-he="BILL_MARKS[row.id]?.he" :category="BILL_MARKS[row.id]?.category ?? 'Housing'" />
+        <MerchantIcon :merchant-he="BILL_MARKS[row.id]?.he ?? row.merchant" :category="BILL_MARKS[row.id]?.category ?? (row.merchant ? 'Subscriptions' : 'Housing')" />
         <span class="bx-row-body">
           <span class="bx-row-top">
             <span class="bx-row-name">{{ tr(row.name) }}</span>
@@ -69,7 +88,7 @@ import type { BudgetPlan } from "@core/spending/budgetPlan";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import { livingBudgetForMonth, normalizeLivingBudgetMonthTopup, normalizeLivingBudgetSegment } from "@/features/household/utils/livingBudget";
 import {
-  DEFAULT_REGULAR_CHARGES,
+  allRegularCharges,
   regularChargesForCycle,
   resolveRegularCharges,
   rulesCoveredByConfigured,
@@ -77,6 +96,7 @@ import {
   type RegularChargeRule,
   type RegularChargeStatus,
 } from "@core/spending/regularCharges";
+import { suggestRegularCharges, type RegularSuggestion } from "@core/spending/regularSuggestions";
 import { fetchReport, saveRegularCharges } from "@/shared/api/client";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";
@@ -127,9 +147,23 @@ const editing = ref<{ id: string; on: boolean; amount: number } | null>(null);
 const configured = ref<ConfiguredCharge[]>([]);
 const budget = ref<number | null>(null);
 
+/** Built-in bills plus the ones confirmed from suggestions. */
+const allRules = computed(() => allRegularCharges(overrides.value));
+
+/** Charges that keep coming and aren't on the list yet — offered for a yes / no. */
+const suggestions = computed((): RegularSuggestion[] =>
+  cycle.value
+    ? suggestRegularCharges([...history.value, ...cycleTxs.value], {
+        cycleStart: cycle.value.start,
+        cycleDay: loadCycleDay(),
+        overrides: overrides.value,
+      })
+    : [],
+);
+
 /** Bills you also entered under Budget → Recurring: counted there, not here. */
 const covered = computed(() =>
-  rulesCoveredByConfigured(DEFAULT_REGULAR_CHARGES, configured.value.filter((c) => c.schedule !== "once")),
+  rulesCoveredByConfigured(allRules.value, configured.value.filter((c) => c.schedule !== "once")),
 );
 
 /** This cycle's plan — the same numbers the Spending screen shows. */
@@ -161,7 +195,9 @@ function shortDate(iso: string): string {
 const statuses = computed((): Map<string, RegularChargeStatus> => {
   if (!cycle.value) return new Map();
   const amountsOnly: RegularChargeOverrides = {};
-  for (const [id, o] of Object.entries(overrides.value)) if (o.amount) amountsOnly[id] = { amount: o.amount };
+  for (const [id, o] of Object.entries(overrides.value)) {
+    if (o.amount || o.custom) amountsOnly[id] = { ...(o.custom ? { custom: o.custom } : {}), ...(o.amount ? { amount: o.amount } : {}) };
+  }
   const list = regularChargesForCycle(
     resolveRegularCharges(amountsOnly),
     cycleTxs.value,
@@ -174,7 +210,7 @@ const statuses = computed((): Map<string, RegularChargeStatus> => {
 });
 
 const rows = computed(() =>
-  DEFAULT_REGULAR_CHARGES.map((rule) => {
+  allRules.value.map((rule) => {
     const s = statuses.value.get(rule.id);
     const off = !!overrides.value[rule.id]?.off;
     const amount = s?.amount ?? rule.defaultAmount;
@@ -202,6 +238,7 @@ const rows = computed(() =>
     return {
       id: rule.id,
       name: rule.name,
+      merchant: rule.merchant,
       amount,
       exact: s?.state === "posted" || rule.exactAmount != null || !!overrides.value[rule.id]?.amount,
       off: off || covered.value.has(rule.id),
@@ -221,7 +258,7 @@ const setAsideTotal = computed(() =>
 /** Average per month of the lines in use (2-monthly bills count half; never-seen ones skipped). */
 const monthlyAverage = computed(() =>
   Math.round(
-    DEFAULT_REGULAR_CHARGES.reduce((sum, rule) => {
+    allRules.value.reduce((sum, rule) => {
       if (overrides.value[rule.id]?.off || covered.value.has(rule.id)) return sum;
       const s = statuses.value.get(rule.id);
       if (!s || (s.state === "unknown" && !s.date && !rule.irregular)) return sum;
@@ -231,13 +268,14 @@ const monthlyAverage = computed(() =>
 );
 watch(monthlyAverage, (v) => emit("monthly", v), { immediate: true });
 
-const editingRule = computed(() => DEFAULT_REGULAR_CHARGES.find((r) => r.id === editing.value?.id) ?? null);
+const editingRule = computed(() => allRules.value.find((r) => r.id === editing.value?.id) ?? null);
 const editingEstimate = computed(() => {
   const id = editing.value?.id;
   if (!id) return 0;
   // The learned amount, ignoring a hand-set one.
   if (!cycle.value) return editingRule.value?.defaultAmount ?? 0;
-  const rule = DEFAULT_REGULAR_CHARGES.find((r) => r.id === id)!;
+  const rule = allRules.value.find((r) => r.id === id);
+  if (!rule) return 0;
   const [s] = regularChargesForCycle([rule], cycleTxs.value, history.value, cycle.value.start, cycle.value.end, cycle.value.today);
   return s?.amount ?? rule.defaultAmount;
 });
@@ -253,8 +291,10 @@ async function saveEdit() {
   if (!e) return;
   const next: RegularChargeOverrides = { ...overrides.value };
   const amount = e.amount > 0 ? Math.round(e.amount * 100) / 100 : null;
-  if (e.on && amount == null) delete next[e.id];
-  else next[e.id] = { ...(e.on ? {} : { off: true }), ...(amount != null ? { amount } : {}) };
+  // A confirmed bill keeps its entry (that entry is what makes it a bill).
+  const custom = overrides.value[e.id]?.custom;
+  if (e.on && amount == null && !custom) delete next[e.id];
+  else next[e.id] = { ...(custom ? { custom } : {}), ...(e.on ? {} : { off: true }), ...(amount != null ? { amount } : {}) };
   saving.value = true;
   error.value = "";
   try {
@@ -265,6 +305,25 @@ async function saveEdit() {
     emit("saved", t("Saved {name}", { name: editingRule.value ? tr(editingRule.value.name) : t("bill") }));
   } catch {
     error.value = t("Could not save — try again.");
+  } finally {
+    saving.value = false;
+  }
+}
+
+/** Yes → it becomes a bill (set aside when due); no → not asked about again. */
+async function answer(sg: RegularSuggestion, yes: boolean) {
+  const next: RegularChargeOverrides = {
+    ...overrides.value,
+    [sg.key]: yes ? { custom: { name: sg.name, merchant: sg.merchant } } : { dismissed: true },
+  };
+  saving.value = true;
+  try {
+    const res = await saveRegularCharges(next, auth.token || undefined);
+    overrides.value = res.overrides;
+    invalidateAllDataCaches();
+    emit("saved", yes ? t("Saved {name}", { name: tr(sg.name) }) : t("Okay, won't ask about {name} again", { name: tr(sg.name) }));
+  } catch {
+    emit("saved", t("Could not save — try again."));
   } finally {
     saving.value = false;
   }
@@ -303,3 +362,30 @@ onMounted(async () => {
 
 void props;
 </script>
+
+<style scoped>
+.rc-suggest {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 14px;
+}
+.rc-suggest-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.rc-suggest-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.rc-suggest-row + .rc-suggest-row {
+  margin-top: 0.75rem;
+}
+.rc-suggest-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+</style>

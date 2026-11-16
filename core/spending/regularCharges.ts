@@ -33,6 +33,8 @@ export interface RegularChargeRule {
   name: string;
   /** Tested against "merchant_he merchant_en". */
   pattern: RegExp;
+  /** A bill you confirmed from a suggestion: only this exact name on the card (pattern unused). */
+  merchant?: string;
   /** Only charges of exactly this amount (BIT / PayBox / Apple). */
   exactAmount?: number;
   /** Ignore smaller charges (e.g. ChatGPT API top-ups, arnona parking fines). */
@@ -51,6 +53,16 @@ export interface RegularChargeOverride {
   off?: boolean;
   /** Fixed amount instead of the estimate. */
   amount?: number | null;
+  /** A bill you confirmed from a suggestion (key "custom:<name on the card>"). */
+  custom?: { name: string; merchant: string };
+  /** A suggestion you declined — not asked again. */
+  dismissed?: boolean;
+}
+
+export const CUSTOM_RULE_PREFIX = "custom:";
+
+export function customRuleKey(merchantHe: string): string {
+  return `${CUSTOM_RULE_PREFIX}${merchantHe.trim()}`;
 }
 
 export type RegularChargeOverrides = Record<string, RegularChargeOverride>;
@@ -77,9 +89,28 @@ export const DEFAULT_REGULAR_CHARGES: readonly RegularChargeRule[] = [
   { id: "gas", name: "Gas", pattern: /סופרגז|אמישראגז|פזגז|דורגז|supergas|amisragas/i, everyMonths: 2, defaultAmount: 330, estimate: "average" },
 ];
 
+/** The built-in list plus the bills you confirmed from suggestions (switched-off ones included). */
+export function allRegularCharges(overrides?: RegularChargeOverrides | null): RegularChargeRule[] {
+  const custom: RegularChargeRule[] = [];
+  for (const [id, o] of Object.entries(overrides ?? {})) {
+    if (!id.startsWith(CUSTOM_RULE_PREFIX) || !o?.custom?.merchant) continue;
+    const merchant = o.custom.merchant.trim();
+    custom.push({
+      id,
+      name: o.custom.name || merchant,
+      pattern: new RegExp(merchant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      merchant,
+      everyMonths: 1,
+      defaultAmount: 0,
+      estimate: "median",
+    });
+  }
+  return [...DEFAULT_REGULAR_CHARGES, ...custom];
+}
+
 /** Rules in effect: defaults minus the ones switched off, with hand-set amounts applied. */
 export function resolveRegularCharges(overrides?: RegularChargeOverrides | null): RegularChargeRule[] {
-  return DEFAULT_REGULAR_CHARGES.filter((r) => !overrides?.[r.id]?.off).map((r) => {
+  return allRegularCharges(overrides).filter((r) => !overrides?.[r.id]?.off).map((r) => {
     const amount = overrides?.[r.id]?.amount;
     return amount != null && amount > 0 ? { ...r, defaultAmount: amount, fixedAmount: true } as RegularChargeRule & { fixedAmount: true } : r;
   });
@@ -103,7 +134,7 @@ export function matchRegularCharge(tx: Transaction, rules: readonly RegularCharg
   if (!(amount > 0)) return null;
   const text = `${tx.merchant_he ?? ""} ${tx.merchant_en ?? ""}`;
   for (const rule of rules) {
-    if (!rule.pattern.test(text)) continue;
+    if (rule.merchant != null ? (tx.merchant_he ?? "").trim() !== rule.merchant : !rule.pattern.test(text)) continue;
     if (rule.exactAmount != null && Math.abs(tx.charge_amount - rule.exactAmount) > 0.5) continue;
     if (rule.minAmount != null && amount < rule.minAmount) continue;
     return rule;
