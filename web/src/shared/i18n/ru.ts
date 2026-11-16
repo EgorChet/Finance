@@ -607,6 +607,9 @@ export const RU: Record<string, string> = {
   "Not counted: {name} {amount}": "Не учитываем: {name} {amount}",
   "Counted as {amount}": "Учитываем как {amount}",
   "hold {total} · counted as {amount}": "резерв {total} · учитываем {amount}",
+  "Still pending — if it's a hold, tap it and say how much will be charged": "Ещё в обработке — если это резерв, нажмите и укажите, сколько спишут",
+  "All charges of this period in Operations ›": "Все операции периода — в «Операциях» ›",
+  "Today's budget, daily amount and preview are on Today ›": "Бюджет на сегодня, сумма в день и прогноз — на «Сегодня» ›",
   // @end-ui
 };
 

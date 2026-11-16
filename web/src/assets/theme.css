@@ -5009,3 +5009,20 @@ button.topup-item {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* Spending: pointers to where the live budget and the charge list now live. */
+.sp-today-link,
+.sp-all-charges {
+  display: block;
+  margin: 0.75rem 0;
+  font-size: 0.88rem;
+}
+
+.sp-today-link {
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
