@@ -33,7 +33,10 @@
       <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
     </template>
     <p class="bh-sub">{{ subline }}</p>
-    <p v-if="ahead" class="bh-preview-note">{{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}</p>
+    <p v-if="ahead" class="bh-preview-note">
+      {{ t("In {n} {n|day|days}, spending nothing", { n: ahead }) }}
+      <button type="button" class="bh-today-btn" @click.stop="ahead = 0" @keydown.stop>{{ t("Back to today") }}</button>
+    </p>
     <p v-for="c in previewChanges" :key="c.label" class="bh-preview-note bh-preview-change">
       {{ c.released ? t("No longer set aside: {name} {amount} — the bill is over 2 weeks late", { name: c.label, amount: whole(c.amount) }) : t("Now set aside: {name} {amount}", { name: c.label, amount: whole(c.amount) }) }}
     </p>

@@ -4996,3 +4996,16 @@ button.topup-item {
 .bh-preview-change {
   font-weight: 500;
 }
+
+.bh-today-btn {
+  margin-left: 0.4rem;
+  padding: 0.15rem 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
