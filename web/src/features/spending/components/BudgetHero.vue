@@ -1,32 +1,41 @@
 <template>
   <div
     class="bh"
-    :class="`bh--${plan.tone}`"
+    :class="[`bh--${shown.tone}`, { 'bh--preview': ahead > 0 }]"
     role="button"
     tabindex="0"
-    :aria-label="`${t(plan.status)}. ${headline}. ${t('Open details')}`"
+    :aria-label="`${t(shown.status)}. ${headline}. ${t('Open details')}`"
     @click="sheetOpen = true"
     @keydown.enter.prevent="sheetOpen = true"
     @keydown.space.prevent="sheetOpen = true"
   >
     <div class="bh-top">
-      <span class="bh-pill"><span class="bh-dot" />{{ t(plan.status) }}</span>
-      <span class="bh-day">{{ t("Day {n} of {total}", { n: plan.dayIndex, total: plan.cycleLength }) }}</span>
+      <span class="bh-pill"><span class="bh-dot" />{{ t(shown.status) }}</span>
+      <span class="bh-day">{{ t("Day {n} of {total}", { n: shown.dayIndex, total: shown.cycleLength }) }}<template v-if="ahead"> · {{ t("preview") }}</template></span>
     </div>
 
-    <template v-if="plan.moneyLeft >= 0 && plan.daysLeft > 0">
+    <template v-if="shown.moneyLeft >= 0 && shown.daysLeft > 0">
       <p class="bh-label">{{ t("You can spend") }}</p>
-      <p class="bh-value">{{ whole(plan.perDayLeft) }}<span class="bh-unit">{{ t("/day") }}</span></p>
+      <p class="bh-value">{{ whole(shown.perDayLeft) }}<span class="bh-unit">{{ t("/day") }}</span></p>
     </template>
-    <template v-else-if="plan.moneyLeft < 0">
+    <template v-else-if="shown.moneyLeft < 0">
       <p class="bh-label">{{ t("Over budget by") }}</p>
-      <p class="bh-value">{{ whole(-plan.moneyLeft) }}</p>
+      <p class="bh-value">{{ whole(-shown.moneyLeft) }}</p>
     </template>
     <template v-else>
       <p class="bh-label">{{ t("Left at the end") }}</p>
-      <p class="bh-value">{{ whole(plan.moneyLeft) }}</p>
+      <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
     </template>
     <p class="bh-sub">{{ subline }}</p>
+
+    <!-- What the card would say after N more days with no spending (up to 14). -->
+    <div v-if="planAt && maxAhead > 0" class="bh-sim" @click.stop @keydown.stop>
+      <button type="button" class="bh-sim-btn" :disabled="ahead === 0" :aria-label="t('One day less')" @click="ahead--">−</button>
+      <span class="bh-sim-label">
+        {{ ahead ? t("In {n} {n|day|days}, spending nothing", { n: ahead }) : t("What if I spend nothing?") }}
+      </span>
+      <button type="button" class="bh-sim-btn" :disabled="ahead >= maxAhead" :aria-label="t('One day more')" @click="ahead++">+</button>
+    </div>
 
     <div class="bh-chart-wrap">
       <svg class="bh-chart" :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" aria-hidden="true">
@@ -56,14 +65,14 @@
     </div>
     <div class="bh-axis" aria-hidden="true">
       <span>{{ t("Day {n}", { n: 1 }) }}</span>
-      <span v-if="zoomed && windowEnd < plan.cycleLength">{{ t("Day {n}", { n: windowEnd }) }} →</span>
-      <span v-else>{{ t("Day {n}", { n: plan.cycleLength }) }}</span>
+      <span v-if="zoomed && windowEnd < shown.cycleLength">{{ t("Day {n}", { n: windowEnd }) }} →</span>
+      <span v-else>{{ t("Day {n}", { n: shown.cycleLength }) }}</span>
     </div>
     <div class="bh-legend">
       <span aria-hidden="true"><i class="bh-key bh-key--actual" />{{ t("You") }}</span>
       <span aria-hidden="true"><i class="bh-key bh-key--plan" />{{ t("Your usual pace") }}</span>
       <button
-        v-if="plan.daysLeft > 0 && plan.dayIndex < plan.cycleLength * 0.7"
+        v-if="shown.daysLeft > 0 && shown.dayIndex < shown.cycleLength * 0.7"
         type="button"
         class="bh-zoom"
         @click.stop="zoomed = !zoomed"
@@ -75,16 +84,16 @@
 
     <div v-if="byDay || setAsideLine || streak" class="bh-chips">
       <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
-      <span v-if="byDay" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
+      <span v-if="byDay && !ahead" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
       <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
     </div>
 
     <div class="bh-budget">
       <div class="bh-budget-head">
         <span>{{ t("Budget this month") }}</span>
-        <strong>{{ whole(plan.budget) }}</strong>
+        <strong>{{ whole(shown.budget) }}</strong>
       </div>
-      <p v-if="extrasTotal > 0" class="bh-budget-extra">{{ whole(plan.budget - extrasTotal) }} + {{ t("{amount} extra", { amount: whole(extrasTotal) }) }}</p>
+      <p v-if="extrasTotal > 0" class="bh-budget-extra">{{ whole(shown.budget - extrasTotal) }} + {{ t("{amount} extra", { amount: whole(extrasTotal) }) }}</p>
       <div class="bh-split" aria-hidden="true">
         <span class="bh-split-spent" :style="{ width: `${split.spent}%` }" />
         <span class="bh-split-aside" :style="{ width: `${split.aside}%` }" />
@@ -95,15 +104,15 @@
     <div class="bh-stats">
       <div>
         <span><i class="bh-dot-key bh-dot-key--spent" />{{ t("Spent") }}</span>
-        <strong>{{ whole(plan.spentOnCap) }}</strong>
+        <strong>{{ whole(shown.spentOnCap) }}</strong>
       </div>
       <div>
         <span><i class="bh-dot-key bh-dot-key--aside" />{{ t("Set aside") }}</span>
         <strong>{{ whole(reserved) }}</strong>
       </div>
       <div>
-        <span><i class="bh-dot-key bh-dot-key--free" />{{ plan.moneyLeft < 0 ? t("Over") : t("Free to spend") }}</span>
-        <strong>{{ whole(plan.moneyLeft < 0 ? -plan.moneyLeft : Math.max(0, plan.flexLeft)) }}</strong>
+        <span><i class="bh-dot-key bh-dot-key--free" />{{ shown.moneyLeft < 0 ? t("Over") : t("Free to spend") }}</span>
+        <strong>{{ whole(shown.moneyLeft < 0 ? -shown.moneyLeft : Math.max(0, shown.flexLeft)) }}</strong>
       </div>
     </div>
   </div>
@@ -112,7 +121,7 @@
     <div v-if="sheetOpen" class="confirm-overlay bh-overlay" @click.self="sheetOpen = false">
       <div class="everyday-breakdown-dialog bh-sheet" role="dialog" aria-modal="true" aria-labelledby="bh-sheet-title">
         <header class="bh-sheet-head">
-          <h3 id="bh-sheet-title">{{ t(plan.status) }}</h3>
+          <h3 id="bh-sheet-title">{{ t(shown.status) }}</h3>
           <button ref="closeBtn" type="button" class="btn bh-sheet-close" @click="sheetOpen = false">{{ t("Done") }}</button>
         </header>
         <p class="bh-sheet-lead">{{ explanation }}</p>
@@ -127,7 +136,7 @@
             <template v-else>{{ t("Keep it up.") }}</template>
           </p>
           <p class="bh-tight-text">
-            {{ t("After bills and what you've spent so far, you have {free} left for {n} {n|day|days}.", { free: whole(tight.freeLeft), n: plan.daysLeft }) }}
+            {{ t("After bills and what you've spent so far, you have {free} left for {n} {n|day|days}.", { free: whole(tight.freeLeft), n: shown.daysLeft }) }}
             {{ t("You usually spend about {need} on everyday things in that time — {short} more than you have.", { need: whole(tight.needAhead), short: whole(tight.shortBy) }) }}
           </p>
           <ul class="bh-tight-list">
@@ -151,7 +160,7 @@
 
         <ul class="bh-rows">
           <template v-if="extrasTotal > 0">
-            <li><span>{{ t("Base budget") }}</span><strong>{{ whole(plan.budget - extrasTotal) }}</strong></li>
+            <li><span>{{ t("Base budget") }}</span><strong>{{ whole(shown.budget - extrasTotal) }}</strong></li>
             <li class="bh-rows-extra" @click="extrasOpen = !extrasOpen">
               <button type="button" class="bh-link" :aria-expanded="extrasOpen">
                 + {{ t("Extra money") }} ({{ extras.length }}) {{ extrasOpen ? "▾" : "›" }}
@@ -164,29 +173,29 @@
               </li>
             </template>
           </template>
-          <li v-else><span>{{ t("Budget this cycle") }}</span><strong>{{ whole(plan.budget) }}</strong></li>
+          <li v-else><span>{{ t("Budget this cycle") }}</span><strong>{{ whole(shown.budget) }}</strong></li>
           <li v-for="bill in billRows" :key="bill.label" class="bh-rows-sub">
             <span>− {{ bill.label }}</span><span>{{ whole(bill.amount) }}</span>
           </li>
-          <li class="bh-rows-total"><span>{{ t("Everyday money this cycle") }}</span><strong>{{ whole(plan.flexBudget) }}</strong></li>
+          <li class="bh-rows-total"><span>{{ t("Everyday money this cycle") }}</span><strong>{{ whole(shown.flexBudget) }}</strong></li>
         </ul>
 
         <ul class="bh-rows">
-          <li><span>{{ t("Usually spent by now") }}</span><strong>{{ whole(plan.plannedSoFar) }}</strong></li>
+          <li><span>{{ t("Usually spent by now") }}</span><strong>{{ whole(shown.plannedSoFar) }}</strong></li>
           <li>
             <button v-if="everydayEnabled" type="button" class="bh-link" @click="openEveryday">{{ t("You've spent") }} ›</button>
             <span v-else>{{ t("You've spent") }}</span>
-            <strong>{{ whole(plan.flexSpent) }}</strong>
+            <strong>{{ whole(shown.flexSpent) }}</strong>
           </li>
-          <li class="bh-rows-total" :class="plan.buffer >= 0 ? 'bh-good' : 'bh-bad'">
-            <span>{{ plan.buffer >= 0 ? t("Under plan") : t("Over plan") }}</span>
-            <strong>{{ whole(Math.abs(plan.buffer)) }}</strong>
+          <li class="bh-rows-total" :class="shown.buffer >= 0 ? 'bh-good' : 'bh-bad'">
+            <span>{{ shown.buffer >= 0 ? t("Under plan") : t("Over plan") }}</span>
+            <strong>{{ whole(Math.abs(shown.buffer)) }}</strong>
           </li>
         </ul>
 
-        <section v-if="plan.byThisDay" class="bh-compare">
+        <section v-if="shown.byThisDay" class="bh-compare">
           <div class="bh-compare-head">
-            <p class="bh-compare-title">{{ t("By day {n}, cycle by cycle", { n: plan.byThisDay.day }) }}</p>
+            <p class="bh-compare-title">{{ t("By day {n}, cycle by cycle", { n: shown.byThisDay.day }) }}</p>
             <div class="seg bh-compare-seg" role="tablist">
               <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'everyday' }" @click="compareMode = 'everyday'">{{ t("Everyday") }}</button>
               <button type="button" class="seg-btn" :class="{ 'seg-btn--on': compareMode === 'total' }" @click="compareMode = 'total'">{{ t("Everything") }}</button>
@@ -202,10 +211,10 @@
           </ul>
         </section>
 
-        <ul v-if="plan.daysLeft > 0" class="bh-rows">
-          <li><span>{{ t("Left for {n} {n|day|days}", { n: plan.daysLeft }) }}</span><strong>{{ whole(Math.max(0, plan.flexLeft)) }}</strong></li>
-          <li><span>{{ t("You can spend") }}</span><strong>{{ whole(plan.perDayLeft) }}{{ t("/day") }}</strong></li>
-          <li><span>{{ t("You usually spend") }}</span><strong>{{ whole(plan.planPerDayAhead) }}{{ t("/day") }}</strong></li>
+        <ul v-if="shown.daysLeft > 0" class="bh-rows">
+          <li><span>{{ t("Left for {n} {n|day|days}", { n: shown.daysLeft }) }}</span><strong>{{ whole(Math.max(0, shown.flexLeft)) }}</strong></li>
+          <li><span>{{ t("You can spend") }}</span><strong>{{ whole(shown.perDayLeft) }}{{ t("/day") }}</strong></li>
+          <li><span>{{ t("You usually spend") }}</span><strong>{{ whole(shown.planPerDayAhead) }}{{ t("/day") }}</strong></li>
         </ul>
 
         <p class="bh-sheet-note">
@@ -226,6 +235,8 @@ import { formatIlsWhole, roundMoney } from "@/shared/utils/format";
 
 const props = defineProps<{
   plan: BudgetPlan;
+  /** Recomputes the plan for another day; enables the "spend nothing for N days" preview. */
+  planAt?: ((ref: Date) => BudgetPlan | null) | null;
   /** This month's extra money, each addition separately. */
   extras?: { extra: number; note?: string }[];
   everydayEnabled?: boolean;
@@ -234,17 +245,32 @@ const props = defineProps<{
 const emit = defineEmits<{ everyday: [] }>();
 
 const sheetOpen = ref(false);
+
+// ── Preview: the same card N days from now if nothing more is spent (0 = today) ──
+const ahead = ref(0);
+const maxAhead = computed(() => Math.max(0, Math.min(14, props.plan.daysLeft - 1)));
+watch(maxAhead, (m) => {
+  if (ahead.value > m) ahead.value = m;
+});
+const preview = computed((): BudgetPlan | null => {
+  if (!ahead.value || !props.planAt) return null;
+  const [y, m, d] = props.plan.cycleStart.split("-").map(Number);
+  // "Today" in the plan's own terms (the demo's clock too), moved `ahead` days on.
+  return props.planAt(new Date(y, m - 1, d + props.plan.dayIndex - 1 + ahead.value));
+});
+/** What the card shows: today's plan, or the preview. */
+const shown = computed(() => preview.value ?? props.plan);
 const closeBtn = ref<HTMLButtonElement | null>(null);
 const gradId = `bh-grad-${Math.random().toString(36).slice(2, 8)}`;
 
 const whole = (n: number) => formatIlsWhole(n);
 
 const headline = computed(() =>
-  props.plan.daysLeft > 0 ? t("You can spend {amount} per day", { amount: whole(props.plan.perDayLeft) }) : "",
+  shown.value.daysLeft > 0 ? t("You can spend {amount} per day", { amount: whole(shown.value.perDayLeft) }) : "",
 );
 
 const subline = computed(() => {
-  const p = props.plan;
+  const p = shown.value;
   if (p.moneyLeft < 0) return t("Budget was {amount}", { amount: whole(p.budget) });
   if (p.daysLeft === 0) return t("of {amount}", { amount: whole(p.budget) });
   const days = t("{n} {n|day|days} left", { n: p.daysLeft });
@@ -256,25 +282,25 @@ const subline = computed(() => {
 });
 
 const billRows = computed(() =>
-  props.plan.committedRows.map((r) => ({
+  shown.value.committedRows.map((r) => ({
     label:
       r.kind === "upcoming"
         ? `${tr(r.label)} · ${t("set aside, not charged yet")}`
-        : r.kind === "vaad" && props.plan.vaadReserve > 0
+        : r.kind === "vaad" && shown.value.vaadReserve > 0
           ? `${tr(r.label)} (${t("set aside")})`
           : tr(r.label),
     amount: r.amount,
   })),
 );
 
-const tight = computed(() => (props.plan.daysLeft > 0 ? props.plan.tight : null));
+const tight = computed(() => (shown.value.daysLeft > 0 ? shown.value.tight : null));
 
 /**
  * Doing well inside a tight cycle: the last full days (before the day of the last sync, which
  * is still incomplete) were under what you can spend per day now.
  */
 const streak = computed(() => {
-  const p = props.plan;
+  const p = shown.value;
   const tc = tight.value;
   if (!tc) return null;
   const lastFull = (p.byThisDay?.day ?? p.dayIndex) - 1;
@@ -288,11 +314,11 @@ const extrasTotal = computed(() => roundMoney(extras.value.reduce((s, e) => s + 
 const extrasOpen = ref(false);
 
 /** Money already promised to charges that haven't gone through yet. */
-const reserved = computed(() => roundMoney(props.plan.upcomingReserve + props.plan.vaadReserve));
+const reserved = computed(() => roundMoney(shown.value.upcomingReserve + shown.value.vaadReserve));
 
 /** Budget = spent + set aside + free; the bar shows the three shares (spent fills it when over). */
 const split = computed(() => {
-  const p = props.plan;
+  const p = shown.value;
   const total = Math.max(p.budget, p.spentOnCap + reserved.value + Math.max(0, p.flexLeft), 1);
   const pct = (n: number) => Math.max(0, Math.min(100, (n / total) * 100));
   return { spent: pct(p.spentOnCap), aside: pct(reserved.value), free: pct(Math.max(0, p.flexLeft)) };
@@ -300,8 +326,8 @@ const split = computed(() => {
 
 /** "🧾 6 bills to come" — why the daily number is lower (amount under Set aside, names in the sheet). */
 const setAsideLine = computed(() => {
-  if (reserved.value < 1 || props.plan.daysLeft === 0) return "";
-  const names = props.plan.committedRows
+  if (reserved.value < 1 || shown.value.daysLeft === 0) return "";
+  const names = shown.value.committedRows
     .filter((r) => r.kind === "upcoming")
     .map((r) => r.label.replace(/\s*\(.*\)\s*$/, ""));
   if (!names.length) return "";
@@ -309,7 +335,7 @@ const setAsideLine = computed(() => {
 });
 
 const explanation = computed(() => {
-  const p = props.plan;
+  const p = shown.value;
   if (p.moneyLeft < 0) return t("You've spent {amount} more than this cycle's budget.", { amount: whole(-p.moneyLeft) });
   if (p.daysLeft === 0) return t("The cycle is over with {amount} left.", { amount: whole(p.moneyLeft) });
   if (p.tone === "good") {
@@ -319,8 +345,8 @@ const explanation = computed(() => {
 });
 
 const curveNote = computed(() =>
-  props.plan.curve.learned
-    ? t("\"Usual\" follows how you spent across your last {n} cycles, scaled to this month's budget.", { n: props.plan.curve.cyclesUsed })
+  shown.value.curve.learned
+    ? t("\"Usual\" follows how you spent across your last {n} cycles, scaled to this month's budget.", { n: shown.value.curve.cyclesUsed })
     : t("\"Usual\" spreads the flexible money evenly until there are 3 past cycles to learn from."),
 );
 
@@ -335,8 +361,8 @@ function ordinal(n: number): string {
 }
 
 const byDay = computed(() => {
-  const b = props.plan.byThisDay;
-  if (!b || props.plan.dayIndex < 1) return null;
+  const b = shown.value.byThisDay;
+  if (!b || shown.value.dayIndex < 1) return null;
   const n = b.past.length + 1;
   const record = b.everydayRank === 1 || b.totalRank === 1;
   // Short chip: which day and the full comparison are in the details sheet.
@@ -347,7 +373,7 @@ const byDay = computed(() => {
 });
 
 const compareRows = computed(() => {
-  const b = props.plan.byThisDay;
+  const b = shown.value.byThisDay;
   if (!b) return [];
   const key = compareMode.value;
   const rows = [
@@ -359,7 +385,7 @@ const compareRows = computed(() => {
 });
 
 const compareNote = computed(() => {
-  const b = props.plan.byThisDay;
+  const b = shown.value.byThisDay;
   if (!b) return "";
   const rank = compareMode.value === "everyday" ? b.everydayRank : b.totalRank;
   const n = b.past.length + 1;
@@ -380,15 +406,15 @@ const PAD = 6;
 const zoomed = ref(true);
 
 const windowEnd = computed(() => {
-  const L = props.plan.cycleLength;
+  const L = shown.value.cycleLength;
   if (!zoomed.value) return L;
-  return Math.min(L, Math.max(7, Math.ceil(props.plan.dayIndex * 1.4) + 1));
+  return Math.min(L, Math.max(7, Math.ceil(shown.value.dayIndex * 1.4) + 1));
 });
 
 const maxY = computed(() => {
   const end = windowEnd.value;
-  const plan = props.plan.planByDay.slice(0, end);
-  const top = Math.max(1, ...props.plan.actualByDay, ...plan);
+  const plan = shown.value.planByDay.slice(0, end);
+  const top = Math.max(1, ...shown.value.actualByDay, ...plan);
   return top * (zoomed.value ? 1.15 : 1.06);
 });
 
@@ -397,7 +423,7 @@ const y = (v: number) => H - PAD - (v / maxY.value) * (H - PAD * 2);
 
 const planPoints = computed(() => [
   { x: 0, y: y(0) },
-  ...props.plan.planByDay.slice(0, windowEnd.value).map((v, i) => ({ x: x(i + 1), y: y(v) })),
+  ...shown.value.planByDay.slice(0, windowEnd.value).map((v, i) => ({ x: x(i + 1), y: y(v) })),
 ]);
 
 const toPath = (pts: { x: number; y: number }[]) =>
@@ -406,7 +432,7 @@ const toPath = (pts: { x: number; y: number }[]) =>
 const planPath = computed(() => toPath(planPoints.value));
 
 const actualPoints = computed(() => {
-  const a = props.plan.actualByDay;
+  const a = shown.value.actualByDay;
   if (!a.length) return [];
   return [{ x: 0, y: y(0) }, ...a.map((v, i) => ({ x: x(i + 1), y: y(v) }))];
 });
@@ -436,9 +462,9 @@ const gapOverArea = computed(() => gapBand((ay, py) => Math.min(ay, py)));
 const gapUnder = computed(() => gapBand((ay, py) => Math.max(ay, py)));
 
 /** Same number as the "over / under plan" line above the chart. */
-const gapOver = computed(() => props.plan.buffer < 0);
+const gapOver = computed(() => shown.value.buffer < 0);
 const gapLabel = computed(() => {
-  const b = props.plan.buffer;
+  const b = shown.value.buffer;
   if (Math.abs(b) < 1) return "";
   return `${b < 0 ? "+" : "−"}${whole(Math.abs(b))}`;
 });

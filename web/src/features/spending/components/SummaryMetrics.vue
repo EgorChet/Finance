@@ -3,6 +3,7 @@
     <BudgetHero
       v-if="plan && !hideLivingBudget"
       :plan="plan"
+      :plan-at="planAt"
       :extras="budgetExtras"
       :everyday-enabled="everydayBreakdownEnabled"
       @everyday="openEverydayBreakdown"
@@ -153,6 +154,8 @@ const props = withDefaults(
     compact?: boolean;
     /** Live-cycle plan — drives the green / yellow / red card, the per-day figure and the bar marker. */
     plan?: BudgetPlan | null;
+    /** Recomputes the plan for another day (the card's "spend nothing for N days" preview). */
+    planAt?: ((ref: Date) => BudgetPlan | null) | null;
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;
@@ -163,6 +166,7 @@ const props = withDefaults(
     retrospective: false,
     compact: false,
     plan: null,
+    planAt: null,
     hideLivingBudget: false,
     livingBudgetPeriodLabel: null,
     budgetExtras: () => [],

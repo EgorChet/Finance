@@ -590,6 +590,11 @@ export const RU: Record<string, string> = {
   "Copy access key": "Скопировать ключ доступа",
   "Access key copied — valid for 30 days. Paste it only into a secure form.": "Ключ скопирован — действует 30 дней. Вставляйте его только в защищённую форму.",
   "Copy the access key:": "Скопируйте ключ доступа:",
+  "In {n} {n|day|days}, spending nothing": "Через {n} {n|день|дня|дней} без трат",
+  "What if I spend nothing?": "А если ничего не тратить?",
+  "One day less": "На день меньше",
+  "One day more": "На день больше",
+  "preview": "прогноз",
   // @end-ui
 };
 
