@@ -378,10 +378,23 @@ export function learnSpendingCurve(
       samples[i].push(j >= b.length ? 1 : cum[j] + (cum[j + 1] - cum[j]) * f);
     }
   }
-  // Median per point: one cycle with a huge day-1 purchase can't bend the curve.
-  const points = samples.map(
-    (vals, i) => CURVE_LEARNED_WEIGHT * median(vals) + (1 - CURVE_LEARNED_WEIGHT) * even[i],
-  );
+  // Each step (the share usually spent between two points) is averaged over the cycles without
+  // the biggest one, then added up: one cycle with a huge day can't bend the curve, and a day
+  // that's light in every cycle stays light. (A median of the running totals jumped whenever a
+  // different cycle became the middle one — a quiet day showed as ₪400 of "usual" spending.)
+  const steps: number[] = [0];
+  for (let i = 1; i <= CURVE_POINTS; i++) {
+    const vals = samples[i].map((v, c) => Math.max(0, v - samples[i - 1][c])).sort((a, b) => a - b);
+    const kept = vals.length >= 3 ? vals.slice(0, -1) : vals;
+    steps.push(kept.reduce((sum, v) => sum + v, 0) / Math.max(1, kept.length));
+  }
+  const totalSteps = steps.reduce((s, v) => s + v, 0);
+  let run = 0;
+  const learned = steps.map((v) => {
+    run += v;
+    return totalSteps > 0 ? run / totalSteps : 0;
+  });
+  const points = learned.map((v, i) => CURVE_LEARNED_WEIGHT * v + (1 - CURVE_LEARNED_WEIGHT) * even[i]);
   points[0] = 0;
   points[CURVE_POINTS] = 1;
   for (let i = 1; i <= CURVE_POINTS; i++) points[i] = Math.max(points[i], points[i - 1]);
