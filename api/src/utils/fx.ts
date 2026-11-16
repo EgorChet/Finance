@@ -213,6 +213,28 @@ export function dedupeTransactionSnapshots(transactions: Transaction[]): Transac
   return order.map((key) => best.get(key)!);
 }
 
+/** Twins inside one statement are two charges; the same row in another statement is a copy. */
+export function dedupeAcrossSnapshots(groups: Transaction[][]): Transaction[] {
+  const best = new Map<string, Transaction>();
+  const order: string[] = [];
+  for (const group of groups) {
+    const seenInGroup = new Map<string, number>();
+    for (const tx of group) {
+      const base = transactionSnapshotKey(tx);
+      const n = seenInGroup.get(base) ?? 0;
+      seenInGroup.set(base, n + 1);
+      const key = n ? `${base}#${n}` : base;
+      if (!best.has(key)) {
+        order.push(key);
+        best.set(key, tx);
+      } else {
+        best.set(key, pickBetterTransaction(best.get(key)!, tx));
+      }
+    }
+  }
+  return order.map((key) => best.get(key)!);
+}
+
 export function isRefundTypeHe(transactionTypeHe: string | null | undefined): boolean {
   if (!transactionTypeHe) return false;
   return REFUND_TYPE_MARKERS.some((m) => transactionTypeHe.includes(m));

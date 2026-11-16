@@ -180,3 +180,37 @@ export function dedupeTransactionSnapshots<
   }
   return order.map((key) => best.get(key)!);
 }
+
+/**
+ * Dedupe across statements without losing real twins: two identical charges inside ONE statement
+ * (e.g. two ₪175 charging plans on the same day) are two charges; the same row repeated in
+ * another statement (a later snapshot of the same month) is a copy.
+ */
+export function dedupeAcrossSnapshots<
+  T extends {
+    date: string;
+    merchant_he: string;
+    charge_amount: number;
+    charge_estimated?: boolean;
+    notes?: string | null;
+  },
+>(groups: T[][]): T[] {
+  const best = new Map<string, T>();
+  const order: string[] = [];
+  for (const group of groups) {
+    const seenInGroup = new Map<string, number>();
+    for (const tx of group) {
+      const base = transactionSnapshotKey(tx);
+      const n = seenInGroup.get(base) ?? 0;
+      seenInGroup.set(base, n + 1);
+      const key = n ? `${base}#${n}` : base;
+      if (!best.has(key)) {
+        order.push(key);
+        best.set(key, tx);
+      } else {
+        best.set(key, pickBetterTransaction(best.get(key)!, tx));
+      }
+    }
+  }
+  return order.map((key) => best.get(key)!);
+}

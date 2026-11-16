@@ -5,9 +5,10 @@
  * - Next date = the month after the last posting (+1 or +2), on the day of the month it
  *   usually posts (median of recent postings). A bill that's late stays set aside in the
  *   next cycle (carried over); one that came early moves the next date with it.
- * - Arnona posts anywhere from the 2nd to the 16th — either side of the cycle start — so it's
- *   set aside already when it's expected up to a week after the cycle ends. Water (10th–12th),
- *   gas (15th–22nd) and electricity (mostly 8th–9th) keep to their days.
+ * - Every bill is set aside only in the cycle its expected date falls in. (Arnona used to be held
+ *   a cycle early "in case it comes before the 10th"; on the real statements that was wrong
+ *   4 times out of 4 — ₪1,500 missing from everyday money for a whole cycle, and then the real
+ *   charge landed in the next one anyway.)
  * - Amount = middle of the last 3 (monthly), last bill (arnona), average of the last 3
  *   (water, gas), or for electricity the average of the last bill and the same bill a year
  *   earlier (summer AC / winter heating), when the history reaches that far.
@@ -70,7 +71,7 @@ export const DEFAULT_REGULAR_CHARGES: readonly RegularChargeRule[] = [
   { id: "apple", name: "Apple", pattern: /apple\.com/i, exactAmount: 39.9, everyMonths: 1, defaultAmount: 39.9, estimate: "last" },
   { id: "hairdresser", name: "Hairdresser (BIT ₪120)", pattern: /\bBIT\b/, exactAmount: 120, everyMonths: 1, irregular: true, defaultAmount: 120, estimate: "last" },
   { id: "nails", name: "Nails (PayBox ₪220)", pattern: /paybox|פייבוקס/i, exactAmount: 220, everyMonths: 1, irregular: true, defaultAmount: 220, estimate: "last" },
-  { id: "arnona", name: "Arnona", pattern: /עיריית|ארנונה|arnona|municipality/i, minAmount: 300, everyMonths: 2, earlyWindowDays: 7, defaultAmount: 1550, estimate: "last" },
+  { id: "arnona", name: "Arnona", pattern: /עיריית|ארנונה|arnona|municipality/i, minAmount: 300, everyMonths: 2, defaultAmount: 1550, estimate: "last" },
   { id: "electricity", name: "Electricity", pattern: /חברת\s*החשמל|israel\s*electric/i, everyMonths: 2, defaultAmount: 500, estimate: "seasonal" },
   { id: "water", name: "Water", pattern: /מי\s*נתניה|תאגיד\s*המים|water\s*corp/i, everyMonths: 2, defaultAmount: 300, estimate: "average" },
   { id: "gas", name: "Gas", pattern: /סופרגז|אמישראגז|פזגז|דורגז|supergas|amisragas/i, everyMonths: 2, defaultAmount: 330, estimate: "average" },
@@ -127,6 +128,8 @@ export interface RegularChargeStatus {
   late: boolean;
   /** How the amount was worked out, e.g. "average of the last 3". */
   basis: string;
+  /** Also entered by hand under Budget — counted there, not set aside here. */
+  coveredByBudget?: boolean;
 }
 
 function iso(d: Date): string {

@@ -16,7 +16,7 @@ import { canonicalMerchantEnglish } from "../utils/merchantVendor.js";
 import { augmentReport, rebuildReportSummaries } from "./fixedCharges.js";
 import { applyAdjustments } from "./adjustments.js";
 import { applyExclusions } from "./exclusions.js";
-import { dedupeTransactionSnapshots, normalizeForeignCharges, shouldSkipNonSpendRow } from "../utils/fx.js";
+import { dedupeAcrossSnapshots, normalizeForeignCharges, shouldSkipNonSpendRow } from "../utils/fx.js";
 import { prefetchRatesForPending } from "../utils/fxRates.js";
 import { getFinalizeVersion } from "./finalizeVersion.js";
 
@@ -258,15 +258,14 @@ function mergeCategorySummaries(reports: SpendingReport[]): CategorySummary[] {
 }
 
 export function combineReports(reports: SpendingReport[], label: string): SpendingReport {
-  const txs: Transaction[] = [];
+  const groups: Transaction[][] = [];
   for (const r of reports) {
     const billing = r.metadata.billing_date as string | undefined;
     const month = billing ? monthLabel(billing) : undefined;
-    for (const tx of r.transactions) {
-      txs.push({ ...tx, billing_month: tx.billing_month || month });
-    }
+    groups.push(r.transactions.map((tx) => ({ ...tx, billing_month: tx.billing_month || month })));
   }
-  const deduped = dedupeTransactionSnapshots(txs);
+  // Twins inside one statement are both kept; the same row in another statement is a copy.
+  const deduped = dedupeAcrossSnapshots(groups);
   deduped.sort((a, b) => b.date.localeCompare(a.date));
   const dates = deduped.map((t) => t.date).sort();
   const total = deduped.reduce((s, t) => s + t.charge_amount, 0);
