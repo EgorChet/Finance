@@ -78,6 +78,7 @@
       :hide-living-budget="selectedMonth === null"
       :retrospective="budgetRetrospective"
       :plan="summaryPlan"
+      :plan-at="planAt"
       :cycle-day="cycleDay"
       :reference-date="refDate"
       :living-budget-period-label="activeLivingBudgetPeriodLabel"
@@ -469,20 +470,23 @@ const paceTransactions = computed(() => {
   return paceReport.value?.transactions ?? report.value?.transactions ?? [];
 });
 
-const summaryPlan = computed(() => {
+/** The live plan as of `ref` — today, or a day ahead for "what if I spend nothing". */
+function planAt(ref: Date) {
   if (!showPaceCard.value || !report.value) return null;
   return computeLiveBudgetPlan({
     cycleTransactions: report.value.transactions,
     cycleDay: cycleDay.value,
     cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
-    referenceDate: refDate.value,
+    referenceDate: ref,
     livingBudget: resolvedLivingBudget.value,
     history: paceTransactions.value,
     configuredCharges: configuredCharges.value,
     regularCharges: regularChargeOverrides.value,
     dataAsOf: statementSavedAt.value,
   });
-});
+}
+
+const summaryPlan = computed(() => planAt(refDate.value));
 
 const statementSavedAt = computed((): string | null => {
   const start =

@@ -15,6 +15,7 @@
           :report="spendingReport"
           :living-budget="livingBudgetAmount"
           :plan="summaryPlan"
+          :plan-at="planAt"
           :cycle-day="cycleDay"
           :reference-date="refDate"
           :budget-extras="budgetExtras"
@@ -215,13 +216,14 @@ const showPaceHealth = computed(() => {
   return cycleNeedsOpenTab(start, cycleDay.value, months.value);
 });
 
-const summaryPlan = computed(() => {
+/** The live plan as of `ref` — today, or a day ahead for "what if I spend nothing". */
+function planAt(ref: Date) {
   if (!showPaceHealth.value || !spendingReport.value) return null;
   return computeLiveBudgetPlan({
     cycleTransactions: spendingReport.value.transactions,
     cycleDay: cycleDay.value,
     cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
-    referenceDate: refDate.value,
+    referenceDate: ref,
     livingBudget: livingBudgetAmount.value,
     history: paceReport.value?.transactions,
     configuredCharges: configuredCharges.value,
@@ -232,7 +234,9 @@ const summaryPlan = computed(() => {
       cycleDay.value,
     )?.saved_at ?? null,
   });
-});
+}
+
+const summaryPlan = computed(() => planAt(refDate.value));
 
 const todayLabel = computed(() =>
   refDate.value.toLocaleDateString(dateTag(), { weekday: "long", day: "numeric", month: "long" }),
