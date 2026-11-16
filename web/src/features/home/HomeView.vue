@@ -82,6 +82,7 @@ import type { MonthItem, SpendingReport, Transaction } from "@/shared/types";
 import { referenceDate } from "@/shared/utils/appDate";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import type { RegularChargeOverrides } from "@core/spending/regularCharges";
+import { suggestRegularCharges } from "@core/spending/regularSuggestions";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
@@ -218,6 +219,19 @@ const hasBitToSort = computed(
   () => !!spendingReport.value?.transactions.some((t) => isBitTransfer(t) && !t.category_override && t.charge_amount > 0),
 );
 
+/** Charges that keep coming and aren't on the bills list yet (answered under Budget). */
+const billSuggestions = computed(() => {
+  if (auth.readOnly || !showPaceHealth.value || !paceReport.value) return [];
+  return suggestRegularCharges(
+    [...paceReport.value.transactions, ...(spendingReport.value?.transactions ?? [])],
+    {
+      cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
+      cycleDay: cycleDay.value,
+      overrides: regularChargeOverrides.value,
+    },
+  );
+});
+
 /** Things to act on: merchants to label and charges coming up this cycle. */
 const todoItems = computed(() => {
   const items: { key: string; icon: string; title: string; sub: string; amount?: string; to: string | object }[] = [];
@@ -228,6 +242,16 @@ const todoItems = computed(() => {
       title: t("{n} {n|merchant needs|merchants need} a name", { n: toLabelCount.value }),
       sub: t("Label them so categories stay right"),
       to: { name: "browse", query: { view: "merchants" } },
+    });
+  }
+  for (const sg of billSuggestions.value) {
+    items.push({
+      key: `bill-${sg.key}`,
+      icon: "🔁",
+      title: t("{name}: a regular bill?", { name: tr(sg.name) }),
+      sub: t("{n} cycles in a row · say yes to set it aside", { n: sg.cycles }),
+      amount: `~${formatIlsWhole(sg.amount)}`,
+      to: { name: "household", hash: "#card-bills" },
     });
   }
   for (const row of summaryPlan.value?.committedRows ?? []) {
