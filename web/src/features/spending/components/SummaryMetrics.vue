@@ -144,6 +144,7 @@ import { formatAboutIls, formatIls, formatIlsWhole, roundMoney } from "@/shared/
 import { budgetSpendBreakdown, moneyLeft } from "@/features/household/utils/householdBudget";
 import { spendingSplit, type BudgetPlan } from "@/features/spending/utils/budgetPlan";
 import BudgetHero from "@/features/spending/components/BudgetHero.vue";
+import type { Transaction } from "@/shared/types";
 
 const props = withDefaults(
   defineProps<{
@@ -155,7 +156,7 @@ const props = withDefaults(
     /** Live-cycle plan — drives the green / yellow / red card, the per-day figure and the bar marker. */
     plan?: BudgetPlan | null;
     /** Recomputes the plan for another day (the card's "spend nothing for N days" preview). */
-    planAt?: ((ref: Date) => BudgetPlan | null) | null;
+    planAt?: ((ref: Date, extra?: Transaction[]) => BudgetPlan | null) | null;
     cycleDay?: number;
     referenceDate?: Date;
     livingBudgetPeriodLabel?: string | null;

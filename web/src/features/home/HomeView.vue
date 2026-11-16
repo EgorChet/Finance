@@ -217,10 +217,10 @@ const showPaceHealth = computed(() => {
 });
 
 /** The live plan as of `ref` — today, or a day ahead for "what if I spend nothing". */
-function planAt(ref: Date) {
+function planAt(ref: Date, extra: Transaction[] = []) {
   if (!showPaceHealth.value || !spendingReport.value) return null;
   return computeLiveBudgetPlan({
-    cycleTransactions: spendingReport.value.transactions,
+    cycleTransactions: extra.length ? [...spendingReport.value.transactions, ...extra] : spendingReport.value.transactions,
     cycleDay: cycleDay.value,
     cycleStart: activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value),
     referenceDate: ref,
