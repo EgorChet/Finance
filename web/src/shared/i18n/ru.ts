@@ -297,7 +297,7 @@ export const RU: Record<string, string> = {
   "{amount} over plan": "на {amount} выше плана",
   "set aside, not charged yet": "отложено, ещё не списано",
   "set aside": "отложено",
-  "{n} {n|bill|bills} to come": "{n|ожидается|ожидаются|ожидаются} {n} {n|счёт|счёта|счетов}",
+  "{n} {n|bill|bills} to come": "ещё {n} {n|счёт|счёта|счетов}",
   "You've spent {amount} more than this cycle's budget.": "Вы потратили на {amount} больше бюджета цикла.",
   "The cycle is over with {amount} left.": "Цикл закончился, осталось {amount}.",
   "Keep spending like you usually do. You have {have} a day; you usually need {need}.": "Тратьте как обычно. У вас {have} в день, обычно нужно {need}.",
