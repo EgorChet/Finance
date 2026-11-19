@@ -81,6 +81,9 @@ export const DEFAULT_REGULAR_CHARGES: readonly RegularChargeRule[] = [
   { id: "hot", name: "HOT mobile", pattern: /הוט\s*מובייל|hot\s*mobile/i, everyMonths: 1, defaultAmount: 120, estimate: "median" },
   { id: "anthropic", name: "Claude (Anthropic)", pattern: /anthropic/i, everyMonths: 1, defaultAmount: 60, estimate: "median" },
   { id: "apple", name: "Apple", pattern: /apple\.com/i, exactAmount: 39.9, everyMonths: 1, defaultAmount: 39.9, estimate: "last" },
+  // The ₪50 monthly subscription only (around the 19th). The ₪175 top-ups of the charging balance and the
+  // small charging sessions come and go as you like — they stay everyday spending.
+  { id: "evedge", name: "EV Edge (₪50)", pattern: /אי\.?\s*וי\.?\s*אדג|ev\s*edge/i, exactAmount: 50, everyMonths: 1, defaultAmount: 50, estimate: "last" },
   { id: "hairdresser", name: "Hairdresser (BIT ₪120)", pattern: /\bBIT\b/, exactAmount: 120, everyMonths: 1, irregular: true, defaultAmount: 120, estimate: "last" },
   { id: "nails", name: "Nails (PayBox ₪220)", pattern: /paybox|פייבוקס/i, exactAmount: 220, everyMonths: 1, irregular: true, defaultAmount: 220, estimate: "last" },
   { id: "arnona", name: "Arnona", pattern: /עיריית|ארנונה|arnona|municipality/i, minAmount: 300, everyMonths: 2, defaultAmount: 1550, estimate: "last" },

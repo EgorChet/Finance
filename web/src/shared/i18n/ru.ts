@@ -233,6 +233,7 @@ export const RU: Record<string, string> = {
   "Bought before the cycle, charged in it": "Куплено до начала цикла, списано в нём",
   "HOT mobile": "HOT Мобайл",
   "Bezeq": "Безек",
+  "EV Edge (₪50)": "EV Edge (₪50)",
   "Hairdresser (BIT ₪120)": "Парикмахер (BIT ₪120)",
   "Nails (PayBox ₪220)": "Ногти (PayBox ₪220)",
   "Electricity": "Электричество",

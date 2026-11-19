@@ -126,6 +126,7 @@ const BILL_MARKS: Record<string, { he?: string; category: string }> = {
   hot: { he: "הוט מובייל", category: "Subscriptions" },
   anthropic: { he: "ANTHROPIC", category: "Subscriptions" },
   apple: { he: "APPLE.COM", category: "Subscriptions" },
+  evedge: { he: "אי.וי. אדג", category: "Transport" },
   hairdresser: { category: "Beauty & Personal Care" },
   nails: { category: "Nails" },
   arnona: { he: "עיריית נתניה", category: "Housing" },
