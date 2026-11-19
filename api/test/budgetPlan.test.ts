@@ -1,7 +1,7 @@
 /** The budget card's numbers, checked by hand on a small cycle — the figures plans are built on. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeBudgetPlan } from "../../core/spending/budgetPlan.js";
+import { committedKind, computeBudgetPlan } from "../../core/spending/budgetPlan.js";
 import { regularChargesForCycle, resolveRegularCharges } from "../../core/spending/regularCharges.js";
 import { dedupeAcrossSnapshots } from "../../core/utils/transaction.js";
 import type { Transaction } from "../../core/types.js";
@@ -93,4 +93,17 @@ test("history keeps two identical charges from one statement, drops copies from 
   ]);
   assert.equal(merged.filter((t) => t.merchant_he === "EV EDGE").length, 2);
   assert.equal(merged.length, 3);
+});
+
+test("the ₪50 EV Edge subscription is a bill; its ₪175 top-ups and small charges stay everyday", () => {
+  const rules = resolveRegularCharges();
+  const sub = (date: string) => tx(date, "אי.וי. אדג' בע\"מ", 50, { category_en: "Transport" });
+  const history = [sub("2026-08-19"), sub("2026-09-19"), sub("2026-10-19"), sub("2026-10-07"), tx("2026-10-10", "אי.וי. אדג' בע\"מ", 175)];
+  // Posted this cycle → counted as a bill, not everyday.
+  assert.equal(committedKind(sub("2026-11-19"), "2026-11-10", rules), "regular");
+  assert.equal(committedKind(tx("2026-11-10", "אי.וי. אדג' בע\"מ", 175), "2026-11-10", rules), null);
+  assert.equal(committedKind(tx("2026-11-12", "אי.וי. אדג' בע\"מ", 44.84), "2026-11-10", rules), null);
+  // Not yet charged → set aside from the start of the cycle it is expected in (around the 19th).
+  const dec = regularChargesForCycle(rules, [], [...history, sub("2026-11-19")], "2026-12-10", "2027-01-09", "2026-12-10").find((r) => r.id === "evedge");
+  assert.deepEqual([dec?.state, dec?.amount, dec?.date], ["due", 50, "2026-12-19"]);
 });
