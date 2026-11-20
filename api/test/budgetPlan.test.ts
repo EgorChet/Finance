@@ -107,3 +107,29 @@ test("the ₪50 EV Edge subscription is a bill; its ₪175 top-ups and small cha
   const dec = regularChargesForCycle(rules, [], [...history, sub("2026-11-19")], "2026-12-10", "2027-01-09", "2026-12-10").find((r) => r.id === "evedge");
   assert.deepEqual([dec?.state, dec?.amount, dec?.date], ["due", 50, "2026-12-19"]);
 });
+
+test("a split charge counts only your share: the graph, the usual-pace curve and 'by this day'", () => {
+  const split = (date: string, merchant: string, raw: number, others: number) =>
+    tx(date, merchant, raw, { reimbursement: others, effective_amount: raw - others });
+  // Three past cycles: a small spend on day 3 and a dinner on day 20 — split in one history, plain ₪500 in the other.
+  const past = (dinner: (d: string) => Transaction) =>
+    ["2026-08", "2026-09", "2026-10"].flatMap((ym) => [tx(`${ym}-12`, "Cafe", 100), dinner(`${ym}-29`)]);
+  const withSplit = past((d) => split(d, "Dinner", 1000, 500));
+  const plain = past((d) => tx(d, "Dinner", 500));
+  const run = (history: Transaction[], cycleTxs: Transaction[]) =>
+    computeBudgetPlan(cycleTxs, 10000, { cycleStart: "2026-11-10", cycleDay: 10, referenceDate: new Date(2026, 10, 16), history });
+
+  // This cycle: a ₪400 dinner on day 3 where others paid ₪150 → the graph steps by ₪250, not ₪400.
+  const a = run(withSplit, [split("2026-11-12", "Dinner", 400, 150), tx("2026-11-14", "Cafe", 50)]);
+  assert.ok(a);
+  assert.deepEqual(a.actualByDay, [0, 0, 250, 250, 300, 300, 300]);
+  assert.equal(a.flexSpent, 300);
+  assert.equal(a.spentOnCap, 300);
+
+  // History: the curve is learned from net amounts, and so are the past cycles in the comparison.
+  const b = run(plain, [split("2026-11-12", "Dinner", 400, 150), tx("2026-11-14", "Cafe", 50)]);
+  assert.ok(b);
+  assert.deepEqual(a.curve.points, b.curve.points);
+  assert.deepEqual(a.byThisDay?.past.map((p) => p.everyday), b.byThisDay?.past.map((p) => p.everyday));
+  assert.equal(a.byThisDay?.everyday, 300);
+});
