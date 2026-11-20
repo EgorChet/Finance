@@ -268,7 +268,8 @@ export function combineReports(reports: SpendingReport[], label: string): Spendi
   const deduped = dedupeAcrossSnapshots(groups);
   deduped.sort((a, b) => b.date.localeCompare(a.date));
   const dates = deduped.map((t) => t.date).sort();
-  const total = deduped.reduce((s, t) => s + t.charge_amount, 0);
+  // Net of what others paid back (splits), like every other total.
+  const total = deduped.reduce((s, t) => s + (t.effective_amount ?? t.charge_amount), 0);
   const combinedDates = reports.flatMap((r) => r.metadata.combined_billing_dates as string[] || []);
   const billingDates = reports.map((r) => r.metadata.billing_date as string).filter(Boolean);
 
