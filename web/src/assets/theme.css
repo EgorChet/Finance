@@ -1624,13 +1624,7 @@ html.sheet-editor-open body {
 }
 
 .minor-sections__title {
-  margin: 0;
-  padding: 1rem 1.1rem 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+  padding: 1rem 0 0.35rem;
 }
 
 .minor-sections .minor-section {
@@ -3431,6 +3425,8 @@ button.bx-legend-item {
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
+  white-space: nowrap;
+  flex: none;
   cursor: pointer;
 }
 
@@ -3439,13 +3435,20 @@ button.bx-legend-item {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin: 1.25rem 0 0.55rem;
+  margin: 1.6rem 0 0.6rem;
 }
 
-.bx-list-head h3 {
+/* One look for every section title on the Budget and Money screens. */
+.bx-list-head h3,
+.living-budget-topups-title,
+.minor-sections__title {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  text-transform: none;
+  color: var(--text);
 }
 
 .bx-list-total {
