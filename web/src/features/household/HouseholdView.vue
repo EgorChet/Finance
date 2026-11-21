@@ -3,6 +3,7 @@
     <DemoBanner />
     <header class="bx-page-head">
       <h2 class="page-title">{{ t("Budget") }}</h2>
+      <button type="button" class="btn btn-sm bx-calc-btn" @click="salaryOpen = true">🧮 {{ t("Salary calculator") }}</button>
       <p v-if="!auth.isDemo && !auth.canEditBudget" class="bx-locked">🔒 {{ t("Only Egor can change the budget") }}</p>
       <p
         v-if="!loading && saveStatus"
@@ -12,6 +13,8 @@
         {{ saveStatus }}
       </p>
     </header>
+
+    <SalaryCalculator :open="salaryOpen" @close="salaryOpen = false" />
 
     <AppLoader
       v-if="loading"
@@ -303,6 +306,7 @@ import ExcludedSection from "@/features/household/components/ExcludedSection.vue
 import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";
 import RegularChargesSection from "@/features/household/components/RegularChargesSection.vue";
+import SalaryCalculator from "@/features/household/components/SalaryCalculator.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";
@@ -348,6 +352,7 @@ import {
 
 const categories = SPENDING_CATEGORIES;
 const auth = useAuthStore();
+const salaryOpen = ref(false);
 /** Demo, or a household member who isn't allowed to change the budget. */
 /** Average monthly bills on the Cal card, reported by "Bills on your card". */
 const cardBillsMonthly = ref(0);
