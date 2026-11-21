@@ -3812,10 +3812,13 @@ button.bx-row {
   }
 }
 
-/* Native rubber-band would fight the custom pull at the top of the page. */
-html,
-body {
-  overscroll-behavior-y: contain;
+/* Native rubber-band would fight the custom pull at the top of the page. Touch screens only: on a desktop
+   Chrome this rule on html/body stops the wheel and trackpad from scrolling the page at all. */
+@media (pointer: coarse) {
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
 }
 
 /* ── Budget hero chart: zoomed, with the gap to your usual pace shaded ── */
