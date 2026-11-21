@@ -124,10 +124,10 @@
                 {{ row.source === "payslip" ? t("Payslip") : row.source === "estimate" ? t("Expected") : t("Plan") }}
               </span>
             </span>
-            <span v-if="row.estimateWas && row.source === 'payslip'" class="bx-row-meta">
+            <span v-if="row.estimateWas && row.source === 'payslip' && Math.round(row.estimateWas) !== Math.round(row.salary)" class="bx-row-meta">
               <span>{{ t("Expected {was}, the payslip says {now}", { was: formatIlsWhole(row.estimateWas), now: formatIlsWhole(row.salary) }) }}</span>
             </span>
-            <span v-if="row.payslipNet != null && row.source !== 'payslip'" class="bx-row-meta lb-compare">
+            <span v-if="row.payslipNet != null && row.source !== 'payslip' && Math.round(row.payslipNet) !== Math.round(row.salary)" class="bx-row-meta lb-compare">
               <span>{{ t("Payslip: {amount} (budget has {was})", { amount: formatIlsWhole(row.payslipNet), was: formatIlsWhole(row.salary) }) }}</span>
               <button v-if="!readonly" type="button" class="bx-pill" @click.stop="usePayslip(row)">{{ t("Use payslip") }}</button>
             </span>
