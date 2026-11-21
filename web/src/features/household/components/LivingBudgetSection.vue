@@ -22,7 +22,8 @@
             {{ t("Edit") }}
           </button>
         </div>
-        <p class="bx-hero-value">{{ formatIlsWhole(segmentTotalCap(headlineSegment.seg)) }}</p>
+        <p class="bx-hero-value">{{ formatIlsWhole(segmentTotalCap(headlineSegment.seg) + heroExtra) }}</p>
+        <p v-if="heroExtra > 0" class="bx-hero-extra">{{ t("Includes {amount} extra for this month", { amount: formatIlsWhole(heroExtra) }) }}</p>
         <p class="bx-hero-free">
           <span>{{ t("Free for everyday") }}</span>
           <b>{{ formatIlsWhole(freeForEveryday) }}</b>
@@ -122,7 +123,7 @@
               <span class="bx-row-amount">{{ formatIlsWhole(row.total) }}</span>
             </span>
             <span class="bx-row-meta">
-              <span>{{ t("Salary {amount}", { amount: formatIlsWhole(row.salary) }) }}</span>
+              <span>{{ t("Salary {amount}", { amount: formatIlsWhole(row.salary) }) }}<template v-if="row.extra > 0"> · +{{ formatIlsWhole(row.extra) }} {{ t("extra") }}</template></span>
               <span class="bx-status" :class="`bx-status--${row.source === 'payslip' ? 'active' : row.source === 'estimate' ? 'upcoming' : 'ended'}`">
                 {{ row.source === "payslip" ? t("Payslip") : row.source === "estimate" ? t("Expected") : row.source === "latest" ? t("Like last payslip") : t("Plan") }}
               </span>
@@ -305,6 +306,7 @@ import {
   isOngoingThrough,
   livingBudgetBaseForMonth,
   livingBudgetStatusLabel,
+  monthTopupExtraForMonth,
   monthRangeLabel,
   ONGOING_THROUGH_MONTH,
   segmentStatus,
@@ -492,6 +494,12 @@ function segmentTotalCap(seg: LivingBudgetSegment): number {
   return livingBudgetBaseForMonth(ym, displaySegments.value, props.configuredCharges) ?? seg.amount;
 }
 
+/** Extra money added for the headline month: part of the budget the pace graph uses. */
+const heroExtra = computed(() => {
+  const head = headlineSegment.value?.seg;
+  return head ? monthTopupExtraForMonth(representativeMonth(head), monthTopups.value) : 0;
+});
+
 function segmentCapVaries(seg: LivingBudgetSegment): boolean {
   const months = calendarMonthsInSegment(seg.from_month, seg.through_month);
   const totals = new Set(
@@ -536,6 +544,7 @@ const sources = computed(() => {
       edit: () => editRecurringCharge(a.chargeId, a.from_month),
     });
   }
+  if (heroExtra.value > 0) parts.push({ key: "topups", label: "Extra money", amount: heroExtra.value });
   const total = parts.reduce((s, p) => s + p.amount, 0) || 1;
   return parts.map((p, i) => ({ ...p, pct: (p.amount / total) * 100, color: SOURCE_COLORS[i % SOURCE_COLORS.length] }));
 });
@@ -584,7 +593,7 @@ const heroNote = computed(() => {
 const freeForEveryday = computed(() => {
   if (cycleSplit.value) return cycleSplit.value.parts.find((p) => p.key === "everyday")?.amount ?? 0;
   const head = headlineSegment.value?.seg;
-  return head ? Math.max(0, segmentTotalCap(head) - monthlyBills.value - props.cardBills) : 0;
+  return head ? Math.max(0, segmentTotalCap(head) + heroExtra.value - monthlyBills.value - props.cardBills) : 0;
 });
 
 const cardBillsPct = computed(() => {
@@ -606,6 +615,7 @@ interface MonthRow {
   source: "payslip" | "estimate" | "latest" | "plan";
   payslipNet: number | null;
   estimateWas: number | null;
+  extra: number;
 }
 
 /** Last five months, this one and the next: each with where its salary comes from. */
@@ -619,9 +629,11 @@ const monthRows = computed((): MonthRow[] => {
   }
   const rows: MonthRow[] = [];
   for (const m of months) {
-    const total = livingBudgetBaseForMonth(m, displaySegments.value, props.configuredCharges);
+    const base0 = livingBudgetBaseForMonth(m, displaySegments.value, props.configuredCharges);
     const seg = livingBudgetSegmentForMonth(m, displaySegments.value);
-    if (total === null || !seg) continue;
+    if (base0 === null || !seg) continue;
+    const extra = monthTopupExtraForMonth(m, monthTopups.value);
+    const total = base0 + extra;
     const base = props.monthBases.find((b) => b.month === m);
     rows.push({
       ym: m,
@@ -630,6 +642,7 @@ const monthRows = computed((): MonthRow[] => {
       source: base ? base.source : "plan",
       payslipNet: props.payslipNets[m] ?? null,
       estimateWas: base?.estimate ?? null,
+      extra,
     });
   }
   return rows.reverse();
