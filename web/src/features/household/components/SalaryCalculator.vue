@@ -66,6 +66,7 @@
           <li class="sal-row sal-row--total"><span>{{ t("Total deductions") }}</span><strong>− {{ formatIls(result.totalDeductions) }}</strong></li>
         </ul>
 
+        <p class="sal-fact">{{ t("Of each ₪1,000 gross, on average, you keep about {amount}", { amount: formatIlsWhole(keepOfEachThousand) }) }}</p>
         <p class="sal-fact">{{ t("Of each extra ₪1,000 gross you keep about {amount}", { amount: formatIlsWhole(keepOfThousand) }) }}</p>
         <p class="sal-fact">{{ t("Income tax, National Insurance and health tax take {pct}% of the gross pay", { pct: Math.round(result.taxShare * 100) }) }}</p>
 
@@ -392,6 +393,12 @@ const split = computed(() => {
   ].filter((x) => x.amount > 0);
   const total = parts.reduce((s, x) => s + x.amount, 0);
   return parts.map((x) => ({ ...x, pct: Math.round((x.amount / total) * 100) }));
+});
+
+/** The average: what stays in your pocket from each ₪1,000 of the whole gross pay. */
+const keepOfEachThousand = computed(() => {
+  const r = result.value;
+  return r && r.gross > 0 ? (r.net / r.gross) * 1000 : 0;
 });
 
 /** What stays in your pocket from the next ₪1,000 of gross pay. */

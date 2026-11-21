@@ -135,6 +135,7 @@ export const RU: Record<string, string> = {
   "Pension": "Пенсия",
   "Severance": "Выходное пособие (пицуим)",
   "Study fund": "Керен иштальмут",
+  "Of each ₪1,000 gross, on average, you keep about {amount}": "С каждой тысячи до вычетов вам в среднем остаётся около {amount}",
   "Of each extra ₪1,000 gross you keep about {amount}": "С каждой лишней тысячи до вычетов вам остаётся около {amount}",
   "Income tax, National Insurance and health tax take {pct}% of the gross pay": "Подоходный налог, нацстрах и налог на здравоохранение забирают {pct}% зарплаты",
   "Counted with your year to date, the way the payslip does.": "Посчитано с учётом года, как в расчётном листе.",
