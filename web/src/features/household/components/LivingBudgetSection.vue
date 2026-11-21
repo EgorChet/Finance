@@ -17,7 +17,7 @@
             type="button"
             class="bx-pill"
             :disabled="disabled"
-            @click="startEditSegment(headlineSegment.seg)"
+            @click="openEstimate(nowYm)"
           >
             {{ t("Edit") }}
           </button>
@@ -121,7 +121,7 @@
             <span class="bx-row-meta">
               <span>{{ t("Salary {amount}", { amount: formatIlsWhole(row.salary) }) }}</span>
               <span class="bx-status" :class="`bx-status--${row.source === 'payslip' ? 'active' : row.source === 'estimate' ? 'upcoming' : 'ended'}`">
-                {{ row.source === "payslip" ? t("Payslip") : row.source === "estimate" ? t("Expected") : t("Plan") }}
+                {{ row.source === "payslip" ? t("Payslip") : row.source === "estimate" ? t("Expected") : row.source === "latest" ? t("Like last payslip") : t("Plan") }}
               </span>
             </span>
             <span v-if="row.estimateWas && row.source === 'payslip' && Math.round(row.estimateWas) !== Math.round(row.salary)" class="bx-row-meta">
@@ -136,47 +136,6 @@
         </component>
       </div>
 
-      <details class="bx-plan">
-        <summary>{{ t("Plan for months without a payslip") }}</summary>
-        <p class="bx-note">{{ t("Used for months that have neither a payslip nor your estimate: for example further ahead.") }}</p>
-      <div class="bx-list-head">
-        <h3>{{ t("Budget periods") }}</h3>
-        <button v-if="!readonly" type="button" class="bx-pill" :disabled="disabled" @click="addSegment">+ {{ t("New period") }}</button>
-      </div>
-      <div class="bx-list">
-        <component
-          :is="readonly ? 'div' : 'button'"
-          v-for="{ seg } in periodRows"
-          :key="`budget-seg-${seg.from_month}-${seg.through_month}`"
-          :type="readonly ? undefined : 'button'"
-          class="bx-row"
-          :disabled="!readonly && disabled"
-          @click="!readonly && startEditSegment(seg)"
-        >
-          <span class="tx-row-icon" aria-hidden="true">🗓️</span>
-          <span class="bx-row-body">
-            <span class="bx-row-top">
-              <span class="bx-row-name">{{ tr(monthRangeLabel(seg.from_month, seg.through_month)) }}</span>
-              <span class="bx-row-amount">{{ formatIlsWhole(segmentTotalCap(seg)) }}</span>
-            </span>
-            <span class="bx-row-meta">
-              <span>{{ t("Salary {amount}", { amount: formatIlsWhole(seg.amount) }) }}</span>
-              <span class="bx-status" :class="`bx-status--${segmentStatus(seg.from_month, seg.through_month)}`">
-                {{ tr(livingBudgetStatusLabel(seg)) }}
-              </span>
-            </span>
-          </span>
-        </component>
-        <button
-          v-if="endedSegments.length"
-          type="button"
-          class="bx-row bx-row--more"
-          @click="showEndedBudget = !showEndedBudget"
-        >
-          {{ showEndedBudget ? t("Hide ended periods ({n})", { n: endedSegments.length }) : t("Show ended periods ({n})", { n: endedSegments.length }) }}
-        </button>
-      </div>
-      </details>
     </template>
 
     <!-- Rarely used: a quiet link until there is at least one extra. -->
@@ -621,7 +580,7 @@ interface MonthRow {
   ym: string;
   salary: number;
   total: number;
-  source: "payslip" | "estimate" | "plan";
+  source: "payslip" | "estimate" | "latest" | "plan";
   payslipNet: number | null;
   estimateWas: number | null;
 }

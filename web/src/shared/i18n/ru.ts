@@ -5,6 +5,7 @@ export const RU: Record<string, string> = {
   "Payslip": "Факт",
   "Expected": "Ожидание",
   "Plan": "План",
+  "Like last payslip": "Как в последнем",
   "Expected {was}, the payslip says {now}": "Ждали {was}, в расчётном листе {now}",
   "Payslip: {amount} (budget has {was})": "Расчётный лист: {amount} (в бюджете {was})",
   "Use payslip": "Взять из расчётного листа",
