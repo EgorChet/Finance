@@ -3293,8 +3293,24 @@ html.sheet-editor-open body {
   color: var(--text-muted);
 }
 
+.bx-hero-free {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.bx-hero-free b {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
 .bx-hero-value {
-  margin: 0.35rem 0 0.9rem;
+  margin: 0.35rem 0 0.4rem;
   font-family: var(--font-display);
   font-size: 2.8rem;
   font-weight: 750;
