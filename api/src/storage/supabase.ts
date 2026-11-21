@@ -11,6 +11,7 @@ import type {
   FxcnPriceCache,
   LivingBudgetData,
   MerchantRules,
+  PayslipsData,
   ReviewProgressData,
   StatementsData,
 } from "../types.js";
@@ -409,4 +410,90 @@ export async function writeRegularCharges(data: Record<string, unknown>): Promis
     const text = await res.text();
     throw new Error(`Supabase write failed (${res.status}): ${text}`);
   }
+}
+
+// ── Payslips: parsed data in app_state, original PDFs in a private storage bucket ─────────────
+
+export async function readPayslips(): Promise<PayslipsData> {
+  if (!supabaseConfigured()) return local.readPayslips();
+  const res = await supabaseFetch("app_state?id=eq.payslips&select=data");
+  if (!res.ok) throw new Error(`Supabase read failed (${res.status})`);
+  const rows = (await res.json()) as { data: PayslipsData }[];
+  return rows[0]?.data || { payslips: {}, updated_at: null };
+}
+
+export async function writePayslips(data: PayslipsData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writePayslips(data);
+    return;
+  }
+  data.updated_at = new Date().toISOString();
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "payslips", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+const PAYSLIP_BUCKET = "payslips";
+let bucketReady: Promise<void> | null = null;
+
+function storageHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, ...extra };
+}
+
+/** The bucket is private: nothing in it is reachable without the service key. Created on first use. */
+function ensurePayslipBucket(): Promise<void> {
+  bucketReady ??= (async () => {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/bucket`, {
+      method: "POST",
+      headers: storageHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ id: PAYSLIP_BUCKET, name: PAYSLIP_BUCKET, public: false }),
+    });
+    if (res.ok) return;
+    const text = await res.text();
+    if (res.status === 409 || /already exists|duplicate/i.test(text)) return;
+    bucketReady = null;
+    throw new Error(`Supabase bucket create failed (${res.status}): ${text}`);
+  })();
+  return bucketReady;
+}
+
+function safeKey(key: string): string {
+  if (!/^[\w-]+\.pdf$/.test(key)) throw new Error("Invalid payslip file key");
+  return key;
+}
+
+export async function savePayslipPdf(key: string, bytes: Buffer): Promise<void> {
+  if (!supabaseConfigured()) return local.savePayslipPdf(key, bytes);
+  await ensurePayslipBucket();
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PAYSLIP_BUCKET}/${safeKey(key)}`, {
+    method: "POST",
+    headers: storageHeaders({ "Content-Type": "application/pdf", "x-upsert": "true" }),
+    body: new Uint8Array(bytes),
+  });
+  if (!res.ok) throw new Error(`Supabase file upload failed (${res.status}): ${await res.text()}`);
+}
+
+export async function readPayslipPdf(key: string): Promise<Buffer | null> {
+  if (!supabaseConfigured()) return local.readPayslipPdf(key);
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/authenticated/${PAYSLIP_BUCKET}/${safeKey(key)}`, {
+    headers: storageHeaders(),
+  });
+  if (res.status === 404 || res.status === 400) return null;
+  if (!res.ok) throw new Error(`Supabase file download failed (${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+export async function deletePayslipPdf(key: string): Promise<void> {
+  if (!supabaseConfigured()) return local.deletePayslipPdf(key);
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PAYSLIP_BUCKET}/${safeKey(key)}`, {
+    method: "DELETE",
+    headers: storageHeaders(),
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Supabase file delete failed (${res.status})`);
 }

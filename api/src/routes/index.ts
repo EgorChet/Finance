@@ -27,6 +27,7 @@ import {
 import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import { buildGuessQueue, buildLabelHints, saveLabelSuggestions } from "../services/labelHints.js";
+import { payslipsRouter } from "./payslips.js";
 import { loadRegularChargeOverrides, saveRegularChargeOverrides } from "../services/regularCharges.js";
 import {
   buildReviewQueue,
@@ -80,6 +81,7 @@ import type { MonthItem as CoreMonthItem, SpendingReport as CoreSpendingReport }
 
 const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
+router.use("/payslips", payslipsRouter);
 
 router.use(async (_req, _res, next) => {
   try {

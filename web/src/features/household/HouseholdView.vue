@@ -40,6 +40,8 @@
         @edit-recurring-charge="editRecurringCharge"
       />
 
+      <PayslipsSection @saved="showSaveStatus" />
+
       <section id="recurring" class="bx-section">
         <div class="bx-list-head">
           <h3>{{ t("Recurring bills") }} <span v-if="activeMonthlyTotal > 0" class="bx-list-total">{{ formatIlsWhole(activeMonthlyTotal) }}{{ t("/mo") }}</span></h3>
@@ -307,6 +309,7 @@ import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";
 import RegularChargesSection from "@/features/household/components/RegularChargesSection.vue";
 import SalaryCalculator from "@/features/household/components/SalaryCalculator.vue";
+import PayslipsSection from "@/features/household/components/PayslipsSection.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";

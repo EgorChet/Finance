@@ -1,3 +1,5 @@
+import type { Payslip } from "../../core/salary/payslip.js";
+
 export interface Transaction {
   date: string;
   merchant_he: string;
@@ -231,3 +233,9 @@ export type UploadJobPublic = {
 export type UploadJobsData = {
   jobs: Record<string, UploadJobPublic>;
 };
+
+/** Parsed payslips by month ("2026-10"); the original PDFs live in file storage. */
+export interface PayslipsData {
+  payslips: Record<string, Payslip>;
+  updated_at: string | null;
+}
