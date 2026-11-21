@@ -102,6 +102,10 @@
             label="Income tax withheld so far"
             :hint="t('Both are in the cumulative columns of your last payslip.')"
           />
+          <p v-if="ytdIncomplete" class="sal-warn">{{ t("Fill in the taxable income too, or set the months to 0: until then the year is ignored.") }}</p>
+          <button v-if="latest" type="button" class="btn btn-sm sal-fill" @click="fillFromPayslip">
+            🧾 {{ t("Restore the numbers from the payslip") }} · {{ latestMonth }}
+          </button>
         </div>
       </details>
 
@@ -270,7 +274,9 @@ function fillFromPayslip() {
   if (details.value) details.value.open = true;
 }
 
-const usingYearToDate = computed(() => state.ytdMonths > 0);
+// A year to date needs all three numbers; with months but no income it would be counted as "ten months of nothing".
+const usingYearToDate = computed(() => state.ytdMonths > 0 && state.ytdTaxable > 0);
+const ytdIncomplete = computed(() => state.ytdMonths > 0 && state.ytdTaxable <= 0);
 
 const baseInput = computed((): Omit<SalaryInput, "gross"> => ({
   benefits: state.benefits,

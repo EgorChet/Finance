@@ -58,6 +58,8 @@ export const RU: Record<string, string> = {
   "Days": "Дни",
   "Hourly rate": "Ставка в час",
   "Download in Russian": "Скачать на русском",
+  "Fill in the taxable income too, or set the months to 0: until then the year is ignored.": "Заполните и облагаемый доход, либо поставьте 0 месяцев: пока год не учитывается.",
+  "Restore the numbers from the payslip": "Вернуть цифры из расчётного листа",
   "Where the gross pay goes": "Куда уходит зарплата",
   "Fund rates, %": "Проценты отчислений, %",
   "Rates as your payslip applies them.": "Проценты как в вашем расчётном листе.",
