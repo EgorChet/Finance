@@ -44,7 +44,7 @@ export interface LivingBudgetMonthEstimate {
   amount: number;
 }
 
-export type LivingBudgetMonthBaseSource = "payslip" | "estimate";
+export type LivingBudgetMonthBaseSource = "payslip" | "estimate" | "latest";
 
 /** The salary part of one month's budget when it is not simply the period's amount. */
 export interface LivingBudgetMonthBase {
@@ -159,6 +159,17 @@ export function resolveMonthBases(opts: {
     const estimate = out.get(month);
     if (month >= opts.currentMonth || estimate) {
       out.set(month, { month, amount: roundMoney(net), source: "payslip", ...(estimate ? { estimate: estimate.amount } : {}) });
+    }
+  }
+  // From this month on, a month with neither a payslip nor an estimate follows the latest payslip.
+  const latest = Object.entries(opts.payslipNets)
+    .filter(([, net]) => net > 0)
+    .sort(([a], [b]) => b.localeCompare(a))[0];
+  if (latest) {
+    let ym = opts.currentMonth;
+    for (let i = 0; i < 12; i += 1) {
+      if (!out.has(ym)) out.set(ym, { month: ym, amount: roundMoney(latest[1]), source: "latest" });
+      ym = nextCalendarMonth(ym);
     }
   }
   return [...out.values()].sort((a, b) => a.month.localeCompare(b.month));

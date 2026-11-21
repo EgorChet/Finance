@@ -14,14 +14,19 @@ const seg = (amount: number, from: string, through: string): LivingBudgetSegment
 test("a payslip counts from the open cycle's month on; for a past month only when you gave it an estimate", () => {
   const nets = { "2026-09": 12000, "2026-10": 13988, "2026-11": 14100 };
   const none = resolveMonthBases({ estimates: [], payslipNets: nets, currentMonth: "2026-11" });
-  assert.deepEqual(none.map((b) => [b.month, b.amount, b.source]), [["2026-11", 14100, "payslip"]]);
+  const real = none.filter((b) => b.source !== "latest");
+  assert.deepEqual(real.map((b) => [b.month, b.amount, b.source]), [["2026-11", 14100, "payslip"]]);
+  // months from the open cycle on with nothing of their own follow the latest payslip (a year ahead)
+  const latest = none.filter((b) => b.source === "latest");
+  assert.equal(latest.length, 11);
+  assert.deepEqual([latest[0].month, latest[0].amount, latest[10].month], ["2026-12", 14100, "2027-10"]);
 
   const withEstimates = resolveMonthBases({
     estimates: [{ month: "2026-10", amount: 13500 }, { month: "2026-12", amount: 13000 }],
     payslipNets: nets,
     currentMonth: "2026-11",
   });
-  assert.deepEqual(withEstimates.map((b) => [b.month, b.amount, b.source, b.estimate ?? null]), [
+  assert.deepEqual(withEstimates.filter((b) => b.source !== "latest").map((b) => [b.month, b.amount, b.source, b.estimate ?? null]), [
     ["2026-10", 13988, "payslip", 13500], // a past month you confirmed: the real net replaces the estimate
     ["2026-11", 14100, "payslip", null],
     ["2026-12", 13000, "estimate", null], // not paid yet: still the estimate
@@ -83,7 +88,7 @@ test("stored budget: an estimate is kept when the periods are saved, the payslip
   ];
   await importPayslipPages([page], Buffer.from("%PDF-1.4 fake"));
   eff = await effectiveLivingBudget(now, 10);
-  assert.deepEqual(eff.month_bases.map((b) => [b.month, b.amount, b.source, b.estimate ?? null]), [["2026-11", 13500, "payslip", 14000]]);
+  assert.deepEqual(eff.month_bases.filter((b) => b.source !== "latest").map((b) => [b.month, b.amount, b.source, b.estimate ?? null]), [["2026-11", 13500, "payslip", 14000]]);
   assert.equal(eff.estimate_suggestion, 13500);
 
   // Clearing the estimate is allowed; nonsense is refused.
