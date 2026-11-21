@@ -457,13 +457,14 @@ const SYNC_STEPS = [
 
 
 
-/** Bottom tab bar: the four screens used most, one thumb-tap away. Everything else stays in the menu. */
+/** Bottom tab bar: the five screens used most, one thumb-tap away. Everything else stays in the menu. */
 const HOME_TAB = { to: "/app/home", label: "Today", icon: "M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" };
 const SPENDING_TAB = { to: "/app/overview", label: "Spending", icon: "M4 19V11M10 19V5M16 19v-6M22 19H2" };
 const TRANSACTIONS_TAB = { to: "/app/browse", label: "Transactions", icon: "M4 6h16M4 12h16M4 18h10" };
 const BUDGET_TAB = { to: "/app/household", label: "Budget", icon: "M4 7h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 7l2-3h12l2 3M15 13h2" };
+const MONEY_TAB = { to: "/app/money", label: "Money", icon: "M4 17l5-5 4 4 7-8M15 8h5v5" };
 // Labelling merchants lives inside Transactions (Merchants view); Today flags it.
-const tabItems = computed(() => [HOME_TAB, SPENDING_TAB, TRANSACTIONS_TAB, BUDGET_TAB]);
+const tabItems = computed(() => [HOME_TAB, SPENDING_TAB, TRANSACTIONS_TAB, BUDGET_TAB, MONEY_TAB]);
 
 const reviewData = useReviewDataStore();
 /** Red dot on Transactions while merchants are waiting for a name. */

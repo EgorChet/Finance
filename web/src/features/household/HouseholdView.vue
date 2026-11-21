@@ -46,7 +46,6 @@
         @edit-recurring-charge="editRecurringCharge"
       />
 
-      <PayslipsSection @saved="showSaveStatus" />
       </div>
 
       <div class="bx-col">
@@ -320,7 +319,6 @@ import IconButton from "@/shared/components/IconButton.vue";
 import LivingBudgetSection from "@/features/household/components/LivingBudgetSection.vue";
 import RegularChargesSection from "@/features/household/components/RegularChargesSection.vue";
 import SalaryCalculator from "@/features/household/components/SalaryCalculator.vue";
-import PayslipsSection from "@/features/household/components/PayslipsSection.vue";
 import MonthSelect from "@/shared/components/MonthSelect.vue";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";
