@@ -19,6 +19,8 @@ export const usePortfolioStore = defineStore("portfolio", () => {
   const marketSnapshot = ref<MarketSnapshot | null>(null);
   const loading = ref(false);
   const refreshing = ref(false);
+  /** True once the first round of quotes has finished (answered or failed), so screens know the numbers are settled. */
+  const ready = ref(false);
 
   let kaspaTimer: ReturnType<typeof setInterval> | null = null;
   let fxcnTimer: ReturnType<typeof setInterval> | null = null;
@@ -28,21 +30,15 @@ export const usePortfolioStore = defineStore("portfolio", () => {
   async function refresh(demo: boolean, token?: string, force = false) {
     if (force) refreshing.value = true;
     else loading.value = true;
-    try {
-      const [kas, fxcn, market] = await Promise.all([
-        fetchKaspaQuote(demo, token, force),
-        fetchFxcnQuote(demo, token, force),
-        fetchMarketSnapshot(demo, token, force),
-      ]);
-      kaspaQuote.value = kas;
-      fxcnQuote.value = fxcn;
-      marketSnapshot.value = market;
-    } catch {
-      /* keep stale values */
-    } finally {
-      loading.value = false;
-      refreshing.value = false;
-    }
+    // Each quote lands on its own, so one slow or failing source does not hold back the others.
+    await Promise.allSettled([
+      fetchKaspaQuote(demo, token, force).then((v) => (kaspaQuote.value = v)),
+      fetchFxcnQuote(demo, token, force).then((v) => (fxcnQuote.value = v)),
+      fetchMarketSnapshot(demo, token, force).then((v) => (marketSnapshot.value = v)),
+    ]);
+    loading.value = false;
+    refreshing.value = false;
+    ready.value = true;
   }
 
   function startPolling(demo: boolean, token?: string) {
@@ -76,6 +72,7 @@ export const usePortfolioStore = defineStore("portfolio", () => {
     marketSnapshot,
     loading,
     refreshing,
+    ready,
     refresh,
     startPolling,
     stopPolling,

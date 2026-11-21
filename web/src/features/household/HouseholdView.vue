@@ -33,6 +33,7 @@
         :configured-charges="charges"
         :reference-ym="referenceYm"
         :readonly="budgetLocked"
+        :pending="!regularReady"
         :disabled="saving"
         :persist="persistCharges"
         :save-error="status"
@@ -107,7 +108,7 @@
         <p v-else class="bx-empty-line">{{ t("No recurring bills yet. Rent, loans and subscriptions go here.") }}</p>
       </section>
 
-      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" @plan="cyclePlan = $event" />
+      <RegularChargesSection :readonly="budgetLocked" @saved="showSaveStatus" @monthly="cardBillsMonthly = $event" @plan="cyclePlan = $event" @ready="regularReady = true" />
 
       <section id="one-time" class="bx-section">
         <div class="bx-list-head">
@@ -372,6 +373,8 @@ const salaryOpen = ref(false);
 /** Average monthly bills on the Cal card, reported by "Bills on your card". */
 const cardBillsMonthly = ref(0);
 const cyclePlan = ref<BudgetPlan | null>(null);
+/** The bills section has its history and plan, so the hero figures will not change any more. */
+const regularReady = ref(false);
 const budgetLocked = computed(() => auth.readOnly || !auth.canEditBudget);
 const homeData = useHomeDataStore();
 const householdData = useHouseholdDataStore();
@@ -1081,20 +1084,6 @@ async function applyHouseholdBundle(bundle: HouseholdBundle) {
   syncSavedSnapshots();
 }
 
-function applyHomeBundlePeek() {
-  const cached = homeData.peek(auth.isDemo, auth.token || undefined);
-  if (!cached) return false;
-  // Home's periods already have the payslip / expected months cut out: not what this page edits and saves.
-  if (cached.living_budget.month_bases?.length) return false;
-  charges.value = cached.fixed_charges.map((c) => normalizeConfiguredCharge(c));
-  livingBudgetSegments.value = cached.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
-  livingBudgetMonthTopups.value = (cached.living_budget.month_topups || []).map((t) =>
-    normalizeLivingBudgetMonthTopup(t),
-  );
-  syncSavedSnapshots();
-  return true;
-}
-
 async function load(options: { background?: boolean; force?: boolean } = {}) {
   const demo = auth.isDemo;
   const token = auth.token || undefined;
@@ -1103,12 +1092,6 @@ async function load(options: { background?: boolean; force?: boolean } = {}) {
     const householdCached = householdData.peek(demo, token);
     if (householdCached) {
       await applyHouseholdBundle(householdCached);
-      hydrated.value = true;
-      loading.value = false;
-      void load({ background: true });
-      return;
-    }
-    if (applyHomeBundlePeek()) {
       hydrated.value = true;
       loading.value = false;
       void load({ background: true });
@@ -1153,6 +1136,8 @@ onBeforeRouteLeave(async () => {
 });
 
 onMounted(() => {
+  // The bills section needs the Home bundle too; start it now so it is in by the time the page has drawn.
+  void homeData.load(auth.isDemo, auth.token || undefined);
   load();
   window.addEventListener("beforeunload", onBeforeUnload);
 });
