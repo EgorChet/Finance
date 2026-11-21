@@ -6,9 +6,7 @@
         <span v-if="setAsideTotal > 0" class="bx-list-total">{{ t("{amount} set aside now", { amount: formatIlsWhole(setAsideTotal) }) }}</span>
       </h3>
     </div>
-    <p class="bx-section-note">
-      {{ t("Bills due this cycle are set aside until they're charged; \"Next cycle\" ones aren't counted yet. Amounts are learned from your statements.") }}
-    </p>
+    <InfoTip :text="billsNote" />
     <div v-if="!readonly && suggestions.length" class="rc-suggest">
       <p class="rc-suggest-title">{{ t("New regular bill?") }}</p>
       <div v-for="sg in suggestions" :key="sg.key" class="rc-suggest-row">
@@ -31,7 +29,7 @@
     <div class="bx-list">
       <component
         :is="readonly ? 'div' : 'button'"
-        v-for="row in rows"
+        v-for="row in shownRows"
         :key="row.id"
         :type="readonly ? undefined : 'button'"
         class="bx-row"
@@ -51,6 +49,9 @@
           </span>
         </span>
       </component>
+      <button v-if="rows.length > BILLS_SHOWN" type="button" class="bx-row bx-row--more" @click="showAllBills = !showAllBills">
+        {{ showAllBills ? t("Show fewer") : t("Show all {n}", { n: rows.length }) }}
+      </button>
     </div>
 
     <SheetEditor
@@ -81,6 +82,7 @@
 
 <script setup lang="ts">
 import { dateTag, t, tr } from "@/shared/i18n";
+import InfoTip from "@/shared/components/InfoTip.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
@@ -134,6 +136,9 @@ const BILL_MARKS: Record<string, { he?: string; category: string }> = {
   water: { he: "מי נתניה", category: "Housing" },
   gas: { he: "סופרגז", category: "Housing" },
 };
+
+const BILLS_SHOWN = 6;
+const showAllBills = ref(false);
 
 const auth = useAuthStore();
 const homeData = useHomeDataStore();
@@ -210,6 +215,10 @@ const statuses = computed((): Map<string, RegularChargeStatus> => {
   return new Map(list.map((s) => [s.id, s]));
 });
 
+const billsNote = computed(() =>
+  t("Bills due this cycle are set aside until they're charged; \"Next cycle\" ones aren't counted yet. Amounts are learned from your statements."),
+);
+
 const rows = computed(() =>
   allRules.value.map((rule) => {
     const s = statuses.value.get(rule.id);
@@ -248,6 +257,8 @@ const rows = computed(() =>
     };
   }),
 );
+
+const shownRows = computed(() => (showAllBills.value ? rows.value : rows.value.slice(0, BILLS_SHOWN)));
 
 const setAsideTotal = computed(() =>
   rows.value.reduce((sum, r) => {
@@ -385,8 +396,15 @@ void props;
 }
 .rc-suggest-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+.rc-suggest-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
 }
 </style>
