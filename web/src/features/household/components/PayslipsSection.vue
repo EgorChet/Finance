@@ -7,7 +7,7 @@
       </button>
       <input ref="picker" type="file" accept="application/pdf,.pdf" class="ps-file" @change="onPick" />
     </div>
-    <p class="bx-section-note">{{ t("Kept private: only you can open them. The original files are stored too.") }}</p>
+    <InfoTip label="Who can see this" :text="t('Kept private: only you can open them. The original files are stored too.')" />
     <p v-if="loadError" class="ps-error">{{ loadError }}</p>
     <p v-else-if="loaded && !payslips.length" class="bx-section-note">{{ t("No payslips yet") }}</p>
 
@@ -53,6 +53,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { dateTag, locale, t } from "@/shared/i18n";
+import InfoTip from "@/shared/components/InfoTip.vue";
 import PayslipSheet from "@/features/household/components/PayslipSheet.vue";
 import { deletePayslip, fetchPayslipPdf, fetchPayslips, uploadPayslipPdf } from "@/shared/api/client";
 import { confirm } from "@/shared/composables/useConfirm";
