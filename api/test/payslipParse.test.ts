@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePayslipItems, type PdfTextItem } from "../../core/salary/payslipParse.js";
-import { deductionLabel, fundRatesFromPayslip, paymentLabel, yearToDateFromPayslip } from "../../core/salary/payslip.js";
+import { deductionLabel, fundRatesFromPayslip, paymentLabel, savingsFromPayslips, yearToDateFromPayslip } from "../../core/salary/payslip.js";
 
 const it = (x1: number, y: number, str: string): PdfTextItem => ({ str, x0: x1 - str.length * 5, x1, y });
 
@@ -129,4 +129,19 @@ test("fund rates come from the payslip's own amounts and bases, for the salary c
   });
   const noBase = fundRatesFromPayslip({ ...p, deposits: { ...p.deposits, pensionBase: null, studyFundBase: 0 } });
   assert.deepEqual(Object.values(noBase), [null, null, null, null, null]);
+});
+
+test("savings add up your deductions and the employer's deposits over the payslips", () => {
+  const { payslip: p } = parsePayslipItems(page());
+  assert.ok(p);
+  const one = savingsFromPayslips([p]);
+  assert.deepEqual(
+    [one.pensionEmployee, one.pensionEmployer, one.severance, one.studyFundEmployee, one.studyFundEmployer],
+    [800, 845, 780, 250, 750],
+  );
+  assert.equal(one.total, 3425);
+  const two = savingsFromPayslips([p, p]);
+  assert.equal(two.months, 2);
+  assert.equal(two.total, 6850);
+  assert.equal(savingsFromPayslips([]).total, 0);
 });

@@ -292,3 +292,49 @@ export function yearToDateFromPayslip(p: Payslip): { months: number; taxable: nu
   if (months == null || taxable == null || taxPaid == null || months < 1 || months > 11) return null;
   return { months, taxable, taxPaid };
 }
+
+export interface SavingsTotals {
+  /** Payslips counted. */
+  months: number;
+  pensionEmployee: number;
+  pensionEmployer: number;
+  severance: number;
+  studyFundEmployee: number;
+  studyFundEmployer: number;
+  /** Everything above: what went into the funds, yours and the employer's. */
+  total: number;
+}
+
+/**
+ * What the payslips say was put into pension, severance and study fund: your part is the deduction line,
+ * the employer's part is the deposits block. Contributions only, not the account balance (returns and fees
+ * are not on a payslip).
+ */
+export function savingsFromPayslips(payslips: Payslip[]): SavingsTotals {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const t: SavingsTotals = {
+    months: payslips.length,
+    pensionEmployee: 0,
+    pensionEmployer: 0,
+    severance: 0,
+    studyFundEmployee: 0,
+    studyFundEmployer: 0,
+    total: 0,
+  };
+  for (const p of payslips) {
+    for (const d of p.deductions) {
+      if (d.kind === "pension") t.pensionEmployee += d.amount;
+      if (d.kind === "study_fund") t.studyFundEmployee += d.amount;
+    }
+    t.pensionEmployer += p.deposits.pensionEmployer ?? 0;
+    t.severance += p.deposits.severance ?? 0;
+    t.studyFundEmployer += p.deposits.studyFundEmployer ?? 0;
+  }
+  t.pensionEmployee = r2(t.pensionEmployee);
+  t.pensionEmployer = r2(t.pensionEmployer);
+  t.severance = r2(t.severance);
+  t.studyFundEmployee = r2(t.studyFundEmployee);
+  t.studyFundEmployer = r2(t.studyFundEmployer);
+  t.total = r2(t.pensionEmployee + t.pensionEmployer + t.severance + t.studyFundEmployee + t.studyFundEmployer);
+  return t;
+}
