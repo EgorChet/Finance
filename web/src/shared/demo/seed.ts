@@ -270,6 +270,7 @@ export function demoFixedCharges(today: string): ConfiguredCharge[] {
     { id: "cibus", name_en: "Cibus", name_he: "סיבוס", amount: 600, category_en: "Groceries", from_month: "2024-01", through_month: "2035-12", schedule: "monthly" },
     { id: "gym", name_en: "Gym", name_he: "חדר כושר", amount: 249, category_en: "Fitness", from_month: ym(addMonths(open, -7)), through_month: "2035-12", schedule: "monthly" },
     { id: "car-service", name_en: "Car service", amount: 1450, category_en: "Transport", from_month: ym(soon), through_month: ym(soon), schedule: "once", charge_date: soon },
+    { id: "pharmacy", name_en: "Pharmacy", amount: 180, category_en: "Health & Medical", from_month: ym(open), through_month: ym(open), schedule: "once", charge_date: open },
     { id: "dentist", name_en: "Dentist", amount: 900, category_en: "Health & Medical", from_month: ym(addMonths(open, -1)), through_month: ym(addMonths(open, -1)), schedule: "once", charge_date: cycleDate(addMonths(open, -1), 18) },
   ];
 }
