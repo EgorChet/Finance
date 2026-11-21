@@ -70,7 +70,6 @@
               </component>
             </li>
           </ul>
-          <InfoTip :text="t('Same numbers as Spending: bills already charged plus those still to come are taken off first.')" />
         </template>
         <template v-else-if="monthlyBills > 0 || cardBills > 0">
           <p class="bx-bar-label">{{ t("Where it goes each month") }}</p>
@@ -100,7 +99,7 @@
             </li>
           </ul>
         </template>
-        <InfoTip v-if="segmentCapVaries(headlineSegment.seg)" :text="t('The total changes in months when Cibus or the rent cover change.')" />
+        <InfoTip v-if="heroNote" :text="heroNote" />
       </article>
 
       <div class="bx-list-head">
@@ -567,6 +566,15 @@ const cycleSplit = computed(() => {
     title: `${t("This cycle (from {date})", { date: d.toLocaleDateString(dateTag(), { day: "numeric", month: "short" }) })} · ${formatIlsWhole(plan.budget)}`,
     parts: parts.map((p) => ({ ...p, pct: (p.amount / total) * 100 })),
   };
+});
+
+/** One explanation for the whole hero, so there is a single «How it's counted» button. */
+const heroNote = computed(() => {
+  const head = headlineSegment.value?.seg;
+  const parts: string[] = [];
+  if (cycleSplit.value) parts.push(t("Same numbers as Spending: bills already charged plus those still to come are taken off first."));
+  if (head && segmentCapVaries(head)) parts.push(t("The total changes in months when Cibus or the rent cover change."));
+  return parts.join(" ");
 });
 
 /** What is left of the month's money after bills: the same figure as «Left for everyday» below. */
