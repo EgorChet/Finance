@@ -11,68 +11,36 @@
     <p v-if="loadError" class="ps-error">{{ loadError }}</p>
     <p v-else-if="loaded && !payslips.length" class="bx-section-note">{{ t("No payslips yet") }}</p>
 
-    <div v-if="savings" class="ps-save">
-      <p class="ps-save__label">{{ t("Put aside for the future") }}</p>
-      <p class="ps-save__big">{{ formatIlsWhole(savings.all.total) }}</p>
-      <p class="ps-save__sub">
-        {{ t("From {n} payslips, since {month}", { n: savings.all.months, month: savings.since }) }}
-        <template v-if="savings.year.total > 0"> · {{ t("This year") }} {{ formatIlsWhole(savings.year.total) }}</template>
-      </p>
-      <table class="ps-save__table">
-        <thead>
-          <tr><th /><th>{{ t("You") }}</th><th>{{ t("Employer") }}</th><th>{{ t("Total") }}</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th>{{ t("Pension") }}</th>
-            <td>{{ formatIlsWhole(savings.all.pensionEmployee) }}</td>
-            <td>{{ formatIlsWhole(savings.all.pensionEmployer) }}</td>
-            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.pensionEmployee + savings.all.pensionEmployer) }}</td>
-          </tr>
-          <tr>
-            <th>{{ t("Pitzuim") }}</th>
-            <td>—</td>
-            <td>{{ formatIlsWhole(savings.all.severance) }}</td>
-            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.severance) }}</td>
-          </tr>
-          <tr>
-            <th>{{ t("Study fund") }}</th>
-            <td>{{ formatIlsWhole(savings.all.studyFundEmployee) }}</td>
-            <td>{{ formatIlsWhole(savings.all.studyFundEmployer) }}</td>
-            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.studyFundEmployee + savings.all.studyFundEmployer) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <InfoTip label="What this is" :text="t('The sum of contributions from the payslips on file. It is not the account balance: returns, fees and money saved before the first payslip are not included.')" />
-    </div>
-
-    <div v-if="payslips.length" class="bx-list">
-      <button v-for="p in shown" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
-        <span class="tx-row-icon" aria-hidden="true">🧾</span>
-        <span class="bx-row-body">
-          <span class="bx-row-top">
-            <span class="bx-row-name">{{ monthLabel(p) }}</span>
-            <span class="bx-row-amount">{{ formatIlsWhole(p.totals.netPayable || p.totals.net) }}</span>
-          </span>
-          <span class="bx-row-meta">
-            <span>{{ t("Total pay") }} {{ formatIlsWhole(p.totals.gross) }}</span>
-            <span class="ps-tags">
-              <span v-if="extrasOf(p)">{{ extrasOf(p) }}</span>
-              <span
-                v-if="changeOf(p)"
-                :class="changeOf(p)! > 0 ? 'ps-change--up' : 'ps-change--down'"
-                :title="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
-                :aria-label="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
-              >{{ signed(changeOf(p)!) }}</span>
+    <details v-for="g in groups" :key="g.year" class="ps-year" :open="g.year === newestYear">
+      <summary class="ps-year__head">
+        <span class="ps-year__name">{{ g.year }}</span>
+        <span class="ps-year__meta">{{ t("{n} {n|payslip|payslips}", { n: g.items.length }) }} · {{ t("Take-home") }} {{ formatIlsWhole(g.net) }}</span>
+      </summary>
+      <div class="bx-list">
+        <button v-for="p in g.items" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
+            <span class="tx-row-icon" aria-hidden="true">🧾</span>
+            <span class="bx-row-body">
+              <span class="bx-row-top">
+                <span class="bx-row-name">{{ monthLabel(p) }}</span>
+                <span class="bx-row-amount">{{ formatIlsWhole(p.totals.netPayable || p.totals.net) }}</span>
+              </span>
+              <span class="bx-row-meta">
+                <span>{{ t("Total pay") }} {{ formatIlsWhole(p.totals.gross) }}</span>
+                <span class="ps-tags">
+                  <span v-if="extrasOf(p)">{{ extrasOf(p) }}</span>
+                  <span
+                    v-if="changeOf(p)"
+                    :class="changeOf(p)! > 0 ? 'ps-change--up' : 'ps-change--down'"
+                    :title="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+                    :aria-label="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+                  >{{ signed(changeOf(p)!) }}</span>
+                </span>
+              </span>
             </span>
-          </span>
-        </span>
-        <span class="bx-chevron" aria-hidden="true">›</span>
-      </button>
-      <button v-if="payslips.length > 6" type="button" class="bx-row bx-row--more" @click="showAll = !showAll">
-        {{ showAll ? t("Show fewer") : t("Show all {n}", { n: payslips.length }) }}
-      </button>
-    </div>
+            <span class="bx-chevron" aria-hidden="true">›</span>
+          </button>
+      </div>
+    </details>
 
     <PayslipSheet
       :payslip="open"
@@ -94,10 +62,10 @@ import { deletePayslip, fetchPayslipPdf, fetchPayslips, uploadPayslipPdf } from 
 import { confirm } from "@/shared/composables/useConfirm";
 import { useAuthStore } from "@/shared/stores/auth";
 import { formatIlsWhole } from "@/shared/utils/format";
-import { paymentKindLabel, savingsFromPayslips, type PaymentKind, type Payslip } from "@core/salary/payslip";
+import { paymentKindLabel, type PaymentKind, type Payslip } from "@core/salary/payslip";
 import { openPayslipPrint } from "@/features/household/utils/payslipPrint";
 
-const emit = defineEmits<{ saved: [string] }>();
+const emit = defineEmits<{ saved: [string]; loaded: [Payslip[]] }>();
 const auth = useAuthStore();
 
 const payslips = ref<Payslip[]>([]);
@@ -106,32 +74,29 @@ const loadError = ref("");
 const uploading = ref(false);
 const busy = ref(false);
 const openId = ref<string | null>(null);
-const showAll = ref(false);
 const picker = ref<HTMLInputElement | null>(null);
 
 /** Payslips are Egor's alone; the demo has none. */
 const available = computed(() => !auth.isDemo && auth.canEditBudget);
 const open = computed(() => payslips.value.find((p) => p.id === openId.value) ?? null);
-const shown = computed(() => (showAll.value ? payslips.value : payslips.value.slice(0, 6)));
+const newestYear = computed(() => payslips.value.reduce((y, p) => Math.max(y, p.year), 0));
+/** Payslips by year, newest first; only the latest year is open so the list stays short. */
+const groups = computed(() => {
+  const byYear = new Map<number, Payslip[]>();
+  for (const p of payslips.value) byYear.set(p.year, [...(byYear.get(p.year) ?? []), p]);
+  return [...byYear.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, items]) => ({
+      year,
+      items: items.sort((a, b) => b.month - a.month),
+      net: items.reduce((sum, p) => sum + netOf(p), 0),
+    }));
+});
 
 function monthLabel(p: Payslip): string {
   const label = new Date(p.year, p.month - 1, 1).toLocaleDateString(dateTag(), { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
-
-/** What went into pension, severance and study fund: all payslips on file, and the latest payslip's year. */
-const savings = computed(() => {
-  if (!payslips.value.length) return null;
-  const oldest = payslips.value.reduce((a, b) => (b.year * 12 + b.month < a.year * 12 + a.month ? b : a));
-  const newest = payslips.value.reduce((a, b) => (b.year * 12 + b.month > a.year * 12 + a.month ? b : a));
-  const all = savingsFromPayslips(payslips.value);
-  if (all.total <= 0) return null;
-  return {
-    all,
-    year: savingsFromPayslips(payslips.value.filter((p) => p.year === newest.year)),
-    since: monthLabel(oldest).toLowerCase(),
-  };
-});
 
 const netOf = (p: Payslip) => p.totals.netPayable || p.totals.net;
 
@@ -167,6 +132,7 @@ async function load() {
   loadError.value = "";
   try {
     payslips.value = (await fetchPayslips(auth.token || undefined)).payslips;
+    emit("loaded", payslips.value);
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -244,60 +210,40 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ps-save {
-  display: grid;
-  gap: 0.2rem;
-  margin: 0.75rem 0 1rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--surface);
+.ps-year {
+  margin: 0 0 0.6rem;
 }
-.ps-save__label {
-  margin: 0;
+.ps-year__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 0.35rem 0.2rem;
+  cursor: pointer;
+  list-style: none;
+}
+.ps-year__head::-webkit-details-marker {
+  display: none;
+}
+.ps-year__head::after {
+  content: "›";
+  order: 3;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.ps-year[open] > .ps-year__head::after {
+  transform: rotate(90deg);
+}
+.ps-year__name {
+  font-weight: 700;
+}
+.ps-year__meta {
+  margin-left: auto;
   font-size: 0.82rem;
   color: var(--text-muted);
-}
-.ps-save__big {
-  margin: 0;
-  font-size: 1.9rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
-}
-.ps-save__sub {
-  margin: 0 0 0.5rem;
-  font-size: 0.82rem;
-  color: var(--text-faint);
-}
-.ps-save__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-.ps-save__table th,
-.ps-save__table td {
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border);
-  text-align: right;
-  font-size: 0.92rem;
-}
-.ps-save__table thead th {
-  border-top: 0;
-  padding-top: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-faint);
-}
-.ps-save__table tbody th {
-  text-align: left;
-  font-weight: 500;
-}
-.ps-save__table td {
-  font-weight: 500;
-}
-.ps-save__table td.ps-save__sum {
-  font-weight: 700;
 }
 .ps-file {
   display: none;

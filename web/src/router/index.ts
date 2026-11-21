@@ -21,6 +21,7 @@ const router = createRouter({
         },
         { path: "review", redirect: { name: "browse", query: { view: "merchants" } } },
         { path: "mappings", redirect: { name: "browse", query: { view: "merchants", tab: "mappings" } } },
+        { path: "money", name: "money", component: () => import("@/features/money/MoneyView.vue") },
         { path: "household", name: "household", component: () => import("@/features/household/HouseholdView.vue") },
         { path: "recurring", redirect: { name: "household" } },
         { path: "excluded", redirect: { name: "household", hash: "#excluded" } },
