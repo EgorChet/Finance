@@ -3317,6 +3317,12 @@ html.sheet-editor-open body {
   transform: rotate(90deg);
 }
 
+.bx-hero-extra {
+  margin: -0.35rem 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--success);
+}
+
 .bx-hero-free {
   display: flex;
   align-items: baseline;
