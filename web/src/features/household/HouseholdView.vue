@@ -133,11 +133,11 @@
               <span class="bx-row-meta">
                 <span>{{ dateToLabel(charge.charge_date!) }} · {{ catName(charge.category_en) }}</span>
                 <span
-                  v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended'"
+                  v-if="oneTimeStatusClass(charge.charge_date!) !== 'ended' || inThisCycle(charge.charge_date!)"
                   class="bx-status"
-                  :class="`bx-status--${oneTimeStatusClass(charge.charge_date!)}`"
+                  :class="`bx-status--${inThisCycle(charge.charge_date!) && oneTimeStatusClass(charge.charge_date!) === 'ended' ? 'active' : oneTimeStatusClass(charge.charge_date!)}`"
                 >
-                  {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? t('Today') : t('Coming up') }}
+                  {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? t('Today') : oneTimeStatus(charge.charge_date!, referenceToday) === 'past' ? t('This cycle') : t('Coming up') }}
                 </span>
               </span>
             </span>
@@ -332,6 +332,7 @@ import { confirm } from "@/shared/composables/useConfirm";
 import { referenceDate, yearMonthForDate } from "@/shared/utils/appDate";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
 import { isoDateLocal } from "@/shared/utils/transactionPeriod";
+import { cycleStartForDate, loadCycleDay } from "@/features/spending/utils/pace";
 import {
   type ChargeGroup,
   type ConfiguredCharge,
@@ -376,6 +377,12 @@ const householdData = useHouseholdDataStore();
 const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
 const referenceYm = computed(() => yearMonthForDate(refDate.value));
 const referenceToday = computed(() => isoDateLocal(refDate.value));
+/** First day of the current billing cycle: a one-time charge from this cycle is not "past" yet, it is still in this month's budget. */
+const thisCycleStart = computed(() => {
+  const start = cycleStartForDate(refDate.value, loadCycleDay());
+  return typeof start === "string" ? start : isoDateLocal(start);
+});
+const inThisCycle = (date: string) => date >= thisCycleStart.value && date <= referenceToday.value;
 const loading = ref(true);
 const hydrated = ref(false);
 const saving = ref(false);
@@ -432,7 +439,7 @@ const oneTimeCharges = computed(() =>
     .sort((a, b) => (b.charge_date ?? "").localeCompare(a.charge_date ?? "")),
 );
 const visibleOneTimeCharges = computed(() =>
-  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) !== "past"),
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) !== "past" || inThisCycle(charge.charge_date!)),
 );
 /** Upcoming ones first, then the latest past ones, so the history is visible without a tap; the rest behind "Show all". */
 const ONE_TIME_SHOWN = 4;
@@ -441,7 +448,7 @@ const shownOneTimeCharges = computed(() => {
   return showPastOneTime.value ? all : all.slice(0, Math.max(ONE_TIME_SHOWN, visibleOneTimeCharges.value.length));
 });
 const pastOneTimeCharges = computed(() =>
-  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) === "past"),
+  oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) === "past" && !inThisCycle(charge.charge_date!)),
 );
 const endedRecurringCount = computed(() =>
   recurringGroups.value.reduce((sum, group) => sum + endedGroupSegments(group).length, 0),
