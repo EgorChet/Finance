@@ -538,3 +538,45 @@ export async function savePaceSettings(
 ) {
   return put<import("@core/spending/paceSettings").PaceSettings>(`${prefix(false)}/settings`, settings, token);
 }
+
+// ── Payslips (private: Egor only) ────────────────────────────────────────────────────────────
+
+export interface PayslipImportResult {
+  imported: { id: string; page: number; gross: number; net: number }[];
+  rejected: { page: number; id?: string; warnings: string[] }[];
+}
+
+export async function fetchPayslips(token?: string) {
+  return get<{ payslips: import("@core/salary/payslip").Payslip[] }>(`${prefix(false)}/payslips`, token);
+}
+
+/** Add payslips from a PDF. A file with nothing readable comes back as a result (not an error) so the screen can say why. */
+export async function uploadPayslipPdf(file: File, token?: string): Promise<PayslipImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  let res: Response;
+  try {
+    res = await fetch(`${prefix(false)}/payslips`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+  } catch {
+    throw new Error("Could not reach the API. If you just opened the app, wait ~30 seconds for Render to wake up and try again.");
+  }
+  if (res.ok || res.status === 422) return res.json() as Promise<PayslipImportResult>;
+  throw new Error(await readApiError(res));
+}
+
+/** The original PDF of one payslip; the page says where in the file it is. */
+export async function fetchPayslipPdf(id: string, token?: string): Promise<{ blob: Blob; page: number }> {
+  const res = await fetch(`${prefix(false)}/payslips/${encodeURIComponent(id)}/pdf`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await readApiError(res));
+  return { blob: await res.blob(), page: Number(res.headers.get("X-Payslip-Page")) || 1 };
+}
+
+export async function deletePayslip(id: string, token?: string) {
+  return del<{ removed: boolean }>(`${prefix(false)}/payslips/${encodeURIComponent(id)}`, token);
+}

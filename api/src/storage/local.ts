@@ -11,6 +11,7 @@ import type {
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
+  PayslipsData,
   StatementsData,
   UploadJobsData,
 } from "../types.js";
@@ -298,4 +299,44 @@ export async function readRegularCharges(): Promise<unknown> {
 export async function writeRegularCharges(data: Record<string, unknown>): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(REGULAR_CHARGES_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+const PAYSLIPS_PATH = path.join(DATA_DIR, "payslips.json");
+const PAYSLIP_PDF_DIR = path.join(DATA_DIR, "payslips");
+
+export async function readPayslips(): Promise<PayslipsData> {
+  try {
+    return JSON.parse(await fs.readFile(PAYSLIPS_PATH, "utf-8")) as PayslipsData;
+  } catch {
+    return { payslips: {}, updated_at: null };
+  }
+}
+
+export async function writePayslips(data: PayslipsData): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  data.updated_at = new Date().toISOString();
+  await fs.writeFile(PAYSLIPS_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+/** Keys are file names made by the payslip service (hash + .pdf): never a path. */
+function payslipPdfPath(key: string): string {
+  if (!/^[\w-]+\.pdf$/.test(key)) throw new Error("Invalid payslip file key");
+  return path.join(PAYSLIP_PDF_DIR, key);
+}
+
+export async function savePayslipPdf(key: string, bytes: Buffer): Promise<void> {
+  await fs.mkdir(PAYSLIP_PDF_DIR, { recursive: true });
+  await fs.writeFile(payslipPdfPath(key), bytes);
+}
+
+export async function readPayslipPdf(key: string): Promise<Buffer | null> {
+  try {
+    return await fs.readFile(payslipPdfPath(key));
+  } catch {
+    return null;
+  }
+}
+
+export async function deletePayslipPdf(key: string): Promise<void> {
+  await fs.rm(payslipPdfPath(key), { force: true });
 }

@@ -25,7 +25,12 @@
       />
       <SheetAmountInput v-else v-model="state.net" label="Take-home you want per month" />
 
-      <details class="sal-details">
+      <button v-if="latest" type="button" class="btn btn-sm sal-fill" @click="fillFromPayslip">
+        🧾 {{ t("Fill from my latest payslip") }} · {{ latestMonth }}
+      </button>
+      <p v-if="filled" class="sal-note">{{ t("Taken from the {month} payslip; the result is for the month after it.", { month: latestMonth }) }}</p>
+
+      <details ref="details" class="sal-details">
         <summary>{{ t("Your details") }}</summary>
         <div class="sal-fields">
           <SheetAmountInput v-model="state.benefits" label="Taxable perks, not paid in cash (meals…)" />
@@ -95,14 +100,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from "vue";
-import { t } from "@/shared/i18n";
+import { computed, reactive, ref, watch } from "vue";
+import { dateTag, t } from "@/shared/i18n";
+import { fetchPayslips } from "@/shared/api/client";
+import { useAuthStore } from "@/shared/stores/auth";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
 import SheetEditor from "@/shared/components/SheetEditor.vue";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
 import { DEFAULT_CREDIT_POINTS, computeSalary, grossForNet, type SalaryInput } from "@core/salary/salaryCalc";
+import { yearToDateFromPayslip, type Payslip } from "@core/salary/payslip";
 
-defineProps<{ open: boolean }>();
+const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 // What you type stays on this device only (the numbers are personal and the site is public).
@@ -165,6 +173,50 @@ watch(
   },
   { deep: true },
 );
+
+const auth = useAuthStore();
+const details = ref<HTMLDetailsElement | null>(null);
+const latest = ref<Payslip | null>(null);
+const filled = ref(false);
+let payslipsTried = false;
+
+// Your own payslips are private (Egor only); when they are there, the details can come from the latest one.
+watch(
+  () => props.open,
+  async (open) => {
+    if (!open || payslipsTried || auth.isDemo || !auth.canEditBudget) return;
+    payslipsTried = true;
+    try {
+      latest.value = (await fetchPayslips(auth.token || undefined)).payslips[0] ?? null;
+    } catch {
+      latest.value = null;
+    }
+  },
+);
+
+const latestMonth = computed(() => {
+  const p = latest.value;
+  if (!p) return "";
+  const label = new Date(p.year, p.month - 1, 1).toLocaleDateString(dateTag(), { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+});
+
+function fillFromPayslip() {
+  const p = latest.value;
+  if (!p) return;
+  const ytd = yearToDateFromPayslip(p);
+  state.mode = "gross";
+  state.gross = Math.round(p.totals.gross);
+  state.benefits = p.tax.benefitMonth ?? 0;
+  state.pensionBase = p.deposits.pensionBase ?? 0;
+  state.studyFundBase = p.deposits.studyFundBase ?? 0;
+  state.creditPoints = p.tax.creditPoints ?? DEFAULT_CREDIT_POINTS;
+  state.ytdMonths = ytd?.months ?? 0;
+  state.ytdTaxable = ytd?.taxable ?? 0;
+  state.ytdTax = ytd?.taxPaid ?? 0;
+  filled.value = true;
+  if (details.value) details.value.open = true;
+}
 
 const usingYearToDate = computed(() => state.ytdMonths > 0);
 
@@ -246,6 +298,9 @@ const keepOfThousand = computed(() => {
 }
 .sal-fields :deep(.sheet-amount__input) {
   font-size: 1.15rem;
+}
+.sal-fill {
+  justify-self: start;
 }
 .sal-sub {
   margin: 0.4rem 0 0;
