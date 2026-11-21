@@ -44,9 +44,14 @@ async function fetchSp500(): Promise<number | null> {
 async function fetchUsdFx(): Promise<{ usd_ils: number; usd_rub: number } | null> {
   const res = await fetch(FRANKFURTER, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return null;
-  const data = (await res.json()) as { rates?: { ILS?: number; RUB?: number } };
-  const usd_ils = data.rates?.ILS;
-  const usd_rub = data.rates?.RUB;
+  // The v2 endpoint answers with a list of {quote, rate}; the older shape was {rates: {ILS, RUB}}.
+  const data = (await res.json()) as unknown;
+  const rateOf = (code: "ILS" | "RUB"): number | undefined => {
+    if (Array.isArray(data)) return (data as { quote?: string; rate?: number }[]).find((r) => r.quote === code)?.rate;
+    return (data as { rates?: Record<string, number> } | null)?.rates?.[code];
+  };
+  const usd_ils = rateOf("ILS");
+  const usd_rub = rateOf("RUB");
   if (
     usd_ils == null ||
     usd_rub == null ||

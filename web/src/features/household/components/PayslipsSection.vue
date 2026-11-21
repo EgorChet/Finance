@@ -254,8 +254,10 @@ onMounted(() => {
 }
 .ps-tags {
   display: inline-flex;
-  gap: 0.5rem;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.1rem 0.5rem;
+  min-width: 0;
 }
 .ps-change--up {
   color: var(--success);
