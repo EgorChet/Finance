@@ -11,6 +11,38 @@
     <p v-if="loadError" class="ps-error">{{ loadError }}</p>
     <p v-else-if="loaded && !payslips.length" class="bx-section-note">{{ t("No payslips yet") }}</p>
 
+    <div v-if="savings" class="ps-save">
+      <p class="ps-save__label">{{ t("Put aside for the future") }}</p>
+      <p class="ps-save__big">{{ formatIlsWhole(savings.all.total) }}</p>
+      <p class="ps-save__sub">
+        {{ t("From {n} payslips, since {month}", { n: savings.all.months, month: savings.since }) }}
+        <template v-if="savings.year.total > 0"> · {{ t("This year") }} {{ formatIlsWhole(savings.year.total) }}</template>
+      </p>
+      <table class="ps-save__table">
+        <thead>
+          <tr><th /><th>{{ t("You") }}</th><th>{{ t("Employer") }}</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>{{ t("Pension") }}</th>
+            <td>{{ formatIlsWhole(savings.all.pensionEmployee) }}</td>
+            <td>{{ formatIlsWhole(savings.all.pensionEmployer) }}</td>
+          </tr>
+          <tr>
+            <th>{{ t("Severance") }}</th>
+            <td>—</td>
+            <td>{{ formatIlsWhole(savings.all.severance) }}</td>
+          </tr>
+          <tr>
+            <th>{{ t("Study fund") }}</th>
+            <td>{{ formatIlsWhole(savings.all.studyFundEmployee) }}</td>
+            <td>{{ formatIlsWhole(savings.all.studyFundEmployer) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <InfoTip label="What this is" :text="t('The sum of contributions from the payslips on file. It is not the account balance: returns, fees and money saved before the first payslip are not included.')" />
+    </div>
+
     <div v-if="payslips.length" class="bx-list">
       <button v-for="p in shown" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
         <span class="tx-row-icon" aria-hidden="true">🧾</span>
@@ -59,7 +91,7 @@ import { deletePayslip, fetchPayslipPdf, fetchPayslips, uploadPayslipPdf } from 
 import { confirm } from "@/shared/composables/useConfirm";
 import { useAuthStore } from "@/shared/stores/auth";
 import { formatIlsWhole } from "@/shared/utils/format";
-import { paymentKindLabel, type PaymentKind, type Payslip } from "@core/salary/payslip";
+import { paymentKindLabel, savingsFromPayslips, type PaymentKind, type Payslip } from "@core/salary/payslip";
 import { openPayslipPrint } from "@/features/household/utils/payslipPrint";
 
 const emit = defineEmits<{ saved: [string] }>();
@@ -83,6 +115,20 @@ function monthLabel(p: Payslip): string {
   const label = new Date(p.year, p.month - 1, 1).toLocaleDateString(dateTag(), { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+/** What went into pension, severance and study fund: all payslips on file, and the latest payslip's year. */
+const savings = computed(() => {
+  if (!payslips.value.length) return null;
+  const oldest = payslips.value.reduce((a, b) => (b.year * 12 + b.month < a.year * 12 + a.month ? b : a));
+  const newest = payslips.value.reduce((a, b) => (b.year * 12 + b.month > a.year * 12 + a.month ? b : a));
+  const all = savingsFromPayslips(payslips.value);
+  if (all.total <= 0) return null;
+  return {
+    all,
+    year: savingsFromPayslips(payslips.value.filter((p) => p.year === newest.year)),
+    since: monthLabel(oldest).toLowerCase(),
+  };
+});
 
 const netOf = (p: Payslip) => p.totals.netPayable || p.totals.net;
 
@@ -195,6 +241,58 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.ps-save {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.75rem 0 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.ps-save__label {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.ps-save__big {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ps-save__sub {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+.ps-save__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.ps-save__table th,
+.ps-save__table td {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  font-size: 0.92rem;
+}
+.ps-save__table thead th {
+  border-top: 0;
+  padding-top: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.ps-save__table tbody th {
+  text-align: left;
+  font-weight: 500;
+}
+.ps-save__table td {
+  font-weight: 650;
+}
 .ps-file {
   display: none;
 }
