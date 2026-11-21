@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { dateTag, t } from "@/shared/i18n";
 import InfoTip from "@/shared/components/InfoTip.vue";
@@ -67,6 +67,21 @@ import { savingsFromPayslips, type Payslip } from "@core/salary/payslip";
 
 const props = defineProps<{ payslips: Payslip[] }>();
 const { kaspaQuote, fxcnQuote, marketSnapshot } = storeToRefs(usePortfolioStore());
+
+/** The dollar rate straight from the public rates service, for when the app's own snapshot has none. */
+const fallbackRate = ref(0);
+onMounted(() => {
+  setTimeout(async () => {
+    if ((marketSnapshot.value?.usd_ils ?? 0) > 0) return;
+    try {
+      const res = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=ILS");
+      const rate = ((await res.json()) as { rates?: { ILS?: number } }).rates?.ILS;
+      if (typeof rate === "number" && rate > 0) fallbackRate.value = rate;
+    } catch {
+      /* no rate: the card says so */
+    }
+  }, 2000);
+});
 
 /** "since" needs the genitive in Russian ("с января 2025"), so take the month from a full date and drop the day. */
 const monthLabel = (p: Payslip) => {
@@ -80,7 +95,7 @@ const monthLabel = (p: Payslip) => {
 const card = computed(() => {
   const list = props.payslips;
   const funds = savingsFromPayslips(list);
-  const rate = marketSnapshot.value?.usd_ils;
+  const rate = marketSnapshot.value?.usd_ils || fallbackRate.value;
   const haveRate = typeof rate === "number" && rate > 0;
   const kasUsd = kaspaQuote.value?.portfolio_usdt ?? 0;
   const fxcnUsd = fxcnQuote.value?.portfolio_usd ?? 0;
