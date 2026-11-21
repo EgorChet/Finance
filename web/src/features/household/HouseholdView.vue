@@ -117,7 +117,7 @@
         <div v-if="visibleOneTimeCharges.length || pastOneTimeCharges.length" class="bx-list">
           <component
             :is="budgetLocked ? 'div' : 'button'"
-            v-for="charge in [...visibleOneTimeCharges, ...(showPastOneTime ? pastOneTimeCharges : [])]"
+            v-for="charge in shownOneTimeCharges"
             :key="charge.id"
             :type="budgetLocked ? undefined : 'button'"
             class="bx-row"
@@ -137,18 +137,18 @@
                   class="bx-status"
                   :class="`bx-status--${oneTimeStatusClass(charge.charge_date!)}`"
                 >
-                  {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? 'Today' : 'Coming up' }}
+                  {{ oneTimeStatus(charge.charge_date!, referenceToday) === 'active' ? t('Today') : t('Coming up') }}
                 </span>
               </span>
             </span>
           </component>
           <button
-            v-if="pastOneTimeCharges.length"
+            v-if="oneTimeCharges.length > shownOneTimeCharges.length || showPastOneTime"
             type="button"
             class="bx-row bx-row--more"
             @click="showPastOneTime = !showPastOneTime"
           >
-            {{ showPastOneTime ? t("Hide past charges ({n})", { n: pastOneTimeCharges.length }) : t("Show past charges ({n})", { n: pastOneTimeCharges.length }) }}
+            {{ showPastOneTime ? t("Show fewer") : t("Show all {n}", { n: oneTimeCharges.length }) }}
           </button>
         </div>
         <p v-else class="bx-empty-line">
@@ -434,6 +434,12 @@ const oneTimeCharges = computed(() =>
 const visibleOneTimeCharges = computed(() =>
   oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) !== "past"),
 );
+/** Upcoming ones first, then the latest past ones, so the history is visible without a tap; the rest behind "Show all". */
+const ONE_TIME_SHOWN = 4;
+const shownOneTimeCharges = computed(() => {
+  const all = [...visibleOneTimeCharges.value, ...pastOneTimeCharges.value];
+  return showPastOneTime.value ? all : all.slice(0, Math.max(ONE_TIME_SHOWN, visibleOneTimeCharges.value.length));
+});
 const pastOneTimeCharges = computed(() =>
   oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) === "past"),
 );
