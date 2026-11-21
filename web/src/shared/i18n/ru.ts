@@ -48,6 +48,7 @@ export const RU: Record<string, string> = {
   "Employer": "Работодатель",
   "What this is": "Что это за сумма",
   "The sum of contributions from the payslips on file. It is not the account balance: returns, fees and money saved before the first payslip are not included.": "Сумма взносов по загруженным расчётным листам. Это не остаток на счёте: доходность, комиссии и то, что было отложено до первого листа, сюда не входят.",
+  "Pitzuim": "Пицуим",
   "Employer: pension": "Работодатель: пенсия",
   "Employer: severance": "Работодатель: выходное пособие (пицуим)",
   "Employer: study fund": "Работодатель: керен иштальмут",

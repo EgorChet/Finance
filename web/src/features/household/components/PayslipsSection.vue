@@ -20,23 +20,26 @@
       </p>
       <table class="ps-save__table">
         <thead>
-          <tr><th /><th>{{ t("You") }}</th><th>{{ t("Employer") }}</th></tr>
+          <tr><th /><th>{{ t("You") }}</th><th>{{ t("Employer") }}</th><th>{{ t("Total") }}</th></tr>
         </thead>
         <tbody>
           <tr>
             <th>{{ t("Pension") }}</th>
             <td>{{ formatIlsWhole(savings.all.pensionEmployee) }}</td>
             <td>{{ formatIlsWhole(savings.all.pensionEmployer) }}</td>
+            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.pensionEmployee + savings.all.pensionEmployer) }}</td>
           </tr>
           <tr>
-            <th>{{ t("Severance") }}</th>
+            <th>{{ t("Pitzuim") }}</th>
             <td>—</td>
             <td>{{ formatIlsWhole(savings.all.severance) }}</td>
+            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.severance) }}</td>
           </tr>
           <tr>
             <th>{{ t("Study fund") }}</th>
             <td>{{ formatIlsWhole(savings.all.studyFundEmployee) }}</td>
             <td>{{ formatIlsWhole(savings.all.studyFundEmployer) }}</td>
+            <td class="ps-save__sum">{{ formatIlsWhole(savings.all.studyFundEmployee + savings.all.studyFundEmployer) }}</td>
           </tr>
         </tbody>
       </table>
@@ -291,7 +294,10 @@ onMounted(() => {
   font-weight: 500;
 }
 .ps-save__table td {
-  font-weight: 650;
+  font-weight: 500;
+}
+.ps-save__table td.ps-save__sum {
+  font-weight: 700;
 }
 .ps-file {
   display: none;
