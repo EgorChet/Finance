@@ -27,6 +27,21 @@
       <button v-if="latest" type="button" class="btn btn-sm sal-fill" @click="fillFromPayslip">
         🧾 {{ t("Fill from my latest payslip") }} · {{ latestMonth }}
       </button>
+      <div v-if="ytdAvailable" class="sal-ytd">
+        <div class="seg" role="tablist" :aria-label="t('How tax is counted')">
+          <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': !usingYearToDate }" :aria-selected="!usingYearToDate" @click="state.ytdOn = 0">
+            {{ t("Every month") }}
+          </button>
+          <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': usingYearToDate }" :aria-selected="usingYearToDate" @click="state.ytdOn = 1">
+            {{ t("This month, with the year so far") }}
+          </button>
+        </div>
+        <p class="sal-note">
+          {{ usingYearToDate
+            ? t("Tax for this one month, counted with what you already earned this year: it differs from a steady month.")
+            : t("As if this salary were paid every month, the year so far ignored.") }}
+        </p>
+      </div>
       <p v-if="filled" class="sal-note">{{ t("Taken from the {month} payslip; the result is for the month after it.", { month: latestMonth }) }}</p>
 
       <section v-if="result" class="sal-result" aria-live="polite">
@@ -174,6 +189,8 @@ interface Saved {
   ytdMonths: number;
   ytdTaxable: number;
   ytdTax: number;
+  /** 1 = count tax with the year so far (this one month); 0 = as if the salary were steady. */
+  ytdOn: number;
   /** Fund rates in percent (6 = 6%). */
   pensionEmployeePct: number;
   pensionEmployerPct: number;
@@ -195,6 +212,7 @@ const DEFAULTS: Saved = {
   ytdMonths: 0,
   ytdTaxable: 0,
   ytdTax: 0,
+  ytdOn: 0,
   pensionEmployeePct: Math.round(DEFAULT_PENSION_EMPLOYEE_RATE * 10000) / 100,
   pensionEmployerPct: Math.round(DEFAULT_PENSION_EMPLOYER_RATE * 10000) / 100,
   severancePct: Math.round(DEFAULT_SEVERANCE_RATE * 10000) / 100,
@@ -293,7 +311,8 @@ function fillFromPayslip() {
 }
 
 // A year to date needs all three numbers; with months but no income it would be counted as "ten months of nothing".
-const usingYearToDate = computed(() => state.ytdMonths > 0 && state.ytdTaxable > 0);
+const ytdAvailable = computed(() => state.ytdMonths > 0 && state.ytdTaxable > 0);
+const usingYearToDate = computed(() => ytdAvailable.value && state.ytdOn === 1);
 const ytdIncomplete = computed(() => state.ytdMonths > 0 && state.ytdTaxable <= 0);
 
 const baseInput = computed((): Omit<SalaryInput, "gross"> => ({
@@ -484,6 +503,13 @@ const keepOfThousand = computed(() => {
 }
 .sal-fields :deep(.sheet-amount__input) {
   font-size: 1.15rem;
+}
+.sal-ytd {
+  display: grid;
+  gap: 0.5rem;
+}
+.sal-ytd .seg {
+  margin: 0;
 }
 .sal-view-actions {
   display: flex;
