@@ -23,6 +23,10 @@
           </button>
         </div>
         <p class="bx-hero-value">{{ formatIlsWhole(segmentTotalCap(headlineSegment.seg)) }}</p>
+        <p class="bx-hero-free">
+          <span>{{ t("Free for everyday") }}</span>
+          <b>{{ formatIlsWhole(freeForEveryday) }}</b>
+        </p>
 
         <p class="bx-bar-label">{{ t("Where it comes from") }}</p>
         <div class="bx-bar" aria-hidden="true">
@@ -561,6 +565,13 @@ const cycleSplit = computed(() => {
     title: `${t("This cycle (from {date})", { date: d.toLocaleDateString(dateTag(), { day: "numeric", month: "short" }) })} · ${formatIlsWhole(plan.budget)}`,
     parts: parts.map((p) => ({ ...p, pct: (p.amount / total) * 100 })),
   };
+});
+
+/** What is left of the month's money after bills: the same figure as «Left for everyday» below. */
+const freeForEveryday = computed(() => {
+  if (cycleSplit.value) return cycleSplit.value.parts.find((p) => p.key === "everyday")?.amount ?? 0;
+  const head = headlineSegment.value?.seg;
+  return head ? Math.max(0, segmentTotalCap(head) - monthlyBills.value - props.cardBills) : 0;
 });
 
 const cardBillsPct = computed(() => {

@@ -58,6 +58,7 @@ export const RU: Record<string, string> = {
   "Days": "Дни",
   "Hourly rate": "Ставка в час",
   "Download in Russian": "Скачать на русском",
+  "Free for everyday": "Свободно на жизнь",
   "How tax is counted": "Как считать налог",
   "This month, with the year so far": "Этот месяц, с учётом года",
   "Tax for this one month, counted with what you already earned this year: it differs from a steady month.": "Налог за этот один месяц с учётом того, что вы уже заработали в этом году. Он отличается от обычного месяца.",
