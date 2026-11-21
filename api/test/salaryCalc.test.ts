@@ -103,3 +103,16 @@ test("net → gross is the inverse (within the rounding steps), and net never fa
   }
   assert.equal(grossForNet(0, inputs), null);
 });
+
+test("a steady salary needs more gross than one month after cheaper months, and higher brackets bite", () => {
+  const base = { pensionBase: null, studyFundBase: 0, creditPoints: 2.25 };
+  const steady = grossForNet(21000, base);
+  const afterCheaperMonths = grossForNet(21000, { ...base, yearToDate: { months: 10, taxable: 150000, taxPaid: 14000 } });
+  assert.ok(steady && afterCheaperMonths);
+  // Cumulative tax: ten months at a lower salary leave room in the cheap brackets for one big month.
+  assert.ok(steady - afterCheaperMonths > 3000, `${steady} vs ${afterCheaperMonths}`);
+  // The share taken by tax keeps growing with salary (31%, 35%, 47%, 50% brackets).
+  const share = (g: number) => computeSalary({ ...base, gross: g }).taxShare;
+  assert.ok(share(20000) < share(30000) && share(30000) < share(50000) && share(50000) < share(80000));
+  assert.equal(computeSalary({ ...base, gross: 80000 }).marginalIncomeTaxRate, 0.5);
+});
