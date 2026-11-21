@@ -6,6 +6,7 @@ A personal finance app. Public repo: **never put personal figures, IDs, emails o
 - Reply in **Russian**, short and concrete. Say what was done, what changed in the numbers, what is left.
 - Modernize the obvious; **discuss design decisions** before building them. Ask a question only when the answer changes what you do next, with a recommended default.
 - Never ask the owner to paste keys in chat. Never print secrets. Anything on the owner's computer that is not read-only needs their go-ahead.
+- **Mobile first.** The owner uses the app on an iPhone (home-screen app, ~375px). Design and check every screen at 375px first, then widen for desktop; desktop rules live only in `web/src/assets/desktop.css` inside `@media (min-width: 1024px)`. Nothing may overflow sideways, tap targets stay ≥ 40px, long lists are folded behind "show all".
 - Money logic must be exactly right (the owner plans real life on the pacing graph): verify against real data, add tests, say plainly what is unverified.
 
 ## Workflow
