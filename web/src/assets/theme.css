@@ -5051,3 +5051,9 @@ button.topup-item {
   text-decoration: none;
   font-weight: 600;
 }
+
+/* Budget page: the salary calculator button sits beside the title. */
+.bx-calc-btn {
+  flex: none;
+  margin-left: auto;
+}
