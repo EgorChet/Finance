@@ -145,6 +145,10 @@ export async function fetchHomeData(demo: boolean, token?: string, paceMonths = 
     living_budget: {
       segments: import("@/features/household/utils/livingBudget").LivingBudgetSegment[];
       month_topups: import("@/features/household/utils/livingBudget").LivingBudgetMonthTopup[];
+      /** The months whose salary comes from a payslip or from what you expected (already inside `segments`). */
+      month_bases?: import("@/features/household/utils/livingBudget").LivingBudgetMonthBase[];
+      /** Net pay of the latest payslip, to offer as the expected amount (Egor only). */
+      estimate_suggestion?: number | null;
     };
     demo_as_of?: string;
   }>(`${prefix(demo)}/home-data${q}`, token);
@@ -214,7 +218,17 @@ export async function fetchLivingBudget(demo: boolean, token?: string) {
   return get<{
     segments: import("@/features/household/utils/livingBudget").LivingBudgetSegment[];
     month_topups: import("@/features/household/utils/livingBudget").LivingBudgetMonthTopup[];
+    month_estimates?: import("@/features/household/utils/livingBudget").LivingBudgetMonthEstimate[];
+    month_bases?: import("@/features/household/utils/livingBudget").LivingBudgetMonthBase[];
+    estimate_suggestion?: number | null;
+    /** Net pay by payslip month: only Egor gets it. */
+    payslip_nets?: Record<string, number>;
   }>(`${prefix(demo)}/living-budget`, token);
+}
+
+/** What you expect to take home for a month until its payslip is uploaded; amount null clears it. */
+export async function saveMonthEstimate(month: string, amount: number | null, token?: string) {
+  return put<{ saved: boolean }>(`${prefix(false)}/living-budget/estimate`, { month, amount }, token);
 }
 
 export async function saveLivingBudget(

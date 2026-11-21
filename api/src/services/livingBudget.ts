@@ -1,4 +1,7 @@
-import type { FixedCharge, LivingBudgetData, LivingBudgetMonthTopup, LivingBudgetSegment } from "../types.js";
+import type { FixedCharge, LivingBudgetData, LivingBudgetMonthEstimate, LivingBudgetMonthTopup, LivingBudgetSegment } from "../types.js";
+import { applyMonthBases, resolveMonthBases, type LivingBudgetMonthBase } from "../../../core/household/livingBudget.js";
+import { cycleStartForDate } from "../../../core/spending/pace.js";
+import { listPayslips } from "./payslips/payslipService.js";
 import { readLivingBudget, writeLivingBudget } from "../storage/index.js";
 
 export const ONGOING_THROUGH_MONTH = "2035-12";
@@ -23,10 +26,21 @@ export function normalizeMonthTopup(topup: LivingBudgetMonthTopup): LivingBudget
   };
 }
 
+export function normalizeEstimates(list: LivingBudgetMonthEstimate[] | undefined): LivingBudgetMonthEstimate[] {
+  const byMonth = new Map<string, LivingBudgetMonthEstimate>();
+  for (const e of list || []) {
+    const month = String(e?.month ?? "").trim();
+    const amount = Math.round(Number(e?.amount) * 100) / 100;
+    if (MONTH_RE.test(month) && Number.isFinite(amount) && amount > 0 && amount < 1_000_000) byMonth.set(month, { month, amount });
+  }
+  return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
 function normalizeData(user: LivingBudgetData): LivingBudgetData {
   return {
     segments: (user.segments || []).map(normalizeSegment),
     month_topups: (user.month_topups || []).map(normalizeMonthTopup),
+    month_estimates: normalizeEstimates(user.month_estimates),
   };
 }
 
@@ -194,10 +208,13 @@ export async function saveLivingBudget(
   segments: LivingBudgetSegment[],
   monthTopups: LivingBudgetMonthTopup[] = [],
   charges: FixedCharge[] = [],
+  /** Undefined keeps what is stored (the Budget page doesn't send them back). */
+  monthEstimates?: LivingBudgetMonthEstimate[],
 ): Promise<LivingBudgetData> {
   const normalized: LivingBudgetData = {
     segments: segments.map(normalizeSegment).sort((a, b) => a.from_month.localeCompare(b.from_month)),
     month_topups: monthTopups.map(normalizeMonthTopup).sort((a, b) => a.month.localeCompare(b.month)),
+    month_estimates: monthEstimates === undefined ? loadLivingBudgetData().month_estimates || [] : normalizeEstimates(monthEstimates),
   };
   const error = validateLivingBudget(normalized.segments, normalized.month_topups, charges);
   if (error) throw new Error(error);
@@ -211,4 +228,57 @@ export async function saveLivingBudget(
     );
   }
   return persisted;
+}
+
+/** Set (or clear with null) what is expected to be taken home for one month. */
+export async function setMonthEstimate(month: string, amount: number | null): Promise<LivingBudgetData> {
+  if (!MONTH_RE.test(month)) throw new Error("Month must be YYYY-MM");
+  const current = loadLivingBudgetData();
+  const others = (current.month_estimates || []).filter((e) => e.month !== month);
+  const next = amount == null ? others : [...others, { month, amount }];
+  const normalized: LivingBudgetData = {
+    segments: current.segments,
+    month_topups: current.month_topups || [],
+    month_estimates: normalizeEstimates(next),
+  };
+  if (amount != null && !normalized.month_estimates!.some((e) => e.month === month)) throw new Error("Amount must be a positive number");
+  await writeLivingBudget(normalized);
+  cached = null;
+  await refreshLivingBudgetCache();
+  return loadLivingBudgetData();
+}
+
+export interface EffectiveLivingBudget {
+  /** The periods with payslip and estimate months cut out: what every calculation should use. */
+  segments: LivingBudgetSegment[];
+  month_topups: LivingBudgetMonthTopup[];
+  month_bases: LivingBudgetMonthBase[];
+  /** Net pay of the latest payslip: the number to offer when asking what to expect for a month. */
+  estimate_suggestion: number | null;
+  /** Net pay by payslip month (private: only handed to Egor). */
+  payslip_nets: Record<string, number>;
+}
+
+/** "Now" decides which month the open cycle is; payslips are only read, never changed here. */
+export async function effectiveLivingBudget(now: Date, cycleDay: number): Promise<EffectiveLivingBudget> {
+  const data = loadLivingBudgetData();
+  let nets: Record<string, number> = {};
+  let suggestion: number | null = null;
+  try {
+    const payslips = await listPayslips();
+    for (const p of payslips) nets[p.id] = p.totals.netPayable || p.totals.net;
+    const latest = payslips[0];
+    suggestion = latest ? latest.totals.netPayable || latest.totals.net : null;
+  } catch {
+    nets = {};
+  }
+  const currentMonth = cycleStartForDate(now, cycleDay).slice(0, 7);
+  const bases = resolveMonthBases({ estimates: data.month_estimates || [], payslipNets: nets, currentMonth });
+  return {
+    segments: applyMonthBases(data.segments, bases),
+    month_topups: data.month_topups || [],
+    month_bases: bases,
+    estimate_suggestion: suggestion,
+    payslip_nets: nets,
+  };
 }

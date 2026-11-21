@@ -190,9 +190,16 @@ export interface LivingBudgetMonthTopup {
   note?: string;
 }
 
+export interface LivingBudgetMonthEstimate {
+  month: string;
+  amount: number;
+}
+
 export interface LivingBudgetData {
   segments: LivingBudgetSegment[];
   month_topups?: LivingBudgetMonthTopup[];
+  /** What Egor expects to take home for a month before its payslip is uploaded. */
+  month_estimates?: LivingBudgetMonthEstimate[];
   updated_at?: string | null;
 }
 

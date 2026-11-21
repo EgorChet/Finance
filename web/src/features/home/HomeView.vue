@@ -24,7 +24,15 @@
         <section v-if="todoItems.length || hasBitToSort" class="today-section">
           <h3 class="today-title">{{ t("Needs you") }}</h3>
           <div class="bx-list">
-            <RouterLink v-for="item in todoItems" :key="item.key" :to="item.to" class="bx-row today-link">
+            <component
+              :is="item.action ? 'button' : 'RouterLink'"
+              v-for="item in todoItems"
+              :key="item.key"
+              :to="item.action ? undefined : item.to"
+              :type="item.action ? 'button' : undefined"
+              class="bx-row today-link"
+              @click="item.action?.()"
+            >
               <span class="tx-row-icon" aria-hidden="true">{{ item.icon }}</span>
               <span class="bx-row-body">
                 <span class="bx-row-top">
@@ -34,7 +42,7 @@
                 <span class="bx-row-meta"><span>{{ item.sub }}</span></span>
               </span>
               <span class="bx-chevron" aria-hidden="true">›</span>
-            </RouterLink>
+            </component>
           </div>
           <BitSortCard v-if="!auth.readOnly" :transactions="spendingReport.transactions" />
         </section>
@@ -57,6 +65,14 @@
       </template>
       <p v-else class="home-card-empty">{{ t("Upload a statement to see spending for this cycle.") }}</p>
     </template>
+    <MonthEstimateSheet
+      :open="estimateOpen"
+      :month="budgetMonth"
+      :suggestion="estimateSuggestion"
+      :current="currentEstimate"
+      @close="estimateOpen = false"
+      @saved="onEstimateSaved"
+    />
   </div>
 </template>
 
@@ -83,6 +99,9 @@ import { referenceDate } from "@/shared/utils/appDate";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import type { RegularChargeOverrides } from "@core/spending/regularCharges";
 import { suggestRegularCharges } from "@core/spending/regularSuggestions";
+import MonthEstimateSheet from "@/features/household/components/MonthEstimateSheet.vue";
+import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
+import type { LivingBudgetMonthBase } from "@/features/household/utils/livingBudget";
 import { DEFAULT_PACE_MONTHS } from "@/features/spending/utils/paceMonths";
 import {
   normalizeLivingBudgetMonthTopup,
@@ -124,6 +143,10 @@ const months = ref<MonthItem[]>([]);
 const currentMonthKey = ref<string | null>(null);
 const configuredCharges = ref<ConfiguredCharge[]>([]);
 const regularChargeOverrides = ref<RegularChargeOverrides>({});
+// Month-by-month salary: which months already have a payslip or an expected amount, and what to offer.
+const monthBases = ref<LivingBudgetMonthBase[]>([]);
+const estimateSuggestion = ref<number | null>(null);
+const estimateOpen = ref(false);
 const livingBudgetSegments = ref<ReturnType<typeof normalizeLivingBudgetSegment>[]>([]);
 const livingBudgetMonthTopups = ref<ReturnType<typeof normalizeLivingBudgetMonthTopup>[]>([]);
 const cycleDay = ref(loadCycleDay());
@@ -232,9 +255,39 @@ const billSuggestions = computed(() => {
   );
 });
 
+/** The month this cycle's budget belongs to (the cycle that starts on 10 Nov is "November"). */
+const budgetMonth = computed(() => (activeCycleStart.value ?? cycleStartForDate(refDate.value, cycleDay.value)).slice(0, 7));
+const currentEstimate = computed(() => {
+  const b = monthBases.value.find((x) => x.month === budgetMonth.value);
+  return b?.source === "estimate" ? b.amount : null;
+});
+/** No payslip and nothing expected said yet for this month's salary: ask. */
+const needsEstimate = computed(
+  () => !auth.isDemo && auth.canEditBudget && showPaceHealth.value && !monthBases.value.some((b) => b.month === budgetMonth.value),
+);
+
+function onEstimateSaved(message: string) {
+  invalidateAllDataCaches();
+  void loadSpending({ force: true });
+  void message;
+}
+
 /** Things to act on: merchants to label and charges coming up this cycle. */
 const todoItems = computed(() => {
-  const items: { key: string; icon: string; title: string; sub: string; amount?: string; to: string | object }[] = [];
+  const items: { key: string; icon: string; title: string; sub: string; amount?: string; to: string | object; action?: () => void }[] = [];
+  if (needsEstimate.value) {
+    const [y, m] = budgetMonth.value.split("-").map(Number);
+    const month = new Date(y, m - 1, 1).toLocaleDateString(dateTag(), { month: "long" });
+    items.push({
+      key: "estimate",
+      icon: "🪙",
+      title: t("What budget do you expect for {month}?", { month }),
+      sub: t("Your payslip comes at the end of the month. Until then the budget uses your estimate."),
+      amount: estimateSuggestion.value ? `~${formatIlsWhole(estimateSuggestion.value)}` : undefined,
+      to: "",
+      action: () => (estimateOpen.value = true),
+    });
+  }
   if (toLabelCount.value > 0) {
     items.push({
       key: "label",
@@ -348,6 +401,8 @@ async function applySpendingBundle(bundle: HomeDataBundle, opts: { preserveMonth
   regularChargeOverrides.value = bundle.regular_charges ?? {};
   paceReport.value = bundle.report;
   livingBudgetSegments.value = bundle.living_budget.segments.map(normalizeLivingBudgetSegment);
+  monthBases.value = bundle.living_budget.month_bases ?? [];
+  estimateSuggestion.value = bundle.living_budget.estimate_suggestion ?? null;
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map(
     normalizeLivingBudgetMonthTopup,
   );

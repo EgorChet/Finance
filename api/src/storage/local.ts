@@ -148,10 +148,11 @@ export async function readLivingBudget(): Promise<LivingBudgetData> {
     return {
       segments: data.segments || [],
       month_topups: data.month_topups || [],
+      month_estimates: data.month_estimates || [],
       updated_at: data.updated_at ?? null,
     };
   } catch {
-    return { segments: [], month_topups: [], updated_at: null };
+    return { segments: [], month_topups: [], month_estimates: [], updated_at: null };
   }
 }
 
