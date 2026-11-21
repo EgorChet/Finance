@@ -4,6 +4,7 @@ import App from "./App.vue";
 import router from "./router";
 import "./assets/main.css";
 import "./assets/theme.css";
+import "./assets/desktop.css";
 import { hydratePaceSettings } from "./shared/settings/paceSettingsSync";
 import { userIdFromToken } from "./shared/utils/users";
 

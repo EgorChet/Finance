@@ -25,6 +25,8 @@
     <template v-else>
       <p v-if="error" style="color: var(--danger)">{{ error }}</p>
 
+      <div class="bx-cols">
+      <div class="bx-col">
       <LivingBudgetSection
         v-model:segments="livingBudgetSegments"
         v-model:month-topups="livingBudgetMonthTopups"
@@ -45,6 +47,9 @@
       />
 
       <PayslipsSection @saved="showSaveStatus" />
+      </div>
+
+      <div class="bx-col">
 
       <section id="recurring" class="bx-section">
         <div class="bx-list-head">
@@ -291,6 +296,8 @@
         <h3 class="minor-sections__title">{{ t("More") }}</h3>
         <ExcludedSection />
         <AdjustmentsSection />
+      </div>
+      </div>
       </div>
     </template>
   </div>
