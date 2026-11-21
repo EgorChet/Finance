@@ -58,6 +58,7 @@ export const RU: Record<string, string> = {
   "{n} {n|payslip|payslips}": "{n} {n|расчётный лист|расчётных листа|расчётных листов}",
   "Funds in detail": "Фонды подробнее",
   "Other months ({n})": "Другие месяцы ({n})",
+  "Coming up": "Скоро",
   "Pitzuim": "Пицуим",
   "Employer: pension": "Работодатель: пенсия",
   "Employer: severance": "Работодатель: выходное пособие (пицуим)",
