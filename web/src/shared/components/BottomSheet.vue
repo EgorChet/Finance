@@ -2,7 +2,7 @@
   <Teleport to="body">
     <Transition name="tx-sheet">
       <div v-if="open" class="tx-sheet-backdrop" @click.self="emit('close')">
-        <div class="tx-sheet bs" role="dialog" aria-modal="true" :aria-label="title">
+        <div class="tx-sheet bs" :class="{ 'bs--wide': wide }" role="dialog" aria-modal="true" :aria-label="title">
           <div class="tx-sheet-grabber" aria-hidden="true" />
           <header v-if="title || $slots.head" class="bs-head">
             <slot name="head">
@@ -26,7 +26,7 @@
 import { t, tr } from "@/shared/i18n";
 import { onUnmounted, watch } from "vue";
 
-const props = defineProps<{ open: boolean; title?: string }>();
+const props = defineProps<{ open: boolean; title?: string; /** Two-column card on wide screens. */ wide?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 function onKeydown(e: KeyboardEvent) {

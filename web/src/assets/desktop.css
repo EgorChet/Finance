@@ -96,6 +96,10 @@
     max-height: min(88dvh, 820px);
   }
 
+  .tx-sheet.bs--wide {
+    max-width: 1000px;
+  }
+
   .tx-sheet .tx-sheet-grabber {
     display: none;
   }
