@@ -64,7 +64,7 @@
               </component>
             </li>
           </ul>
-          <p class="bx-note">{{ t("Same numbers as Spending: bills already charged plus those still to come are taken off first.") }}</p>
+          <InfoTip :text="t('Same numbers as Spending: bills already charged plus those still to come are taken off first.')" />
         </template>
         <template v-else-if="monthlyBills > 0 || cardBills > 0">
           <p class="bx-bar-label">{{ t("Where it goes each month") }}</p>
@@ -94,15 +94,13 @@
             </li>
           </ul>
         </template>
-        <p v-if="segmentCapVaries(headlineSegment.seg)" class="bx-note">
-          {{ t("The total changes in months when Cibus or the rent cover change.") }}
-        </p>
+        <InfoTip v-if="segmentCapVaries(headlineSegment.seg)" :text="t('The total changes in months when Cibus or the rent cover change.')" />
       </article>
 
       <div class="bx-list-head">
         <h3>{{ t("Budget by month") }}</h3>
       </div>
-      <p class="bx-note lb-months-note">{{ t("Each month has its own salary: from its payslip once you upload it (it comes at the end of the month), until then what you expect.") }}</p>
+      <InfoTip label="Where the salary comes from" :text="t('Each month has its own salary: from its payslip once you upload it (it comes at the end of the month), until then what you expect.')" />
       <div class="bx-list">
         <component
           :is="canEditMonth(row) ? 'button' : 'div'"
@@ -269,6 +267,7 @@
 
 <script setup lang="ts">
 import { dateTag, t, tr } from "@/shared/i18n";
+import InfoTip from "@/shared/components/InfoTip.vue";
 import { computed, ref } from "vue";
 import type { BudgetPlan } from "@core/spending/budgetPlan";
 import IconButton from "@/shared/components/IconButton.vue";
