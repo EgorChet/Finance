@@ -177,7 +177,7 @@ const DEDUCTION_LABELS: Record<DeductionKind, { en: string; ru: string }> = {
   national_insurance: { en: "National Insurance", ru: "Национальное страхование" },
   health_tax: { en: "Health tax", ru: "Налог на здравоохранение" },
   pension: { en: "Pension", ru: "Пенсия" },
-  study_fund: { en: "Study fund", ru: "Учебный фонд" },
+  study_fund: { en: "Study fund (Keren Hishtalmut)", ru: "Керен иштальмут" },
   other: { en: "Other deduction", ru: "Прочий вычет" },
 };
 
@@ -188,6 +188,58 @@ const LEAVE_LABELS: Record<LeaveKind, { en: string; ru: string }> = {
   recuperation: { en: "Recuperation (havra'a)", ru: "Оздоровительные (хавраа)" },
   other: { en: "Other", ru: "Прочее" },
 };
+
+/** A kind's name alone ("Other" for unknown ones), for screens that show the Hebrew next to it anyway. */
+export function paymentKindLabel(kind: PaymentKind, locale: PayslipLocale): string {
+  return PAYMENT_LABELS[kind][locale];
+}
+export function deductionKindLabel(kind: DeductionKind, locale: PayslipLocale): string {
+  return DEDUCTION_LABELS[kind][locale];
+}
+export function leaveKindLabel(kind: LeaveKind, locale: PayslipLocale): string {
+  return LEAVE_LABELS[kind][locale];
+}
+
+/** A payment's description as printed, without the "*" that marks a perk. */
+export function paymentHebrew(p: PayslipPayment): string {
+  return p.description.replace(/^\*\s*/, "").trim();
+}
+
+/**
+ * Labels as printed on the payslip (the "Trio" template) for the fields that are read by position and so
+ * have no stored text of their own. The same headings the parser anchors to.
+ */
+export const PAYSLIP_HEBREW = {
+  title: "תלוש משכורת",
+  payments: "תשלומים",
+  deductions: "ניכויים",
+  grossTotal: 'סה"כ תשלומים',
+  mandatoryDeductions: "ניכויי חובה וגמל",
+  voluntaryDeductions: "ניכויי רשות",
+  net: "שכר נטו",
+  netPayable: "נטו לתשלום",
+  deposits: "הפקדות מעסיק לקופות גמל",
+  fundBase: "שכר לגמל",
+  employerContribution: "תגמולים",
+  severance: "פיצויים",
+  insuredSalary: "משכורת מבוטחת",
+  taxable: 'חייב מ"ה',
+  benefit: "שווי למס",
+  insuranceBase: 'חייב ב"ל',
+  creditPointsValue: 'ערך נ"ז',
+  pensionCredit: "זיכוי גמל",
+  incomeTax: "מס הכנסה",
+  nationalInsurance: "ביטוח לאומי",
+  healthTax: "בריאות",
+  creditPoints: 'נ"ז',
+  monthsInCalculation: "חודשי עבודה",
+  marginalRate: "שולי%",
+  startDate: "תחילת עבודה",
+  seniority: "שנות ותק",
+  hours: "ש' עבודה",
+  days: "ימי עבודה",
+  scope: "היקף משרה",
+} as const;
 
 /** A payment's name in the chosen language; unknown ones keep the Hebrew as printed. */
 export function paymentLabel(p: PayslipPayment, locale: PayslipLocale): string {
