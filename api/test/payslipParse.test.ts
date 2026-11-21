@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePayslipItems, type PdfTextItem } from "../../core/salary/payslipParse.js";
-import { deductionLabel, paymentLabel, yearToDateFromPayslip } from "../../core/salary/payslip.js";
+import { deductionLabel, fundRatesFromPayslip, paymentLabel, yearToDateFromPayslip } from "../../core/salary/payslip.js";
 
 const it = (x1: number, y: number, str: string): PdfTextItem => ({ str, x0: x1 - str.length * 5, x1, y });
 
@@ -115,4 +115,18 @@ test("labels come in Russian and English, unknown ones keep the Hebrew; year to 
   assert.equal(paymentLabel({ ...p.payments[0], kind: "other", description: "תוספת מיוחדת" }, "en"), "תוספת מיוחדת");
   assert.deepEqual(yearToDateFromPayslip(p), { months: 3, taxable: 47100, taxPaid: 3000 });
   assert.equal(yearToDateFromPayslip({ ...p, tax: { ...p.tax, monthsInCalculation: 12 } }), null);
+});
+
+test("fund rates come from the payslip's own amounts and bases, for the salary calculator", () => {
+  const { payslip: p } = parsePayslipItems(page());
+  assert.ok(p);
+  assert.deepEqual(fundRatesFromPayslip(p), {
+    pensionEmployee: 0.0615, // 800 / 13,000
+    pensionEmployer: 0.065, // 845 / 13,000
+    severance: 0.06, // 780 / 13,000
+    studyFundEmployee: 0.025, // 250 / 10,000
+    studyFundEmployer: 0.075, // 750 / 10,000
+  });
+  const noBase = fundRatesFromPayslip({ ...p, deposits: { ...p.deposits, pensionBase: null, studyFundBase: 0 } });
+  assert.deepEqual(Object.values(noBase), [null, null, null, null, null]);
 });

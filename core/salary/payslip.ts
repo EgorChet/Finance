@@ -254,6 +254,36 @@ export function leaveLabel(l: PayslipLeave, locale: PayslipLocale): string {
   return l.kind === "other" ? l.label : LEAVE_LABELS[l.kind][locale];
 }
 
+export interface PayslipFundRates {
+  pensionEmployee: number | null;
+  pensionEmployer: number | null;
+  severance: number | null;
+  studyFundEmployee: number | null;
+  studyFundEmployer: number | null;
+}
+
+/**
+ * The fund rates this payslip actually applies (amount ÷ the base it was worked out on), as fractions
+ * rounded to 0.01%. Null where the payslip has no base or no such line. The employee pension line may
+ * include disability cover bundled by the fund, which is part of what really leaves the salary.
+ */
+export function fundRatesFromPayslip(p: Payslip): PayslipFundRates {
+  const rate = (amount: number | null | undefined, base: number | null | undefined) =>
+    amount != null && base != null && base > 0 && amount >= 0 ? Math.round((amount / base) * 10000) / 10000 : null;
+  const sum = (kind: DeductionKind) => {
+    const rows = p.deductions.filter((d) => d.kind === kind && !d.voluntary);
+    return rows.length ? rows.reduce((s, d) => s + d.amount, 0) : null;
+  };
+  const { pensionBase, studyFundBase } = p.deposits;
+  return {
+    pensionEmployee: rate(sum("pension"), pensionBase),
+    pensionEmployer: rate(p.deposits.pensionEmployer, pensionBase),
+    severance: rate(p.deposits.severance, pensionBase),
+    studyFundEmployee: rate(sum("study_fund"), studyFundBase),
+    studyFundEmployer: rate(p.deposits.studyFundEmployer, studyFundBase),
+  };
+}
+
 /** The cumulative figures of a payslip in the shape the salary calculator takes as "year to date". */
 export function yearToDateFromPayslip(p: Payslip): { months: number; taxable: number; taxPaid: number } | null {
   const months = p.tax.monthsInCalculation;
