@@ -8,7 +8,8 @@
       <input ref="picker" type="file" accept="application/pdf,.pdf" class="ps-file" @change="onPick" />
     </div>
     <InfoTip label="Who can see this" :text="t('Kept private: only you can open them. The original files are stored too.')" />
-    <p v-if="loadError" class="ps-error">{{ loadError }}</p>
+    <AppLoader v-if="!loaded" variant="list" :rows="3" title="Loading payslips" />
+    <p v-else-if="loadError" class="ps-error">{{ loadError }}</p>
     <p v-else-if="loaded && !payslips.length" class="bx-section-note">{{ t("No payslips yet") }}</p>
 
     <details v-for="g in groups" :key="g.year" class="ps-year" :open="g.year === newestYear">
@@ -18,7 +19,7 @@
       </summary>
       <div class="bx-list">
         <button v-for="p in g.items" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
-            <span class="tx-row-icon" aria-hidden="true">🧾</span>
+            <span class="ps-icon" aria-hidden="true"><MoneyIcon name="receipt" /></span>
             <span class="bx-row-body">
               <span class="bx-row-top">
                 <span class="bx-row-name">{{ monthLabel(p) }}</span>
@@ -54,11 +55,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { dateTag, locale, t } from "@/shared/i18n";
 import InfoTip from "@/shared/components/InfoTip.vue";
+import MoneyIcon from "@/features/money/MoneyIcon.vue";
+import AppLoader from "@/shared/components/AppLoader.vue";
 import PayslipSheet from "@/features/household/components/PayslipSheet.vue";
-import { deletePayslip, fetchPayslipPdf, fetchPayslips, uploadPayslipPdf } from "@/shared/api/client";
+import { deletePayslip, fetchPayslipPdf, uploadPayslipPdf } from "@/shared/api/client";
+import { usePayslipsDataStore } from "@/features/money/stores/payslipsData";
 import { confirm } from "@/shared/composables/useConfirm";
 import { useAuthStore } from "@/shared/stores/auth";
 import { formatIlsWhole } from "@/shared/utils/format";
@@ -67,6 +71,7 @@ import { openPayslipPrint } from "@/features/household/utils/payslipPrint";
 
 const emit = defineEmits<{ saved: [string]; loaded: [Payslip[]] }>();
 const auth = useAuthStore();
+const store = usePayslipsDataStore();
 
 const payslips = ref<Payslip[]>([]);
 const loaded = ref(false);
@@ -128,17 +133,26 @@ function openTranslated() {
   if (!openPayslipPrint(p)) emit("saved", t("Allow pop-ups to download the payslip"));
 }
 
-async function load() {
+/** Cached payslips show at once; a fresh copy is fetched behind them and swapped in when it arrives. */
+async function load(force = false) {
   loadError.value = "";
   try {
-    payslips.value = (await fetchPayslips(auth.token || undefined)).payslips;
-    emit("loaded", payslips.value);
+    const res = await store.load(auth.isDemo, auth.token || undefined, force ? { force: true } : {});
+    payslips.value = res.payslips;
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e);
   } finally {
     loaded.value = true;
+    emit("loaded", payslips.value);
   }
 }
+watch(
+  () => store.data,
+  (d) => {
+    if (d) payslips.value = d.payslips;
+  },
+);
+watch(payslips, (list) => emit("loaded", list));
 
 async function onPick(e: Event) {
   const input = e.target as HTMLInputElement;
@@ -154,7 +168,7 @@ async function onPick(e: Event) {
       added += result.imported.length;
       refused += result.rejected.length;
     }
-    await load();
+    await load(true);
     if (added) emit("saved", t("Added {n} {n|payslip|payslips}", { n: added }));
     if (refused) emit("saved", t("{n} {n|page was|pages were} not added: not a payslip, or the numbers didn't add up", { n: refused }));
     if (!added && !refused) emit("saved", t("Nothing to add"));
@@ -196,7 +210,7 @@ async function removeOpen() {
   try {
     await deletePayslip(p.id, auth.token || undefined);
     openId.value = null;
-    await load();
+    await load(true);
   } catch (e) {
     emit("saved", e instanceof Error ? e.message : String(e));
   } finally {
@@ -210,6 +224,16 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.ps-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
 .ps-year {
   margin: 0 0 0.6rem;
 }

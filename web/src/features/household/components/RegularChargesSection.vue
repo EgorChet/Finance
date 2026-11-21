@@ -26,7 +26,8 @@
         </span>
       </div>
     </div>
-    <div class="bx-list">
+    <AppLoader v-if="!ready" variant="list" :rows="4" title="Loading bills" />
+    <div v-else class="bx-list">
       <component
         :is="readonly ? 'div' : 'button'"
         v-for="row in shownRows"
@@ -82,9 +83,10 @@
 
 <script setup lang="ts">
 import { dateTag, t, tr } from "@/shared/i18n";
+import AppLoader from "@/shared/components/AppLoader.vue";
 import InfoTip from "@/shared/components/InfoTip.vue";
 import MerchantIcon from "@/shared/components/MerchantIcon.vue";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { computeLiveBudgetPlan } from "@/features/spending/utils/paceHealth";
 import type { BudgetPlan } from "@core/spending/budgetPlan";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
@@ -117,7 +119,9 @@ import {
 } from "@/features/spending/utils/pace";
 
 const props = defineProps<{ readonly: boolean }>();
-const emit = defineEmits<{ saved: [string]; monthly: [number]; plan: [BudgetPlan | null] }>();
+const emit = defineEmits<{ saved: [string]; monthly: [number]; plan: [BudgetPlan | null]; ready: [] }>();
+/** True once the history is in and the plan is worked out: before that the amounts are guesses. */
+const ready = ref(false);
 
 /** Which brand mark / category icon each bill line shows (the name as it appears on the card). */
 const BILL_MARKS: Record<string, { he?: string; category: string }> = {
@@ -369,6 +373,11 @@ onMounted(async () => {
   } catch (e) {
     // The list still shows with the usual amounts.
     console.warn("Bills on your card: could not load history", e);
+  } finally {
+    // Let the plan watcher emit first, then tell the page the numbers are settled.
+    await nextTick();
+    ready.value = true;
+    emit("ready");
   }
 });
 

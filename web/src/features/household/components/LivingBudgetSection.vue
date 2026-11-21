@@ -6,7 +6,16 @@
     </div>
 
     <template v-else>
-      <article v-if="headlineSegment" class="bx-hero">
+      <div v-if="pending" class="skeleton-block skeleton-block--hero" role="status" aria-live="polite">
+        <span class="skeleton-sr">{{ t("Loading budget") }}</span>
+        <div class="skeleton-row"><span class="skeleton-line skeleton-line--w45" /><span class="skeleton-line skeleton-line--w20" /></div>
+        <span class="skeleton-line skeleton-line--xxl skeleton-line--w60" />
+        <span class="skeleton-line skeleton-line--w50" />
+        <span class="skeleton-line skeleton-line--bar" />
+        <div class="skeleton-row"><span class="skeleton-line skeleton-line--w40" /><span class="skeleton-line skeleton-line--w20" /></div>
+        <div class="skeleton-row"><span class="skeleton-line skeleton-line--w45" /><span class="skeleton-line skeleton-line--w20" /></div>
+      </div>
+      <article v-else-if="headlineSegment" class="bx-hero">
         <div class="bx-hero-top">
           <span class="bx-eyebrow">
             {{ headlineSegmentIsActive ? t("Monthly budget") : t("Next budget") }} ·
@@ -316,6 +325,8 @@ import {
 const props = withDefaults(
   defineProps<{
     readonly?: boolean;
+    /** The numbers are still arriving: show a placeholder instead of a figure that will change. */
+    pending?: boolean;
     disabled?: boolean;
     configuredCharges?: ConfiguredCharge[];
     referenceYm?: string;

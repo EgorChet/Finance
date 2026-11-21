@@ -6,10 +6,10 @@
     </header>
     <div class="money-cols">
       <div class="money-col">
-        <SavingsCard :payslips="payslips" />
+        <SavingsCard :payslips="payslips" :payslips-ready="payslipsReady" />
       </div>
       <div class="money-col">
-        <PayslipsSection @saved="showSaveStatus" @loaded="payslips = $event" />
+        <PayslipsSection @saved="showSaveStatus" @loaded="onLoaded" />
         <p v-if="saveStatus" class="recurring-save-status">{{ saveStatus }}</p>
       </div>
     </div>
@@ -17,14 +17,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useAuthStore } from "@/shared/stores/auth";
 import DemoBanner from "@/shared/components/DemoBanner.vue";
 import PayslipsSection from "@/features/household/components/PayslipsSection.vue";
 import SavingsCard from "@/features/money/SavingsCard.vue";
 import { t } from "@/shared/i18n";
 import type { Payslip } from "@core/salary/payslip";
 
+const auth = useAuthStore();
 const payslips = ref<Payslip[]>([]);
+const loadedOnce = ref(false);
+/** Payslips are the owner's alone: for anyone else there is nothing to wait for. */
+const payslipsReady = computed(() => auth.isDemo || !auth.canEditBudget || loadedOnce.value);
+function onLoaded(list: Payslip[]) {
+  payslips.value = list;
+  loadedOnce.value = true;
+}
 const saveStatus = ref("");
 let timer: ReturnType<typeof setTimeout> | null = null;
 

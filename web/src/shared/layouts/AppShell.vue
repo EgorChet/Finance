@@ -419,6 +419,9 @@ import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
 import { useAppStore } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
+import { useHouseholdDataStore } from "@/shared/stores/viewData";
+import { usePayslipsDataStore } from "@/features/money/stores/payslipsData";
+import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
@@ -630,7 +633,18 @@ watch(navOpen, (open) => {
 
 const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
+/** Quietly fetch what the Budget and Money tabs need while the first screen is being read, so they open with numbers in. */
+function warmTabs() {
+  const demo = auth.isDemo;
+  const token = auth.token || undefined;
+  const quiet = () => undefined;
+  void useHomeDataStore().load(demo, token).catch(quiet);
+  void useHouseholdDataStore().load(demo, token).catch(quiet);
+  if (!demo && auth.canEditBudget) void usePayslipsDataStore().load(demo, token).catch(quiet);
+}
+
 onMounted(() => {
+  setTimeout(warmTabs, 600);
   portfolio.startPolling(auth.isDemo, auth.token || undefined);
   void resumeUploadJobIfNeeded();
   void resumeCalSyncIfNeeded();
