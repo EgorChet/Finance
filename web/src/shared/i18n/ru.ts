@@ -59,6 +59,7 @@ export const RU: Record<string, string> = {
   "Funds in detail": "Фонды подробнее",
   "Other months ({n})": "Другие месяцы ({n})",
   "Coming up": "Скоро",
+  "Nothing this cycle": "В этом цикле разовых платежей нет",
   "Pitzuim": "Пицуим",
   "Employer: pension": "Работодатель: пенсия",
   "Employer: severance": "Работодатель: выходное пособие (пицуим)",

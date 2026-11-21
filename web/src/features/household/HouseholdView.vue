@@ -142,13 +142,14 @@
               </span>
             </span>
           </component>
+          <p v-if="!visibleOneTimeCharges.length" class="bx-empty-line">{{ t("Nothing this cycle") }}</p>
           <button
-            v-if="oneTimeCharges.length > shownOneTimeCharges.length || showPastOneTime"
+            v-if="pastOneTimeCharges.length"
             type="button"
             class="bx-row bx-row--more"
             @click="showPastOneTime = !showPastOneTime"
           >
-            {{ showPastOneTime ? t("Show fewer") : t("Show all {n}", { n: oneTimeCharges.length }) }}
+            {{ showPastOneTime ? t("Hide past charges ({n})", { n: pastOneTimeCharges.length }) : t("Show past charges ({n})", { n: pastOneTimeCharges.length }) }}
           </button>
         </div>
         <p v-else class="bx-empty-line">
@@ -441,12 +442,10 @@ const oneTimeCharges = computed(() =>
 const visibleOneTimeCharges = computed(() =>
   oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) !== "past" || inThisCycle(charge.charge_date!)),
 );
-/** Upcoming ones first, then the latest past ones, so the history is visible without a tap; the rest behind "Show all". */
-const ONE_TIME_SHOWN = 4;
-const shownOneTimeCharges = computed(() => {
-  const all = [...visibleOneTimeCharges.value, ...pastOneTimeCharges.value];
-  return showPastOneTime.value ? all : all.slice(0, Math.max(ONE_TIME_SHOWN, visibleOneTimeCharges.value.length));
-});
+/** This cycle's and upcoming charges; earlier cycles are one tap away. */
+const shownOneTimeCharges = computed(() =>
+  showPastOneTime.value ? [...visibleOneTimeCharges.value, ...pastOneTimeCharges.value] : visibleOneTimeCharges.value,
+);
 const pastOneTimeCharges = computed(() =>
   oneTimeCharges.value.filter((charge) => oneTimeStatus(charge.charge_date!, referenceToday.value) === "past" && !inThisCycle(charge.charge_date!)),
 );
