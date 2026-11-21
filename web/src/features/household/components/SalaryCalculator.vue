@@ -1,12 +1,11 @@
 <template>
-  <SheetEditor
-    :open="open"
-    title="Salary calculator"
-    subtitle="From gross pay to take-home, the way a payslip works it out"
-    save-label="Done"
-    @save="emit('close')"
-    @cancel="emit('close')"
-  >
+  <BottomSheet :open="open" :title="t('Salary calculator')" @close="emit('close')">
+    <template #head>
+      <div class="sal-head">
+        <h3 class="bs-title">{{ t("Salary calculator") }}</h3>
+        <p class="sal-head-sub">{{ t("From gross pay to take-home, the way a payslip works it out") }}</p>
+      </div>
+    </template>
     <div class="sal">
       <div class="seg" role="tablist">
         <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': state.mode === 'gross' }" :aria-selected="state.mode === 'gross'" @click="state.mode = 'gross'">
@@ -30,42 +29,19 @@
       </button>
       <p v-if="filled" class="sal-note">{{ t("Taken from the {month} payslip; the result is for the month after it.", { month: latestMonth }) }}</p>
 
-      <details ref="details" class="sal-details">
-        <summary>{{ t("Your details") }}</summary>
-        <div class="sal-fields">
-          <SheetAmountInput v-model="state.benefits" label="Taxable perks, not paid in cash (meals…)" />
-          <SheetAmountInput
-            v-model="state.pensionBase"
-            label="Salary the pension is based on"
-            :hint="t('Leave 0 if it is the same as the gross pay.')"
-          />
-          <SheetAmountInput
-            v-model="state.studyFundBase"
-            label="Salary the study fund is based on"
-            :hint="t('0 if you have none.')"
-          />
-          <label class="sheet-field">
-            <span class="sheet-field__label">{{ t("Credit points") }}</span>
-            <input v-model.number="state.creditPoints" class="input" type="number" inputmode="decimal" step="0.25" min="0" />
-          </label>
-          <p class="sal-sub">{{ t("Year to date (optional)") }}</p>
-          <label class="sheet-field">
-            <span class="sheet-field__label">{{ t("Months already paid this year") }}</span>
-            <input v-model.number="state.ytdMonths" class="input" type="number" inputmode="numeric" step="1" min="0" max="11" />
-          </label>
-          <SheetAmountInput v-model="state.ytdTaxable" label="Taxable income so far" />
-          <SheetAmountInput
-            v-model="state.ytdTax"
-            label="Income tax withheld so far"
-            :hint="t('Both are in the cumulative columns of your last payslip.')"
-          />
-        </div>
-      </details>
-
       <section v-if="result" class="sal-result" aria-live="polite">
         <p class="sal-label">{{ state.mode === "net" ? t("Gross pay needed") : t("You take home") }}</p>
         <p class="sal-big">{{ formatIls(state.mode === "net" ? result.gross : result.net) }}</p>
         <p v-if="state.mode === 'net'" class="sal-sub-big">{{ t("You take home") }} {{ formatIls(result.net) }}</p>
+
+        <div class="sal-bar" role="img" :aria-label="t('Where the gross pay goes')">
+          <span v-for="part in split" :key="part.key" :class="['sal-bar__part', `sal-bar__part--${part.key}`]" :style="{ flexGrow: part.amount }" />
+        </div>
+        <ul class="sal-legend">
+          <li v-for="part in split" :key="part.key">
+            <span :class="['sal-dot', `sal-bar__part--${part.key}`]" aria-hidden="true" />{{ part.label }} <strong>{{ part.pct }}%</strong>
+          </li>
+        </ul>
 
         <ul class="sal-rows">
           <li class="sal-row"><span>{{ t("Gross pay per month") }}</span><strong>{{ formatIls(result.gross) }}</strong></li>
@@ -89,6 +65,47 @@
       </section>
       <p v-else-if="state.mode === 'net' && state.net > 0" class="sal-warn">{{ t("That take-home can't be reached") }}</p>
 
+      <details ref="details" class="sal-details">
+        <summary>{{ t("Your details") }}</summary>
+        <div class="sal-fields">
+          <SheetAmountInput v-model="state.benefits" label="Taxable perks, not paid in cash (meals…)" />
+          <SheetAmountInput
+            v-model="state.pensionBase"
+            label="Salary the pension is based on"
+            :hint="t('Leave 0 if it is the same as the gross pay.')"
+          />
+          <SheetAmountInput
+            v-model="state.studyFundBase"
+            label="Salary the study fund is based on"
+            :hint="t('0 if you have none.')"
+          />
+          <p class="sal-sub">{{ t("Fund rates, %") }}</p>
+          <div class="sal-rates">
+            <label v-for="f in rateFields" :key="f.key" class="sheet-field">
+              <span class="sheet-field__label">{{ t(f.label) }}</span>
+              <input v-model.number="state[f.key]" class="input" type="number" inputmode="decimal" step="0.01" min="0" max="30" />
+            </label>
+          </div>
+          <p class="sal-note">{{ ratesFromPayslip ? t("Rates as your payslip applies them.") : t("Usual rates; fill from your payslip for yours.") }}</p>
+          <label class="sheet-field">
+            <span class="sheet-field__label">{{ t("Credit points") }}</span>
+            <input v-model.number="state.creditPoints" class="input" type="number" inputmode="decimal" step="0.25" min="0" />
+          </label>
+          <p class="sal-sub">{{ t("Year to date (optional)") }}</p>
+          <label class="sheet-field">
+            <span class="sheet-field__label">{{ t("Months already paid this year") }}</span>
+            <input v-model.number="state.ytdMonths" class="input" type="number" inputmode="numeric" step="1" min="0" max="11" />
+          </label>
+          <SheetAmountInput v-model="state.ytdTaxable" label="Taxable income so far" />
+          <SheetAmountInput
+            v-model="state.ytdTax"
+            label="Income tax withheld so far"
+            :hint="t('Both are in the cumulative columns of your last payslip.')"
+          />
+        </div>
+      </details>
+
+
       <p class="sal-note">
         {{ usingYearToDate
           ? t("Counted with your year to date, the way the payslip does.")
@@ -96,7 +113,7 @@
       </p>
       <p class="sal-note">{{ t("2026 rates, including the March bracket update. Not covered: tax-free ceilings on perks, several employers, special credits.") }}</p>
     </div>
-  </SheetEditor>
+  </BottomSheet>
 </template>
 
 <script setup lang="ts">
@@ -105,10 +122,20 @@ import { dateTag, t } from "@/shared/i18n";
 import { fetchPayslips } from "@/shared/api/client";
 import { useAuthStore } from "@/shared/stores/auth";
 import SheetAmountInput from "@/shared/components/SheetAmountInput.vue";
-import SheetEditor from "@/shared/components/SheetEditor.vue";
+import BottomSheet from "@/shared/components/BottomSheet.vue";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
-import { DEFAULT_CREDIT_POINTS, computeSalary, grossForNet, type SalaryInput } from "@core/salary/salaryCalc";
-import { yearToDateFromPayslip, type Payslip } from "@core/salary/payslip";
+import {
+  DEFAULT_CREDIT_POINTS,
+  DEFAULT_PENSION_EMPLOYEE_RATE,
+  DEFAULT_PENSION_EMPLOYER_RATE,
+  DEFAULT_SEVERANCE_RATE,
+  DEFAULT_STUDY_FUND_EMPLOYEE_RATE,
+  DEFAULT_STUDY_FUND_EMPLOYER_RATE,
+  computeSalary,
+  grossForNet,
+  type SalaryInput,
+} from "@core/salary/salaryCalc";
+import { fundRatesFromPayslip, yearToDateFromPayslip, type Payslip } from "@core/salary/payslip";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -127,6 +154,14 @@ interface Saved {
   ytdMonths: number;
   ytdTaxable: number;
   ytdTax: number;
+  /** Fund rates in percent (6 = 6%). */
+  pensionEmployeePct: number;
+  pensionEmployerPct: number;
+  severancePct: number;
+  studyFundEmployeePct: number;
+  studyFundEmployerPct: number;
+  /** 1 when the rates came from a payslip, 0 for the usual ones. */
+  ratesFromPayslip: number;
 }
 
 const DEFAULTS: Saved = {
@@ -140,6 +175,12 @@ const DEFAULTS: Saved = {
   ytdMonths: 0,
   ytdTaxable: 0,
   ytdTax: 0,
+  pensionEmployeePct: Math.round(DEFAULT_PENSION_EMPLOYEE_RATE * 10000) / 100,
+  pensionEmployerPct: Math.round(DEFAULT_PENSION_EMPLOYER_RATE * 10000) / 100,
+  severancePct: Math.round(DEFAULT_SEVERANCE_RATE * 10000) / 100,
+  studyFundEmployeePct: Math.round(DEFAULT_STUDY_FUND_EMPLOYEE_RATE * 10000) / 100,
+  studyFundEmployerPct: Math.round(DEFAULT_STUDY_FUND_EMPLOYER_RATE * 10000) / 100,
+  ratesFromPayslip: 0,
 };
 
 function load(): Saved {
@@ -201,9 +242,12 @@ const latestMonth = computed(() => {
   return label.charAt(0).toUpperCase() + label.slice(1);
 });
 
+let filling = false;
 function fillFromPayslip() {
   const p = latest.value;
   if (!p) return;
+  filling = true;
+  setTimeout(() => (filling = false));
   const ytd = yearToDateFromPayslip(p);
   state.mode = "gross";
   state.gross = Math.round(p.totals.gross);
@@ -214,6 +258,14 @@ function fillFromPayslip() {
   state.ytdMonths = ytd?.months ?? 0;
   state.ytdTaxable = ytd?.taxable ?? 0;
   state.ytdTax = ytd?.taxPaid ?? 0;
+  const rates = fundRatesFromPayslip(p);
+  const asPct = (x: number | null, fallback: number) => (x == null ? fallback : Math.round(x * 10000) / 100);
+  state.pensionEmployeePct = asPct(rates.pensionEmployee, DEFAULTS.pensionEmployeePct);
+  state.pensionEmployerPct = asPct(rates.pensionEmployer, DEFAULTS.pensionEmployerPct);
+  state.severancePct = asPct(rates.severance, DEFAULTS.severancePct);
+  state.studyFundEmployeePct = asPct(rates.studyFundEmployee, DEFAULTS.studyFundEmployeePct);
+  state.studyFundEmployerPct = asPct(rates.studyFundEmployer, DEFAULTS.studyFundEmployerPct);
+  state.ratesFromPayslip = 1;
   filled.value = true;
   if (details.value) details.value.open = true;
 }
@@ -225,6 +277,11 @@ const baseInput = computed((): Omit<SalaryInput, "gross"> => ({
   creditPoints: state.creditPoints,
   pensionBase: state.pensionBase > 0 ? state.pensionBase : null,
   studyFundBase: state.studyFundBase,
+  pensionEmployeeRate: state.pensionEmployeePct / 100,
+  pensionEmployerRate: state.pensionEmployerPct / 100,
+  severanceRate: state.severancePct / 100,
+  studyFundEmployeeRate: state.studyFundEmployeePct / 100,
+  studyFundEmployerRate: state.studyFundEmployerPct / 100,
   yearToDate: usingYearToDate.value
     ? { months: Math.min(11, Math.floor(state.ytdMonths)), taxable: state.ytdTaxable, taxPaid: state.ytdTax }
     : null,
@@ -250,6 +307,36 @@ const rows = computed(() => {
   return list;
 });
 
+type PctKey = "pensionEmployeePct" | "pensionEmployerPct" | "severancePct" | "studyFundEmployeePct" | "studyFundEmployerPct";
+const rateFields: { key: PctKey; label: string }[] = [
+  { key: "pensionEmployeePct", label: "Pension: you" },
+  { key: "pensionEmployerPct", label: "Pension: employer" },
+  { key: "severancePct", label: "Severance: employer" },
+  { key: "studyFundEmployeePct", label: "Study fund: you" },
+  { key: "studyFundEmployerPct", label: "Study fund: employer" },
+];
+const ratesFromPayslip = computed(() => state.ratesFromPayslip === 1);
+// Typing a rate by hand makes it yours, no longer the payslip's.
+watch(
+  () => rateFields.map((f) => state[f.key]).join("|"),
+  (_now, before) => {
+    if (before !== undefined && !filling) state.ratesFromPayslip = 0;
+  },
+);
+
+/** Gross pay split into take-home, taxes and your fund deposits (for the bar). */
+const split = computed(() => {
+  const r = result.value;
+  if (!r || r.gross <= 0) return [];
+  const parts = [
+    { key: "net", label: t("Take-home"), amount: r.net },
+    { key: "tax", label: t("Taxes"), amount: r.incomeTax + r.nationalInsurance + r.healthTax },
+    { key: "funds", label: t("Pension and fund"), amount: r.pension + r.studyFund + r.otherDeductions },
+  ].filter((x) => x.amount > 0);
+  const total = parts.reduce((s, x) => s + x.amount, 0);
+  return parts.map((x) => ({ ...x, pct: Math.round((x.amount / total) * 100) }));
+});
+
 /** What stays in your pocket from the next ₪1,000 of gross pay. */
 const keepOfThousand = computed(() => {
   const r = result.value;
@@ -262,6 +349,67 @@ const keepOfThousand = computed(() => {
 .sal {
   display: grid;
   gap: 1rem;
+}
+.sal-head {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.sal-head-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.sal-bar {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+  margin-top: 0.8rem;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.sal-bar__part {
+  min-width: 4px;
+  background: var(--text-faint);
+}
+.sal-bar__part--net {
+  background: var(--success);
+}
+.sal-bar__part--tax {
+  background: var(--danger);
+}
+.sal-bar__part--funds {
+  background: var(--accent);
+}
+.sal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.sal-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sal-legend strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.sal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.sal-rates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 0.7rem;
 }
 .sal .seg {
   margin: 0;

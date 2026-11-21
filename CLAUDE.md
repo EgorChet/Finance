@@ -11,6 +11,9 @@ A personal finance app. Public repo: **never put personal figures, IDs, emails o
 ## Workflow
 - Develop on `claude/dazzling-cori-x8tznf`, open a PR to `main`, merge it, then sync the branch:
   `git fetch origin main && git reset --hard origin/main && git push -u origin claude/dazzling-cori-x8tznf`.
+- The owner has allowed merging these PRs and syncing the branch without asking each time. If the auto mode
+  classifier still blocks `gh pr merge` or the sync, the allow rules belong in the owner's untracked
+  `.claude/settings.local.json` (the owner adds them; never edit permission settings yourself).
 - Commit messages and PR bodies end with the attribution lines the session asks for.
 - Checks: `cd api && npx tsx --test test/*.test.ts` (41 tests), `cd web && npx vue-tsc --noEmit && npx vite build`.
 - Deploy: web on GitHub Pages (builds from `main`), API on Render (see `docs/DEPLOY.md`). The Telegram bot "Totoshka" is in `docs/TOTOSHKA.md`.

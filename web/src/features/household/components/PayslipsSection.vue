@@ -21,20 +21,30 @@
           </span>
           <span class="bx-row-meta">
             <span>{{ t("Total pay") }} {{ formatIlsWhole(p.totals.gross) }}</span>
+            <span class="ps-tags">
+              <span v-if="extrasOf(p)">{{ extrasOf(p) }}</span>
+              <span
+                v-if="changeOf(p)"
+                :class="changeOf(p)! > 0 ? 'ps-change--up' : 'ps-change--down'"
+                :title="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+                :aria-label="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+              >{{ signed(changeOf(p)!) }}</span>
+            </span>
           </span>
         </span>
         <span class="bx-chevron" aria-hidden="true">›</span>
       </button>
+      <button v-if="payslips.length > 6" type="button" class="bx-row bx-row--more" @click="showAll = !showAll">
+        {{ showAll ? t("Show fewer") : t("Show all {n}", { n: payslips.length }) }}
+      </button>
     </div>
-    <button v-if="payslips.length > 6 && !showAll" type="button" class="btn btn-sm ps-more" @click="showAll = true">
-      {{ t("Show all {n}", { n: payslips.length }) }}
-    </button>
 
     <PayslipSheet
       :payslip="open"
       :busy="busy"
       @close="openId = null"
       @original="openOriginal"
+      @translated="openTranslated"
       @remove="removeOpen"
     />
   </section>
@@ -42,13 +52,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { dateTag, t } from "@/shared/i18n";
+import { dateTag, locale, t } from "@/shared/i18n";
 import PayslipSheet from "@/features/household/components/PayslipSheet.vue";
 import { deletePayslip, fetchPayslipPdf, fetchPayslips, uploadPayslipPdf } from "@/shared/api/client";
 import { confirm } from "@/shared/composables/useConfirm";
 import { useAuthStore } from "@/shared/stores/auth";
 import { formatIlsWhole } from "@/shared/utils/format";
-import type { Payslip } from "@core/salary/payslip";
+import { paymentKindLabel, type PaymentKind, type Payslip } from "@core/salary/payslip";
+import { openPayslipPrint } from "@/features/household/utils/payslipPrint";
 
 const emit = defineEmits<{ saved: [string] }>();
 const auth = useAuthStore();
@@ -70,6 +81,36 @@ const shown = computed(() => (showAll.value ? payslips.value : payslips.value.sl
 function monthLabel(p: Payslip): string {
   const label = new Date(p.year, p.month - 1, 1).toLocaleDateString(dateTag(), { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+const netOf = (p: Payslip) => p.totals.netPayable || p.totals.net;
+
+/** Take-home change against the month right before it; nothing when that month has no payslip. */
+function changeOf(p: Payslip): number | null {
+  const prevId = p.month === 1 ? `${p.year - 1}-12` : `${p.year}-${String(p.month - 1).padStart(2, "0")}`;
+  const prev = payslips.value.find((x) => x.id === prevId);
+  if (!prev) return null;
+  const d = Math.round(netOf(p) - netOf(prev));
+  return d === 0 ? null : d;
+}
+
+function signed(n: number): string {
+  return (n > 0 ? "+" : "−") + formatIlsWhole(Math.abs(n));
+}
+
+/** One-off payments that explain an unusual month (bonus, vacation pay-out…). */
+const EXTRA_KINDS: PaymentKind[] = ["bonus", "vacation", "recuperation", "holidays", "sick", "reserve", "overtime", "election_day"];
+function extrasOf(p: Payslip): string {
+  const lang = locale.value === "en" ? "en" : "ru";
+  const kinds = [...new Set(p.payments.filter((x) => !x.benefit && x.amount > 0 && EXTRA_KINDS.includes(x.kind)).map((x) => x.kind))];
+  return kinds.map((k) => paymentKindLabel(k, lang)).join(", ");
+}
+
+/** The Russian page with the Hebrew in brackets; the print dialog saves it as PDF. */
+function openTranslated() {
+  const p = open.value;
+  if (!p) return;
+  if (!openPayslipPrint(p)) emit("saved", t("Allow pop-ups to download the payslip"));
 }
 
 async function load() {
@@ -160,7 +201,15 @@ onMounted(() => {
   margin: 0;
   color: var(--danger);
 }
-.ps-more {
-  margin-top: 0.5rem;
+.ps-tags {
+  display: inline-flex;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+.ps-change--up {
+  color: var(--success);
+}
+.ps-change--down {
+  color: var(--danger);
 }
 </style>

@@ -1,0 +1,110 @@
+/*
+ * Desktop layout. The app is designed for the phone; on a wide screen (≥1024px) the bottom tab bar
+ * becomes a left rail, the content gets a readable width, sheets open as centred cards and the Budget
+ * page goes into two columns. Everything here sits inside the media query, so phones are untouched.
+ */
+@media (min-width: 1024px) {
+  .app-layout {
+    --rail-w: 232px;
+    padding-left: var(--rail-w);
+  }
+
+  /* ---- Bottom tab bar → left rail ---- */
+  .app-tabbar {
+    top: 0;
+    right: auto;
+    width: var(--rail-w);
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 0.25rem;
+    padding: 1.1rem 0.85rem;
+    border-top: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .app-tabbar::before {
+    content: "Finance";
+    padding: 0.35rem 0.75rem 1.1rem;
+    font-size: 1.15rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .app-tab {
+    position: relative;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0 0.75rem;
+    font-size: 0.92rem;
+    letter-spacing: 0;
+  }
+
+  .app-tab:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--text);
+  }
+
+  .app-tab--active,
+  .app-tab--active:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+
+  .app-tab-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-tab--active .app-tab-icon {
+    transform: none;
+  }
+
+  .app-tab-badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  /* ---- Content: a readable width, more air ---- */
+  .main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 1.6rem 2rem 3rem;
+  }
+
+  .main--with-tabbar {
+    padding-bottom: 3rem;
+  }
+
+  /* ---- Bottom sheets open as centred cards (SheetEditor already does from 641px) ---- */
+  .tx-sheet-backdrop {
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .tx-sheet {
+    max-width: 560px;
+    border-radius: 26px;
+    max-height: min(88dvh, 820px);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  .bs {
+    max-height: min(88dvh, 820px);
+  }
+
+  .tx-sheet .tx-sheet-grabber {
+    display: none;
+  }
+
+  /* ---- Budget: money in on the left, bills on the right ---- */
+  .bx-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 0 2rem;
+    align-items: start;
+  }
+}
