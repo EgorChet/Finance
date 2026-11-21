@@ -19,10 +19,10 @@
           <span class="bx-row-meta">
             <span>{{ t("{n} cycles in a row, around the {day}th", { n: sg.cycles, day: sg.day }) }}</span>
           </span>
-          <span class="rc-suggest-actions">
-            <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="answer(sg, true)">{{ t("Yes, set it aside") }}</button>
-            <button type="button" class="btn btn-sm" :disabled="saving" @click="answer(sg, false)">{{ t("No, not regular") }}</button>
-          </span>
+        </span>
+        <span class="rc-suggest-actions">
+          <button type="button" class="btn btn-primary btn-sm" :disabled="saving" @click="answer(sg, true)">{{ t("Yes, set it aside") }}</button>
+          <button type="button" class="btn btn-sm" :disabled="saving" @click="answer(sg, false)">{{ t("No, not regular") }}</button>
         </span>
       </div>
     </div>
@@ -388,23 +388,28 @@ void props;
 }
 .rc-suggest-row {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.75rem;
   align-items: flex-start;
+}
+.rc-suggest-row .bx-row-body {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .rc-suggest-row + .rc-suggest-row {
   margin-top: 0.75rem;
 }
 .rc-suggest-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  flex: 1 0 100%;
 }
 .rc-suggest-actions .btn {
-  flex: 1 1 0;
   min-width: 0;
-  min-height: 40px;
+  min-height: 42px;
   padding-inline: 0.5rem;
-  font-size: 0.85rem;
-  line-height: 1.2;
+  font-size: 0.88rem;
+  white-space: nowrap;
 }
 </style>
