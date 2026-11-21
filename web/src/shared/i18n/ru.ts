@@ -57,6 +57,7 @@ export const RU: Record<string, string> = {
   "Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today's price and dollar rate.": "Фонды — это сумма взносов по загруженным расчётным листам, а не остаток на счёте: доходность, комиссии и то, что было отложено до первого листа, сюда не входят. Крипта и акции оценены по сегодняшней цене и курсу доллара.",
   "{n} {n|payslip|payslips}": "{n} {n|расчётный лист|расчётных листа|расчётных листов}",
   "Funds in detail": "Фонды подробнее",
+  "Other months ({n})": "Другие месяцы ({n})",
   "Pitzuim": "Пицуим",
   "Employer: pension": "Работодатель: пенсия",
   "Employer: severance": "Работодатель: выходное пособие (пицуим)",

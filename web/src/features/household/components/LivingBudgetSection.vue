@@ -109,7 +109,7 @@
       <div class="bx-list">
         <component
           :is="canEditMonth(row) ? 'button' : 'div'"
-          v-for="row in monthRows"
+          v-for="row in shownMonthRows"
           :key="row.ym"
           :type="canEditMonth(row) ? 'button' : undefined"
           class="bx-row"
@@ -137,6 +137,9 @@
           </span>
           <span v-if="canEditMonth(row)" class="bx-chevron" aria-hidden="true">›</span>
         </component>
+        <button v-if="otherMonthCount > 0" type="button" class="bx-row bx-row--more" @click="showAllMonths = !showAllMonths">
+          {{ showAllMonths ? t("Show fewer") : t("Other months ({n})", { n: otherMonthCount }) }}
+        </button>
       </div>
 
     </template>
@@ -631,6 +634,15 @@ const monthRows = computed((): MonthRow[] => {
   }
   return rows.reverse();
 });
+
+/** Last month, this one and the next are enough at a glance; the rest sit behind one button. */
+const showAllMonths = ref(false);
+const shownMonthRows = computed(() => {
+  if (showAllMonths.value) return monthRows.value;
+  const near = new Set([previousCalendarMonth(nowYm.value), nowYm.value, nextCalendarMonth(nowYm.value)]);
+  return monthRows.value.filter((r) => near.has(r.ym));
+});
+const otherMonthCount = computed(() => monthRows.value.length - monthRows.value.filter((r) => [previousCalendarMonth(nowYm.value), nowYm.value, nextCalendarMonth(nowYm.value)].includes(r.ym)).length);
 
 const estimateMonth = ref<string | null>(null);
 const estimateRow = computed(() => monthRows.value.find((r) => r.ym === estimateMonth.value) ?? null);
