@@ -3293,6 +3293,36 @@ html.sheet-editor-open body {
   color: var(--text-muted);
 }
 
+.bx-fold {
+  margin: 0 0 0.6rem;
+}
+
+.bx-fold > summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.bx-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bx-fold > summary::after {
+  content: "›";
+  margin-left: 0.4rem;
+  font-size: 1.2rem;
+  transition: transform 0.15s;
+}
+
+.bx-fold[open] > summary::after {
+  transform: rotate(90deg);
+}
+
 .bx-hero-free {
   display: flex;
   align-items: baseline;

@@ -28,7 +28,8 @@
           <b>{{ formatIlsWhole(freeForEveryday) }}</b>
         </p>
 
-        <p class="bx-bar-label">{{ t("Where it comes from") }}</p>
+        <details class="bx-fold">
+          <summary>{{ t("What it is made of") }}</summary>
         <div class="bx-bar" aria-hidden="true">
           <span
             v-for="part in sources"
@@ -50,6 +51,7 @@
             </component>
           </li>
         </ul>
+        </details>
 
         <template v-if="cycleSplit">
           <p class="bx-bar-label">{{ cycleSplit.title }}</p>
