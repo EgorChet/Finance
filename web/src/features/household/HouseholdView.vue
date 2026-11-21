@@ -36,6 +36,10 @@
         :save-error="status"
         :card-bills="cardBillsMonthly"
         :cycle-plan="cyclePlan"
+        :month-bases="monthBases"
+        :payslip-nets="payslipNets"
+        :estimate-suggestion="estimateSuggestion"
+        @estimate-saved="onEstimateSaved"
         @save="persistCharges"
         @edit-recurring-charge="editRecurringCharge"
       />
@@ -316,7 +320,7 @@ import SheetEditor from "@/shared/components/SheetEditor.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import { SPENDING_CATEGORIES } from "@/shared/categories";
 import { useAuthStore } from "@/shared/stores/auth";
-import { invalidateHouseholdDataCaches } from "@/shared/stores/invalidateCaches";
+import { invalidateAllDataCaches, invalidateHouseholdDataCaches } from "@/shared/stores/invalidateCaches";
 import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { type HouseholdBundle, useHouseholdDataStore } from "@/shared/stores/viewData";
 import { confirm } from "@/shared/composables/useConfirm";
@@ -345,6 +349,7 @@ import {
   ymToLabel,
 } from "@/features/household/utils/fixedCharges";
 import {
+  type LivingBudgetMonthBase,
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
   normalizeLivingBudgetMonthTopup,
@@ -375,6 +380,10 @@ const saveStatus = ref("");
 const saveError = ref(false);
 const charges = ref<ConfiguredCharge[]>([]);
 const livingBudgetSegments = ref<LivingBudgetSegment[]>([]);
+// Month-by-month salary (payslip or expected), kept apart from the periods that get edited and saved.
+const monthBases = ref<LivingBudgetMonthBase[]>([]);
+const payslipNets = ref<Record<string, number>>({});
+const estimateSuggestion = ref<number | null>(null);
 const livingBudgetMonthTopups = ref<LivingBudgetMonthTopup[]>([]);
 const savedSnapshot = ref("");
 const savedBudgetSnapshot = ref("");
@@ -1037,7 +1046,16 @@ async function addOneTime() {
   }
 }
 
+function onEstimateSaved(message: string) {
+  showSaveStatus(message);
+  invalidateAllDataCaches();
+  void load({ force: true, background: true });
+}
+
 async function applyHouseholdBundle(bundle: HouseholdBundle) {
+  monthBases.value = bundle.living_budget.month_bases ?? [];
+  payslipNets.value = bundle.living_budget.payslip_nets ?? {};
+  estimateSuggestion.value = bundle.living_budget.estimate_suggestion ?? null;
   charges.value = bundle.charges.map((c) => normalizeConfiguredCharge(c));
   livingBudgetSegments.value = bundle.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (bundle.living_budget.month_topups || []).map((t) =>
@@ -1049,6 +1067,8 @@ async function applyHouseholdBundle(bundle: HouseholdBundle) {
 function applyHomeBundlePeek() {
   const cached = homeData.peek(auth.isDemo, auth.token || undefined);
   if (!cached) return false;
+  // Home's periods already have the payslip / expected months cut out: not what this page edits and saves.
+  if (cached.living_budget.month_bases?.length) return false;
   charges.value = cached.fixed_charges.map((c) => normalizeConfiguredCharge(c));
   livingBudgetSegments.value = cached.living_budget.segments.map((s) => normalizeLivingBudgetSegment(s));
   livingBudgetMonthTopups.value = (cached.living_budget.month_topups || []).map((t) =>

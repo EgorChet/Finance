@@ -28,6 +28,7 @@ import { createUploadJob, getUploadJob } from "../services/uploadJobs.js";
 import { getFinalizeVersion } from "../services/finalizeVersion.js";
 import { buildGuessQueue, buildLabelHints, saveLabelSuggestions } from "../services/labelHints.js";
 import { payslipsRouter } from "./payslips.js";
+import type { AuthenticatedRequest } from "../auth.js";
 import { loadRegularChargeOverrides, saveRegularChargeOverrides } from "../services/regularCharges.js";
 import {
   buildReviewQueue,
@@ -63,12 +64,7 @@ import {
   saveFixedCharges,
   validateFixedCharges,
 } from "../services/fixedCharges.js";
-import {
-  loadLivingBudgetData,
-  loadLivingBudgetSegments,
-  saveLivingBudget,
-  validateLivingBudget,
-} from "../services/livingBudget.js";
+import { loadLivingBudgetData, loadLivingBudgetSegments, saveLivingBudget, validateLivingBudget, effectiveLivingBudget, setMonthEstimate, normalizeEstimates } from "../services/livingBudget.js";
 import { ensureAuxCachesFresh } from "../middleware/auxCache.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
@@ -165,7 +161,7 @@ router.get("/home-data", async (req, res) => {
   const paceMonths = Math.max(1, Number(req.query.pace_months ?? DEFAULT_PACE_MONTHS));
   const paceKeys = recentBillingKeys(data, paceMonths);
   const { report, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
-  const budget = loadLivingBudgetData();
+  const budget = await effectiveLivingBudget(householdNow(), (await loadPaceSettings()).cycle_day);
   // lean=1: the client rebuilds the combined history from scoped_reports (halves the payload).
   const lean = req.query.lean === "1";
   res.json({
@@ -178,7 +174,13 @@ router.get("/home-data", async (req, res) => {
     pace_months_requested: paceMonths,
     fixed_charges: loadFixedCharges(),
     regular_charges: await loadRegularChargeOverrides(),
-    living_budget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+    // The periods already carry the payslip / expected months: every calculation can use them as they are.
+    living_budget: {
+      segments: budget.segments,
+      month_topups: budget.month_topups,
+      month_bases: budget.month_bases,
+      estimate_suggestion: (req as AuthenticatedRequest).userId === "egor" ? budget.estimate_suggestion : null,
+    },
   });
 });
 
@@ -214,7 +216,7 @@ router.get("/summary", async (req, res) => {
   const paceKeys = recentBillingKeys(data, DEFAULT_PACE_MONTHS);
   const { report: paceReport, scopedReports } = await getPaceBundleAsync(data, paceKeys, version);
   const settings = await loadPaceSettings();
-  const budget = loadLivingBudgetData();
+  const budget = await effectiveLivingBudget(householdNow(), settings.cycle_day);
   const reports: Record<string, CoreSpendingReport | undefined> = {
     ...(scopedReports as unknown as Record<string, CoreSpendingReport>),
   };
@@ -234,7 +236,7 @@ router.get("/summary", async (req, res) => {
       paceReport: (paceReport ?? null) as unknown as CoreSpendingReport | null,
       fixedCharges: loadFixedCharges() as unknown as Parameters<typeof computeSpendingSummary>[0]["fixedCharges"],
       regularCharges: regularOverrides,
-      livingBudget: { segments: budget.segments, month_topups: budget.month_topups || [] },
+      livingBudget: { segments: budget.segments, month_topups: budget.month_topups },
       referenceDate: householdNow(),
       monthKey,
       reports,
@@ -333,9 +335,34 @@ router.put("/regular-charges", async (req, res) => {
   res.json({ saved: true, overrides: await saveRegularChargeOverrides(body.overrides) });
 });
 
-router.get("/living-budget", async (_req, res) => {
+router.get("/living-budget", async (req, res) => {
   const data = loadLivingBudgetData();
-  res.json({ segments: data.segments, month_topups: data.month_topups || [] });
+  const isOwner = (req as AuthenticatedRequest).userId === "egor";
+  const effective = await effectiveLivingBudget(householdNow(), (await loadPaceSettings()).cycle_day);
+  // The periods as saved (they are what gets edited) plus the month-by-month salary derived from payslips and estimates.
+  res.json({
+    segments: data.segments,
+    month_topups: data.month_topups || [],
+    month_estimates: data.month_estimates || [],
+    month_bases: effective.month_bases,
+    // The payslips themselves are Egor's: others see the budget they produce, not the figures behind it.
+    estimate_suggestion: isOwner ? effective.estimate_suggestion : null,
+    payslip_nets: isOwner ? effective.payslip_nets : {},
+  });
+});
+
+/** What you expect to take home for one month, until its payslip is uploaded. amount null clears it. */
+router.put("/living-budget/estimate", async (req, res) => {
+  const body = req.body as { month?: unknown; amount?: unknown };
+  const month = typeof body.month === "string" ? body.month.trim() : "";
+  const amount = body.amount === null ? null : Number(body.amount);
+  if (!/^\d{4}-\d{2}$/.test(month) || (amount !== null && !(Number.isFinite(amount) && amount > 0 && amount < 1_000_000))) {
+    res.status(400).json({ error: "month (YYYY-MM) and a positive amount are required" });
+    return;
+  }
+  const saved = await setMonthEstimate(month, amount === null ? null : Math.round(amount * 100) / 100);
+  const effective = await effectiveLivingBudget(householdNow(), (await loadPaceSettings()).cycle_day);
+  res.json({ saved: true, month_estimates: saved.month_estimates || [], month_bases: effective.month_bases });
 });
 
 router.put("/living-budget", async (req, res) => {
@@ -353,7 +380,7 @@ router.put("/living-budget", async (req, res) => {
     return;
   }
   const saved = await saveLivingBudget(segments, monthTopups, charges);
-  res.json({ saved: true, segments: saved.segments, month_topups: saved.month_topups || [] });
+  res.json({ saved: true, segments: saved.segments, month_topups: saved.month_topups || [], month_estimates: saved.month_estimates || [] });
 });
 
 router.get("/exclusions", async (_req, res) => {

@@ -100,6 +100,46 @@
       </article>
 
       <div class="bx-list-head">
+        <h3>{{ t("Budget by month") }}</h3>
+      </div>
+      <p class="bx-note lb-months-note">{{ t("Each month has its own salary: from its payslip once you upload it (it comes at the end of the month), until then what you expect.") }}</p>
+      <div class="bx-list">
+        <component
+          :is="canEditMonth(row) ? 'button' : 'div'"
+          v-for="row in monthRows"
+          :key="row.ym"
+          :type="canEditMonth(row) ? 'button' : undefined"
+          class="bx-row"
+          @click="canEditMonth(row) && openEstimate(row.ym)"
+        >
+          <span class="tx-row-icon" aria-hidden="true">{{ row.source === "payslip" ? "🧾" : row.source === "estimate" ? "🪙" : "🗓️" }}</span>
+          <span class="bx-row-body">
+            <span class="bx-row-top">
+              <span class="bx-row-name">{{ ymToLabel(row.ym) }}</span>
+              <span class="bx-row-amount">{{ formatIlsWhole(row.total) }}</span>
+            </span>
+            <span class="bx-row-meta">
+              <span>{{ t("Salary {amount}", { amount: formatIlsWhole(row.salary) }) }}</span>
+              <span class="bx-status" :class="`bx-status--${row.source === 'payslip' ? 'active' : row.source === 'estimate' ? 'upcoming' : 'ended'}`">
+                {{ row.source === "payslip" ? t("Payslip") : row.source === "estimate" ? t("Expected") : t("Plan") }}
+              </span>
+            </span>
+            <span v-if="row.estimateWas && row.source === 'payslip'" class="bx-row-meta">
+              <span>{{ t("Expected {was}, the payslip says {now}", { was: formatIlsWhole(row.estimateWas), now: formatIlsWhole(row.salary) }) }}</span>
+            </span>
+            <span v-if="row.payslipNet != null && row.source !== 'payslip'" class="bx-row-meta lb-compare">
+              <span>{{ t("Payslip: {amount} (budget has {was})", { amount: formatIlsWhole(row.payslipNet), was: formatIlsWhole(row.salary) }) }}</span>
+              <button v-if="!readonly" type="button" class="bx-pill" @click.stop="usePayslip(row)">{{ t("Use payslip") }}</button>
+            </span>
+          </span>
+          <span v-if="canEditMonth(row)" class="bx-chevron" aria-hidden="true">›</span>
+        </component>
+      </div>
+
+      <details class="bx-plan">
+        <summary>{{ t("Plan for months without a payslip") }}</summary>
+        <p class="bx-note">{{ t("Used for months that have neither a payslip nor your estimate: for example further ahead.") }}</p>
+      <div class="bx-list-head">
         <h3>{{ t("Budget periods") }}</h3>
         <button v-if="!readonly" type="button" class="bx-pill" :disabled="disabled" @click="addSegment">+ {{ t("New period") }}</button>
       </div>
@@ -136,6 +176,7 @@
           {{ showEndedBudget ? t("Hide ended periods ({n})", { n: endedSegments.length }) : t("Show ended periods ({n})", { n: endedSegments.length }) }}
         </button>
       </div>
+      </details>
     </template>
 
     <!-- Rarely used: a quiet link until there is at least one extra. -->
@@ -195,6 +236,16 @@
         {{ showPastTopups ? t("Hide past months ({n})", { n: pastTopupGroups.length }) : t("Show past months ({n})", { n: pastTopupGroups.length }) }}
       </button>
     </div>
+
+    <MonthEstimateSheet
+      :open="!readonly && !!estimateMonth"
+      :month="estimateMonth ?? nowYm"
+      :suggestion="estimateSuggestion"
+      :current="estimateRow?.source === 'estimate' ? estimateRow.salary : null"
+      :payslip-net="estimateMonth ? (payslipNets[estimateMonth] ?? null) : null"
+      @close="estimateMonth = null"
+      @saved="emit('estimateSaved', $event)"
+    />
 
     <SheetEditor
       :open="!readonly && !!editingSegment"
@@ -268,14 +319,22 @@ import SheetEditor from "@/shared/components/SheetEditor.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import { confirm } from "@/shared/composables/useConfirm";
 import { formatIls, formatIlsWhole } from "@/shared/utils/format";
+import MonthEstimateSheet from "@/features/household/components/MonthEstimateSheet.vue";
+import { saveMonthEstimate } from "@/shared/api/client";
+import { useAuthStore } from "@/shared/stores/auth";
 import { chargesForMonth, isMonthlyCharge } from "@/features/household/utils/fixedCharges";
 import type { ConfiguredCharge } from "@/features/household/utils/fixedCharges";
 import { capAdditionPeriodsForSegment } from "@/features/household/utils/budgetCapAdditions";
 import { calendarMonthsInSegment } from "@/features/household/utils/fatherInjection";
 import { compareMonthTopups, compareTemporalRanges, isArchivedTopupMonth } from "@/features/household/utils/householdUi";
 import {
+  type LivingBudgetMonthBase,
   type LivingBudgetMonthTopup,
   type LivingBudgetSegment,
+  applyMonthBases,
+  livingBudgetSegmentForMonth,
+  previousCalendarMonth,
+  nextCalendarMonth,
   currentYearMonth,
   isOngoingThrough,
   livingBudgetBaseForMonth,
@@ -299,6 +358,12 @@ const props = withDefaults(
     cardBills?: number;
     /** This cycle's plan (from "Bills on your card"): the real split, same as Spending. */
     cyclePlan?: BudgetPlan | null;
+    /** Months whose salary comes from a payslip or from what you expected. */
+    monthBases?: LivingBudgetMonthBase[];
+    /** Net pay by payslip month (only Egor gets it): for comparing with the budget. */
+    payslipNets?: Record<string, number>;
+    /** The last payslip's net, offered as the expected amount. */
+    estimateSuggestion?: number | null;
   }>(),
   {
     readonly: false,
@@ -309,13 +374,18 @@ const props = withDefaults(
     saveError: "",
     cardBills: 0,
     cyclePlan: null,
+    monthBases: () => [],
+    payslipNets: () => ({}),
+    estimateSuggestion: null,
   },
 );
 
 const emit = defineEmits<{
   save: [];
   editRecurringCharge: [chargeId: string, fromMonth: string];
+  estimateSaved: [message: string];
 }>();
+const auth = useAuthStore();
 
 const segments = defineModel<LivingBudgetSegment[]>("segments", { required: true });
 const monthTopups = defineModel<LivingBudgetMonthTopup[]>("monthTopups", { required: true });
@@ -347,6 +417,9 @@ async function requestSave(): Promise<boolean> {
 }
 
 const nowYm = computed(() => props.referenceYm ?? currentYearMonth());
+
+/** The periods with the payslip / expected months cut out: what the budget really is, month by month. */
+const displaySegments = computed(() => applyMonthBases(segments.value, props.monthBases));
 
 const indexedSegments = computed(() => segments.value.map((seg, index) => ({ seg, index })));
 
@@ -450,13 +523,13 @@ function representativeMonth(seg: LivingBudgetSegment): string {
 
 function segmentTotalCap(seg: LivingBudgetSegment): number {
   const ym = representativeMonth(seg);
-  return livingBudgetBaseForMonth(ym, segments.value, props.configuredCharges) ?? seg.amount;
+  return livingBudgetBaseForMonth(ym, displaySegments.value, props.configuredCharges) ?? seg.amount;
 }
 
 function segmentCapVaries(seg: LivingBudgetSegment): boolean {
   const months = calendarMonthsInSegment(seg.from_month, seg.through_month);
   const totals = new Set(
-    months.map((ym) => livingBudgetBaseForMonth(ym, segments.value, props.configuredCharges)),
+    months.map((ym) => livingBudgetBaseForMonth(ym, displaySegments.value, props.configuredCharges)),
   );
   return totals.size > 1;
 }
@@ -481,7 +554,12 @@ const sources = computed(() => {
   if (!head) return [];
   const ym = representativeMonth(head);
   const parts: { key: string; label: string; amount: number; edit?: () => void }[] = [
-    { key: "salary", label: "Salary after tax", amount: head.amount, edit: () => startEditSegment(head) },
+    {
+      key: "salary",
+      label: "Salary after tax",
+      amount: livingBudgetSegmentForMonth(ym, displaySegments.value)?.amount ?? head.amount,
+      edit: () => openEstimate(ym),
+    },
   ];
   for (const a of capAdditions(head)) {
     if (a.from_month > ym || ym > a.through_month) continue;
@@ -538,6 +616,75 @@ const billsPct = computed(() => {
   const total = head ? segmentTotalCap(head) : 0;
   return total > 0 ? Math.min(100, (monthlyBills.value / total) * 100) : 0;
 });
+
+interface MonthRow {
+  ym: string;
+  salary: number;
+  total: number;
+  source: "payslip" | "estimate" | "plan";
+  payslipNet: number | null;
+  estimateWas: number | null;
+}
+
+/** Last five months, this one and the next: each with where its salary comes from. */
+const monthRows = computed((): MonthRow[] => {
+  const months: string[] = [];
+  let ym = nowYm.value;
+  for (let i = 0; i < 5; i += 1) ym = previousCalendarMonth(ym);
+  for (let i = 0; i < 7; i += 1) {
+    months.push(ym);
+    ym = nextCalendarMonth(ym);
+  }
+  const rows: MonthRow[] = [];
+  for (const m of months) {
+    const total = livingBudgetBaseForMonth(m, displaySegments.value, props.configuredCharges);
+    const seg = livingBudgetSegmentForMonth(m, displaySegments.value);
+    if (total === null || !seg) continue;
+    const base = props.monthBases.find((b) => b.month === m);
+    rows.push({
+      ym: m,
+      salary: seg.amount,
+      total,
+      source: base ? base.source : "plan",
+      payslipNet: props.payslipNets[m] ?? null,
+      estimateWas: base?.estimate ?? null,
+    });
+  }
+  return rows.reverse();
+});
+
+const estimateMonth = ref<string | null>(null);
+const estimateRow = computed(() => monthRows.value.find((r) => r.ym === estimateMonth.value) ?? null);
+
+/** A month can be given an expected salary until its payslip is in. */
+function canEditMonth(row: MonthRow): boolean {
+  return !props.readonly && row.source !== "payslip";
+}
+
+function openEstimate(ym: string) {
+  if (!props.readonly) estimateMonth.value = ym;
+}
+
+/** Past month: take the payslip's net as that month's salary (it then follows the payslip). */
+async function usePayslip(row: MonthRow) {
+  if (row.payslipNet == null) return;
+  const ok = await confirm({
+    title: t("Use the payslip for {month}?", { month: ymToLabel(row.ym) }),
+    message: t("The salary of {month} changes from {was} to {now}. Extras you added for that month stay.", {
+      month: ymToLabel(row.ym),
+      was: formatIlsWhole(row.salary),
+      now: formatIlsWhole(row.payslipNet),
+    }),
+    confirmLabel: t("Use payslip"),
+  });
+  if (!ok) return;
+  try {
+    await saveMonthEstimate(row.ym, row.payslipNet, auth.token || undefined);
+    emit("estimateSaved", t("Saved the expected budget"));
+  } catch (e) {
+    emit("estimateSaved", e instanceof Error ? e.message : String(e));
+  }
+}
 
 function topupRowKey(topup: LivingBudgetMonthTopup, index: number): string {
   if (editingTopup.value === topup) return `topup-editing-${index}`;

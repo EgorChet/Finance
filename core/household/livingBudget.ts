@@ -35,9 +35,30 @@ export interface LivingBudgetMonthTopup {
   note?: string;
 }
 
+/**
+ * What you expect to take home for a month, said before the payslip is there (it comes at the very end
+ * of the cycle). Until the payslip is uploaded the month's budget uses this; then the payslip wins.
+ */
+export interface LivingBudgetMonthEstimate {
+  month: string;
+  amount: number;
+}
+
+export type LivingBudgetMonthBaseSource = "payslip" | "estimate";
+
+/** The salary part of one month's budget when it is not simply the period's amount. */
+export interface LivingBudgetMonthBase {
+  month: string;
+  amount: number;
+  source: LivingBudgetMonthBaseSource;
+  /** The expected amount that the payslip replaced, when there was one. */
+  estimate?: number;
+}
+
 export interface LivingBudgetData {
   segments: LivingBudgetSegment[];
   month_topups?: LivingBudgetMonthTopup[];
+  month_estimates?: LivingBudgetMonthEstimate[];
 }
 
 export function normalizeLivingBudgetSegment(segment: LivingBudgetSegment): LivingBudgetSegment {
@@ -108,6 +129,65 @@ export function livingBudgetSegmentForMonth(
   segments: LivingBudgetSegment[],
 ): LivingBudgetSegment | null {
   return segments.find((s) => s.from_month <= ym && ym <= s.through_month) ?? null;
+}
+
+/** Next calendar month as YYYY-MM. */
+export function nextCalendarMonth(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return m >= 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
+/**
+ * The month-by-month salary: a payslip replaces an estimate, and counts by itself from the month the
+ * cycle is in now onwards. A past month without an estimate keeps its period amount: the payslip's net
+ * can include pay that was added to the budget as an extra by hand, so past months are changed only
+ * when you confirm it (which is done by giving that month an estimate).
+ */
+export function resolveMonthBases(opts: {
+  estimates: LivingBudgetMonthEstimate[];
+  /** Net pay by payslip month ("2026-10" → 12345.67). */
+  payslipNets: Record<string, number>;
+  /** The month the open cycle belongs to. */
+  currentMonth: string;
+}): LivingBudgetMonthBase[] {
+  const out = new Map<string, LivingBudgetMonthBase>();
+  for (const e of opts.estimates) {
+    if (/^\d{4}-\d{2}$/.test(e.month) && e.amount > 0) out.set(e.month, { month: e.month, amount: roundMoney(e.amount), source: "estimate" });
+  }
+  for (const [month, net] of Object.entries(opts.payslipNets)) {
+    if (!(net > 0)) continue;
+    const estimate = out.get(month);
+    if (month >= opts.currentMonth || estimate) {
+      out.set(month, { month, amount: roundMoney(net), source: "payslip", ...(estimate ? { estimate: estimate.amount } : {}) });
+    }
+  }
+  return [...out.values()].sort((a, b) => a.month.localeCompare(b.month));
+}
+
+/** The periods with those months cut out and given their own amount. */
+export function applyMonthBases(segments: LivingBudgetSegment[], bases: LivingBudgetMonthBase[]): LivingBudgetSegment[] {
+  if (!bases.length) return segments;
+  const byMonth = new Map(bases.map((b) => [b.month, b.amount]));
+  const out: LivingBudgetSegment[] = [];
+  for (const seg of segments) {
+    const inside = [...byMonth.keys()].filter((m) => seg.from_month <= m && m <= seg.through_month).sort();
+    if (!inside.length) {
+      out.push(seg);
+      continue;
+    }
+    let from = seg.from_month;
+    for (const m of inside) {
+      const before = previousCalendarMonth(m);
+      if (from <= before) out.push({ amount: seg.amount, from_month: from, through_month: before });
+      out.push({ amount: byMonth.get(m)!, from_month: m, through_month: m });
+      from = nextCalendarMonth(m);
+    }
+    if (from <= seg.through_month) out.push({ amount: seg.amount, from_month: from, through_month: seg.through_month });
+  }
+  for (const [m, amount] of byMonth) {
+    if (!out.some((s) => s.from_month <= m && m <= s.through_month)) out.push({ amount, from_month: m, through_month: m });
+  }
+  return out.sort((a, b) => a.from_month.localeCompare(b.from_month));
 }
 
 /** Previous calendar month as YYYY-MM. */
@@ -198,6 +278,7 @@ export function serializeLivingBudget(data: LivingBudgetData): string {
     month_topups: (data.month_topups || [])
       .map(normalizeLivingBudgetMonthTopup)
       .sort((a, b) => a.month.localeCompare(b.month)),
+    month_estimates: (data.month_estimates || []).slice().sort((a, b) => a.month.localeCompare(b.month)),
   });
 }
 
