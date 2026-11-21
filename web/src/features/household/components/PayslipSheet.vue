@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="!!payslip" :title="monthTitle" @close="emit('close')">
+  <BottomSheet :open="!!payslip" :title="monthTitle" wide @close="emit('close')">
     <template #head>
       <div class="ps-head">
         <h3 class="bs-title">{{ monthTitle }}</h3>
@@ -327,5 +327,23 @@ function leaveMeta(l: PayslipLeave): string {
   padding-left: 0;
   text-align: left;
   white-space: normal;
+}
+@media (min-width: 1024px) {
+  .ps {
+    grid-template-columns: 300px minmax(0, 1fr);
+    column-gap: 2rem;
+    row-gap: 0;
+  }
+  .ps > * {
+    grid-column: 2;
+    margin-bottom: 1.25rem;
+  }
+  .ps > .ps-hero {
+    grid-column: 1;
+    grid-row: 1 / span 12;
+    align-self: start;
+    position: sticky;
+    top: 0;
+  }
 }
 </style>

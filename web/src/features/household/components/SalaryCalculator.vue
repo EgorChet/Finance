@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" :title="t('Salary calculator')" @close="emit('close')">
+  <BottomSheet :open="open" :title="t('Salary calculator')" wide @close="emit('close')">
     <template #head>
       <div class="sal-head">
         <h3 class="bs-title">{{ t("Salary calculator") }}</h3>
@@ -67,7 +67,21 @@
 
       <details ref="details" class="sal-details">
         <summary>{{ t("Your details") }}</summary>
-        <div class="sal-fields">
+        <div v-if="!editing" class="sal-view">
+          <ul class="sal-rows">
+            <li v-for="row in summaryRows" :key="row.label" class="sal-row">
+              <span>{{ t(row.label) }}</span><strong>{{ row.value }}</strong>
+            </li>
+          </ul>
+          <p class="sal-note">{{ ratesFromPayslip ? t("Rates as your payslip applies them.") : t("Usual rates; fill from your payslip for yours.") }}</p>
+          <div class="sal-view-actions">
+            <button type="button" class="btn btn-sm" @click="editing = true">✎ {{ t("Edit") }}</button>
+            <button v-if="latest" type="button" class="btn btn-sm" @click="fillFromPayslip">
+              🧾 {{ t("Restore the numbers from the payslip") }} · {{ latestMonth }}
+            </button>
+          </div>
+        </div>
+        <div v-else class="sal-fields">
           <SheetAmountInput v-model="state.benefits" label="Taxable perks, not paid in cash (meals…)" />
           <SheetAmountInput
             v-model="state.pensionBase"
@@ -86,7 +100,6 @@
               <input v-model.number="state[f.key]" class="input" type="number" inputmode="decimal" step="0.01" min="0" max="30" />
             </label>
           </div>
-          <p class="sal-note">{{ ratesFromPayslip ? t("Rates as your payslip applies them.") : t("Usual rates; fill from your payslip for yours.") }}</p>
           <label class="sheet-field">
             <span class="sheet-field__label">{{ t("Credit points") }}</span>
             <input v-model.number="state.creditPoints" class="input" type="number" inputmode="decimal" step="0.25" min="0" />
@@ -103,9 +116,12 @@
             :hint="t('Both are in the cumulative columns of your last payslip.')"
           />
           <p v-if="ytdIncomplete" class="sal-warn">{{ t("Fill in the taxable income too, or set the months to 0: until then the year is ignored.") }}</p>
-          <button v-if="latest" type="button" class="btn btn-sm sal-fill" @click="fillFromPayslip">
-            🧾 {{ t("Restore the numbers from the payslip") }} · {{ latestMonth }}
-          </button>
+          <div class="sal-view-actions">
+            <button type="button" class="btn btn-sm btn-primary" @click="editing = false">{{ t("Done") }}</button>
+            <button v-if="latest" type="button" class="btn btn-sm" @click="fillFromPayslip">
+              🧾 {{ t("Restore the numbers from the payslip") }} · {{ latestMonth }}
+            </button>
+          </div>
         </div>
       </details>
 
@@ -221,6 +237,8 @@ watch(
 
 const auth = useAuthStore();
 const details = ref<HTMLDetailsElement | null>(null);
+// The details open read-only; the fields appear only after "Edit", so a stray tap cannot wipe a number.
+const editing = ref(false);
 const latest = ref<Payslip | null>(null);
 const filled = ref(false);
 let payslipsTried = false;
@@ -309,8 +327,22 @@ const rows = computed(() => {
     { key: "health", label: t("Health tax"), amount: r.healthTax },
     { key: "pension", label: t("Pension (you)"), amount: r.pension },
   ];
-  if (r.studyFund > 0) list.push({ key: "study", label: t("Study fund (you)"), amount: r.studyFund });
+  if (r.studyFund > 0 || state.studyFundBase > 0) list.push({ key: "study", label: t("Study fund (you)"), amount: r.studyFund });
   return list;
+});
+
+const summaryRows = computed(() => {
+  const money = (x: number) => (x > 0 ? formatIlsWhole(x) : "—");
+  return [
+    { label: "Taxable perks, not paid in cash (meals…)", value: money(state.benefits) },
+    { label: "Salary the pension is based on", value: state.pensionBase > 0 ? formatIlsWhole(state.pensionBase) : t("same as gross pay") },
+    { label: "Salary the study fund is based on", value: money(state.studyFundBase) },
+    ...rateFields.map((f) => ({ label: f.label, value: `${state[f.key]}%` })),
+    { label: "Credit points", value: String(state.creditPoints) },
+    { label: "Months already paid this year", value: state.ytdMonths > 0 ? String(state.ytdMonths) : "—" },
+    { label: "Taxable income so far", value: money(state.ytdTaxable) },
+    { label: "Income tax withheld so far", value: money(state.ytdTax) },
+  ];
 });
 
 type PctKey = "pensionEmployeePct" | "pensionEmployerPct" | "severancePct" | "studyFundEmployeePct" | "studyFundEmployerPct";
@@ -453,6 +485,12 @@ const keepOfThousand = computed(() => {
 .sal-fields :deep(.sheet-amount__input) {
   font-size: 1.15rem;
 }
+.sal-view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
 .sal-fill {
   justify-self: start;
 }
@@ -520,5 +558,24 @@ const keepOfThousand = computed(() => {
   margin: 0;
   font-size: 0.78rem;
   color: var(--text-faint);
+}
+@media (min-width: 1024px) {
+  .sal {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 2rem;
+    row-gap: 0;
+  }
+  .sal > * {
+    grid-column: 1;
+    margin-bottom: 1rem;
+  }
+  .sal > .sal-result {
+    grid-column: 2;
+    grid-row: 1 / span 12;
+    align-self: start;
+    position: sticky;
+    top: 0;
+    margin-bottom: 0;
+  }
 }
 </style>
