@@ -29,13 +29,16 @@
             </span>
             <span class="sv-meta">
               <span>{{ r.sub }}</span>
-              <span class="sv-pct">{{ r.pct }}%</span>
+              <span class="sv-end">
+                <span v-if="r.change != null" class="sv-change" :class="r.change < 0 ? 'is-down' : 'is-up'">{{ changeLabel(r.change) }}</span>
+                <span class="sv-pct">{{ r.pct }}%</span>
+              </span>
             </span>
           </span>
         </li>
       </ul>
 
-      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate.')" />
+      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate. The crypto change is the price change since 1 January, not your own return.')" />
     </template>
   </section>
 </template>
@@ -112,7 +115,13 @@ interface Row {
   color: string;
   icon?: "pension" | "pitzuim" | "study" | "stocks";
   logo?: string;
+  /** Price change since 1 January, in percent. Only where the app knows the starting price. */
+  change?: number;
 }
+
+/** "+12,5% с нач. года" / "−40,4% с нач. года" */
+const changeLabel = (pct: number) =>
+  `${pct < 0 ? "−" : "+"}${Math.abs(pct).toLocaleString(dateTag(), { maximumFractionDigits: 1 })}% ${t("YTD").toLowerCase()}`;
 
 const card = computed(() => {
   const list = props.payslips;
@@ -141,7 +150,8 @@ const card = computed(() => {
       sub: `${t("You")} ${formatIlsWhole(f.studyFundEmployee)} · ${t("Employer")} ${formatIlsWhole(f.studyFundEmployer)}` });
   }
   if (kasUsd > 0 && rate > 0) {
-    rows.push({ key: "kaspa", label: t("Crypto (Kaspa)"), ils: kasUsd * rate, color: "#49eacb", logo: kaspaLogo, sub: formatUsd(kasUsd, 0) });
+    rows.push({ key: "kaspa", label: t("Crypto (Kaspa)"), ils: kasUsd * rate, color: "#49eacb", logo: kaspaLogo, sub: formatUsd(kasUsd, 0),
+      change: kaspaQuote.value?.year_change_pct });
   }
   if (fxcnUsd > 0 && rate > 0) {
     rows.push({ key: "fxcn", label: t("Stocks (FXCN)"), ils: fxcnUsd * rate, color: "#4fc3ff", icon: "stocks", sub: formatUsd(fxcnUsd, 0) });
@@ -258,6 +268,21 @@ const card = computed(() => {
 .sv-meta {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+.sv-end {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.sv-change {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.sv-change.is-up {
+  color: var(--success);
+}
+.sv-change.is-down {
+  color: var(--danger);
 }
 .sv-pct {
   font-variant-numeric: tabular-nums;

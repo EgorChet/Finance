@@ -299,6 +299,8 @@ export type KaspaQuote = {
   updated_at: string;
   source: string;
   stale?: boolean;
+  year_open_usdt?: number;
+  year_change_pct?: number;
 };
 
 export async function fetchKaspaQuote(demo: boolean, token?: string, force = false) {

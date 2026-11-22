@@ -54,7 +54,7 @@ export const RU: Record<string, string> = {
   "Pension, pitzuim and study fund": "Пенсия, пицуим и керен",
   "Crypto (Kaspa)": "Крипта (Kaspa)",
   "Stocks (FXCN)": "Акции (FXCN)",
-  "Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today's price and dollar rate.": "Фонды — это сумма взносов по загруженным расчётным листам, а не остаток на счёте: доходность, комиссии и то, что было отложено до первого листа, сюда не входят. Крипта и акции оценены по сегодняшней цене и курсу доллара.",
+  "Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today's price and dollar rate. The crypto change is the price change since 1 January, not your own return.": "Фонды — это сумма взносов по загруженным расчётным листам, а не остаток на счёте: доходность, комиссии и то, что было отложено до первого листа, сюда не входят. Крипта и акции оценены по сегодняшней цене и курсу доллара. Изменение крипты — это рост или падение цены с 1 января, а не ваша личная доходность.",
   "{n} {n|payslip|payslips}": "{n} {n|расчётный лист|расчётных листа|расчётных листов}",
   "Funds in detail": "Фонды подробнее",
   "Other months ({n})": "Другие месяцы ({n})",
