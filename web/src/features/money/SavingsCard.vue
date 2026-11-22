@@ -43,6 +43,7 @@
                 <span class="sv-pct">{{ r.pct }}%</span>
               </span>
             </span>
+            <span v-if="r.note" class="sv-note">{{ r.note }}</span>
           </span>
         </li>
       </ul>
@@ -152,9 +153,21 @@ interface Row {
   logo?: string;
   /** Price change since 1 January, in percent. Only where the app knows the starting price. */
   change?: number;
+  /** A line under the row, e.g. that the price is frozen. */
+  note?: string;
 }
 
 /** "+12,5% с нач. года" / "−40,4% за всё время" */
+/** A fund whose latest price is older than this has stopped publishing: its price is frozen, not live. */
+const FROZEN_AFTER_DAYS = 10;
+const frozenNote = (navDate?: string) => {
+  if (!navDate) return undefined;
+  const day = new Date(`${navDate}T00:00:00`);
+  if (Number.isNaN(day.getTime()) || Date.now() - day.getTime() < FROZEN_AFTER_DAYS * 86_400_000) return undefined;
+  const date = day.toLocaleDateString(dateTag(), { day: "numeric", month: "long" });
+  return t("frozen · price on {date}", { date });
+};
+
 const changeLabel = (pct: number) =>
   `${pct < 0 ? "−" : "+"}${Math.abs(pct).toLocaleString(dateTag(), { maximumFractionDigits: 1 })}% ${(period.value === "all" ? t("All time") : t("YTD")).toLowerCase()}`;
 
@@ -190,7 +203,8 @@ const card = computed(() => {
   }
   if (fxcnUsd > 0 && rate > 0) {
     rows.push({ key: "fxcn", label: t("Stocks (FXCN)"), ils: fxcnUsd * rate, color: "#4fc3ff", icon: "stocks", sub: formatUsd(fxcnUsd, 0),
-      change: period.value === "all" ? fxcnQuote.value?.all_time_pct : fxcnQuote.value?.year_change_pct });
+      change: period.value === "all" ? fxcnQuote.value?.all_time_pct : fxcnQuote.value?.year_change_pct,
+      note: frozenNote(fxcnQuote.value?.nav_date) });
   }
   const totalIls = rows.reduce((s, r) => s + r.ils, 0);
   if (totalIls <= 0) return null;
@@ -336,6 +350,12 @@ const card = computed(() => {
 .sv-meta {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+.sv-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-faint);
 }
 .sv-seg {
   margin: 0;

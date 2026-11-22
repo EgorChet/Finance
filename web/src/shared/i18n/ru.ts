@@ -494,6 +494,7 @@ export const RU: Record<string, string> = {
   "Put aside this year": "Отложено в этом году",
   "Price change this year": "Изменение цен в этом году",
   "Total this year": "Итого за год",
+  "frozen · price on {date}": "заморожен · цена на {date}",
   "YTD": "С нач. года",
   "12M": "12 мес.",
   "ALL": "ВСЁ",

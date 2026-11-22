@@ -84,3 +84,17 @@ describe("FXCN NAV at the start of the year", () => {
     assert.equal(pickYearStartNav([{ date: "2025-12-31", value: 0 }, { date: "2025-12-30" }], 2026), null);
   });
 });
+
+describe("Date of the latest FXCN NAV", () => {
+  it("is the newest valid point, so a fund that stopped publishing shows its last day", async () => {
+    const { latestNavDate } = await import("../src/services/fxcnQuote.js");
+    const points = [
+      { date: "2026-08-28", value: 38.16 },
+      { date: "2026-08-27", value: 38.4 },
+      { date: "2026-09-01", value: 0 },
+      { date: "2026-09-02" },
+    ];
+    assert.equal(latestNavDate(points), "2026-08-28");
+    assert.equal(latestNavDate([]), null);
+  });
+});

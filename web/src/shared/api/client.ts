@@ -320,6 +320,7 @@ export type FxcnQuote = {
   all_time_pct?: number;
   year_open_nav_usd?: number;
   year_change_pct?: number;
+  nav_date?: string;
 };
 
 export async function fetchFxcnQuote(demo: boolean, token?: string, force = false) {

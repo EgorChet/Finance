@@ -63,6 +63,8 @@ export type FxcnQuote = {
   /** NAV at the end of last year, and the change since then in percent. Absent when unknown. */
   year_open_nav_usd?: number;
   year_change_pct?: number;
+  /** Date (YYYY-MM-DD) of the latest NAV the fund published: old when the fund has stopped trading. */
+  nav_date?: string;
 };
 
 async function fetchFromFinex(): Promise<number | null> {
@@ -115,33 +117,47 @@ async function finexQuery<T>(query: string, variables?: Record<string, unknown>)
   return ((await res.json()) as { data?: T }).data ?? null;
 }
 
-export async function fetchYearStartNav(year: number): Promise<number | null> {
+/** Date of the newest valid NAV point (YYYY-MM-DD), or null. The fund may have stopped publishing. */
+export function latestNavDate(points: NavPoint[]): string | null {
+  let best: string | null = null;
+  for (const p of points) {
+    if (typeof p.date !== "string" || typeof p.value !== "number" || !(p.value > 0)) continue;
+    if (!best || p.date > best) best = p.date;
+  }
+  return best;
+}
+
+async function fetchNavHistory(): Promise<NavPoint[] | null> {
   const ids = await finexQuery<{ fonds?: { edges?: { node?: { id?: string; ticker?: string } | null }[] } }>(ID_QUERY);
   const id = ids?.fonds?.edges?.map((e) => e.node).find((n) => n?.ticker === FINEX_TICKER)?.id;
   if (!id) return null;
   const hist = await finexQuery<{ fond?: { fondhistorySet?: { edges?: { node?: NavPoint | null }[] } } }>(HISTORY_QUERY, { id });
-  const points = (hist?.fond?.fondhistorySet?.edges ?? []).map((e) => e.node).filter((n): n is NavPoint => !!n);
-  return pickYearStartNav(points, year);
+  const edges = hist?.fond?.fondhistorySet?.edges;
+  if (!edges) return null;
+  return edges.map((e) => e.node).filter((n): n is NavPoint => !!n);
 }
 
-let yearStartCache: { year: number; nav: number } | null = null;
-let yearStartFailedAt = 0;
+type HistoryInfo = { year: number; fetchedAt: number; yearStartNav: number | null; latestDate: string | null };
+let historyCache: HistoryInfo | null = null;
+let historyFailedAt = 0;
 
-async function loadYearStartNav(now: number): Promise<number | null> {
+/** Start-of-year NAV and the date of the latest NAV, read together from the fund history (cached like the quote). */
+async function loadHistoryInfo(now: number): Promise<HistoryInfo | null> {
   const year = new Date(now).getUTCFullYear();
-  if (yearStartCache?.year === year) return yearStartCache.nav;
-  if (now - yearStartFailedAt < YEAR_START_RETRY_MS) return null;
-  try {
-    const nav = await fetchYearStartNav(year);
-    if (nav != null) {
-      yearStartCache = { year, nav };
-      return nav;
+  if (historyCache?.year === year && now - historyCache.fetchedAt < CACHE_MS) return historyCache;
+  if (now - historyFailedAt >= YEAR_START_RETRY_MS) {
+    try {
+      const points = await fetchNavHistory();
+      if (points) {
+        historyCache = { year, fetchedAt: now, yearStartNav: pickYearStartNav(points, year), latestDate: latestNavDate(points) };
+        return historyCache;
+      }
+    } catch {
+      /* no history: the quote simply has no year change */
     }
-  } catch {
-    /* no history: the quote simply has no year change */
+    historyFailedAt = now;
   }
-  yearStartFailedAt = now;
-  return null;
+  return historyCache?.year === year ? historyCache : null; // an older answer of this year beats none
 }
 
 async function persistNav(navUsd: number, source: string): Promise<void> {
@@ -225,10 +241,11 @@ export async function getFxcnQuote(options?: { force?: boolean }): Promise<FxcnQ
   }
 
   const quote = quoteFromCache(cached, now - cached.fetchedAt > CACHE_MS);
-  const open = await loadYearStartNav(now);
-  if (open != null) {
-    quote.year_open_nav_usd = roundNav(open);
-    quote.year_change_pct = percentChange(open, quote.nav_usd);
+  const info = await loadHistoryInfo(now);
+  if (info?.yearStartNav != null) {
+    quote.year_open_nav_usd = roundNav(info.yearStartNav);
+    quote.year_change_pct = percentChange(info.yearStartNav, quote.nav_usd);
   }
+  if (info?.latestDate) quote.nav_date = info.latestDate;
   return quote;
 }
