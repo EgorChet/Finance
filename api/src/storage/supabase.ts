@@ -9,6 +9,7 @@ import type {
   FxFallbackData,
   KaspaPriceCache,
   FxcnPriceCache,
+  InvestmentsData,
   LivingBudgetData,
   MerchantRules,
   PayslipsData,
@@ -273,6 +274,30 @@ export async function writeKaspaPriceCache(data: KaspaPriceCache): Promise<void>
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ id: "kaspa_price", data }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase write failed (${res.status}): ${text}`);
+  }
+}
+
+export async function readInvestments(): Promise<InvestmentsData> {
+  if (!supabaseConfigured()) return local.readInvestments();
+  const res = await supabaseFetch("app_state?id=eq.investments&select=data");
+  if (!res.ok) return {};
+  const rows = (await res.json()) as { data: InvestmentsData }[];
+  return rows[0]?.data ?? {};
+}
+
+export async function writeInvestments(data: InvestmentsData): Promise<void> {
+  if (!supabaseConfigured()) {
+    await local.writeInvestments(data);
+    return;
+  }
+  const res = await supabaseFetch("app_state", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: "investments", data }),
   });
   if (!res.ok) {
     const text = await res.text();

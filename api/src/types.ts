@@ -214,6 +214,12 @@ export interface KaspaPriceCache {
   source?: string;
 }
 
+/** What the owner put in, in USD. Private: stored in the database, never in the repository. */
+export interface InvestmentsData {
+  kaspa_usd?: number;
+  fxcn_usd?: number;
+}
+
 export interface FxcnPriceCache {
   updated_at: string;
   nav_usd: number;

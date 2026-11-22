@@ -1,6 +1,6 @@
 /** Kaspa spot price in USDT. MEXC KASUSDT primary; CoinPaprika fallback; stale cache on errors. */
 import { readKaspaPriceCache, writeKaspaPriceCache } from "../storage/index.js";
-import { allTimePct, investedUsd, percentChange } from "./investment.js";
+import { percentChange } from "./investment.js";
 
 const MEXC_API = "https://api.mexc.com/api/v3/ticker/price";
 const MEXC_KLINES = "https://api.mexc.com/api/v3/klines";
@@ -43,7 +43,7 @@ export type KaspaQuote = {
   /** Price on 1 January (UTC) of this year, and the price change since then in percent. Absent when unknown. */
   year_open_usdt?: number;
   year_change_pct?: number;
-  /** Change of the whole holding against the amount invested (server setting KAS_INVESTED_USD), in percent. */
+  /** Change of the whole holding against the amount invested, in percent. Added by the route, for the owner only. */
   all_time_pct?: number;
 };
 
@@ -175,7 +175,6 @@ function quoteFromCache(cached: MemoryCache, stale: boolean): KaspaQuote {
     updated_at: new Date(cached.fetchedAt).toISOString(),
     source: cached.source,
     stale: stale || undefined,
-    all_time_pct: allTimePct(roundMoney(balance * price), investedUsd("KAS_INVESTED_USD")),
   };
 }
 
