@@ -1,5 +1,6 @@
 /** FXCN NAV from FinEx GraphQL (same data as finex-etf.ru/calc/nav). */
 import { readFxcnPriceCache, writeFxcnPriceCache } from "../storage/index.js";
+import { percentChange } from "./investment.js";
 
 const FINEX_GRAPHQL = "https://api.finex-etf.ru/graphql/";
 const FINEX_TICKER = "FXCN";
@@ -20,6 +21,14 @@ const NAV_QUERY = `
     }
   }
 `;
+
+const ID_QUERY = `query FxcnId { fonds(first: 100) { edges { node { id ticker } } } }`;
+const HISTORY_QUERY = `
+  query FxcnHistory($id: ID!) {
+    fond(id: $id) { fondhistorySet(last: 400) { edges { node { date value } } } }
+  }
+`;
+const YEAR_START_RETRY_MS = 3_600_000;
 
 type MemoryCache = { navUsd: number; fetchedAt: number; source: string };
 
@@ -51,6 +60,9 @@ export type FxcnQuote = {
   stale?: boolean;
   /** Change of the whole holding against the amount invested, in percent. Added by the route, for the owner only. */
   all_time_pct?: number;
+  /** NAV at the end of last year, and the change since then in percent. Absent when unknown. */
+  year_open_nav_usd?: number;
+  year_change_pct?: number;
 };
 
 async function fetchFromFinex(): Promise<number | null> {
@@ -77,6 +89,59 @@ async function fetchFromFinex(): Promise<number | null> {
   const nav = node?.navPerShare;
   if (nav == null || !Number.isFinite(nav) || nav <= 0) return null;
   return nav;
+}
+
+type NavPoint = { date?: string; value?: number };
+
+/** The last published NAV dated before 1 January of `year` (the close of the year before); null when none. */
+export function pickYearStartNav(points: NavPoint[], year: number): number | null {
+  const limit = `${year}-01-01`;
+  let best: NavPoint | null = null;
+  for (const p of points) {
+    if (typeof p.date !== "string" || p.date >= limit) continue;
+    if (typeof p.value !== "number" || !Number.isFinite(p.value) || p.value <= 0) continue;
+    if (!best || p.date > (best.date as string)) best = p;
+  }
+  return best ? (best.value as number) : null;
+}
+
+async function finexQuery<T>(query: string, variables?: Record<string, unknown>): Promise<T | null> {
+  const res = await fetch(FINEX_GRAPHQL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "User-Agent": USER_AGENT },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as { data?: T }).data ?? null;
+}
+
+export async function fetchYearStartNav(year: number): Promise<number | null> {
+  const ids = await finexQuery<{ fonds?: { edges?: { node?: { id?: string; ticker?: string } | null }[] } }>(ID_QUERY);
+  const id = ids?.fonds?.edges?.map((e) => e.node).find((n) => n?.ticker === FINEX_TICKER)?.id;
+  if (!id) return null;
+  const hist = await finexQuery<{ fond?: { fondhistorySet?: { edges?: { node?: NavPoint | null }[] } } }>(HISTORY_QUERY, { id });
+  const points = (hist?.fond?.fondhistorySet?.edges ?? []).map((e) => e.node).filter((n): n is NavPoint => !!n);
+  return pickYearStartNav(points, year);
+}
+
+let yearStartCache: { year: number; nav: number } | null = null;
+let yearStartFailedAt = 0;
+
+async function loadYearStartNav(now: number): Promise<number | null> {
+  const year = new Date(now).getUTCFullYear();
+  if (yearStartCache?.year === year) return yearStartCache.nav;
+  if (now - yearStartFailedAt < YEAR_START_RETRY_MS) return null;
+  try {
+    const nav = await fetchYearStartNav(year);
+    if (nav != null) {
+      yearStartCache = { year, nav };
+      return nav;
+    }
+  } catch {
+    /* no history: the quote simply has no year change */
+  }
+  yearStartFailedAt = now;
+  return null;
 }
 
 async function persistNav(navUsd: number, source: string): Promise<void> {
@@ -159,5 +224,11 @@ export async function getFxcnQuote(options?: { force?: boolean }): Promise<FxcnQ
     throw new Error("FXCN NAV unavailable");
   }
 
-  return quoteFromCache(cached, now - cached.fetchedAt > CACHE_MS);
+  const quote = quoteFromCache(cached, now - cached.fetchedAt > CACHE_MS);
+  const open = await loadYearStartNav(now);
+  if (open != null) {
+    quote.year_open_nav_usd = roundNav(open);
+    quote.year_change_pct = percentChange(open, quote.nav_usd);
+  }
+  return quote;
 }

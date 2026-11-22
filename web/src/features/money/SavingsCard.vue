@@ -7,7 +7,11 @@
       <article class="sv-hero">
         <p class="sv-label">{{ t("Savings in total") }}</p>
         <p class="sv-big">{{ formatIlsWhole(card.totalIls) }}</p>
-        <p v-if="card.yearTotal > 0" class="sv-chip">{{ t("This year") }} +{{ formatIlsWhole(card.yearTotal) }}</p>
+        <div v-if="card.yearTotal > 0 || card.marketIls != null" class="sv-chips">
+          <p v-if="card.yearTotal > 0" class="sv-chip">{{ t("Put aside this year") }} +{{ formatIlsWhole(card.yearTotal) }}</p>
+          <p v-if="card.marketIls != null" class="sv-chip" :class="card.marketIls < 0 ? 'is-down' : ''">{{ t("Price change this year") }} {{ signedIls(card.marketIls) }}</p>
+        </div>
+        <p v-if="card.totalYearIls != null" class="sv-sub sv-year-total">{{ t("Total this year") }}: <strong>{{ signedIls(card.totalYearIls) }}</strong></p>
         <p v-if="card.fundsNote" class="sv-sub">{{ card.fundsNote }}</p>
         <p v-if="card.partial" class="sv-sub">{{ t("Without crypto and stocks: no dollar rate yet") }}</p>
 
@@ -43,7 +47,7 @@
         </li>
       </ul>
 
-      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate. The change since 1 January is the price change, not your own return; the all-time change compares the value with the amount put in.')" />
+      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate. The change since 1 January is the price change, not your own return; the all-time change compares the value with the amount put in. The price change in shekels assumes the same amount of crypto and FXCN since 1 January and uses the dollar rate of that day.')" />
     </template>
   </section>
 </template>
@@ -103,7 +107,31 @@ onMounted(async () => {
   }
 });
 
-const settled = computed(() => props.payslipsReady && quotesReady.value && rateChecked.value && !retrying.value);
+/** The dollar rate on the last day of last year: the start of the year is priced the way the total is. */
+const startRate = ref(0);
+const startRateChecked = ref(false);
+watch(
+  quotesReady,
+  async (ready) => {
+    if (!ready || startRateChecked.value) return;
+    try {
+      const res = await fetch(`https://api.frankfurter.dev/v1/${new Date().getFullYear() - 1}-12-31?base=USD&symbols=ILS`);
+      const rate = ((await res.json()) as { rates?: { ILS?: number } }).rates?.ILS;
+      if (typeof rate === "number" && rate > 0) startRate.value = rate;
+    } catch {
+      /* no start rate: the price change in shekels is simply not shown */
+    } finally {
+      startRateChecked.value = true;
+    }
+  },
+  { immediate: true },
+);
+
+const settled = computed(
+  () => props.payslipsReady && quotesReady.value && rateChecked.value && startRateChecked.value && !retrying.value,
+);
+
+const signedIls = (v: number) => `${v < 0 ? "−" : "+"}${formatIlsWhole(Math.abs(v))}`;
 
 /** "since" needs the genitive in Russian ("с января 2025"), so take the month from a full date and drop the day. */
 const monthLabel = (p: Payslip) => {
@@ -162,16 +190,34 @@ const card = computed(() => {
   }
   if (fxcnUsd > 0 && rate > 0) {
     rows.push({ key: "fxcn", label: t("Stocks (FXCN)"), ils: fxcnUsd * rate, color: "#4fc3ff", icon: "stocks", sub: formatUsd(fxcnUsd, 0),
-      change: period.value === "all" ? fxcnQuote.value?.all_time_pct : undefined });
+      change: period.value === "all" ? fxcnQuote.value?.all_time_pct : fxcnQuote.value?.year_change_pct });
   }
   const totalIls = rows.reduce((s, r) => s + r.ils, 0);
   if (totalIls <= 0) return null;
+
+  // Price change this year in shekels: the holdings now against the same holdings at last year's close,
+  // each at its own dollar rate. Shown only when every holding has its start price: a half count is a wrong count.
+  const kq = kaspaQuote.value;
+  const fq = fxcnQuote.value;
+  const kasStart = kq?.year_open_usdt != null ? kq.balance_kas * kq.year_open_usdt : null;
+  const fxStart = fq?.year_open_nav_usd != null ? fq.lots * fq.year_open_nav_usd : null;
+  const hasKas = kasUsd > 0;
+  const hasFx = fxcnUsd > 0;
+  const startsKnown = (hasKas || hasFx) && (!hasKas || kasStart != null) && (!hasFx || fxStart != null) && rate > 0 && startRate.value > 0;
+  const marketIls = startsKnown
+    ? (kasUsd + fxcnUsd) * rate - ((hasKas ? (kasStart as number) : 0) + (hasFx ? (fxStart as number) : 0)) * startRate.value
+    : null;
+  const yearTotal = savingsFromPayslips(list.filter((p) => p.year === newest)).total;
+  // The payslips must be of this calendar year, or the two parts would cover different periods.
+  const totalYearIls = marketIls != null && newest === new Date().getFullYear() && yearTotal > 0 ? yearTotal + marketIls : null;
   return {
     partial,
     fundsNote,
     totalIls,
     hasAllTime: kaspaQuote.value?.all_time_pct != null || fxcnQuote.value?.all_time_pct != null,
-    yearTotal: savingsFromPayslips(list.filter((p) => p.year === newest)).total,
+    yearTotal,
+    marketIls,
+    totalYearIls,
     rows: rows.map((r) => ({ ...r, pct: Math.round((r.ils / totalIls) * 100) })) as Row[],
   };
 });
@@ -200,9 +246,22 @@ const card = computed(() => {
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
+.sv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.8rem;
+}
+.sv-chip.is-down {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+.sv-year-total strong {
+  color: var(--text);
+}
 .sv-chip {
   display: inline-block;
-  margin: 0 0 0.8rem;
+  margin: 0;
   padding: 0.2rem 0.65rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--success) 18%, transparent);

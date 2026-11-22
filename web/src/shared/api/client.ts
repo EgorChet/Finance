@@ -318,6 +318,8 @@ export type FxcnQuote = {
   source: string;
   stale?: boolean;
   all_time_pct?: number;
+  year_open_nav_usd?: number;
+  year_change_pct?: number;
 };
 
 export async function fetchFxcnQuote(demo: boolean, token?: string, force = false) {
