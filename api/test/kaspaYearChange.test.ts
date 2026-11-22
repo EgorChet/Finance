@@ -63,3 +63,24 @@ describe("All-time change against the amount invested", () => {
     assert.equal(await withAllTime(false, quote, 1500, "kaspa_usd"), quote);
   });
 });
+
+describe("FXCN NAV at the start of the year", () => {
+  it("takes the last NAV dated before 1 January, whatever the order of the points", async () => {
+    const { pickYearStartNav } = await import("../src/services/fxcnQuote.js");
+    const points = [
+      { date: "2026-01-02", value: 44 },
+      { date: "2025-12-31", value: 43.28 },
+      { date: "2025-12-30", value: 43.59 },
+      { date: "2025-06-24", value: 39.9 },
+    ];
+    assert.equal(pickYearStartNav(points, 2026), 43.28);
+    assert.equal(pickYearStartNav(points, 2025), null); // nothing dated before 2025 in these points
+  });
+
+  it("never guesses: no history, bad values or only later dates give null", async () => {
+    const { pickYearStartNav } = await import("../src/services/fxcnQuote.js");
+    assert.equal(pickYearStartNav([], 2026), null);
+    assert.equal(pickYearStartNav([{ date: "2026-02-01", value: 40 }], 2026), null);
+    assert.equal(pickYearStartNav([{ date: "2025-12-31", value: 0 }, { date: "2025-12-30" }], 2026), null);
+  });
+});
