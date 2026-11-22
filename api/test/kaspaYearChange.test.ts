@@ -40,3 +40,30 @@ describe("Kaspa change since 1 January", () => {
     assert.equal(await fetchYearOpen(2026), null);
   });
 });
+
+describe("All-time change against the amount invested", () => {
+  const saved = process.env.TEST_INVESTED;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.TEST_INVESTED;
+    else process.env.TEST_INVESTED = saved;
+  });
+
+  it("reads a positive amount from the environment and nothing else", async () => {
+    const { investedUsd } = await import("../src/services/investment.js");
+    delete process.env.TEST_INVESTED;
+    assert.equal(investedUsd("TEST_INVESTED"), null);
+    for (const bad of ["", "abc", "0", "-5"]) {
+      process.env.TEST_INVESTED = bad;
+      assert.equal(investedUsd("TEST_INVESTED"), null, bad);
+    }
+    process.env.TEST_INVESTED = " 1000 ";
+    assert.equal(investedUsd("TEST_INVESTED"), 1000);
+  });
+
+  it("is the value against the amount put in, undefined when the amount is not set", async () => {
+    const { allTimePct } = await import("../src/services/investment.js");
+    assert.equal(allTimePct(1500, 1000), 50);
+    assert.equal(allTimePct(600, 1000), -40);
+    assert.equal(allTimePct(1000, null), undefined);
+  });
+});

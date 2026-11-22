@@ -301,6 +301,7 @@ export type KaspaQuote = {
   stale?: boolean;
   year_open_usdt?: number;
   year_change_pct?: number;
+  all_time_pct?: number;
 };
 
 export async function fetchKaspaQuote(demo: boolean, token?: string, force = false) {
@@ -316,6 +317,7 @@ export type FxcnQuote = {
   updated_at: string;
   source: string;
   stale?: boolean;
+  all_time_pct?: number;
 };
 
 export async function fetchFxcnQuote(demo: boolean, token?: string, force = false) {

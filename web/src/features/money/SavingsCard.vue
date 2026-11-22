@@ -16,6 +16,11 @@
         </div>
       </article>
 
+      <div v-if="card.hasAllTime" class="seg sv-seg" role="tablist" :aria-label="t('Change')">
+        <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': period === 'ytd' }" :aria-selected="period === 'ytd'" @click="period = 'ytd'">{{ t("This year") }}</button>
+        <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': period === 'all' }" :aria-selected="period === 'all'" @click="period = 'all'">{{ t("All time") }}</button>
+      </div>
+
       <ul class="sv-rows">
         <li v-for="r in card.rows" :key="r.key" class="sv-row">
           <span class="sv-icon" :style="{ '--c': r.color }">
@@ -38,7 +43,7 @@
         </li>
       </ul>
 
-      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate. The crypto change is the price change since 1 January, not your own return.')" />
+      <InfoTip label="What this is" :text="t('Funds are the sum of contributions from the payslips on file, not the account balance: returns, fees and money saved before the first payslip are not included. Crypto and stocks are valued at today\'s price and dollar rate. The change since 1 January is the price change, not your own return; the all-time change compares the value with the amount put in.')" />
     </template>
   </section>
 </template>
@@ -57,6 +62,8 @@ import { formatIlsWhole, formatUsd } from "@/shared/utils/format";
 import { savingsFromPayslips, type Payslip } from "@core/salary/payslip";
 
 const props = defineProps<{ payslips: Payslip[]; payslipsReady: boolean }>();
+/** Which change the crypto and stock rows show: since 1 January, or since the money went in. */
+const period = ref<"ytd" | "all">("ytd");
 const portfolio = usePortfolioStore();
 const { kaspaQuote, fxcnQuote, marketSnapshot, ready: quotesReady } = storeToRefs(portfolio);
 
@@ -119,9 +126,9 @@ interface Row {
   change?: number;
 }
 
-/** "+12,5% с нач. года" / "−40,4% с нач. года" */
+/** "+12,5% с нач. года" / "−40,4% за всё время" */
 const changeLabel = (pct: number) =>
-  `${pct < 0 ? "−" : "+"}${Math.abs(pct).toLocaleString(dateTag(), { maximumFractionDigits: 1 })}% ${t("YTD").toLowerCase()}`;
+  `${pct < 0 ? "−" : "+"}${Math.abs(pct).toLocaleString(dateTag(), { maximumFractionDigits: 1 })}% ${(period.value === "all" ? t("All time") : t("YTD")).toLowerCase()}`;
 
 const card = computed(() => {
   const list = props.payslips;
@@ -151,10 +158,11 @@ const card = computed(() => {
   }
   if (kasUsd > 0 && rate > 0) {
     rows.push({ key: "kaspa", label: t("Crypto (Kaspa)"), ils: kasUsd * rate, color: "#49eacb", logo: kaspaLogo, sub: formatUsd(kasUsd, 0),
-      change: kaspaQuote.value?.year_change_pct });
+      change: period.value === "all" ? kaspaQuote.value?.all_time_pct : kaspaQuote.value?.year_change_pct });
   }
   if (fxcnUsd > 0 && rate > 0) {
-    rows.push({ key: "fxcn", label: t("Stocks (FXCN)"), ils: fxcnUsd * rate, color: "#4fc3ff", icon: "stocks", sub: formatUsd(fxcnUsd, 0) });
+    rows.push({ key: "fxcn", label: t("Stocks (FXCN)"), ils: fxcnUsd * rate, color: "#4fc3ff", icon: "stocks", sub: formatUsd(fxcnUsd, 0),
+      change: period.value === "all" ? fxcnQuote.value?.all_time_pct : undefined });
   }
   const totalIls = rows.reduce((s, r) => s + r.ils, 0);
   if (totalIls <= 0) return null;
@@ -162,6 +170,7 @@ const card = computed(() => {
     partial,
     fundsNote,
     totalIls,
+    hasAllTime: kaspaQuote.value?.all_time_pct != null || fxcnQuote.value?.all_time_pct != null,
     yearTotal: savingsFromPayslips(list.filter((p) => p.year === newest)).total,
     rows: rows.map((r) => ({ ...r, pct: Math.round((r.ils / totalIls) * 100) })) as Row[],
   };
@@ -268,6 +277,9 @@ const card = computed(() => {
 .sv-meta {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+.sv-seg {
+  margin: 0;
 }
 .sv-end {
   display: inline-flex;

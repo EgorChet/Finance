@@ -1,5 +1,6 @@
 /** FXCN NAV from FinEx GraphQL (same data as finex-etf.ru/calc/nav). */
 import { readFxcnPriceCache, writeFxcnPriceCache } from "../storage/index.js";
+import { allTimePct, investedUsd } from "./investment.js";
 
 const FINEX_GRAPHQL = "https://api.finex-etf.ru/graphql/";
 const FINEX_TICKER = "FXCN";
@@ -49,6 +50,8 @@ export type FxcnQuote = {
   updated_at: string;
   source: string;
   stale?: boolean;
+  /** Change of the whole holding against the amount invested (server setting FXCN_INVESTED_USD), in percent. */
+  all_time_pct?: number;
 };
 
 async function fetchFromFinex(): Promise<number | null> {
@@ -133,6 +136,7 @@ function quoteFromCache(cached: MemoryCache, stale: boolean): FxcnQuote {
     updated_at: new Date(cached.fetchedAt).toISOString(),
     source: cached.source,
     stale: stale || undefined,
+    all_time_pct: allTimePct(roundMoney(lots * nav), investedUsd("FXCN_INVESTED_USD")),
   };
 }
 
