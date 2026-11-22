@@ -67,6 +67,7 @@ import {
 import { loadLivingBudgetData, loadLivingBudgetSegments, saveLivingBudget, validateLivingBudget, effectiveLivingBudget, setMonthEstimate, normalizeEstimates } from "../services/livingBudget.js";
 import { ensureAuxCachesFresh } from "../middleware/auxCache.js";
 import { getKaspaQuote } from "../services/kaspaPrice.js";
+import { withAllTime } from "../services/investment.js";
 import { getFxcnQuote } from "../services/fxcnQuote.js";
 import { getMarketSnapshot } from "../services/marketSnapshot.js";
 import type { FixedCharge, LivingBudgetMonthTopup, LivingBudgetSegment, MerchantRules } from "../types.js";
@@ -119,7 +120,8 @@ router.get("/config", (_req, res) => {
 router.get("/kaspa", async (req, res) => {
   try {
     const force = req.query.refresh === "1" || req.query.force === "1";
-    res.json(await getKaspaQuote({ force }));
+    const quote = await getKaspaQuote({ force });
+    res.json(await withAllTime((req as AuthenticatedRequest).userId === "egor", quote, quote.portfolio_usdt, "kaspa_usd"));
   } catch (e) {
     const message = e instanceof Error ? e.message : "Kaspa price unavailable";
     res.status(502).json({ error: message });
@@ -129,7 +131,8 @@ router.get("/kaspa", async (req, res) => {
 router.get("/fxcn", async (req, res) => {
   try {
     const force = req.query.refresh === "1" || req.query.force === "1";
-    res.json(await getFxcnQuote({ force }));
+    const quote = await getFxcnQuote({ force });
+    res.json(await withAllTime((req as AuthenticatedRequest).userId === "egor", quote, quote.portfolio_usd, "fxcn_usd"));
   } catch (e) {
     const message = e instanceof Error ? e.message : "FXCN NAV unavailable";
     res.status(502).json({ error: message });

@@ -49,6 +49,8 @@ export type FxcnQuote = {
   updated_at: string;
   source: string;
   stale?: boolean;
+  /** Change of the whole holding against the amount invested, in percent. Added by the route, for the owner only. */
+  all_time_pct?: number;
 };
 
 async function fetchFromFinex(): Promise<number | null> {

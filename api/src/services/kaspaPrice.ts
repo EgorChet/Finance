@@ -1,7 +1,11 @@
 /** Kaspa spot price in USDT. MEXC KASUSDT primary; CoinPaprika fallback; stale cache on errors. */
 import { readKaspaPriceCache, writeKaspaPriceCache } from "../storage/index.js";
+import { percentChange } from "./investment.js";
 
 const MEXC_API = "https://api.mexc.com/api/v3/ticker/price";
+const MEXC_KLINES = "https://api.mexc.com/api/v3/klines";
+const DAY_MS = 86_400_000;
+const YEAR_OPEN_RETRY_MS = 3_600_000;
 const COINPAPRIKA_URL = "https://api.coinpaprika.com/v1/tickers/kas-kaspa";
 const CACHE_MS = 600_000;
 const DEFAULT_BALANCE = 347_078.071;
@@ -36,6 +40,11 @@ export type KaspaQuote = {
   updated_at: string;
   source: string;
   stale?: boolean;
+  /** Price on 1 January (UTC) of this year, and the price change since then in percent. Absent when unknown. */
+  year_open_usdt?: number;
+  year_change_pct?: number;
+  /** Change of the whole holding against the amount invested, in percent. Added by the route, for the owner only. */
+  all_time_pct?: number;
 };
 
 function roundPrice(value: number): number {
@@ -51,6 +60,48 @@ async function fetchFromMexc(): Promise<number | null> {
   const data = (await res.json()) as { price?: string };
   const price = Number(data.price);
   return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+/**
+ * Open of the 1 January daily candle (UTC). MEXC needs both startTime and endTime here:
+ * with startTime alone it ignores the date and returns the latest candle.
+ */
+export async function fetchYearOpen(year: number): Promise<number | null> {
+  const start = Date.UTC(year, 0, 1);
+  const url = `${MEXC_KLINES}?symbol=${encodeURIComponent(mexcSymbol())}&interval=1d&startTime=${start}&endTime=${start + DAY_MS}&limit=1`;
+  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as unknown;
+  if (!Array.isArray(rows) || !Array.isArray(rows[0])) return null;
+  const [openTime, open] = rows[0] as [number, string];
+  if (openTime !== start) return null; // not the 1 January candle: never guess
+  const price = Number(open);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+/** Percent change from `open` to `price`, one decimal. */
+export function priceChangePct(open: number, price: number): number {
+  return percentChange(open, price);
+}
+
+let yearOpenCache: { year: number; price: number } | null = null;
+let yearOpenFailedAt = 0;
+
+async function loadYearOpen(now: number): Promise<number | null> {
+  const year = new Date(now).getUTCFullYear();
+  if (yearOpenCache?.year === year) return yearOpenCache.price;
+  if (now - yearOpenFailedAt < YEAR_OPEN_RETRY_MS) return null;
+  try {
+    const price = await fetchYearOpen(year);
+    if (price != null) {
+      yearOpenCache = { year, price };
+      return price;
+    }
+  } catch {
+    /* no history: the quote simply has no year change */
+  }
+  yearOpenFailedAt = now;
+  return null;
 }
 
 async function fetchFromCoinPaprika(): Promise<number | null> {
@@ -156,5 +207,11 @@ export async function getKaspaQuote(options?: { force?: boolean }): Promise<Kasp
     throw new Error("Kaspa price unavailable");
   }
 
-  return quoteFromCache(cached, now - cached.fetchedAt > CACHE_MS);
+  const quote = quoteFromCache(cached, now - cached.fetchedAt > CACHE_MS);
+  const open = await loadYearOpen(now);
+  if (open != null) {
+    quote.year_open_usdt = roundPrice(open);
+    quote.year_change_pct = priceChangePct(open, quote.price_usdt);
+  }
+  return quote;
 }

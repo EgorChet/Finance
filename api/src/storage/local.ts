@@ -8,6 +8,7 @@ import type {
   FxFallbackData,
   KaspaPriceCache,
   FxcnPriceCache,
+  InvestmentsData,
   LivingBudgetData,
   MerchantRules,
   ReviewProgressData,
@@ -32,6 +33,7 @@ const REGULAR_CHARGES_PATH = path.join(DATA_DIR, "regular_charges.json");
 const FX_FALLBACK_PATH = path.join(DATA_DIR, "fx_fallback.json");
 const KASPA_PRICE_PATH = path.join(DATA_DIR, "kaspa_price.json");
 const FXCN_PRICE_PATH = path.join(DATA_DIR, "fxcn_price.json");
+const INVESTMENTS_PATH = path.join(DATA_DIR, "investments.json");
 const UPLOAD_JOBS_PATH = path.join(DATA_DIR, "upload_jobs.json");
 const XLSX_DIRS = [STATEMENTS_DIR];
 
@@ -213,6 +215,19 @@ export async function readFxcnPriceCache(): Promise<FxcnPriceCache> {
 export async function writeFxcnPriceCache(data: FxcnPriceCache): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(FXCN_PRICE_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
+export async function readInvestments(): Promise<InvestmentsData> {
+  try {
+    return JSON.parse(await fs.readFile(INVESTMENTS_PATH, "utf-8")) as InvestmentsData;
+  } catch {
+    return {};
+  }
+}
+
+export async function writeInvestments(data: InvestmentsData): Promise<void> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(INVESTMENTS_PATH, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
 export async function readUploadJobs(): Promise<UploadJobsData> {
