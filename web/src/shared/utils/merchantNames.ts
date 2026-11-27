@@ -188,6 +188,9 @@ const NAMES: [RegExp, string][] = [
  * "ארקפה ביג גלילות", "ARCAFFE RAANANA" → "Arcaffe". Tested on "merchant_he merchant_en".
  */
 const CANONICAL: [RegExp, string][] = [
+  // The bank prints "העברה ב BIT בנה"פ" (the last word is the bank, not a person) and machine translation
+  // turns it into "Transfer in BIT in NHP": one plain name for every BIT transfer.
+  [/העברה\s*ב[\s-]*bit|transfer in bit/i, "BIT transfer"],
   // Named by Egor
   [/גוסטו|goosto/i, "Gusto (hookah store)"],
   [/דנאל אי וי|zeekr/i, "Zeekr (Danel EV)"],
