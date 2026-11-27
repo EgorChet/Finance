@@ -349,6 +349,10 @@ const streak = computed(() => {
   const tc = tight.value;
   if (!tc) return null;
   const lastFull = (p.byThisDay?.day ?? p.dayIndex) - 1;
+  // The day still in progress is not counted, but it breaks the streak once it is already over the limit.
+  const today = lastFull + 1;
+  const todaySpent = (p.actualByDay[today - 1] ?? 0) - (today > 1 ? p.actualByDay[today - 2] ?? 0 : 0);
+  if (todaySpent > p.perDayLeft) return null;
   return tightStreak(p.actualByDay, lastFull, p.perDayLeft, tc.usualPerDay, tc.shortBy);
 });
 /** Gap rounded up to the next ₪100. */
@@ -408,13 +412,13 @@ function ordinal(n: number): string {
 const byDay = computed(() => {
   const b = shown.value.byThisDay;
   if (!b || shown.value.dayIndex < 1) return null;
-  const n = b.past.length + 1;
   // Only everyday spending can be a "record": bills are planned and already taken off the budget.
   const record = b.everydayRank === 1;
   // Short chip: which day and the full comparison are in the details sheet.
   const stale = b.dataAgeDays >= 3 ? " ⚠️" : "";
   if (b.everydayRank === 1) return { record, line: `🔺 ${t("Record {amount}", { amount: whole(b.everyday) })}${stale}` };
-  return { record, line: `${t("{ord} of {n} cycles", { ord: ordinal(b.everydayRank), n })}${stale}` };
+  // Only a record is worth a chip; "7th of 7 cycles" was noise.
+  return null;
 });
 
 const compareRows = computed(() => {
