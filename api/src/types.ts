@@ -26,6 +26,8 @@ export interface Transaction {
   category_override?: string;
   /** Category before the per-charge override, so removing it can restore it. */
   category_original?: string;
+  /** A name given to the charges of a regular bill; shown instead of the bank's wording. */
+  display_name?: string;
 }
 
 export interface CategorySummary {

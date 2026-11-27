@@ -7,6 +7,7 @@ import type {
   StatementsData,
   Transaction,
 } from "../types.js";
+import { applyRegularAliases } from "./regularCharges.js";
 import { monthLabelFromIso } from "../utils/dates.js";
 import {
   billingCycleLabelFromIso,
@@ -117,7 +118,7 @@ export function finalizeReport(report: SpendingReport): SpendingReport {
   const withFx = changed
     ? rebuildReportSummaries({ ...base, transactions: normalizedTxs })
     : base;
-  return applyAdjustments(applyExclusions(augmentReport(remapLegacyCategories(withFx))));
+  return applyRegularAliases(applyAdjustments(applyExclusions(augmentReport(remapLegacyCategories(withFx)))));
 }
 
 export async function finalizeReportAsync(report: SpendingReport): Promise<SpendingReport> {

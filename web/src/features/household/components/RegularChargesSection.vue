@@ -76,6 +76,11 @@
           :placeholder="String(Math.round(editingEstimate))"
           :hint="t('Leave empty to use the learned amount (~{amount}).', { amount: formatIlsWhole(editingEstimate) })"
         />
+        <label class="sheet-field">
+          <span class="sheet-field__label">{{ t("Name for these charges") }}</span>
+          <input v-model="editing.alias" class="input" type="text" maxlength="60" :placeholder="t('As the bank writes it')" />
+          <span class="sheet-field__hint">{{ t("Shown in Transactions and Spending instead of the bank's wording, e.g. a barber you pay by BIT.") }}</span>
+        </label>
       </template>
     </SheetEditor>
   </section>
@@ -153,7 +158,7 @@ const cycleTxs = ref<Transaction[]>([]);
 const cycle = ref<{ start: string; end: string; today: string } | null>(null);
 const saving = ref(false);
 const error = ref("");
-const editing = ref<{ id: string; on: boolean; amount: number } | null>(null);
+const editing = ref<{ id: string; on: boolean; amount: number; alias: string } | null>(null);
 const configured = ref<ConfiguredCharge[]>([]);
 const budget = ref<number | null>(null);
 
@@ -299,7 +304,7 @@ const editingEstimate = computed(() => {
 function startEdit(id: string) {
   error.value = "";
   const o = overrides.value[id] ?? {};
-  editing.value = { id, on: !o.off, amount: o.amount ?? 0 };
+  editing.value = { id, on: !o.off, amount: o.amount ?? 0, alias: o.alias ?? "" };
 }
 
 async function saveEdit() {
@@ -309,8 +314,9 @@ async function saveEdit() {
   const amount = e.amount > 0 ? Math.round(e.amount * 100) / 100 : null;
   // A confirmed bill keeps its entry (that entry is what makes it a bill).
   const custom = overrides.value[e.id]?.custom;
-  if (e.on && amount == null && !custom) delete next[e.id];
-  else next[e.id] = { ...(custom ? { custom } : {}), ...(e.on ? {} : { off: true }), ...(amount != null ? { amount } : {}) };
+  const alias = e.alias.trim();
+  if (e.on && amount == null && !custom && !alias) delete next[e.id];
+  else next[e.id] = { ...(custom ? { custom } : {}), ...(e.on ? {} : { off: true }), ...(amount != null ? { amount } : {}), ...(alias ? { alias } : {}) };
   saving.value = true;
   error.value = "";
   try {

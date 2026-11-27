@@ -57,6 +57,8 @@ export interface RegularChargeOverride {
   custom?: { name: string; merchant: string };
   /** A suggestion you declined — not asked again. */
   dismissed?: boolean;
+  /** A name for this bill's charges, shown instead of the bank's wording (e.g. "Barber"). */
+  alias?: string;
 }
 
 export const CUSTOM_RULE_PREFIX = "custom:";

@@ -341,7 +341,9 @@ export function knownMerchantName(merchantHe: string | null | undefined): string
  * a canonical brand name, else its English name (tidied), else a known translation, else the
  * Hebrew. A Latin-only statement name is tidied too ("GO MOBILE" → "Go Mobile").
  */
-export function englishMerchantName(tx: { merchant_he: string; merchant_en?: string | null }): string {
+export function englishMerchantName(tx: { merchant_he: string; merchant_en?: string | null; display_name?: string }): string {
+  // A name you gave this bill's charges wins over everything the bank or a translation says.
+  if (tx.display_name) return tx.display_name;
   // The statement's own (Hebrew) name decides first: a wrong English name saved for a Zara
   // branch ("Arcaffe") must not turn it into a café.
   const fromHebrew = canonicalMerchantName(tx.merchant_he);
@@ -360,9 +362,9 @@ export function englishMerchantName(tx: { merchant_he: string; merchant_en?: str
 }
 
 /** The name to show in the chosen language (Russian forms for local places; brands keep theirs). */
-export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: string | null }): string {
+export function merchantDisplayName(tx: { merchant_he: string; merchant_en?: string | null; display_name?: string }): string {
   const en = englishMerchantName(tx);
-  if (displayLocale() !== "ru") return en;
+  if (tx.display_name || displayLocale() !== "ru") return en;
   return RU_MERCHANT_NAMES[en] ?? en;
 }
 
