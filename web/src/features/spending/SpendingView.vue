@@ -84,7 +84,7 @@
       :budget-extras="budgetExtras"
     />
     <RouterLink v-if="summaryPlan" class="sp-today-link" to="/app/home">
-      {{ t("Today's budget, daily amount and preview are on Today ›") }}
+      {{ t("Today's budget and preview ›") }}
     </RouterLink>
     <PendingCycleCard v-if="isPendingCycleSelected && selectedCycleStart" :cycle-start="selectedCycleStart" />
     <template v-if="showCategoryExplorer">
