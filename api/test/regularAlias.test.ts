@@ -29,3 +29,11 @@ test("without a name nothing changes, and a blank or unknown entry is dropped", 
   assert.equal(applyRegularAliases(r, {}), r);
   assert.deepEqual(normalizeRegularChargeOverrides({ hairdresser: { alias: "   " }, nonsense: { alias: "x" } }), {});
 });
+
+test("a change of name changes the signature that forces stored reports to be rebuilt", async () => {
+  const { regularAliasSignature } = await import("../src/services/regularCharges.js");
+  const a = regularAliasSignature({ hairdresser: { alias: "A" } });
+  const b = regularAliasSignature({ hairdresser: { alias: "B" } });
+  assert.notDeepEqual(a, b);
+  assert.deepEqual(regularAliasSignature({}), []);
+});

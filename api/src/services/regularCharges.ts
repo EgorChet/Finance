@@ -63,6 +63,14 @@ export async function saveRegularChargeOverrides(input: unknown): Promise<Regula
 
 let cachedOverrides: RegularChargeOverrides = {};
 
+/** The names given to bills, as a stable list: part of the finalize version, so stored reports pick a change up. */
+export function regularAliasSignature(overrides: RegularChargeOverrides = cachedOverrides): string[] {
+  return Object.entries(overrides)
+    .filter(([, o]) => o.alias)
+    .map(([id, o]) => `${id}|${o.alias}|${o.amount ?? ""}`)
+    .sort();
+}
+
 export async function refreshRegularChargesCache(): Promise<void> {
   cachedOverrides = await loadRegularChargeOverrides();
 }

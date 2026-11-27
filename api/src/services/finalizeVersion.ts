@@ -3,6 +3,7 @@ import { loadAdjustments } from "./adjustments.js";
 import { loadExcludedKeys } from "./exclusions.js";
 import { loadFixedCharges } from "./fixedCharges.js";
 import { loadLivingBudgetData } from "./livingBudget.js";
+import { regularAliasSignature } from "./regularCharges.js";
 import { readRules } from "../storage/index.js";
 
 /** Retired categories — must match reportService CATEGORY_ALIASES. */
@@ -30,6 +31,7 @@ export async function getFinalizeVersion(): Promise<string> {
     aliases: CATEGORY_ALIASES,
     exclusions,
     adjustments,
+    regularAliases: regularAliasSignature(),
     fxPipeline: FX_PIPELINE_VERSION,
   });
   return createHash("sha256").update(payload).digest("hex").slice(0, 16);
