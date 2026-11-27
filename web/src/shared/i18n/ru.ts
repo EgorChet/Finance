@@ -69,6 +69,7 @@ export const RU: Record<string, string> = {
   "Name for these charges": "Название для этих платежей",
   "As the bank writes it": "Как пишет банк",
   "Shown in Transactions and Spending instead of the bank's wording, e.g. a barber you pay by BIT.": "Показывается в «Операциях» и «Расходах» вместо формулировки банка, например барбер, которому вы платите через BIT.",
+  "Take-home pay, or the gross you need for a net amount": "Сколько будет на руки и какая зарплата нужна, чтобы получать нужную сумму",
   "Pitzuim": "Пицуим",
   "Employer: pension": "Работодатель: пенсия",
   "Employer: severance": "Работодатель: выходное пособие (пицуим)",
