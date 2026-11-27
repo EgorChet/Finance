@@ -36,9 +36,8 @@
           <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
         </template>
       </div>
-      <div v-if="byDay || setAsideLine || streak" class="bh-chips">
+      <div v-if="setAsideLine || streak" class="bh-chips">
         <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
-        <span v-if="byDay && !ahead" class="bh-chip" :class="{ 'bh-chip--record': byDay.record }">{{ byDay.line }}</span>
         <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
       </div>
     </div>
@@ -408,18 +407,6 @@ function ordinal(n: number): string {
   const v = n % 100;
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
-
-const byDay = computed(() => {
-  const b = shown.value.byThisDay;
-  if (!b || shown.value.dayIndex < 1) return null;
-  // Only everyday spending can be a "record": bills are planned and already taken off the budget.
-  const record = b.everydayRank === 1;
-  // Short chip: which day and the full comparison are in the details sheet.
-  const stale = b.dataAgeDays >= 3 ? " ⚠️" : "";
-  if (b.everydayRank === 1) return { record, line: `🔺 ${t("Record {amount}", { amount: whole(b.everyday) })}${stale}` };
-  // Only a record is worth a chip; "7th of 7 cycles" was noise.
-  return null;
-});
 
 const compareRows = computed(() => {
   const b = shown.value.byThisDay;
