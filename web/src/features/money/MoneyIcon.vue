@@ -20,6 +20,10 @@
       <rect x="5" y="3" width="14" height="18" rx="2.5" />
       <path d="M8.5 7.5h7M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01" />
     </template>
+    <template v-else-if="name === 'check'">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.3 2.4 2.4 4.6-5" />
+    </template>
     <template v-else-if="name === 'receipt'">
       <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
       <path d="M9 8h6M9 12h6" />
@@ -28,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ name: "pension" | "pitzuim" | "study" | "stocks" | "receipt" | "calc" }>();
+defineProps<{ name: "pension" | "pitzuim" | "study" | "stocks" | "receipt" | "calc" | "check" }>();
 </script>
 
 <style scoped>

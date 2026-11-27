@@ -18,6 +18,15 @@
           <span class="money-calc__chevron" aria-hidden="true">›</span>
         </button>
         <SalaryCalculator :open="calcOpen" @close="calcOpen = false" />
+        <button v-if="payslips.length" type="button" class="money-calc" @click="checksOpen = true">
+          <span class="money-calc__icon money-calc__icon--ok" :class="{ 'money-calc__icon--warn': checksFlagged }" aria-hidden="true"><MoneyIcon name="check" /></span>
+          <span class="money-calc__text">
+            <strong>{{ t("Check payslips") }}</strong>
+            <span>{{ checkSummary }}</span>
+          </span>
+          <span class="money-calc__chevron" aria-hidden="true">›</span>
+        </button>
+        <PayslipChecksSheet :open="checksOpen" :payslips="payslips" @close="checksOpen = false" />
         <PayslipsSection @saved="showSaveStatus" @loaded="onLoaded" />
         <p v-if="saveStatus" class="recurring-save-status">{{ saveStatus }}</p>
       </div>
@@ -32,16 +41,24 @@ import DemoBanner from "@/shared/components/DemoBanner.vue";
 import PayslipsSection from "@/features/household/components/PayslipsSection.vue";
 import SavingsCard from "@/features/money/SavingsCard.vue";
 import MoneyIcon from "@/features/money/MoneyIcon.vue";
+import PayslipChecksSheet from "@/features/money/PayslipChecksSheet.vue";
+import { checkVacation } from "@core/salary/payslipChecks";
 import SalaryCalculator from "@/features/household/components/SalaryCalculator.vue";
 import { t } from "@/shared/i18n";
 import type { Payslip } from "@core/salary/payslip";
 
 const auth = useAuthStore();
 const calcOpen = ref(false);
+const checksOpen = ref(false);
 const payslips = ref<Payslip[]>([]);
 const loadedOnce = ref(false);
 /** Payslips are the owner's alone: for anyone else there is nothing to wait for. */
 const payslipsReady = computed(() => auth.isDemo || !auth.canEditBudget || loadedOnce.value);
+const checksFlagged = computed(() => checkVacation(payslips.value, 13).flagged);
+const checkSummary = computed(() => {
+  const flagged = checksFlagged.value;
+  return flagged ? t("Worth asking about ({n})", { n: flagged }) : t("Vacation days and pay: all adds up");
+});
 function onLoaded(list: Payslip[]) {
   payslips.value = list;
   loadedOnce.value = true;
@@ -81,6 +98,14 @@ function showSaveStatus(message: string) {
   border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent);
+}
+.money-calc__icon--ok {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
+.money-calc__icon--warn {
+  background: color-mix(in srgb, #fbbf24 18%, transparent);
+  color: #fbbf24;
 }
 .money-calc__text {
   flex: 1;
