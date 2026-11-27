@@ -31,6 +31,13 @@ A personal finance app. Public repo: **never put personal figures, IDs, emails o
 - **Salary calculator** (`core/salary/salaryCalc.ts`): Israeli cumulative income tax (brackets × months), credit points, pension credit, BL/health thresholds, study fund after tax. 2026 law constants are in `LAW_2026`; the insured-income maximum is an unverified assumption.
 - **Payslips** (`core/salary/payslip.ts`, `payslipParse.ts`, `api/src/services/payslips/`): pdf.js text items with positions → parser anchored to headings → strict arithmetic self-checks; a page that does not add up is rejected, never stored. Data in `app_state`, originals in the private bucket. **Owner-only**: other household members never get payslip nets. In Russian UI the term is «расчётный лист» (not «листок»); month pills are «Факт / Ожидание / Как в последнем / План».
 
+## Working from the phone (cloud sessions)
+The owner wants to work from the phone without the Mac being on. In a cloud session (Claude app → Code → cloud, repo `EgorChet/Finance`) everything in "Workflow" works as usual: code, tests, screenshots with the preinstalled browser, PRs, merge.
+- **New payslips**: the owner adds them with "Add PDF" on the Money tab; no script and no Mac needed.
+- **Real data** (payslips, budget) is reachable from the cloud only if the cloud environment has the Supabase variables and its host allowed. Those are set by the owner in the environment settings; never ask for keys in chat, never print them.
+- **Checks on real data** belong in the app (e.g. Money → "Check payslips", logic in `core/salary/payslipChecks.ts`), not in one-off scripts, so they work from anywhere.
+- Mac-only: `~/Desktop/Salaries` PDFs and the local `.env`. Do not rely on them in a cloud session.
+
 ## The owner's computer
 - Projects live in `~/Developer` (not in iCloud: moving them out fixed a stalled iCloud sync caused by dev folders on the synced Desktop). Do not put code back on Desktop/Documents.
 - `Finance/.env` holds the Supabase keys: use it with `node --env-file=…/.env --import tsx script.mts` for one-off tasks, never print it. Delete temporary scripts and data copies afterwards.

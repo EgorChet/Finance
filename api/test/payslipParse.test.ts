@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePayslipItems, type PdfTextItem } from "../../core/salary/payslipParse.js";
+import { checkVacation } from "../../core/salary/payslipChecks.js";
 import { deductionLabel, fundRatesFromPayslip, paymentLabel, savingsFromPayslips, yearToDateFromPayslip } from "../../core/salary/payslip.js";
 
 const it = (x1: number, y: number, str: string): PdfTextItem => ({ str, x0: x1 - str.length * 5, x1, y });
@@ -144,4 +145,40 @@ test("savings add up your deductions and the employer's deposits over the paysli
   assert.equal(two.months, 2);
   assert.equal(two.total, 6850);
   assert.equal(savingsFromPayslips([]).total, 0);
+});
+
+test("vacation check: pay matches days taken, carry jumps and odd accruals are flagged", () => {
+  const { payslip: p } = parsePayslipItems(page());
+  assert.ok(p);
+  const month = (id: string, leave: [number, number, number | null, number], pay: { qty: number; rate: number } | null, base = 12000) => ({
+    ...p,
+    id,
+    year: 2026,
+    month: Number(id.slice(5)),
+    job: { ...p.job, daysExpected: 20 },
+    leave: [{ label: "x", kind: "vacation" as const, previous: leave[0], added: leave[1], used: leave[2], balance: leave[3] }],
+    payments: [
+      { description: "שכר יסוד", kind: "base_salary" as const, quantity: null, rate: null, taxableValue: null, amount: base, benefit: false },
+      ...(pay ? [{ description: "חופשה", kind: "vacation" as const, quantity: pay.qty, rate: pay.rate, taxableValue: null, amount: pay.qty * pay.rate, benefit: false }] : []),
+    ],
+  });
+  const list = [
+    month("2026-01", [5, 1, null, 6], null),
+    month("2026-02", [6, 1, 2, 5], { qty: 2, rate: 600 }, 10800), // 10,800 + 2 x 600 = 12,000 = 600 x 20
+    month("2026-03", [5, -0.5, null, 4.5], null), // a negative accrual
+    month("2026-04", [6, 1, null, 7], null), // starts 1.5 above the 4.5 left
+    month("2026-05", [7, 1, 1, 7], { qty: 2, rate: 600 }, 10800), // paid 2, took 1
+  ];
+  const r = checkVacation(list);
+  const kinds = (id: string) => r.rows.find((x) => x.id === id)!.flags.map((f) => f.kind);
+  assert.deepEqual(kinds("2026-01"), []);
+  assert.deepEqual(kinds("2026-02"), []);
+  assert.deepEqual(kinds("2026-03"), ["accrual"]);
+  assert.deepEqual(kinds("2026-04"), ["carry"]);
+  assert.deepEqual(kinds("2026-05"), ["paid_days"]);
+  assert.equal(r.jumpTotal, 1.5);
+  assert.equal(r.usedTotal, 3);
+  assert.equal(r.flagged, 3);
+  assert.equal(checkVacation(list, 2).rows.length, 2);
+  assert.deepEqual(checkVacation(list, 2).rows[0].flags.map((f) => f.kind), ["carry"]);
 });
