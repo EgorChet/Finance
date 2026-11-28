@@ -1,15 +1,12 @@
 <template>
-  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 195 60' : '0 0 60 60'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
-    <rect class="lg-fill" :style="scrub?.fill" x="0" y="0" width="60" height="60" rx="17" />
-    <rect class="lg-frame" :style="scrub?.frame" x="1.25" y="1.25" width="57.5" height="57.5" rx="16" fill="none" stroke-width="2.5" pathLength="100" />
-    <!-- The Ч is the same glyph, size and stroke as the letters of the word: cap height 32, stroke 6. -->
-    <g class="lg-ch" transform="translate(17 14)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path class="lg-s1" :style="scrub?.s1" pathLength="100" d="M3 3V14Q3 19 8 19H23" />
-      <path class="lg-s2" :style="scrub?.s2" pathLength="100" d="M23 3V29" />
-    </g>
-    <!-- The mark is the first letter of the name, so the word only spells БАНК. Drawn with lines, not a font. -->
-    <g v-if="lockup" class="lg-word" transform="translate(76 14)" stroke="currentColor" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">
-      <path d="M23 3H3V29H14Q23 29 23 23.5Q23 18 14 18H3" /><path transform="translate(30 0)" d="M3 29L13 3L23 29M6.2 21H19.8" /><path transform="translate(60 0)" d="M3 3V29M23 3V29M3 16H23" /><path transform="translate(93 0)" d="M3 3V29M23 3L3 17M9.5 12.5L23 29" />
+  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 285 84' : '0 0 84 84'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <rect class="lg-fill" :style="scrub?.fill" x="0" y="0" width="84" height="84" rx="22" />
+    <rect class="lg-frame" :style="scrub?.frame" x="1.25" y="1.25" width="81.5" height="81.5" rx="21" fill="none" stroke-width="2.5" pathLength="100" />
+    <!-- Mark and word share one cap height (36) and the same top and bottom lines, as in the T-Bank logo. -->
+    <path class="lg-ch" :style="scrub?.ch" transform="translate(22 23)" d="M0 0H9V19.5H31V0H40V36H31V28.5H0Z" />
+    <!-- The square holds the first letter of the name, so the word only spells БАНК. Drawn with paths, not a font. -->
+    <g v-if="lockup" class="lg-word" transform="translate(105 23)" fill="currentColor">
+      <path fill-rule="evenodd" d="M0 0H40V9H9V13.5H24Q40 13.5 40 24.75Q40 36 24 36H0Z M9 22.5V27H24Q31 27 31 24.75Q31 22.5 24 22.5Z" /><path fill-rule="evenodd" transform="translate(41.5 0)" d="M0 36L17.5 0H28.5L46 36H35L32.6 31H13.4L11 36Z M17.3 23H28.7L23 11.3Z" /><path transform="translate(90.7 0)" d="M0 0H9V14.5H31V0H40V36H31V23.5H9V36H0Z" /><path transform="translate(137.1 0)" d="M0 0H9V15.2L30.5 0H42.5L21.2 17.6L43 36H30.8L14.6 22.6L9 27.3V36H0Z" />
     </g>
   </svg>
 </template>
@@ -19,24 +16,22 @@ import { computed } from "vue";
 
 /**
  * The Ч-Банк mark: a rounded square in the palette's fill colour holding the letter Ч; the lockup adds БАНК.
- * One letter construction for all five letters (cap height 32, stroke 6, round caps and joins), and the Ч in the
- * square has exactly the word's cap height and stroke, so nothing looks smaller or from another font.
- * `animated` plays the draw-on once, as on the launch screen. Keep the paths in step with the inline copy in
- * index.html and scripts/make-icons.mjs.
+ * Proportions follow the T-Bank logo (see docs/BRAND.md): mark and word share one cap height and the same top and
+ * bottom lines, heavy wide letters, tight spacing. `animated` plays the draw-on once, as on the launch screen.
+ * Keep the paths in step with the inline copy in index.html and scripts/make-icons.mjs.
  */
 const props = defineProps<{ animated?: boolean; lockup?: boolean; /** 0..1: draw the mark by hand, as far as this (pull to refresh). */ progress?: number }>();
 
 const scrubbing = computed(() => props.progress != null);
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
-/** The same order as the launch animation: frame, fill, then the two strokes, driven by `progress`. */
+/** The same order as the launch animation: frame, fill, then the Ч revealed top to bottom, driven by `progress`. */
 const scrub = computed(() => {
   if (props.progress == null) return null;
   const p = props.progress;
   return {
     frame: { opacity: 1, strokeDasharray: 100, strokeDashoffset: 100 * (1 - clamp(p / 0.55)) },
-    fill: { opacity: clamp((p - 0.6) / 0.2) },
-    s1: { opacity: p > 0.4 ? 1 : 0, strokeDasharray: 100, strokeDashoffset: 100 * (1 - clamp((p - 0.4) / 0.35)) },
-    s2: { opacity: p > 0.7 ? 1 : 0, strokeDasharray: 100, strokeDashoffset: 100 * (1 - clamp((p - 0.7) / 0.3)) },
+    fill: { opacity: clamp((p - 0.5) / 0.25) },
+    ch: { clipPath: `inset(0 0 ${100 * (1 - clamp((p - 0.55) / 0.45))}% 0)` },
   };
 });
 </script>
@@ -54,9 +49,9 @@ const scrub = computed(() => {
   stroke: var(--accent-fill);
 }
 .lg-ch {
-  stroke: var(--accent-contrast);
+  fill: var(--accent-contrast);
 }
-/* Animated: the frame is drawn, the fill comes in, the two strokes are drawn, the word wipes in. */
+/* Animated: the frame is drawn, the fill comes in, the Ч is revealed top to bottom, the word wipes in. */
 .lg--anim .lg-fill {
   opacity: 0;
   animation: lg-fade 0.4s 0.55s ease-out forwards;
@@ -67,17 +62,9 @@ const scrub = computed(() => {
   stroke-dashoffset: 100;
   animation: lg-draw 0.7s 0.05s cubic-bezier(0.6, 0, 0.2, 1) forwards;
 }
-.lg--anim .lg-s1,
-.lg--anim .lg-s2 {
-  opacity: 0;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-}
-.lg--anim .lg-s1 {
-  animation: lg-draw 0.55s 0.8s cubic-bezier(0.6, 0, 0.2, 1) forwards;
-}
-.lg--anim .lg-s2 {
-  animation: lg-draw 0.4s 1.2s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+.lg--anim .lg-ch {
+  clip-path: inset(0 0 100% 0);
+  animation: lg-reveal 0.6s 0.85s cubic-bezier(0.7, 0, 0.2, 1) forwards;
 }
 .lg--anim .lg-word {
   clip-path: inset(0 100% 0 0);
@@ -97,6 +84,11 @@ const scrub = computed(() => {
     opacity: 1;
   }
 }
+@keyframes lg-reveal {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
 @keyframes lg-wipe {
   to {
     clip-path: inset(0 0 0 0);
@@ -105,8 +97,7 @@ const scrub = computed(() => {
 @media (prefers-reduced-motion: reduce) {
   .lg--anim .lg-fill,
   .lg--anim .lg-frame,
-  .lg--anim .lg-s1,
-  .lg--anim .lg-s2,
+  .lg--anim .lg-ch,
   .lg--anim .lg-word {
     animation: none;
   }
@@ -116,11 +107,7 @@ const scrub = computed(() => {
   .lg--anim .lg-frame {
     opacity: 0;
   }
-  .lg--anim .lg-s1,
-  .lg--anim .lg-s2 {
-    opacity: 1;
-    stroke-dashoffset: 0;
-  }
+  .lg--anim .lg-ch,
   .lg--anim .lg-word {
     clip-path: none;
   }
