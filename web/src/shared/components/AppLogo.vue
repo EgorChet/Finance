@@ -3,7 +3,7 @@
     <rect class="lg-fill" :style="scrub?.fill" x="0" y="0" width="84" height="84" rx="22" />
     <rect class="lg-frame" :style="scrub?.frame" x="1.25" y="1.25" width="81.5" height="81.5" rx="21" fill="none" stroke-width="2.5" pathLength="100" />
     <!-- Mark and word share one cap height (36) and the same top and bottom lines, as in the T-Bank logo. -->
-    <path class="lg-ch" :style="scrub?.ch" transform="translate(22 23)" d="M0 0H9V19.5H31V0H40V36H31V28.5H0Z" />
+    <path class="lg-ch" :style="scrub?.ch" transform="translate(22 23)" d="M0 0H9V12.5Q9 18 15.5 18H31V0H40V36H31V27H13Q0 27 0 15Z" />
     <!-- The square holds the first letter of the name, so the word only spells БАНК. Drawn with paths, not a font. -->
     <g v-if="lockup" class="lg-word" transform="translate(105 23)" fill="currentColor">
       <path fill-rule="evenodd" d="M0 0H40V9H9V13.5H24Q40 13.5 40 24.75Q40 36 24 36H0Z M9 22.5V27H24Q31 27 31 24.75Q31 22.5 24 22.5Z" /><path fill-rule="evenodd" transform="translate(41.5 0)" d="M0 36L17.5 0H28.5L46 36H35L32.6 31H13.4L11 36Z M17.3 23H28.7L23 11.3Z" /><path transform="translate(90.7 0)" d="M0 0H9V14.5H31V0H40V36H31V23.5H9V36H0Z" /><path transform="translate(137.1 0)" d="M0 0H9V15.2L30.5 0H42.5L21.2 17.6L43 36H30.8L14.6 22.6L9 27.3V36H0Z" />

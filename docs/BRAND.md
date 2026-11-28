@@ -20,7 +20,7 @@ of the cap height), spacing is tight (0–2 units of 12). In our units (cap heig
 | Gap square → word | 21 |
 | Letter gaps | Б→А 1.5 · А→Н 3.2 · Н→К 6.4 |
 
-Glyphs (filled outlines, no font): Ч `M0 0H9V19.5H31V0H40V36H31V28.5H0Z`; Б `M0 0H40V9H9V13.5H24Q40 13.5 40 24.75Q40 36 24 36H0Z M9 22.5V27H24Q31 27 31 24.75Q31 22.5 24 22.5Z` (even-odd); А `M0 36L17.5 0H28.5L46 36H35L32.6 31H13.4L11 36Z M17.3 23H28.7L23 11.3Z` (even-odd); Н `M0 0H9V14.5H31V0H40V36H31V23.5H9V36H0Z`; К `M0 0H9V15.2L30.5 0H42.5L21.2 17.6L43 36H30.8L14.6 22.6L9 27.3V36H0Z`.
+Glyphs (filled outlines, no font): Ч `M0 0H9V12.5Q9 18 15.5 18H31V0H40V36H31V27H13Q0 27 0 15Z`; Б `M0 0H40V9H9V13.5H24Q40 13.5 40 24.75Q40 36 24 36H0Z M9 22.5V27H24Q31 27 31 24.75Q31 22.5 24 22.5Z` (even-odd); А `M0 36L17.5 0H28.5L46 36H35L32.6 31H13.4L11 36Z M17.3 23H28.7L23 11.3Z` (even-odd); Н `M0 0H9V14.5H31V0H40V36H31V23.5H9V36H0Z`; К `M0 0H9V15.2L30.5 0H42.5L21.2 17.6L43 36H30.8L14.6 22.6L9 27.3V36H0Z`.
 The Ч is a letter of the same family as БАНК and has exactly the same cap height and stem, so it cannot look smaller.
 
 - Letters are drawn with paths, not a font, so the logo looks the same on every device.
