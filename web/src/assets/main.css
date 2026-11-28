@@ -1681,16 +1681,9 @@ button {
 
 .app-logo {
   flex: none;
-  display: grid;
-  place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  background: var(--accent-gradient);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 700;
-  box-shadow: 0 6px 16px -8px var(--glow-1);
+  filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--glow-1) 80%, transparent));
 }
 
 .app-brand-name {

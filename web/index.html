@@ -11,6 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="Finance" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <title>Finance Analyzer</title>
     <style>
@@ -27,14 +28,21 @@
         font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
       }
       .boot-inner { display: grid; justify-items: center; gap: 18px; animation: boot-in 0.5s ease-out both; }
-      .boot-logo {
-        width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center;
-        font-size: 34px; font-weight: 700; color: #fff;
-        background: linear-gradient(135deg, #7b6cff 0%, #a35cff 55%, #e255c8 100%);
-        box-shadow: 0 16px 40px -12px rgba(123, 108, 255, 0.6);
-        animation: boot-pulse 1.6s ease-in-out infinite;
-      }
-      .boot-name { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; color: #9a9aa6; }
+      /* The same mark and drawn word as AppLogo.vue: frame, strokes, dot and word are drawn in turn. */
+      .boot-lockup { width: min(300px, 80vw); height: auto; overflow: visible; color: #f4f4f6; }
+      .boot-lockup .l-fill { opacity: 0; animation: l-fade 0.4s 0.55s ease-out forwards; }
+      .boot-lockup .l-frame { stroke-dasharray: 100; stroke-dashoffset: 100; animation: l-draw 0.7s 0.05s cubic-bezier(0.6, 0, 0.2, 1) forwards; }
+      .boot-lockup .l-s { stroke-dasharray: 100; stroke-dashoffset: 100; }
+      .boot-lockup .l-s1 { animation: l-draw 0.55s 0.6s cubic-bezier(0.6, 0, 0.2, 1) forwards; }
+      .boot-lockup .l-s2 { animation: l-draw 0.55s 0.95s cubic-bezier(0.6, 0, 0.2, 1) forwards; }
+      .boot-lockup .l-dot { opacity: 0; transform-box: fill-box; transform-origin: center; animation: l-pop 0.5s 1.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+      .boot-lockup .l-ring { opacity: 0; transform-box: fill-box; transform-origin: center; animation: l-ring 0.9s 1.45s ease-out forwards; }
+      .boot-lockup .l-word { clip-path: inset(0 100% 0 0); animation: l-wipe 0.7s 1.2s cubic-bezier(0.7, 0, 0.2, 1) forwards; }
+      @keyframes l-draw { to { stroke-dashoffset: 0; } }
+      @keyframes l-fade { to { opacity: 1; } }
+      @keyframes l-pop { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: none; } }
+      @keyframes l-ring { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
+      @keyframes l-wipe { to { clip-path: inset(0 0 0 0); } }
       .boot-bar { width: 120px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
       .boot-bar::after {
         content: ""; display: block; width: 40%; height: 100%; border-radius: inherit;
@@ -44,15 +52,37 @@
       @keyframes boot-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
       @keyframes boot-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
       @keyframes boot-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
-      @media (prefers-reduced-motion: reduce) { .boot-inner, .boot-logo, .boot-bar::after { animation: none; } }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-inner, .boot-bar::after, .boot-lockup * { animation: none !important; }
+        .boot-lockup .l-fill, .boot-lockup .l-dot { opacity: 1; }
+        .boot-lockup .l-frame { stroke-dashoffset: 100; }
+        .boot-lockup .l-s { stroke-dashoffset: 0; }
+        .boot-lockup .l-word { clip-path: none; }
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <div class="boot" role="status" aria-label="Loading Finance">
         <div class="boot-inner">
-          <div class="boot-logo" aria-hidden="true">₪</div>
-          <div class="boot-name">Finance</div>
+          <svg class="boot-lockup" viewBox="0 0 360 48" role="img" aria-label="Finance" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="boot-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7b6cff"/><stop offset="0.55" stop-color="#a35cff"/><stop offset="1" stop-color="#e255c8"/></linearGradient></defs>
+            <g>
+              <rect class="l-fill" x="2" y="2" width="44" height="44" rx="13" fill="url(#boot-g)"/>
+              <rect class="l-frame" x="2" y="2" width="44" height="44" rx="13" fill="none" stroke="url(#boot-g)" stroke-width="2.5" pathLength="100"/>
+              <g stroke="#fff" stroke-width="4.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path class="l-s l-s1" pathLength="100" d="M14 34V14H22a6 6 0 0 1 6 6V28"/>
+                <path class="l-s l-s2" pathLength="100" d="M34 14V34H26a6 6 0 0 1-6-6V20"/>
+              </g>
+              <circle class="l-ring" cx="39" cy="9.5" r="3" fill="none" stroke="#4fc3ff" stroke-width="1.4"/>
+              <circle class="l-dot" cx="39" cy="9.5" r="2.6" fill="#4fc3ff"/>
+            </g>
+            <g class="l-word" transform="translate(64 8)" stroke="currentColor" stroke-width="6" fill="none" stroke-linejoin="bevel" stroke-linecap="butt">
+              <path d="M4 36V4H32M4 20H26"/><path transform="translate(48 0)" d="M4 4V36"/><path transform="translate(68 0)" d="M4 36V4L36 36V4"/>
+              <path transform="translate(116 0)" d="M4 36L20 4L36 36M10 26H30"/><path transform="translate(164 0)" d="M4 36V4L36 36V4"/>
+              <path transform="translate(212 0)" d="M36 8Q32 4 22 4Q4 4 4 20Q4 36 22 36Q32 36 36 32"/><path transform="translate(260 0)" d="M36 4H4V36H36M4 20H28"/>
+            </g>
+          </svg>
           <div class="boot-bar" aria-hidden="true"></div>
         </div>
       </div>
