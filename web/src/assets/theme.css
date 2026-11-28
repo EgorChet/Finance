@@ -359,23 +359,6 @@ textarea:focus {
   border-bottom: 0;
 }
 
-.mobile-nav-toggle {
-  border: 0;
-  background: var(--surface);
-  border-radius: var(--radius-control);
-}
-
-.mobile-nav-drawer {
-  border-radius: 0 var(--radius-card) var(--radius-card) 0;
-  border: 0;
-  background: var(--surface);
-}
-
-.mobile-nav-link {
-  border-radius: var(--radius-control);
-  font-weight: 600;
-}
-
 .app-tabbar {
   background: color-mix(in srgb, var(--bg) 80%, transparent);
   border-top: 1px solid var(--border);
@@ -3561,12 +3544,6 @@ button.bx-row {
   box-shadow: 0 4px 14px -6px var(--glow-1);
 }
 
-/* The account panel slides in from the right, next to its button. */
-.mobile-nav-drawer {
-  left: auto !important;
-  right: 0 !important;
-}
-
 /* ── Tab badge ── */
 .app-tab {
   position: relative;
@@ -3636,16 +3613,6 @@ button.bx-row {
   margin: 0;
 }
 
-/* Account panel content starts at the top now that it has no nav links. */
-.mobile-nav-drawer .mobile-nav-bottom {
-  margin-top: 0;
-}
-
-.mobile-nav-drawer .mobile-nav-portfolio {
-  border-top: 0;
-  padding-top: 0.25rem;
-}
-
 /* To label / Saved names: a smaller version of the segmented switch. */
 .merchants-tabs {
   display: flex;
@@ -3668,12 +3635,6 @@ button.bx-row {
   background: var(--surface-alt);
   color: var(--text);
   box-shadow: none;
-}
-
-.mobile-nav-drawer .mobile-nav-footer {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
 }
 
 .bx-locked {
@@ -4966,3 +4927,148 @@ button.topup-item {
   font-weight: 600;
 }
 
+
+/* ── Account panel: slides in from the right, three quiet groups and a sign-out line ── */
+.acct-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.acct {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: min(20rem, 88vw);
+  padding:
+    max(0.85rem, env(safe-area-inset-top))
+    max(0.85rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom))
+    0.85rem;
+  overflow-y: auto;
+  background: var(--sidebar);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+}
+
+.acct-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+}
+
+.acct-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 700;
+}
+
+.acct-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.05rem;
+}
+
+.acct-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.acct-group {
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.acct-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 0.9rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.acct-row + .acct-row {
+  border-top: 1px solid var(--border);
+}
+
+.acct-row--btn {
+  cursor: pointer;
+}
+
+.acct-row--btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.acct-row--accent .acct-label {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.acct-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+
+.acct-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.acct-chevron {
+  color: var(--text-faint);
+  font-size: 1.3rem;
+}
+
+.acct-note {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.acct-signout {
+  margin-top: auto;
+  min-height: 48px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
