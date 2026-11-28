@@ -75,6 +75,7 @@ const BUNDLED_LOGOS = new Set([
   "telyzhak.co.il",
   "temu.com",
   "tivtaam.co.il",
+  "universe-netanya",
   "victoryonline.co.il",
   "weekend-market",
   "wolt.com",
@@ -108,7 +109,7 @@ const BRANDS: [RegExp, Mark][] = [
   [/weekend market|וויקאנד|ויקנד/i, { text: "WM", bg: "#C9A04A", fg: "#1A1A1A", domain: "weekend-market" }],
   [/rose\s?marine|רוזמרין|רוזמארין/i, { text: "R", bg: "#1F4D2E", domain: "rosemarine" }],
   [/kassa|קאסה/i, { text: "K", bg: "#1F6FB5", domain: "kassa.co.il" }],
-  [/universe|יוניברס/i, { text: "U", bg: "#D6202B" }],
+  [/universe|יוניברס/i, { text: "U", bg: "#ED1C2E", domain: "universe-netanya" }],
   // Coffee & bakeries
   [/arcaffe|ארקפה/i, { text: "A", bg: "#8B1E2D", domain: "arcaffe.co.il" }],
   [/aroma|ארומה/i, { text: "a", bg: "#E31B23", domain: "aroma.co.il" }],
