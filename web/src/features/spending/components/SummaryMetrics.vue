@@ -6,6 +6,8 @@
       :plan-at="planAt"
       :extras="budgetExtras"
       :everyday-enabled="everydayBreakdownEnabled"
+      :date-title="dateTitle"
+      :date-sub="dateSub"
       @everyday="openEverydayBreakdown"
     />
 
@@ -148,6 +150,9 @@ import type { Transaction } from "@/shared/types";
 
 const props = withDefaults(
   defineProps<{
+    /** Today's date inside the budget card (the Today screen). */
+    dateTitle?: string;
+    dateSub?: string;
     report: SpendingReport;
     livingBudget: number | null;
     hideLivingBudget?: boolean;

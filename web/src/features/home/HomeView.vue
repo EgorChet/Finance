@@ -1,7 +1,8 @@
 <template>
   <div class="home-page">
     <DemoBanner />
-    <header class="today-head">
+    <!-- With a live plan the date sits inside the budget card; without one the screen keeps its title row. -->
+    <header v-if="!summaryPlan" class="today-head">
       <h2 class="page-title">{{ t("Today") }}</h2>
       <span class="today-date">· {{ todayLabel }}</span>
     </header>
@@ -19,6 +20,8 @@
           :cycle-day="cycleDay"
           :reference-date="refDate"
           :budget-extras="budgetExtras"
+          :date-title="t('Today')"
+          :date-sub="todayLabel"
         />
 
         <section v-if="todoItems.length || hasBitToSort" class="today-section">

@@ -5476,3 +5476,24 @@ button.topup-item {
   width: 36px;
   height: 36px;
 }
+
+/* Today's date, top of the budget card's right column, above the "N more bills" chip. */
+.bh-date {
+  display: grid;
+  justify-items: end;
+  gap: 0.05rem;
+  margin-bottom: 0.15rem;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.bh-date b {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bh-date small {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
