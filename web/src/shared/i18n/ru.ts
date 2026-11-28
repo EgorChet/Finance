@@ -313,7 +313,7 @@ export const RU: Record<string, string> = {
   "{amount} a month on average": "в среднем {amount} в месяц",
   "No comparison — the statements don't reach far enough back.": "Сравнить не с чем — выписки не уходят так далеко назад.",
   "Everyday": "Повседневные",
-  "Bills & fixed": "Счета и фиксированные",
+  "Bills & fixed": "Счета и фикс.",
   "Months": "Месяцев",
   "Where it went": "Куда ушли деньги",
   "{pct}% of spending": "{pct}% расходов",
