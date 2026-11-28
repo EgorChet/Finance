@@ -1,5 +1,5 @@
 <template>
-  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 285 84' : '0 0 84 84'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--loop': loop, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 285 84' : '0 0 84 84'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
     <rect class="lg-fill" :style="scrub?.fill" x="0" y="0" width="84" height="84" rx="22" />
     <rect class="lg-frame" :style="scrub?.frame" x="1.25" y="1.25" width="81.5" height="81.5" rx="21" fill="none" stroke-width="2.5" pathLength="100" />
     <!-- Mark and word share one cap height (36) and the same top and bottom lines, as in the T-Bank logo. -->
@@ -20,7 +20,7 @@ import { computed } from "vue";
  * bottom lines, heavy wide letters, tight spacing. `animated` plays the draw-on once, as on the launch screen.
  * Keep the paths in step with the inline copy in index.html and scripts/make-icons.mjs.
  */
-const props = defineProps<{ animated?: boolean; lockup?: boolean; /** 0..1: draw the mark by hand, as far as this (pull to refresh). */ progress?: number }>();
+const props = defineProps<{ animated?: boolean; /** Repeat the draw-on until it is removed (while something loads). */ loop?: boolean; lockup?: boolean; /** 0..1: draw the mark by hand, as far as this (pull to refresh). */ progress?: number }>();
 
 const scrubbing = computed(() => props.progress != null);
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
@@ -94,12 +94,85 @@ const scrub = computed(() => {
     clip-path: inset(0 0 0 0);
   }
 }
+/* Loop: the same draw-on over and over while something loads, so the mark never freezes. */
+.lg--loop .lg-frame {
+  opacity: 1;
+  stroke-dasharray: 100;
+  animation: lg-c-frame 1.8s cubic-bezier(0.6, 0, 0.2, 1) infinite;
+}
+.lg--loop .lg-fill {
+  opacity: 0;
+  animation: lg-c-fill 1.8s ease-out infinite;
+}
+.lg--loop .lg-ch {
+  clip-path: inset(0 0 100% 0);
+  animation: lg-c-ch 1.8s cubic-bezier(0.7, 0, 0.2, 1) infinite;
+}
+@keyframes lg-c-frame {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 1;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes lg-c-fill {
+  0%,
+  28% {
+    opacity: 0;
+  }
+  45%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lg-c-ch {
+  0%,
+  40% {
+    clip-path: inset(0 0 100% 0);
+    opacity: 1;
+  }
+  65%,
+  85% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .lg--anim .lg-fill,
   .lg--anim .lg-frame,
   .lg--anim .lg-ch,
-  .lg--anim .lg-word {
+  .lg--anim .lg-word,
+  .lg--loop .lg-fill,
+  .lg--loop .lg-frame,
+  .lg--loop .lg-ch {
     animation: none;
+  }
+  .lg--loop .lg-fill {
+    opacity: 1;
+  }
+  .lg--loop .lg-frame {
+    opacity: 0;
+  }
+  .lg--loop .lg-ch {
+    clip-path: none;
   }
   .lg--anim .lg-fill {
     opacity: 1;
