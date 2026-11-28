@@ -116,4 +116,9 @@
   .overview-seg {
     max-width: 420px;
   }
+
+  /* The rail already carries the name; the header keeps just the mark. */
+  .app-brand-name {
+    display: none;
+  }
 }

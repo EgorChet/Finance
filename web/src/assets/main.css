@@ -806,7 +806,6 @@ button {
   line-height: 1.35;
 }
 
-
 .recurring-card--compact {
   padding: 0.85rem 1rem;
 }
@@ -1675,120 +1674,29 @@ button {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: nowrap;
+  gap: 0.55rem;
+  color: var(--text);
+  text-decoration: none;
 }
 
-.app-portfolio-switch {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: stretch;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-}
-
-.app-portfolio-tabs {
-  display: inline-flex;
-}
-
-.app-portfolio-tab {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.68rem;
+.app-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  padding: 0.28rem 0.55rem;
-  cursor: pointer;
+  box-shadow: 0 6px 16px -8px var(--glow-1);
 }
 
-.app-portfolio-tab--active {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-}
-
-.app-portfolio-refresh {
-  flex-shrink: 0;
-  border: 0;
-  border-left: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  padding: 0.28rem 0.5rem;
-  cursor: pointer;
-  font: inherit;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.app-portfolio-refresh:hover:not(:disabled) {
-  color: var(--text);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-}
-
-.app-portfolio-refresh:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.app-portfolio-refresh-icon {
-  display: inline-block;
-  font-size: 0.95rem;
-  line-height: 1;
-}
-
-.app-portfolio-refresh-icon--spin {
-  animation: app-portfolio-spin 0.8s linear infinite;
-}
-
-@keyframes app-portfolio-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.app-kaspa-strip {
-  margin: 0;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.76rem;
-  line-height: 1.2;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.app-kaspa-logo {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  object-fit: cover;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--border) 70%, transparent);
-}
-
-.app-kaspa-item {
-  flex-shrink: 0;
-}
-
-.app-kaspa-portfolio {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.app-kaspa-sep {
-  flex-shrink: 0;
-  opacity: 0.55;
-}
-
-.app-kaspa-strip--stale {
-  opacity: 0.72;
+.app-brand-name {
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
 }
 
 .mobile-nav-toggle {
@@ -2903,7 +2811,6 @@ button {
   white-space: nowrap;
 }
 
-
 .mappings-list {
   display: flex;
   flex-direction: column;
@@ -3068,7 +2975,6 @@ table.rules select {
     min-height: auto;
   }
 }
-
 
 .excluded-list {
   display: flex;
@@ -4466,7 +4372,6 @@ table.rules select {
   border-bottom: none;
 }
 
-
 .pace-warning {
   margin: 0;
   font-size: 0.82rem;
@@ -4583,7 +4488,6 @@ table.rules select {
   text-decoration: none;
 }
 
-
 /* ===== Bottom tab bar (home-screen app on iPhone) ===== */
 .app-tabbar {
   position: fixed;
@@ -4632,27 +4536,6 @@ table.rules select {
 
 .main--with-tabbar {
   padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-}
-
-/* Header ticker: never push past the screen edge; truncate instead. */
-.app-kaspa-strip {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.app-kaspa-strip .app-kaspa-item {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (max-width: 420px) {
-  /* The price is in the menu; keep the header to the portfolio value. */
-  .app-kaspa-strip .app-kaspa-item:not(.app-kaspa-portfolio),
-  .app-kaspa-strip .app-kaspa-sep {
-    display: none;
-  }
 }
 
 /* Read-only household member (Julia): view everything, change nothing. */

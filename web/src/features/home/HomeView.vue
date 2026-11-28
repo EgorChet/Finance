@@ -3,7 +3,7 @@
     <DemoBanner />
     <header class="today-head">
       <h2 class="page-title">{{ t("Today") }}</h2>
-      <span class="today-date">{{ todayLabel }}<template v-if="cycleLabel"> · {{ tr(cycleLabel) }}</template></span>
+      <span class="today-date">{{ todayLabel }}</span>
     </header>
 
     <AppLoader v-if="spendingLoading" variant="hero" :title="t('Loading spending')" />
@@ -157,12 +157,6 @@ const displayMonths = computed(() => {
   return merged.map((m) => formatOverviewMonthLabel(m, months.value, cycleDay.value, refDate.value));
 });
 
-const cycleLabel = computed(() => {
-  const key = currentMonthKey.value;
-  if (!key) return "";
-  return displayMonths.value.find((m) => m.key === key)?.label ?? "";
-});
-
 const isPartialCycle = computed(() => {
   const key = currentMonthKey.value;
   if (!key) return false;
@@ -235,7 +229,7 @@ function planAt(ref: Date, extra: Transaction[] = []) {
 const summaryPlan = computed(() => planAt(refDate.value));
 
 const todayLabel = computed(() =>
-  refDate.value.toLocaleDateString(dateTag(), { weekday: "long", day: "numeric", month: "long" }),
+  refDate.value.toLocaleDateString(dateTag(), { weekday: "short", day: "numeric", month: "short" }),
 );
 
 const hasBitToSort = computed(
