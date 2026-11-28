@@ -8,21 +8,14 @@ import "./assets/desktop.css";
 import { hydratePaceSettings } from "./shared/settings/paceSettingsSync";
 import { userIdFromToken } from "./shared/utils/users";
 
-/** The launch screen draws the logo in about 2 s. A cold start keeps it up until the drawing is done, even if the app is ready sooner;
- *  a reload in the same session (or reduced motion) drops it at once. */
-const BOOT_DRAW_MS = 2000;
+/** The launch screen draws the logo in about 2 s. Every launch keeps it up until the drawing is done and the finished
+ *  logo has been on screen for a moment, even when the app is ready sooner. Reduced motion drops it at once. */
+const BOOT_HOLD_MS = 2800;
 function finishBoot() {
   const boot = document.getElementById("boot");
   if (!boot) return;
-  let seen = false;
-  try {
-    seen = sessionStorage.getItem("boot_seen") === "1";
-    sessionStorage.setItem("boot_seen", "1");
-  } catch {
-    /* private mode: treat every launch as a first one */
-  }
   const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  const wait = seen || calm ? 0 : Math.max(0, BOOT_DRAW_MS - performance.now());
+  const wait = calm ? 0 : Math.max(0, BOOT_HOLD_MS - performance.now());
   window.setTimeout(() => {
     boot.classList.add("boot--out");
     window.setTimeout(() => boot.remove(), 600);
