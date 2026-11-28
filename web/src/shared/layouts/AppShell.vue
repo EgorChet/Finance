@@ -136,7 +136,12 @@
         :style="{ height: `${pullRefreshing ? PULL_TRIGGER : pullDistance}px` }"
         aria-hidden="true"
       >
-        <span class="ptr-icon" :style="{ transform: `rotate(${pullRefreshing ? 0 : pullDistance * 3}deg)` }">↻</span>
+        <AppLogo
+          :key="pullRefreshing ? 'busy' : 'drag'"
+          class="ptr-logo"
+          :animated="pullRefreshing"
+          :progress="pullRefreshing ? undefined : Math.min(pullDistance / PULL_TRIGGER, 1)"
+        />
       </div>
       <RouterView :key="viewKey" />
     </main>
@@ -219,6 +224,7 @@
 
 <script setup lang="ts">
 import { useAllReportStore } from "@/shared/stores/allReport";
+import { whenSettled } from "@/shared/utils/whenSettled";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -559,7 +565,7 @@ async function onPullEnd() {
     invalidateAllDataCaches();
     void portfolio.refresh(auth.isDemo, auth.token || undefined, true);
     viewKey.value += 1; // remount the screen so it loads fresh data
-    await new Promise((r) => setTimeout(r, 700));
+    await whenSettled(1700, 8000); // the logo is drawn, and stays until the screen has its data
   } finally {
     pullRefreshing.value = false;
   }
