@@ -19,7 +19,7 @@
         try {
           var d = document.documentElement, t = localStorage.getItem("finance_theme"), p = localStorage.getItem("finance_palette");
           if (t === "light" || t === "dark") d.dataset.theme = t;
-          if (p && /^(gold|emerald|cobalt|carmine)$/.test(p)) d.dataset.palette = p;
+          if (p && /^(gold|emerald|cobalt|carmine|tiffany|powder|peach)$/.test(p)) d.dataset.palette = p;
         } catch (e) {}
       })();
     </script>
@@ -33,6 +33,12 @@
       [data-palette="emerald"][data-theme="light"] { --b-bg: #eef5f1; --b-text: #0e1a14; --b-fill: #2bd48a; --b-on: #04140d; --b-end: #12a66a; --b-g1: rgba(43,212,138, 0.22); --b-g2: rgba(18,166,106, 0.12); --b-g3: rgba(61,220,151, 0.1); }
       [data-palette="cobalt"][data-theme="light"] { --b-bg: #eff2f9; --b-text: #0f1424; --b-fill: #3d6bff; --b-on: #ffffff; --b-end: #2f58e6; --b-g1: rgba(61,107,255, 0.22); --b-g2: rgba(91,133,255, 0.12); --b-g3: rgba(47,88,230, 0.1); }
       [data-palette="carmine"][data-theme="light"] { --b-bg: #f7f2f0; --b-text: #1a1211; --b-fill: #e5392e; --b-on: #ffffff; --b-end: #c92b21; --b-g1: rgba(229,57,46, 0.22); --b-g2: rgba(255,90,74, 0.12); --b-g3: rgba(201,43,33, 0.1); }
+      [data-palette="tiffany"] { --b-bg: #0b1112; --b-text: #eef8f7; --b-fill: #81d8d0; --b-on: #0b2b2a; --b-end: #5cc6bd; --b-g1: rgba(129,216,208, 0.22); --b-g2: rgba(249,182,207, 0.12); --b-g3: rgba(92,198,189, 0.1); }
+      [data-palette="powder"] { --b-bg: #120c0f; --b-text: #fbf0f4; --b-fill: #f6a9c4; --b-on: #3b1226; --b-end: #f18fb0; --b-g1: rgba(246,169,196, 0.22); --b-g2: rgba(214,184,255, 0.12); --b-g3: rgba(241,143,176, 0.1); }
+      [data-palette="peach"] { --b-bg: #130e0c; --b-text: #fdf3ee; --b-fill: #ffb8a0; --b-on: #3a1a10; --b-end: #f79a7e; --b-g1: rgba(255,184,160, 0.22); --b-g2: rgba(249,182,207, 0.12); --b-g3: rgba(247,154,126, 0.1); }
+      [data-palette="tiffany"][data-theme="light"] { --b-bg: #eaf7f6; --b-text: #0f2322; --b-fill: #81d8d0; --b-on: #0b2b2a; --b-end: #5cc6bd; --b-g1: rgba(129,216,208, 0.22); --b-g2: rgba(249,182,207, 0.12); --b-g3: rgba(92,198,189, 0.1); }
+      [data-palette="powder"][data-theme="light"] { --b-bg: #fdf1f5; --b-text: #2a1019; --b-fill: #f6a9c4; --b-on: #3b1226; --b-end: #f18fb0; --b-g1: rgba(246,169,196, 0.22); --b-g2: rgba(214,184,255, 0.12); --b-g3: rgba(241,143,176, 0.1); }
+      [data-palette="peach"][data-theme="light"] { --b-bg: #fff3ee; --b-text: #2b1610; --b-fill: #ffb8a0; --b-on: #3a1a10; --b-end: #f79a7e; --b-g1: rgba(255,184,160, 0.22); --b-g2: rgba(249,182,207, 0.12); --b-g3: rgba(247,154,126, 0.1); }
       /* Launch screen: shown until the app mounts and replaces #app's content. */
       html, body { margin: 0; background: var(--b-bg); }
       .boot {

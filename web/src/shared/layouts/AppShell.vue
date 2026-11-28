@@ -35,7 +35,7 @@
               <span class="acct-label">{{ t("Light mode") }}</span>
               <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
             </label>
-            <div class="acct-row">
+            <div class="acct-row acct-row--stack">
               <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M8 1.75a6.25 6.25 0 1 0 0 12.5c.9 0 1.4-.6 1.4-1.3 0-1-.9-1.2-.9-2.1 0-.8.6-1.4 1.5-1.4h1.5a2.25 2.25 0 0 0 2.25-2.25C13.75 4.1 11.2 1.75 8 1.75z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
                 <circle cx="5" cy="7.5" r="0.9" fill="currentColor" /><circle cx="7.6" cy="4.9" r="0.9" fill="currentColor" /><circle cx="10.6" cy="5.6" r="0.9" fill="currentColor" />
@@ -236,7 +236,7 @@ import {
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
-import { useAppStore, type Palette } from "@/shared/stores/app";
+import { hasSavedPalette, useAppStore, type Palette } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
 import { useHouseholdDataStore } from "@/shared/stores/viewData";
@@ -255,6 +255,9 @@ const PALETTE_OPTIONS: { value: Palette; label: string; color: string }[] = [
   { value: "emerald", label: "Emerald", color: "#2bd48a" },
   { value: "cobalt", label: "Cobalt", color: "#3d6bff" },
   { value: "carmine", label: "Carmine graphite", color: "#e5392e" },
+  { value: "tiffany", label: "Tiffany", color: "#81d8d0" },
+  { value: "powder", label: "Powder", color: "#f6a9c4" },
+  { value: "peach", label: "Peach", color: "#ffb8a0" },
 ];
 
 const LANGS: { value: Locale; label: string }[] = [
@@ -340,6 +343,15 @@ const marketRows = computed(() => {
       change: r.change ?? null,
     }));
 });
+
+// Julia opens the app in the soft Tiffany palette until she picks her own.
+watch(
+  () => auth.userId,
+  (id) => {
+    if (id === "julia" && !hasSavedPalette()) app.setPalette("tiffany");
+  },
+  { immediate: true },
+);
 
 function closeNav() {
   navOpen.value = false;
