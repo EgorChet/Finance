@@ -145,7 +145,7 @@ export const RU: Record<string, string> = {
   "used {n}": "использовано {n}",
   "{delta} vs previous month": "{delta} к прошлому месяцу",
   "Allow pop-ups to download the payslip": "Разрешите всплывающие окна, чтобы скачать расчётный лист",
-  "Fill from my latest payslip": "Заполнить по последнему расчётному листу",
+  "Fill from my latest payslip": "Из последнего листа",
   "Taken from the {month} payslip; the result is for the month after it.": "Взято из расчётного листа за {month}; результат для следующего месяца.",
   "Salary calculator": "Калькулятор зарплаты",
   "From gross pay to take-home, the way a payslip works it out": "От зарплаты до вычетов к сумме на руки, как считает расчётный лист",
