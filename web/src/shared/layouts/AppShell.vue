@@ -35,6 +35,28 @@
               <span class="acct-label">{{ t("Light mode") }}</span>
               <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
             </label>
+            <div class="acct-row">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 1.75a6.25 6.25 0 1 0 0 12.5c.9 0 1.4-.6 1.4-1.3 0-1-.9-1.2-.9-2.1 0-.8.6-1.4 1.5-1.4h1.5a2.25 2.25 0 0 0 2.25-2.25C13.75 4.1 11.2 1.75 8 1.75z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+                <circle cx="5" cy="7.5" r="0.9" fill="currentColor" /><circle cx="7.6" cy="4.9" r="0.9" fill="currentColor" /><circle cx="10.6" cy="5.6" r="0.9" fill="currentColor" />
+              </svg>
+              <span class="acct-label">{{ t("Palette") }}</span>
+              <div class="pal-switch" role="radiogroup" :aria-label="t('Palette')">
+                <button
+                  v-for="p in PALETTE_OPTIONS"
+                  :key="p.value"
+                  type="button"
+                  role="radio"
+                  class="pal-dot"
+                  :class="{ 'pal-dot--on': app.palette === p.value }"
+                  :style="{ '--dot': p.color }"
+                  :aria-checked="app.palette === p.value"
+                  :aria-label="t(p.label)"
+                  :title="t(p.label)"
+                  @click="app.setPalette(p.value)"
+                />
+              </div>
+            </div>
             <div v-if="LANGUAGE_READY" class="acct-row">
               <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
@@ -214,7 +236,7 @@ import {
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
-import { useAppStore } from "@/shared/stores/app";
+import { useAppStore, type Palette } from "@/shared/stores/app";
 import { useAuthStore } from "@/shared/stores/auth";
 import { usePortfolioStore } from "@/shared/stores/portfolio";
 import { useHouseholdDataStore } from "@/shared/stores/viewData";
@@ -228,6 +250,13 @@ import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
 
 /** The switch shows once every screen is translated. */
 const LANGUAGE_READY = true;
+const PALETTE_OPTIONS: { value: Palette; label: string; color: string }[] = [
+  { value: "gold", label: "Gold", color: "#ffcf3f" },
+  { value: "emerald", label: "Emerald", color: "#2bd48a" },
+  { value: "cobalt", label: "Cobalt", color: "#3d6bff" },
+  { value: "carmine", label: "Carmine graphite", color: "#e5392e" },
+];
+
 const LANGS: { value: Locale; label: string }[] = [
   { value: "en", label: "EN" },
   { value: "ru", label: "RU" },

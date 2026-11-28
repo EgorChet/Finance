@@ -80,9 +80,9 @@ button {
 }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0f172a;
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-contrast);
   font-weight: 600;
 }
 
@@ -268,8 +268,8 @@ button {
 }
 
 .toggle-switch-input:checked + .toggle-switch-track {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
 }
 
 .toggle-switch-input:checked + .toggle-switch-track::after {
@@ -1986,7 +1986,7 @@ button {
   margin-top: 0.35rem;
   border-radius: 999px;
   flex-shrink: 0;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .upload-job-toast--syncing .upload-job-toast-dot {
@@ -3415,7 +3415,7 @@ table.rules select {
 
 .pace-progress-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--accent-fill);
   border-radius: 999px;
   transition: width 0.2s ease;
 }
@@ -4215,8 +4215,8 @@ table.rules select {
 }
 
 .lang-switch-btn--on {
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-fill);
+  color: var(--accent-contrast);
 }
 
 .login-lang {

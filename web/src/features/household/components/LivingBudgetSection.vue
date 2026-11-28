@@ -99,7 +99,7 @@
             </li>
             <li v-if="cardBills > 0">
               <span class="bx-legend-item">
-                <i style="background: var(--accent)" /><span class="bx-legend-name">{{ t("Bills on your card (avg)") }}</span><b>~{{ formatIlsWhole(cardBills) }}</b>
+                <i style="background: var(--accent-fill)" /><span class="bx-legend-name">{{ t("Bills on your card (avg)") }}</span><b>~{{ formatIlsWhole(cardBills) }}</b>
               </span>
             </li>
             <li>
@@ -531,7 +531,7 @@ const periodRows = computed(() => [
 ].filter((row, i, all) => all.findIndex((r) => r.seg === row.seg) === i)
   .sort((a, b) => b.seg.from_month.localeCompare(a.seg.from_month)));
 
-const SOURCE_COLORS = ["var(--accent)", "#34d399", "#fbbf24", "#4fc3ff", "#f472b6"];
+const SOURCE_COLORS = ["var(--accent-fill)", "#34d399", "#fbbf24", "#4fc3ff", "#f472b6"];
 
 /** Salary + Cibus + rent cover active in the headline month, for the "where it comes from" bar. */
 const sources = computed(() => {
