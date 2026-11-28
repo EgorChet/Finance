@@ -298,7 +298,7 @@ export const RU: Record<string, string> = {
   "About usual": "Как обычно",
   "{amount} more than usual": "на {amount} больше обычного",
   "{amount} less than usual": "на {amount} меньше обычного",
-  "by {date}, the last sync": "к {date}, последняя синхронизация",
+  "by {date}, the last sync": "к {date}",
   "by day {n}": "к {n}-му дню",
   "{cycle} is waiting for its statement": "{cycle} ждёт выписку",
   "The numbers and categories appear as soon as the card syncs — tap Sync Cal or ask Totoshka to upload the statement.": "Цифры и категории появятся, как только карта синхронизируется — нажмите «Синхронизировать Cal» или попросите Тотошку загрузить выписку.",
