@@ -443,7 +443,7 @@ const keepOfThousand = computed(() => {
   background: var(--danger);
 }
 .sal-bar__part--funds {
-  background: var(--accent-fill);
+  background: var(--chart-blue);
 }
 .sal-legend {
   display: flex;
