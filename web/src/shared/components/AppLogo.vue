@@ -1,8 +1,8 @@
 <template>
   <svg class="lg" :class="{ 'lg--anim': animated }" :viewBox="lockup ? '0 0 240 48' : '0 0 48 48'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
-    <rect class="lg-fill" x="2" y="2" width="44" height="44" rx="13" fill="#FFCF3F" />
-    <rect class="lg-frame" x="2" y="2" width="44" height="44" rx="13" fill="none" stroke="#FFCF3F" stroke-width="2.5" pathLength="100" />
-    <g stroke="#111114" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect class="lg-fill" x="2" y="2" width="44" height="44" rx="13" />
+    <rect class="lg-frame" x="2" y="2" width="44" height="44" rx="13" fill="none" stroke-width="2.5" pathLength="100" />
+    <g class="lg-ch" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
       <path class="lg-s1" pathLength="100" d="M15 12V26Q15 30 20 30H33" />
       <path class="lg-s2" pathLength="100" d="M33 12V38" />
     </g>
@@ -15,7 +15,7 @@
 
 <script setup lang="ts">
 /**
- * The Ч-Банк mark: a yellow rounded square with a Ч drawn in two strokes; the lockup adds БАНК.
+ * The Ч-Банк mark: a rounded square in the palette's fill colour with a Ч drawn in two strokes; the lockup adds БАНК.
  * `animated` plays the draw-on once, as on the launch screen.
  * Keep the paths in step with the inline copy in index.html and scripts/make-icons.mjs.
  */
@@ -27,8 +27,15 @@ defineProps<{ animated?: boolean; lockup?: boolean }>();
   display: block;
   overflow: visible;
 }
+.lg-fill {
+  fill: var(--accent-fill);
+}
 .lg-frame {
   opacity: 0;
+  stroke: var(--accent-fill);
+}
+.lg-ch {
+  stroke: var(--accent-contrast);
 }
 /* Animated: the frame is drawn, the fill comes in, the two strokes are drawn, the word wipes in. */
 .lg--anim .lg-fill {
