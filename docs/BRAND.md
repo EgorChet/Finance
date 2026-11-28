@@ -5,14 +5,23 @@ by CSS variables in `web/src/assets/theme.css`. Nothing in the app should hard-c
 
 ## Logo
 
-**Letter construction (one system for all five letters):** cap height 32, stroke 6, round caps and round joins,
-outer width 26 for every letter, drawn with paths (no font). Optical kerning: diagonals (А) sit 4 units closer,
-straight-to-straight pairs have a gap of 7. The Ч inside the square has *exactly* the cap height and stroke of the
-letters in the word and sits on the same top and bottom lines, so it never looks smaller or from another font.
-Square 60×60, corner radius 17; the word is vertically centred on the square (cap lines 14 and 46).
-The Ч glyph: `M3 3V14Q3 19 8 19H23` + `M23 3V29`. БАНК: Б `M23 3H3V29H14Q23 29 23 23.5Q23 18 14 18H3`,
-А `M3 29L13 3L23 29M6.2 21H19.8`, Н `M3 3V29M23 3V29M3 16H23`, К `M3 3V29M23 3L3 17M9.5 12.5L23 29`.
+**Proportions (measured from the T-Bank logo, Wikimedia Commons `T-Bank_RU_logo.svg`, 95×34, cap height 12):**
+the mark and the word share one cap height and the same top and bottom lines; the mark is about 2.4 × 2.3 cap
+heights; the letter inside it is about 1.1 cap heights wide and sits one unit above the geometric centre; the gap
+from the mark to the word is 0.58 cap heights; letters are wide (1.1–1.27 cap heights) and heavy (stems about 28 %
+of the cap height), spacing is tight (0–2 units of 12). In our units (cap height 36):
 
+| Part | Value |
+|---|---|
+| Square | 84 × 84, corner radius 22 |
+| Cap height (Ч and БАНК) | 36, from y = 23 to y = 59 |
+| Stem | 9 |
+| Letter widths | Б 40 · А 46 · Н 40 · К 43 · Ч 40 |
+| Gap square → word | 21 |
+| Letter gaps | Б→А 1.5 · А→Н 3.2 · Н→К 6.4 |
+
+Glyphs (filled outlines, no font): Ч `M0 0H9V19.5H31V0H40V36H31V28.5H0Z`; Б `M0 0H40V9H9V13.5H24Q40 13.5 40 24.75Q40 36 24 36H0Z M9 22.5V27H24Q31 27 31 24.75Q31 22.5 24 22.5Z` (even-odd); А `M0 36L17.5 0H28.5L46 36H35L32.6 31H13.4L11 36Z M17.3 23H28.7L23 11.3Z` (even-odd); Н `M0 0H9V14.5H31V0H40V36H31V23.5H9V36H0Z`; К `M0 0H9V15.2L30.5 0H42.5L21.2 17.6L43 36H30.8L14.6 22.6L9 27.3V36H0Z`.
+The Ч is a letter of the same family as БАНК and has exactly the same cap height and stem, so it cannot look smaller.
 
 - Letters are drawn with paths, not a font, so the logo looks the same on every device.
 - Colours: the square uses `--accent-fill`, the Ч uses `--accent-contrast`, the word uses the text colour.
