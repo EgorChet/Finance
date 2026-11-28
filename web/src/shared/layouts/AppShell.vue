@@ -1,9 +1,9 @@
 <template>
   <div class="app-layout">
     <header class="app-header">
-      <RouterLink to="/app/home" class="app-header-brand" aria-label="Finance">
+      <RouterLink to="/app/home" class="app-header-brand" aria-label="Ч-Банк">
         <AppLogo class="app-logo" />
-        <span class="app-brand-name">Finance</span>
+        <span class="app-brand-name">Банк</span>
       </RouterLink>
       <button
         type="button"

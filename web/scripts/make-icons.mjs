@@ -1,13 +1,12 @@
-// Renders the app icons from the mark (same paths as AppLogo.vue and index.html):
+// Renders the Ч-Банк app icons from the mark (same paths as AppLogo.vue and index.html):
 //   node scripts/make-icons.mjs        (needs Playwright; writes public/favicon.svg, apple-touch-icon.png, icon-512.png)
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const GRAD = `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7b6cff"/><stop offset="0.55" stop-color="#a35cff"/><stop offset="1" stop-color="#e255c8"/></linearGradient></defs>`;
-const GLYPH = `<g stroke="#fff" stroke-width="4.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 34V14H22a6 6 0 0 1 6 6V28"/><path d="M34 14V34H26a6 6 0 0 1-6-6V20"/></g><circle cx="39" cy="9.5" r="2.6" fill="#4fc3ff"/>`;
-const svg = (rx) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">${GRAD}<rect width="48" height="48" rx="${rx}" fill="url(#g)"/>${GLYPH}</svg>`;
+const GLYPH = `<path d="M15 12V26Q15 30 20 30H33M33 12V38" stroke="#111114" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+const svg = (rx) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="${rx}" fill="#FFCF3F"/>${GLYPH}</svg>`;
 
 writeFileSync(new URL("../public/favicon.svg", import.meta.url), svg(11));
 
