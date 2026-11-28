@@ -29,6 +29,15 @@ by a small script in `index.html`.
 | **Cobalt** | `#3d6bff` | `#7fa3ff` / `#2748c9` | `#ffffff` |
 | **Carmine graphite** | `#e5392e` | `#ff6b5e` / `#c2281d` | `#ffffff` |
 
+Three soft palettes are added for Julia; they are open to everyone, and Julia's account opens in **Tiffany**
+until she picks her own (a saved choice always wins).
+
+| Palette | Fill | Text accent dark / light | Text on fill |
+|---|---|---|---|
+| **Tiffany** | `#81d8d0` | `#8fe3dc` / `#0b8a86` | `#0b2b2a` |
+| **Powder** (soft pink) | `#f6a9c4` | `#ffb8d0` / `#b83a6b` | `#3b1226` |
+| **Peach** | `#ffb8a0` | `#ffc6b3` / `#c2563a` | `#3a1a10` |
+
 Each palette also sets its own neutrals (background, cards, borders, text), a fill gradient, soft glows and a
 tinted "neutral hero" card, so no cold violet is left over.
 

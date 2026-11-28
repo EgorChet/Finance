@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
-export const PALETTES = ["gold", "emerald", "cobalt", "carmine"] as const;
+export const PALETTES = ["gold", "emerald", "cobalt", "carmine", "tiffany", "powder", "peach"] as const;
 export type Palette = (typeof PALETTES)[number];
 
 const THEME_KEY = "finance_theme";
@@ -12,6 +12,15 @@ function remember(key: string, value: string) {
     localStorage.setItem(key, value);
   } catch {
     /* private mode: the choice just lasts until the page closes */
+  }
+}
+
+/** True when the user (or an earlier visit) already chose a palette on this device. */
+export function hasSavedPalette(): boolean {
+  try {
+    return localStorage.getItem(PALETTE_KEY) !== null;
+  } catch {
+    return false;
   }
 }
 
