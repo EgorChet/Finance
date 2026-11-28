@@ -138,7 +138,7 @@
         <AppLogo
           :key="pullRefreshing ? 'busy' : 'drag'"
           class="ptr-logo"
-          :animated="pullRefreshing"
+          :loop="pullRefreshing"
           :progress="pullRefreshing ? undefined : Math.min(pullDistance / PULL_TRIGGER, 1)"
         />
       </div>
