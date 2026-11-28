@@ -78,6 +78,9 @@
 }
 
 :root {
+  /* Chart series colours do not follow the palette (a palette's brand colour can equal amber or green,
+     which also mean "careful" and "good"): installments and similar third series use this blue. */
+  --chart-blue: #4f94f7;
   --radius-card: 22px;
   --radius-inner: 16px;
   --radius-control: 14px;
@@ -3763,9 +3766,10 @@ button.bx-row {
   color: var(--success);
 }
 
+/* Expected / upcoming is blue in every palette: the brand colour can be green (Emerald) and would read as "actual". */
 .bx-status--upcoming {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--chart-blue) 18%, transparent);
+  color: var(--chart-blue);
 }
 
 .bx-section-note {
