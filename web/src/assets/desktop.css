@@ -24,12 +24,7 @@
   }
 
   .app-tabbar::before {
-    content: "Finance";
-    padding: 0.35rem 0.75rem 1.1rem;
-    font-size: 1.15rem;
-    font-weight: 750;
-    letter-spacing: -0.02em;
-    color: var(--text);
+    content: none;
   }
 
   .app-tab {
@@ -117,8 +112,4 @@
     max-width: 420px;
   }
 
-  /* The rail already carries the name; the header keeps just the mark. */
-  .app-brand-name {
-    display: none;
-  }
 }

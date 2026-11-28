@@ -10,7 +10,7 @@ export const RU_MERCHANT_NAMES: Record<string, string> = {
   "Super-Pharm Online": "Супер-Фарм онлайн",
   "Super-Pharm": "Супер-Фарм",
   "Good Pharm": "Гуд Фарм",
-  "B Drugstores": "Би Драгсторс",
+  "Be Pharm": "Би Фарм",
   Benedict: "Бенедикт",
   Roladin: "Роладин",
   Aroma: "Арома",
