@@ -1,56 +1,10 @@
 <template>
   <div class="app-layout">
     <header class="app-header">
-      <div class="app-header-brand">
-        <div class="app-portfolio-switch">
-          <div class="app-portfolio-tabs" role="tablist" aria-label="Portfolio asset">
-            <button
-              type="button"
-              class="app-portfolio-tab"
-              :class="{ 'app-portfolio-tab--active': portfolioAsset === 'kas' }"
-              role="tab"
-              :aria-selected="portfolioAsset === 'kas'"
-              aria-label="Kaspa"
-              @click="setPortfolioAsset('kas')"
-            >
-              <img class="app-portfolio-tab-logo" :src="kaspaLogo" alt="" width="18" height="18" />
-            </button>
-            <button
-              type="button"
-              class="app-portfolio-tab"
-              :class="{ 'app-portfolio-tab--active': portfolioAsset === 'fxcn' }"
-              role="tab"
-              :aria-selected="portfolioAsset === 'fxcn'"
-              @click="setPortfolioAsset('fxcn')"
-            >
-              FXCN
-            </button>
-          </div>
-          <button
-            type="button"
-            class="app-portfolio-refresh"
-            :disabled="portfolioRefreshing"
-            :aria-label="portfolioRefreshLabel"
-            @click="refreshPortfolioQuote(true)"
-          >
-            <span
-              class="app-portfolio-refresh-icon"
-              :class="{ 'app-portfolio-refresh-icon--spin': portfolioRefreshing }"
-              aria-hidden="true"
-            >↻</span>
-          </button>
-        </div>
-        <div
-          v-if="portfolioStripVisible"
-          class="app-kaspa-strip"
-          :class="{ 'app-kaspa-strip--stale': portfolioStale }"
-          :title="portfolioTitle"
-        >
-          <span class="app-kaspa-item">{{ portfolioPriceLabel }}</span>
-          <span class="app-kaspa-sep" aria-hidden="true">·</span>
-          <span class="app-kaspa-item app-kaspa-portfolio">{{ portfolioValueLabel }}</span>
-        </div>
-      </div>
+      <RouterLink to="/app/home" class="app-header-brand" aria-label="Finance">
+        <span class="app-logo" aria-hidden="true">₪</span>
+        <span class="app-brand-name">Finance</span>
+      </RouterLink>
       <button
         type="button"
         class="app-account-btn"
@@ -77,10 +31,7 @@
               <div
                 v-if="kaspaQuote"
                 class="mobile-nav-portfolio-row"
-                :class="{
-                  'mobile-nav-portfolio-row--active': portfolioAsset === 'kas',
-                  'mobile-nav-portfolio-row--stale': kaspaQuote.stale,
-                }"
+                :class="{ 'mobile-nav-portfolio-row--stale': kaspaQuote.stale }"
                 :title="kasPortfolioTitle"
               >
                 <img class="mobile-nav-portfolio-logo" :src="kaspaLogo" alt="" width="18" height="18" />
@@ -91,10 +42,7 @@
               <div
                 v-if="fxcnQuote"
                 class="mobile-nav-portfolio-row"
-                :class="{
-                  'mobile-nav-portfolio-row--active': portfolioAsset === 'fxcn',
-                  'mobile-nav-portfolio-row--stale': fxcnQuote.stale,
-                }"
+                :class="{ 'mobile-nav-portfolio-row--stale': fxcnQuote.stale }"
                 :title="fxcnPortfolioTitle"
               >
                 <span class="mobile-nav-portfolio-label">FXCN</span>
@@ -438,18 +386,6 @@ const LANGS: { value: Locale; label: string }[] = [
   { value: "ru", label: "RU" },
 ];
 
-/** v2 — default header asset is KAS (v1 may have persisted FXCN). */
-const PORTFOLIO_ASSET_KEY = "portfolio_header_asset_v2";
-type PortfolioAsset = "kas" | "fxcn";
-
-function readPortfolioAsset(): PortfolioAsset {
-  try {
-    return localStorage.getItem(PORTFOLIO_ASSET_KEY) === "fxcn" ? "fxcn" : "kas";
-  } catch {
-    return "kas";
-  }
-}
-
 const SYNC_STEPS = [
   "Scanning statements folder",
   "Reading spreadsheets",
@@ -484,7 +420,7 @@ function onLightModeChange(value: boolean) {
 }
 const auth = useAuthStore();
 const portfolio = usePortfolioStore();
-const { kaspaQuote, fxcnQuote, marketSnapshot, refreshing: portfolioRefreshing } = storeToRefs(portfolio);
+const { kaspaQuote, fxcnQuote, marketSnapshot } = storeToRefs(portfolio);
 const route = useRoute();
 const router = useRouter();
 const processing = ref(false);
@@ -502,7 +438,6 @@ const uploadToast = ref<{ state: "syncing" | "done" | "error"; message: string }
 const uploadToastMuted = ref(false);
 const uploadRetry = ref<{ file: File; statementType: "partial" | "final" } | null>(null);
 const navOpen = ref(false);
-const portfolioAsset = ref<PortfolioAsset>(readPortfolioAsset());
 let stepTimer: ReturnType<typeof setInterval> | null = null;
 let uploadPollTimer: ReturnType<typeof setInterval> | null = null;
 let uploadDoneTimer: ReturnType<typeof setTimeout> | null = null;
@@ -553,38 +488,6 @@ const portfolioCombinedTitle = computed(() => {
   return `${t("Combined portfolio")} · ${parts.join(" · ")}`;
 });
 
-const portfolioStripVisible = computed(() =>
-  portfolioAsset.value === "kas" ? !!kaspaQuote.value : !!fxcnQuote.value,
-);
-
-const portfolioStale = computed(() =>
-  portfolioAsset.value === "kas" ? !!kaspaQuote.value?.stale : !!fxcnQuote.value?.stale,
-);
-
-const portfolioPriceLabel = computed(() => {
-  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
-    return formatKasUsdtPrice(kaspaQuote.value.price_usdt);
-  }
-  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
-    return formatFxcnNavPrice(fxcnQuote.value.nav_usd);
-  }
-  return "";
-});
-
-const portfolioValueLabel = computed(() => {
-  if (portfolioAsset.value === "kas" && kaspaQuote.value) {
-    return formatUsdt(kaspaQuote.value.portfolio_usdt, 0);
-  }
-  if (portfolioAsset.value === "fxcn" && fxcnQuote.value) {
-    return formatUsd(fxcnQuote.value.portfolio_usd, 0);
-  }
-  return "";
-});
-
-const portfolioRefreshLabel = computed(() =>
-  portfolioAsset.value === "kas" ? t("Refresh KAS price") : t("Refresh FXCN NAV"),
-);
-
 const kasPortfolioTitle = computed(() => {
   if (!kaspaQuote.value) return "";
   const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
@@ -598,23 +501,6 @@ const fxcnPortfolioTitle = computed(() => {
   const staleNote = stale ? ` · ${t("cached")}` : "";
   return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
 });
-
-const portfolioTitle = computed(() => {
-  if (portfolioAsset.value === "kas") return kasPortfolioTitle.value;
-  if (portfolioAsset.value === "fxcn") return fxcnPortfolioTitle.value;
-  return "";
-});
-
-function setPortfolioAsset(asset: PortfolioAsset) {
-  portfolioAsset.value = asset;
-  localStorage.setItem(PORTFOLIO_ASSET_KEY, asset);
-  void refreshPortfolioQuote();
-}
-
-async function refreshPortfolioQuote(force = false) {
-  if (portfolioRefreshing.value) return;
-  await portfolio.refresh(auth.isDemo, auth.token || undefined, force);
-}
 
 function closeNav() {
   navOpen.value = false;

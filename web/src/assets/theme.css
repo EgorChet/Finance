@@ -359,16 +359,6 @@ textarea:focus {
   border-bottom: 0;
 }
 
-.app-portfolio-switch {
-  border: 0;
-  background: var(--surface);
-}
-
-.app-portfolio-tab--active {
-  background: var(--surface-raised);
-  border-radius: var(--radius-pill);
-}
-
 .mobile-nav-toggle {
   border: 0;
   background: var(--surface);
@@ -1757,99 +1747,12 @@ html.sheet-editor-open body {
   cursor: pointer;
 }
 
-
 .budget-edit-btn:disabled {
   opacity: 0.45;
 }
 
 .living-budget-breakdown__value .budget-edit-btn {
   margin-left: 0.5rem;
-}
-
-/* Phones: menu button on the left, one compact portfolio pill on the right
-   (asset switch, value, refresh). Prices and holdings are also on Home and in the menu. */
-@media (max-width: 640px) {
-  .app-header-brand {
-    flex: none;
-    margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    height: 40px;
-    padding: 0 0.3rem 0 0.25rem;
-    border-radius: 999px;
-    background: var(--surface);
-    box-shadow: var(--shadow-card), inset 0 0 0 1px var(--border);
-  }
-
-  /* Let the switch's children join the pill so they can be ordered: tabs, value, refresh. */
-  .app-header-brand .app-portfolio-switch {
-    display: contents;
-  }
-
-  .app-header-brand .app-portfolio-tabs {
-    order: 1;
-    display: inline-flex;
-    padding: 2px;
-    border-radius: 999px;
-    background: var(--surface-alt);
-  }
-
-  .app-header-brand .app-portfolio-tab {
-    min-height: 28px;
-    padding: 0 0.55rem;
-    border: 0;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--text-faint);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-  }
-
-  .app-header-brand .app-portfolio-tab--active {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  }
-
-  .app-header-brand .app-kaspa-strip {
-    order: 2;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin: 0;
-    padding: 0 0.15rem;
-    border: 0;
-    background: none;
-  }
-
-  .app-header-brand .app-kaspa-portfolio {
-    font-size: 0.92rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .app-header-brand .app-portfolio-refresh {
-    order: 3;
-    width: 30px;
-    height: 30px;
-    min-width: 30px;
-    min-height: 30px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: var(--surface-alt);
-    color: var(--text-muted);
-    display: grid;
-    place-items: center;
-  }
-
-  .app-header-brand .app-portfolio-refresh-icon {
-    font-size: 0.95rem;
-    line-height: 1;
-  }
 }
 
 /* Right side of a list row: amount on top, a status pill only when it says something. */
@@ -1914,32 +1817,9 @@ html.sheet-editor-open body {
 
 /* Small phones (iPhone SE, 320px): keep the switch and the value; refresh stays on Home. */
 @media (max-width: 374px) {
-  .app-header-brand .app-portfolio-refresh {
-    display: none;
-  }
-
-  .app-header-brand {
-    gap: 0.3rem;
-    padding-right: 0.55rem;
-  }
-
-  .app-header-brand .app-portfolio-tab {
-    padding: 0 0.42rem;
-  }
 
   .app-header {
     gap: 0.4rem;
-  }
-}
-
-/* View-only (Julia) on phones: the eye badge needs room, refresh stays on the Home card. */
-@media (max-width: 640px) {
-  .app-layout--readonly .app-header-brand .app-portfolio-refresh {
-    display: none;
-  }
-
-  .app-layout--readonly .app-header-brand {
-    padding-right: 0.55rem;
   }
 }
 
@@ -1993,27 +1873,6 @@ html.sheet-editor-open body {
 
 .fold-section__body > .manual-section-lead {
   margin: 0 0 0.75rem;
-}
-
-/* The KAS tab is the Kaspa logo itself; dimmed when the other asset is selected. */
-.app-portfolio-tab-logo {
-  display: block;
-  width: 18px;
-  height: 18px;
-  opacity: 0.45;
-  filter: grayscale(0.6);
-  transition: opacity 0.15s ease, filter 0.15s ease;
-}
-
-.app-portfolio-tab--active .app-portfolio-tab-logo {
-  opacity: 1;
-  filter: none;
-}
-
-.app-portfolio-tab:has(.app-portfolio-tab-logo) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* ── Categories: grouped list, one tap target per row ── */
@@ -3633,9 +3492,10 @@ button.bx-row {
 /* ── Today (Home) ── */
 .today-head {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  margin-bottom: 0.9rem;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.7rem;
 }
 
 .today-head .page-title {
@@ -3643,8 +3503,10 @@ button.bx-row {
 }
 
 .today-date {
+  min-width: 0;
   font-size: 0.85rem;
   color: var(--text-muted);
+  text-align: right;
 }
 
 .today-section {
@@ -3767,13 +3629,10 @@ button.bx-row {
   line-height: 18px;
 }
 
-/* Header: portfolio on the left, account button on the right. */
+/* Header: the app mark on the left, account button on the right. */
 .app-header .app-header-brand {
   flex: 0 1 auto;
-  min-width: 0;
   margin: 0;
-  justify-content: flex-start;
-  text-align: left;
 }
 
 /* Account panel content starts at the top now that it has no nav links. */
@@ -3808,10 +3667,6 @@ button.bx-row {
   background: var(--surface-alt);
   color: var(--text);
   box-shadow: none;
-}
-
-.app-header .app-portfolio-switch {
-  flex: 0 0 auto;
 }
 
 .mobile-nav-drawer .mobile-nav-footer {
