@@ -68,14 +68,20 @@
               <span class="acct-label">{{ t("Import statement") }}</span>
               <span class="acct-chevron" aria-hidden="true">›</span>
             </button>
-            <button type="button" class="acct-row acct-row--btn" :disabled="calBusy" @click="syncCal()">
-              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <span class="acct-label">{{ t("Sync Cal") }}</span>
-              <span class="acct-chevron" aria-hidden="true">›</span>
-            </button>
+          </div>
+
+          <div v-if="marketRows.length" class="acct-group acct-markets" role="group" :aria-label="t('Markets')">
+            <div v-for="m in marketRows" :key="m.key" class="acct-tick">
+              <span class="acct-tick-name">
+                <strong>{{ m.label }}</strong>
+                <small v-if="m.sub">{{ m.sub }}</small>
+              </span>
+              <span class="acct-tick-price">{{ m.price }}</span>
+              <span v-if="m.change != null" class="acct-tick-change" :class="m.change >= 0 ? 'acct-tick-change--up' : 'acct-tick-change--down'">
+                {{ m.change >= 0 ? "+" : "−" }}{{ Math.abs(m.change).toFixed(1) }}%
+              </span>
+              <span v-else class="acct-tick-change" aria-hidden="true">—</span>
+            </div>
           </div>
 
           <div v-if="auth.isDemo" class="acct-group">
@@ -88,9 +94,15 @@
             </button>
           </div>
 
-          <button v-if="auth.authRequired && auth.isAuthenticated" type="button" class="acct-signout" @click="logout">
-            {{ t("Sign out") }}
-          </button>
+          <div v-if="auth.authRequired && auth.isAuthenticated" class="acct-group acct-group--bottom">
+            <button type="button" class="acct-row acct-row--btn acct-row--danger" @click="logout">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M6.25 2.75h4.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M9.25 8H2.75M6.75 5.5 9.25 8l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="acct-label">{{ t("Sign out") }}</span>
+            </button>
+          </div>
         </nav>
       </template>
     </Teleport>
@@ -186,6 +198,7 @@
 <script setup lang="ts">
 import { useAllReportStore } from "@/shared/stores/allReport";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import AppLogo from "@/shared/components/AppLogo.vue";
@@ -193,15 +206,11 @@ import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import UploadJobToast from "@/shared/components/UploadJobToast.vue";
 import AppToast from "@/shared/components/AppToast.vue";
 import {
-  fetchCalSyncJob,
   fetchUploadJob,
-  startCalSync,
   startUploadJob,
   fetchAppConfig,
-  type CalSyncJob,
   type UploadJobResponse,
 } from "@/shared/api/client";
-import { clearCalSyncJobId, readCalSyncJobId, saveCalSyncJobId } from "@/shared/utils/calSyncSession";
 import { emitSpendingRefresh } from "@/features/spending/composables/useSpendingRefresh";
 import { wakeAnalyzerInBrowser } from "@/shared/api/wakeAnalyzer";
 import { invalidateAllDataCaches } from "@/shared/stores/invalidateCaches";
@@ -248,6 +257,7 @@ function onLightModeChange(value: boolean) {
 }
 const auth = useAuthStore();
 const portfolio = usePortfolioStore();
+const { kaspaQuote, marketSnapshot } = storeToRefs(portfolio);
 const route = useRoute();
 const router = useRouter();
 const processing = ref(false);
@@ -269,15 +279,38 @@ let stepTimer: ReturnType<typeof setInterval> | null = null;
 let uploadPollTimer: ReturnType<typeof setInterval> | null = null;
 let uploadDoneTimer: ReturnType<typeof setTimeout> | null = null;
 let activeUploadJobId: string | null = null;
-const calBusy = ref(false);
-let calPollTimer: ReturnType<typeof setInterval> | null = null;
-let activeCalJobId: string | null = null;
 
 const accountInitial = computed(() => {
   const label = auth.userLabel?.trim();
   return label ? label.charAt(0).toUpperCase() : "?";
 });
 
+
+/** Main tickers for the account panel; a row is left out when its price is missing. */
+function tickerPrice(n: number): string {
+  const decimals = n >= 1000 ? 0 : n >= 1 ? 2 : 4;
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+}
+const marketRows = computed(() => {
+  const m = marketSnapshot.value;
+  if (!m) return [];
+  const c = m.change_pct ?? {};
+  const rows: { key: string; label: string; sub?: string; value?: number; change?: number }[] = [
+    { key: "btc", label: "BTC", value: m.btc_usd, change: c.btc },
+    { key: "kas", label: "KAS", value: m.kas_usd ?? kaspaQuote.value?.price_usdt, change: c.kas },
+    { key: "sp500", label: "S&P 500", value: m.sp500, change: c.sp500 },
+    { key: "dog", label: "DOG", sub: "ProShares Short Dow30", value: m.dog_usd, change: c.dog },
+  ];
+  return rows
+    .filter((r) => r.value != null && r.value > 0)
+    .map((r) => ({
+      key: r.key,
+      label: r.label,
+      sub: r.sub,
+      price: r.key === "sp500" ? r.value!.toLocaleString("en-US", { maximumFractionDigits: 0 }) : tickerPrice(r.value!),
+      change: r.change ?? null,
+    }));
+});
 
 function closeNav() {
   navOpen.value = false;
@@ -308,13 +341,11 @@ onMounted(() => {
   setTimeout(warmTabs, 600);
   portfolio.startPolling(auth.isDemo, auth.token || undefined);
   void resumeUploadJobIfNeeded();
-  void resumeCalSyncIfNeeded();
 });
 
 onUnmounted(() => {
   clearStepTimer();
   stopUploadPolling();
-  stopCalPolling();
   if (uploadDoneTimer) clearTimeout(uploadDoneTimer);
   portfolio.stopPolling();
   document.body.style.overflow = "";
@@ -540,87 +571,6 @@ function retryUploadJob() {
   dismissUploadToast();
   if (!pending) return;
   void runUpload(pending.file, pending.statementType);
-}
-
-function stopCalPolling() {
-  if (calPollTimer) {
-    clearInterval(calPollTimer);
-    calPollTimer = null;
-  }
-}
-
-function applyCalJobStatus(job: CalSyncJob) {
-  if (job.status === "done") {
-    stopCalPolling();
-    clearCalSyncJobId();
-    activeCalJobId = null;
-    calBusy.value = false;
-    showUploadToast("done", tr(job.message) || t("Statement saved"));
-    uploadDoneTimer = window.setTimeout(dismissUploadToast, 6000);
-    emitSpendingRefresh();
-    return;
-  }
-  if (job.status === "error") {
-    stopCalPolling();
-    clearCalSyncJobId();
-    activeCalJobId = null;
-    calBusy.value = false;
-    showUploadToast("error", tr(job.error?.trim() || job.message) || t("Cal sync failed"));
-    return;
-  }
-  showUploadToast("syncing", tr(job.message) || t("Syncing Cal…"));
-}
-
-async function pollCalJob(jobId: string) {
-  try {
-    const job = await fetchCalSyncJob(jobId, auth.token || undefined);
-    if (activeCalJobId !== jobId) return;
-    applyCalJobStatus(job);
-  } catch (e) {
-    if (activeCalJobId !== jobId) return;
-    stopCalPolling();
-    clearCalSyncJobId();
-    activeCalJobId = null;
-    calBusy.value = false;
-    const message = e instanceof Error ? e.message : String(e);
-    showUploadToast("error", message.trim() || t("Could not check Cal sync"));
-  }
-}
-
-function watchCalJob(jobId: string) {
-  stopCalPolling();
-  activeCalJobId = jobId;
-  calBusy.value = true;
-  saveCalSyncJobId(jobId);
-  void pollCalJob(jobId);
-  calPollTimer = setInterval(() => {
-    void pollCalJob(jobId);
-  }, 2000);
-}
-
-async function resumeCalSyncIfNeeded() {
-  if (auth.isDemo || !auth.canEdit) return;
-  const jobId = readCalSyncJobId();
-  if (!jobId || activeCalJobId) return;
-  showUploadToast("syncing", t("Checking Cal sync…"));
-  watchCalJob(jobId);
-}
-
-async function syncCal() {
-  closeNav();
-  void wakeAnalyzerFromHere();
-  calBusy.value = true;
-  uploadToastMuted.value = false;
-  showUploadToast("syncing", t("Starting Cal sync…"));
-  try {
-    const job = await startCalSync(auth.token || undefined);
-    applyCalJobStatus(job);
-    if (job.status !== "done" && job.status !== "error") watchCalJob(job.jobId);
-  } catch (err) {
-    calBusy.value = false;
-    const message = err instanceof Error ? err.message : String(err);
-    showUploadToast("error", message.trim() || t("Cal sync failed"));
-  }
 }
 
 function cancelUploadPrompt() {

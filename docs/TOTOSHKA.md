@@ -5,7 +5,7 @@ thinking and hands its answers to the app, which shows them in **Review** as *To
 and pre-fills the English name and category. Egor still confirms each one with one tap.
 
 All calls use the existing assistant access: header `X-Assistant-Key: <ASSISTANT_KEY>` against
-`<API_URL>/api/...` (the same base URL and key Totoshka already uses for the Cal sync).
+`<API_URL>/api/...` (the same base URL and key Totoshka already uses for uploads).
 
 ## 1. Get merchants to guess
 
@@ -83,7 +83,7 @@ The response says how many were saved and why any were skipped:
 | `POST /api/review/confirm` | Save a label directly, if Egor tells Totoshka what a merchant is |
 | `POST /api/adjustments/category` `{ transaction: { date, merchant_he, charge_amount }, category }` | Set the category of one charge, e.g. a BIT transfer Egor explains in chat |
 
-## Waking the analyzer before an upload or a Cal sync
+## Waking the analyzer before an upload
 
 The analyzer runs on Render's free tier and sleeps after ~15 minutes without traffic. Render
 often does **not** wake it for server-to-server requests, so `GET /api/ingest/wake` (the API
@@ -93,10 +93,9 @@ avoids this by waking it from the browser; Totoshka should do the same:
 1. `GET https://finance-analyzer-jsoq.onrender.com/health` directly (no key needed). Retry every
    10 seconds for up to 3 minutes until it returns `200 {"status":"ok"}`. A cold start usually
    takes 20–60 seconds.
-2. Then start the work as usual — an upload (`POST /api/ingest`) or the hourly Cal sync
-   (`POST /api/cal/cron`). The analyzer stays awake for ~15 minutes after the last request.
+2. Then start the upload (`POST /api/ingest`). The analyzer stays awake for ~15 minutes after the last request.
 
-Do this before **every** upload and **every** Cal sync. The API also tries to wake the
+Do this before **every** upload. The API also tries to wake the
 analyzer itself, but on the free tier that alone is not reliable.
 
 Only if step 1 never succeeds is the analyzer actually down; then it needs a Restart or Manual

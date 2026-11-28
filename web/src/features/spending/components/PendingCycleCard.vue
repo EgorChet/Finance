@@ -3,7 +3,7 @@
     <p class="pending-cycle__icon" aria-hidden="true">🧾</p>
     <p class="pending-cycle__title">{{ t("{cycle} is waiting for its statement", { cycle: cycleLabel }) }}</p>
     <p class="pending-cycle__text">
-      {{ cycleRange }}. {{ t("The numbers and categories appear as soon as the card syncs — tap Sync Cal or ask Totoshka to upload the statement.") }}
+      {{ cycleRange }}. {{ t("The numbers and categories appear once you upload this cycle’s statement from the account menu.") }}
     </p>
   </section>
 </template>
