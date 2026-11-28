@@ -521,6 +521,7 @@ async function wakeAnalyzerFromHere() {
 
 /* ── Pull to refresh: drag down at the top of any screen to reload it from the server. ── */
 const PULL_TRIGGER = 64;
+const PULL_DEADZONE = 14;
 const pullDistance = ref(0);
 const pullRefreshing = ref(false);
 const viewKey = ref(0);
@@ -537,6 +538,11 @@ function onPullStart(e: TouchEvent) {
     pullStartY = null;
     return;
   }
+  // A touch that starts on the tab bar or the header is a tap on a button, never a pull.
+  if ((e.target as Element | null)?.closest?.(".app-tabbar, .app-header")) {
+    pullStartY = null;
+    return;
+  }
   pullStartY = e.touches[0].clientY;
   pullStartX = e.touches[0].clientX;
 }
@@ -545,12 +551,18 @@ function onPullMove(e: TouchEvent) {
   if (pullStartY == null) return;
   const dy = e.touches[0].clientY - pullStartY;
   const dx = Math.abs(e.touches[0].clientX - pullStartX);
-  if (dy <= 0 || dx > dy || window.scrollY > 0) {
+  if (window.scrollY > 0 || dx > dy) {
+    pullDistance.value = 0;
+    return;
+  }
+  // A tap always drifts a few pixels. Below the dead zone this is still a tap: do not cancel the touch,
+  // or iOS drops the click and the button "gets stuck".
+  if (dy <= PULL_DEADZONE) {
     pullDistance.value = 0;
     return;
   }
   // Resistance: the indicator follows at half speed and stops at 1.5× the trigger.
-  pullDistance.value = Math.min(dy * 0.5, PULL_TRIGGER * 1.5);
+  pullDistance.value = Math.min((dy - PULL_DEADZONE) * 0.5, PULL_TRIGGER * 1.5);
   if (e.cancelable) e.preventDefault();
 }
 

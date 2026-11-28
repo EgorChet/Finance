@@ -26,9 +26,30 @@ async function finishBoot() {
   window.setTimeout(() => boot.remove(), 600);
 }
 
+/** A screen's code is fetched when its tab is first used. After a new deploy an open app still points at the old
+ *  files, which are gone, so the tap does nothing and the tab "sticks". Reload once to pick up the new build
+ *  (not more than once in 30 s, so a real outage cannot loop). */
+function reloadOnce() {
+  try {
+    const last = Number(sessionStorage.getItem("chunk_reload_at") || 0);
+    if (Date.now() - last < 30_000) return;
+    sessionStorage.setItem("chunk_reload_at", String(Date.now()));
+  } catch {
+    /* private mode: reload anyway */
+  }
+  window.location.reload();
+}
+window.addEventListener("vite:preloadError", (e) => {
+  e.preventDefault();
+  reloadOnce();
+});
+
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
+router.onError((err) => {
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String((err as Error)?.message ?? err))) reloadOnce();
+});
 
 // Pace settings live on the server; load them (briefly) before the first screen renders.
 const savedToken = localStorage.getItem("finance_auth_token");
