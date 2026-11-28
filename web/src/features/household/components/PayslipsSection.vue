@@ -18,7 +18,7 @@
         <span class="ps-year__meta">{{ t("{n} {n|payslip|payslips}", { n: g.items.length }) }} · {{ t("Take-home") }} {{ formatIlsWhole(g.net) }}</span>
       </summary>
       <div class="bx-list">
-        <button v-for="p in g.items" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
+        <button v-for="p in shown(g)" :key="p.id" type="button" class="bx-row" @click="openId = p.id">
             <span class="ps-icon" aria-hidden="true"><MoneyIcon name="receipt" /></span>
             <span class="bx-row-body">
               <span class="bx-row-top">
@@ -26,20 +26,20 @@
                 <span class="bx-row-amount">{{ formatIlsWhole(p.totals.netPayable || p.totals.net) }}</span>
               </span>
               <span class="bx-row-meta">
-                <span>{{ t("Total pay") }} {{ formatIlsWhole(p.totals.gross) }}</span>
-                <span class="ps-tags">
-                  <span v-if="extrasOf(p)">{{ extrasOf(p) }}</span>
-                  <span
-                    v-if="changeOf(p)"
-                    :class="changeOf(p)! > 0 ? 'ps-change--up' : 'ps-change--down'"
-                    :title="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
-                    :aria-label="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
-                  >{{ signed(changeOf(p)!) }}</span>
-                </span>
+                <span class="ps-sub">{{ t("Total pay") }} {{ formatIlsWhole(p.totals.gross) }}<template v-if="extrasOf(p)"> · {{ extrasOf(p) }}</template></span>
+                <span
+                  v-if="changeOf(p)"
+                  :class="changeOf(p)! > 0 ? 'ps-change--up' : 'ps-change--down'"
+                  :title="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+                  :aria-label="t('{delta} vs previous month', { delta: signed(changeOf(p)!) })"
+                >{{ signed(changeOf(p)!) }}</span>
               </span>
             </span>
             <span class="bx-chevron" aria-hidden="true">›</span>
           </button>
+        <button v-if="g.items.length > SHOWN" type="button" class="bx-row bx-row--more" @click="toggleYear(g.year)">
+          {{ expanded.has(g.year) ? t("Show fewer") : t("Show all {n}", { n: g.items.length }) }}
+        </button>
       </div>
     </details>
 
@@ -80,6 +80,15 @@ const uploading = ref(false);
 const busy = ref(false);
 const openId = ref<string | null>(null);
 const picker = ref<HTMLInputElement | null>(null);
+/** A year shows its latest months; the rest sit behind "Show all". */
+const SHOWN = 6;
+const expanded = ref(new Set<number>());
+const shown = (g: { year: number; items: Payslip[] }) => (expanded.value.has(g.year) ? g.items : g.items.slice(0, SHOWN));
+function toggleYear(year: number) {
+  const next = new Set(expanded.value);
+  if (!next.delete(year)) next.add(year);
+  expanded.value = next;
+}
 
 /** Payslips are Egor's alone; the demo has none. */
 const available = computed(() => !auth.isDemo && auth.canEditBudget);
@@ -276,11 +285,7 @@ onMounted(() => {
   margin: 0;
   color: var(--danger);
 }
-.ps-tags {
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.1rem 0.5rem;
+.ps-sub {
   min-width: 0;
 }
 .ps-change--up {

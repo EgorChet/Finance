@@ -21,7 +21,7 @@
         </div>
       </section>
 
-      <section>
+      <section class="ps-pay">
         <h4 class="ps-h">{{ t("Payments") }}</h4>
         <ul class="ps-rows">
           <li v-for="(p, i) in payslip.payments" :key="i" class="ps-row">
@@ -36,7 +36,7 @@
         </ul>
       </section>
 
-      <section>
+      <section class="ps-ded">
         <h4 class="ps-h">{{ t("Deductions") }}</h4>
         <ul class="ps-rows">
           <li v-for="(d, i) in payslip.deductions" :key="i" class="ps-row">
@@ -214,7 +214,8 @@ function leaveMeta(l: PayslipLeave): string {
 .ps-hero {
   padding: 1rem;
   border-radius: 20px;
-  background: var(--surface);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
 }
 .ps-label {
   margin: 0;
@@ -242,9 +243,15 @@ function leaveMeta(l: PayslipLeave): string {
   font-weight: 600;
 }
 .ps-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+}
+.ps-actions .btn {
+  min-height: 40px;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
 }
 .ps-h {
   margin: 0 0 0.3rem;
@@ -252,9 +259,17 @@ function leaveMeta(l: PayslipLeave): string {
   font-weight: 650;
   color: var(--text-muted);
 }
+.ps-more {
+  padding: 0.15rem 0.9rem;
+  border-radius: 16px;
+  background: var(--surface-alt);
+}
 .ps-more > summary {
   cursor: pointer;
-  min-height: 32px;
+  min-height: 44px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text);
   display: flex;
   align-items: center;
   list-style: none;
@@ -301,7 +316,8 @@ function leaveMeta(l: PayslipLeave): string {
   color: var(--text-faint);
 }
 .ps-name small.ps-he {
-  font-size: 0.76rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 .ps-table {
   width: 100%;
@@ -330,13 +346,21 @@ function leaveMeta(l: PayslipLeave): string {
 }
 @media (min-width: 1024px) {
   .ps {
-    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 2rem;
     row-gap: 0;
   }
   .ps > * {
-    grid-column: 2;
+    grid-column: 2 / 4;
     margin-bottom: 1.25rem;
+  }
+  .ps > .ps-pay {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .ps > .ps-ded {
+    grid-column: 3;
+    grid-row: 1;
   }
   .ps > .ps-hero {
     grid-column: 1;
