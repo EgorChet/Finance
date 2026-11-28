@@ -36,7 +36,8 @@
           <p class="bh-value">{{ whole(shown.moneyLeft) }}</p>
         </template>
       </div>
-      <div v-if="setAsideLine || streak" class="bh-chips">
+      <div v-if="setAsideLine || streak || dateTitle" class="bh-chips">
+        <span v-if="dateTitle" class="bh-date"><b>{{ dateTitle }}</b><small>{{ dateSub }}</small></span>
         <span v-if="streak" class="bh-chip bh-chip--good">👍 {{ t("{n} {n|day|days} on track", { n: streak.days }) }}</span>
         <span v-if="setAsideLine" class="bh-chip">{{ setAsideLine }}</span>
       </div>
@@ -249,6 +250,9 @@ const props = defineProps<{
   /** This month's extra money, each addition separately. */
   extras?: { extra: number; note?: string }[];
   everydayEnabled?: boolean;
+  /** Today's date, shown at the top of the right column ("Today" / "Sat, 28 Nov"). */
+  dateTitle?: string;
+  dateSub?: string;
 }>();
 
 const emit = defineEmits<{ everyday: [] }>();
