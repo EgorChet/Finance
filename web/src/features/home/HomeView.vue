@@ -3,7 +3,7 @@
     <DemoBanner />
     <header class="today-head">
       <h2 class="page-title">{{ t("Today") }}</h2>
-      <span class="today-date">{{ todayLabel }}</span>
+      <span class="today-date">· {{ todayLabel }}</span>
     </header>
 
     <AppLoader v-if="spendingLoading" variant="hero" :title="t('Loading spending')" />

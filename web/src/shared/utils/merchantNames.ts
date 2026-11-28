@@ -84,7 +84,7 @@ const NAMES: [RegExp, string][] = [
   [/רונן בשרים/, "Ronen Meats"],
   [/גינגר בריאות/, "Ginger Health Food"],
   [/מסעדת תל יצחק|תל יצחק/, "Tel Yitzhak Restaurant"],
-  [/חוף פולג מסעדה/, "Poleg Beach Restaurant"],
+  [/חוף פולג מסעדה/, "Bayz Poleg"],
   [/משק השרון/, "Meshek HaSharon"],
   [/רקפת/, "Rakefet"],
   [/טריו מרקט/, "Trio Market"],

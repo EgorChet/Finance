@@ -76,7 +76,7 @@ export const RU_MERCHANT_NAMES: Record<string, string> = {
   "Ginger Health Food": "Джинджер (здоровое питание)",
   "Tel Yitzhak Restaurant": "Ресторан Тель-Ицхак",
   "Tel Yitzhak Bakery": "Пекарня Тель-Ицхак",
-  "Poleg Beach Restaurant": "Ресторан на пляже Полег",
+  "Bayz Poleg": "Байз Полег",
   "Meshek HaSharon": "Мешек а-Шарон",
   "Meshek HaSharon 26": "Мешек а-Шарон 26",
   Rakefet: "Ракефет",
