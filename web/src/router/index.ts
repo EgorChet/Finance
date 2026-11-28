@@ -43,6 +43,11 @@ router.beforeEach(async (to) => {
       /* offline — login page shows a connection error when needed */
     }
   }
+  // A shareable link straight into the demo: <site>/?demo=1 (ignored for a signed-in user, whose session must not be touched).
+  if ((to.name === "login" || to.path === "/") && to.query.demo === "1" && !auth.isAuthenticated) {
+    auth.enterDemo();
+    return { name: "home" };
+  }
   if (to.path.startsWith("/app") && auth.authRequired && !auth.isAuthenticated && !auth.isDemo) {
     return { name: "login", query: { signin: "1" } };
   }
