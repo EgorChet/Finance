@@ -718,21 +718,11 @@ body {
   text-align: left;
 }
 
-.login-logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: var(--accent-gradient);
-  box-shadow: 0 12px 30px -10px var(--glow-1);
-  margin-bottom: 1.4rem;
-}
-
-.login-logo svg {
-  width: 30px;
-  height: 30px;
+.login-lockup {
+  width: min(300px, 80vw);
+  height: auto;
+  margin-bottom: 1.6rem;
+  color: var(--text);
 }
 
 .login-title {

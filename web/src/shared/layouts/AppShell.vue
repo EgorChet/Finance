@@ -2,7 +2,7 @@
   <div class="app-layout">
     <header class="app-header">
       <RouterLink to="/app/home" class="app-header-brand" aria-label="Finance">
-        <span class="app-logo" aria-hidden="true">₪</span>
+        <AppLogo class="app-logo" />
         <span class="app-brand-name">Finance</span>
       </RouterLink>
       <button
@@ -188,6 +188,7 @@ import { useAllReportStore } from "@/shared/stores/allReport";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "@/shared/components/AppLoader.vue";
+import AppLogo from "@/shared/components/AppLogo.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
 import UploadJobToast from "@/shared/components/UploadJobToast.vue";
 import AppToast from "@/shared/components/AppToast.vue";

@@ -3,17 +3,7 @@
     <div class="login-glow" aria-hidden="true" />
     <div class="login-shell">
       <header class="login-brand">
-        <div class="login-logo" aria-hidden="true">
-          <svg viewBox="0 0 32 32">
-            <path
-              d="M9 24V9.5a1.5 1.5 0 0 1 1.5-1.5H15a5 5 0 0 1 5 5v5M23 8v14.5a1.5 1.5 0 0 1-1.5 1.5H17a5 5 0 0 1-5-5v-5"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.4"
-              stroke-linecap="round"
-            />
-          </svg>
-        </div>
+        <AppLogo class="login-lockup" animated lockup />
         <div class="lang-switch login-lang" role="radiogroup" :aria-label="t('Language')">
           <button
             v-for="opt in LANGS"
@@ -98,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import AppLogo from "@/shared/components/AppLogo.vue";
 import { locale, setLocale, t } from "@/shared/i18n";
 
 const LANGS = ["en", "ru"] as const;
