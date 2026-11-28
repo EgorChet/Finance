@@ -1,4 +1,4 @@
-import type { Payslip } from "./payslip";
+import type { Payslip } from "./payslip.js";
 
 /**
  * Checks of the vacation days and their pay across payslips: what was added, what was used, whether the
