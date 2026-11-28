@@ -191,8 +191,8 @@ const BRANDS: [RegExp, Mark][] = [
   [/לאומי|leumi/i, { text: "L", bg: "#1F57A3", domain: "leumi.co.il" }],
   [/מכבי|maccabi/i, { text: "M", bg: "#00539B", domain: "maccabi4u.co.il" }],
   [/ביטוח חקלאי/i, { text: "BH", bg: "#2E7D32", domain: "bth.co.il" }],
-  // Small neighbourhood shops share one generic mark (specific brands above win)
-  [/מינימרקט|מיני מרקט|mini ?market|מרכולית|מכולת|סופר אגמים|super agamim|טריו מרקט|trio market|גו מרקט|go market|מרקט vip|market vip|ממ סופר|mm super|corner ?shop|convenience store/i, { text: "🛒", bg: "#2E9E5B", domain: "minimarket" }],
+  // Small neighbourhood shops and fuel stations share one generic mark (specific brands above win: Paz, Delek, Sonol…)
+  [/מינימרקט|מיני מרקט|mini ?market|מרכולית|מכולת|סופר אגמים|super agamim|טריו מרקט|trio market|גו מרקט|go market|מרקט vip|market vip|ממ סופר|mm super|corner ?shop|convenience store|תחנת דלק|תחנת תדלוק|gas station|petrol|fuel station|דור אלון|dor alon|אלונית|alonit|דלקן|delkan/i, { text: "🛒", bg: "#2E9E5B", domain: "minimarket" }],
   [/revolut/i, { icon: "revolut" }],
   [/paypal/i, { icon: "paypal" }],
 ];
