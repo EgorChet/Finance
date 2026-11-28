@@ -1,14 +1,15 @@
 <template>
-  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 240 48' : '0 0 48 48'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
-    <rect class="lg-fill" :style="scrub?.fill" x="2" y="2" width="44" height="44" rx="13" />
-    <rect class="lg-frame" x="2" y="2" width="44" height="44" rx="13" :style="scrub?.frame" fill="none" stroke-width="2.5" pathLength="100" />
-    <g class="lg-ch" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path class="lg-s1" :style="scrub?.s1" pathLength="100" d="M15 12V26Q15 30 20 30H33" />
-      <path class="lg-s2" :style="scrub?.s2" pathLength="100" d="M33 12V38" />
+  <svg class="lg" :class="{ 'lg--anim': animated, 'lg--scrub': scrubbing }" :viewBox="lockup ? '0 0 195 60' : '0 0 60 60'" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <rect class="lg-fill" :style="scrub?.fill" x="0" y="0" width="60" height="60" rx="17" />
+    <rect class="lg-frame" :style="scrub?.frame" x="1.25" y="1.25" width="57.5" height="57.5" rx="16" fill="none" stroke-width="2.5" pathLength="100" />
+    <!-- The Ч is the same glyph, size and stroke as the letters of the word: cap height 32, stroke 6. -->
+    <g class="lg-ch" transform="translate(17 14)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path class="lg-s1" :style="scrub?.s1" pathLength="100" d="M3 3V14Q3 19 8 19H23" />
+      <path class="lg-s2" :style="scrub?.s2" pathLength="100" d="M23 3V29" />
     </g>
-    <!-- The Ч is the mark itself, so the word only spells БАНК. Letters are drawn with lines, not a font. -->
-    <g v-if="lockup" class="lg-word" transform="translate(58 8)" stroke="currentColor" stroke-width="5.5" fill="none" stroke-linejoin="bevel" stroke-linecap="butt">
-      <path d="M34 4H4V36H22Q34 36 34 28Q34 20 22 20H4" /><path transform="translate(46 0)" d="M4 36L20 4L36 36M10 26H30" /><path transform="translate(92 0)" d="M4 4V36M36 4V36M4 20H36" /><path transform="translate(138 0)" d="M4 4V36M34 4L4 21M12 16L36 36" />
+    <!-- The mark is the first letter of the name, so the word only spells БАНК. Drawn with lines, not a font. -->
+    <g v-if="lockup" class="lg-word" transform="translate(76 14)" stroke="currentColor" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M23 3H3V29H14Q23 29 23 23.5Q23 18 14 18H3" /><path transform="translate(30 0)" d="M3 29L13 3L23 29M6.2 21H19.8" /><path transform="translate(60 0)" d="M3 3V29M23 3V29M3 16H23" /><path transform="translate(93 0)" d="M3 3V29M23 3L3 17M9.5 12.5L23 29" />
     </g>
   </svg>
 </template>
@@ -17,9 +18,11 @@
 import { computed } from "vue";
 
 /**
- * The Ч-Банк mark: a rounded square in the palette's fill colour with a Ч drawn in two strokes; the lockup adds БАНК.
- * `animated` plays the draw-on once, as on the launch screen.
- * Keep the paths in step with the inline copy in index.html and scripts/make-icons.mjs.
+ * The Ч-Банк mark: a rounded square in the palette's fill colour holding the letter Ч; the lockup adds БАНК.
+ * One letter construction for all five letters (cap height 32, stroke 6, round caps and joins), and the Ч in the
+ * square has exactly the word's cap height and stroke, so nothing looks smaller or from another font.
+ * `animated` plays the draw-on once, as on the launch screen. Keep the paths in step with the inline copy in
+ * index.html and scripts/make-icons.mjs.
  */
 const props = defineProps<{ animated?: boolean; lockup?: boolean; /** 0..1: draw the mark by hand, as far as this (pull to refresh). */ progress?: number }>();
 

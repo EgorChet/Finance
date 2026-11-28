@@ -5,10 +5,10 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const GLYPH = `<path d="M15 12V26Q15 30 20 30H33M33 12V38" stroke="#111114" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-const svg = (rx) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="${rx}" fill="#FFCF3F"/>${GLYPH}</svg>`;
+const GLYPH = `<g transform="translate(17 14)" stroke="#111114" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3V14Q3 19 8 19H23"/><path d="M23 3V29"/></g>`;
+const svg = (rx) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60"><rect width="60" height="60" rx="${rx}" fill="#FFCF3F"/>${GLYPH}</svg>`;
 
-writeFileSync(new URL("../public/favicon.svg", import.meta.url), svg(11));
+writeFileSync(new URL("../public/favicon.svg", import.meta.url), svg(14));
 
 const browser = await chromium.launch();
 for (const [file, size] of [["apple-touch-icon.png", 180], ["icon-512.png", 512]]) {

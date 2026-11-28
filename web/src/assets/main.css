@@ -1681,16 +1681,12 @@ button {
 
 .app-logo {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: auto;
+  height: 34px;
+  color: var(--text);
   filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--glow-1) 80%, transparent));
 }
 
-.app-brand-name {
-  font-size: 1.05rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-}
 
 .hamburger-icon {
   display: flex;

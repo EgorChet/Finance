@@ -1028,7 +1028,7 @@ body {
 }
 
 .login-lockup {
-  width: min(280px, 76vw);
+  width: min(240px, 66vw);
   height: auto;
   margin-bottom: 1.6rem;
   color: var(--text);
