@@ -169,8 +169,7 @@
     <button
       v-else-if="total > defaultLimit && !showAll"
       type="button"
-      class="btn"
-      style="margin-top: 0.65rem"
+      class="more-pill"
       @click="showAll = true"
     >
       {{ t("Show all {n} charges", { n: total }) }}
@@ -178,8 +177,7 @@
     <button
       v-else-if="total > defaultLimit && showAll"
       type="button"
-      class="btn btn-ghost"
-      style="margin-top: 0.65rem"
+      class="more-pill more-pill--open"
       @click="showAll = false"
     >
       {{ t("Show recent {n}", { n: defaultLimit }) }}

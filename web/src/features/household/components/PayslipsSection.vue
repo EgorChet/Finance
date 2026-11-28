@@ -37,7 +37,7 @@
             </span>
             <span class="bx-chevron" aria-hidden="true">›</span>
           </button>
-        <button v-if="g.items.length > SHOWN" type="button" class="bx-row bx-row--more" @click="toggleYear(g.year)">
+        <button v-if="g.items.length > SHOWN" type="button" class="more-pill" :class="{ 'more-pill--open': expanded.has(g.year) }" @click="toggleYear(g.year)">
           {{ expanded.has(g.year) ? t("Show fewer") : t("Show all {n}", { n: g.items.length }) }}
         </button>
       </div>

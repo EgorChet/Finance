@@ -50,7 +50,7 @@
           </span>
         </span>
       </component>
-      <button v-if="rows.length > BILLS_SHOWN" type="button" class="bx-row bx-row--more" @click="showAllBills = !showAllBills">
+      <button v-if="rows.length > BILLS_SHOWN" type="button" class="more-pill" :class="{ 'more-pill--open': showAllBills }" @click="showAllBills = !showAllBills">
         {{ showAllBills ? t("Show fewer") : t("Show all {n}", { n: rows.length }) }}
       </button>
     </div>

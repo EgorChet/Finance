@@ -96,7 +96,8 @@
           <button
             v-if="endedRecurringCount"
             type="button"
-            class="bx-row bx-row--more"
+            class="more-pill"
+            :class="{ 'more-pill--open': showEndedRecurring }"
             @click="showEndedRecurring = !showEndedRecurring"
           >
             {{ showEndedRecurring ? t("Hide ended periods ({n})", { n: endedRecurringCount }) : t("Show ended periods ({n})", { n: endedRecurringCount }) }}
@@ -144,7 +145,8 @@
           <button
             v-if="pastOneTimeCharges.length"
             type="button"
-            class="bx-row bx-row--more"
+            class="more-pill"
+            :class="{ 'more-pill--open': showPastOneTime }"
             @click="showPastOneTime = !showPastOneTime"
           >
             {{ showPastOneTime ? t("Hide past charges ({n})", { n: pastOneTimeCharges.length }) : t("Show past charges ({n})", { n: pastOneTimeCharges.length }) }}

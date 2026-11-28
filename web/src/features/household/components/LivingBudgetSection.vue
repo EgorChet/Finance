@@ -147,7 +147,7 @@
           </span>
           <span v-if="canEditMonth(row)" class="bx-chevron" aria-hidden="true">›</span>
         </component>
-        <button v-if="otherMonthCount > 0" type="button" class="bx-row bx-row--more" @click="showAllMonths = !showAllMonths">
+        <button v-if="otherMonthCount > 0" type="button" class="more-pill" :class="{ 'more-pill--open': showAllMonths }" @click="showAllMonths = !showAllMonths">
           {{ showAllMonths ? t("Show fewer") : t("Other months ({n})", { n: otherMonthCount }) }}
         </button>
       </div>
