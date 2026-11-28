@@ -18,237 +18,79 @@
 
     <Teleport to="body">
       <template v-if="navOpen">
-        <div class="mobile-nav-backdrop" aria-hidden="true" @click="closeNav" />
-        <nav class="mobile-nav-drawer" aria-label="Main navigation">
-          <div class="mobile-nav-drawer-head">
-            <span class="mobile-nav-drawer-title">{{ t("Account") }}</span>
-            <button type="button" class="btn btn-icon mobile-nav-close" :aria-label="t('Close')" @click="closeNav">
-              ×
+        <div class="acct-backdrop" aria-hidden="true" @click="closeNav" />
+        <nav class="acct" :aria-label="t('Account')">
+          <header class="acct-head">
+            <span class="acct-avatar" aria-hidden="true">{{ auth.isDemo ? "👤" : accountInitial || "👤" }}</span>
+            <strong class="acct-who">{{ auth.isDemo ? t("Demo household") : auth.userLabel || t("Account") }}</strong>
+            <button type="button" class="acct-close" :aria-label="t('Close')" @click="closeNav">×</button>
+          </header>
+
+          <div class="acct-group">
+            <label class="acct-row">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <path d="M8 1.5v1.25M8 13.25V14.5M14.5 8h-1.25M2.75 8H1.5M12.55 3.45l-.88.88M4.33 11.67l-.88.88M12.55 12.55l-.88-.88M4.33 4.33l-.88-.88" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" />
+              </svg>
+              <span class="acct-label">{{ t("Light mode") }}</span>
+              <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
+            </label>
+            <div v-if="LANGUAGE_READY" class="acct-row">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
+                <path d="M1.75 8h12.5M8 1.75c1.9 1.8 2.75 3.9 2.75 6.25S9.9 12.45 8 14.25C6.1 12.45 5.25 10.35 5.25 8S6.1 3.55 8 1.75z" fill="none" stroke="currentColor" stroke-width="1.3" />
+              </svg>
+              <span class="acct-label">{{ t("Language") }}</span>
+              <div class="lang-switch" role="radiogroup" :aria-label="t('Language')">
+                <button
+                  v-for="opt in LANGS"
+                  :key="opt.value"
+                  type="button"
+                  role="radio"
+                  class="lang-switch-btn"
+                  :class="{ 'lang-switch-btn--on': locale === opt.value }"
+                  :aria-checked="locale === opt.value"
+                  @click="setLocale(opt.value)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="!auth.isDemo && auth.canEdit" class="acct-group">
+            <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
+            <button type="button" class="acct-row acct-row--btn" :disabled="processing" @click="uploadInput?.click()">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 10.25V3.5M5.25 6.25 8 3.5l2.75 2.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3.25 10.25v1.5a1.25 1.25 0 0 0 1.25 1.25h7a1.25 1.25 0 0 0 1.25-1.25v-1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="acct-label">{{ t("Import statement") }}</span>
+              <span class="acct-chevron" aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="acct-row acct-row--btn" :disabled="calBusy" @click="syncCal()">
+              <svg class="acct-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="acct-label">{{ t("Sync Cal") }}</span>
+              <span class="acct-chevron" aria-hidden="true">›</span>
             </button>
           </div>
-          <div class="mobile-nav-bottom">
-            <div v-if="sideMenuPortfolioVisible" class="mobile-nav-portfolio">
-              <div
-                v-if="kaspaQuote"
-                class="mobile-nav-portfolio-row"
-                :class="{ 'mobile-nav-portfolio-row--stale': kaspaQuote.stale }"
-                :title="kasPortfolioTitle"
-              >
-                <img class="mobile-nav-portfolio-logo" :src="kaspaLogo" alt="" width="18" height="18" />
-                <span class="mobile-nav-portfolio-price">{{ formatKasUsdtPrice(kaspaQuote.price_usdt) }}</span>
-                <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
-                <span class="mobile-nav-portfolio-total">{{ formatUsdt(kaspaQuote.portfolio_usdt, 0) }}</span>
-              </div>
-              <div
-                v-if="fxcnQuote"
-                class="mobile-nav-portfolio-row"
-                :class="{ 'mobile-nav-portfolio-row--stale': fxcnQuote.stale }"
-                :title="fxcnPortfolioTitle"
-              >
-                <span class="mobile-nav-portfolio-label">FXCN</span>
-                <span class="mobile-nav-portfolio-price">{{ formatFxcnNavPrice(fxcnQuote.nav_usd) }}</span>
-                <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
-                <span class="mobile-nav-portfolio-total">{{ formatUsd(fxcnQuote.portfolio_usd, 0) }}</span>
-              </div>
-              <div
-                v-if="portfolioCombinedUsd != null"
-                class="mobile-nav-portfolio-row mobile-nav-portfolio-row--combined"
-                :title="portfolioCombinedTitle"
-              >
-                <span class="mobile-nav-portfolio-label">{{ t("Total") }}</span>
-                <span class="mobile-nav-portfolio-values">
-                  <span>{{ formatUsd(portfolioCombinedUsd, 0) }}</span>
-                  <template v-if="portfolioCombinedIls != null">
-                    <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
-                    <span>{{ formatIls(portfolioCombinedIls, 0) }}</span>
-                  </template>
-                  <template v-if="portfolioCombinedRub != null">
-                    <span class="mobile-nav-portfolio-sep" aria-hidden="true">·</span>
-                    <span>{{ formatRub(portfolioCombinedRub, 0) }}</span>
-                  </template>
-                </span>
-              </div>
-              <div v-if="marketSnapshot?.btc_usd" class="mobile-nav-portfolio-row mobile-nav-portfolio-row--market">
-                <span class="mobile-nav-portfolio-label">BTC</span>
-                <span class="mobile-nav-portfolio-total">{{ formatUsd(marketSnapshot.btc_usd, 0) }}</span>
-              </div>
-              <div v-if="marketSnapshot?.sp500" class="mobile-nav-portfolio-row mobile-nav-portfolio-row--market">
-                <span class="mobile-nav-portfolio-label">S&amp;P</span>
-                <span class="mobile-nav-portfolio-total">{{ formatSp500(marketSnapshot.sp500) }}</span>
-              </div>
-            </div>
-            <div class="mobile-nav-footer">
-              <label class="mobile-nav-setting-row">
-                <span class="mobile-nav-setting-icon" aria-hidden="true">
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16">
-                    <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.5" />
-                    <path
-                      d="M8 1.5v1.25M8 13.25V14.5M14.5 8h-1.25M2.75 8H1.5M12.55 3.45l-.88.88M4.33 11.67l-.88.88M12.55 12.55l-.88-.88M4.33 4.33l-.88-.88"
-                      stroke="currentColor"
-                      stroke-width="1.35"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </span>
-                <span class="mobile-nav-setting-copy">
-                  <span class="mobile-nav-setting-label">{{ t("Light mode") }}</span>
-                  <span class="mobile-nav-setting-hint">{{ app.lightMode ? t("On") : t("Off") }}</span>
-                </span>
-                <ToggleSwitch :model-value="app.lightMode" @update:model-value="onLightModeChange" />
-              </label>
 
-              <div v-if="LANGUAGE_READY" class="mobile-nav-setting-row">
-                <span class="mobile-nav-setting-icon" aria-hidden="true">
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16">
-                    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
-                    <path d="M1.75 8h12.5M8 1.75c1.9 1.8 2.75 3.9 2.75 6.25S9.9 12.45 8 14.25C6.1 12.45 5.25 10.35 5.25 8S6.1 3.55 8 1.75z" fill="none" stroke="currentColor" stroke-width="1.3" />
-                  </svg>
-                </span>
-                <span class="mobile-nav-setting-copy">
-                  <span class="mobile-nav-setting-label">{{ t("Language") }}</span>
-                  <span class="mobile-nav-setting-hint">{{ locale === "ru" ? "Русский" : "English" }}</span>
-                </span>
-                <div class="lang-switch" role="radiogroup" :aria-label="t('Language')">
-                  <button
-                    v-for="opt in LANGS"
-                    :key="opt.value"
-                    type="button"
-                    role="radio"
-                    class="lang-switch-btn"
-                    :class="{ 'lang-switch-btn--on': locale === opt.value }"
-                    :aria-checked="locale === opt.value"
-                    @click="setLocale(opt.value)"
-                  >
-                    {{ opt.label }}
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="auth.isDemo" class="mobile-nav-account-card">
-                <p class="mobile-nav-demo-note">{{ t("Demo household — try anything: edits stay in this browser only.") }}</p>
-                <button type="button" class="mobile-nav-action btn" @click="onResetDemo">
-                  {{ t("Reset demo") }}
-                </button>
-                <button type="button" class="mobile-nav-action btn mobile-nav-action--accent" @click="goLogin">
-                  {{ t("Sign in") }}
-                </button>
-              </div>
-
-              <div v-else class="mobile-nav-account-card">
-                <div v-if="auth.userLabel" class="mobile-nav-account-header">
-                  <span class="mobile-nav-account-avatar" aria-hidden="true">{{ accountInitial }}</span>
-                  <div class="mobile-nav-account-meta">
-                    <span class="mobile-nav-account-eyebrow">{{ t("Signed in as") }}</span>
-                    <span class="mobile-nav-account-name">{{ auth.userLabel }}</span>
-                  </div>
-                </div>
-
-                <input ref="uploadInput" type="file" accept=".xlsx" hidden @change="onUpload" />
-                <button
-                  v-if="auth.isDemo || auth.canEdit"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="processing"
-                  @click="uploadInput?.click()"
-                >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M8 10.25V3.5M5.25 6.25 8 3.5l2.75 2.75"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M3.25 10.25v1.5a1.25 1.25 0 0 0 1.25 1.25h7a1.25 1.25 0 0 0 1.25-1.25v-1.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  {{ t("Import statement") }}
-                </button>
-
-                <button
-                  v-if="auth.canEdit && !auth.isDemo"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="calBusy"
-                  @click="syncCal()"
-                >
-                  {{ t("Sync Cal") }}
-                </button>
-
-                <button
-                  v-if="showLocalSync && (auth.isDemo || auth.canEdit)"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  :disabled="processing"
-                  @click="sync"
-                >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M13.25 2.75v3.5H9.75M2.75 13.25v-3.5h3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M3.15 6.5A4.75 4.75 0 0 1 12.1 4.5M12.85 9.5A4.75 4.75 0 0 1 3.9 11.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  {{ t("Sync .xlsx files") }}
-                </button>
-
-                <button
-                  v-if="auth.isAuthenticated && auth.token"
-                  type="button"
-                  class="mobile-nav-action btn"
-                  @click="copyAccessKey"
-                >
-                  {{ t("Copy access key") }}
-                  <span class="mobile-nav-action-hint">{{ apiHost }}</span>
-                </button>
-
-                <button
-                  v-if="auth.authRequired && auth.isAuthenticated"
-                  type="button"
-                  class="mobile-nav-action btn mobile-nav-action--danger"
-                  @click="logout"
-                >
-                  <svg class="mobile-nav-action-icon" viewBox="0 0 16 16" aria-hidden="true">
-                    <path
-                      d="M6.25 2.75h4.5a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-4.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M9.25 8H2.75M6.75 5.5 9.25 8l-2.5 2.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  {{ t("Sign out") }}
-                </button>
-              </div>
-            </div>
+          <div v-if="auth.isDemo" class="acct-group">
+            <p class="acct-note">{{ t("Demo household — try anything: edits stay in this browser only.") }}</p>
+            <button type="button" class="acct-row acct-row--btn" @click="onResetDemo">
+              <span class="acct-label">{{ t("Reset demo") }}</span>
+            </button>
+            <button type="button" class="acct-row acct-row--btn acct-row--accent" @click="goLogin">
+              <span class="acct-label">{{ t("Sign in") }}</span>
+            </button>
           </div>
+
+          <button v-if="auth.authRequired && auth.isAuthenticated" type="button" class="acct-signout" @click="logout">
+            {{ t("Sign out") }}
+          </button>
         </nav>
       </template>
     </Teleport>
@@ -344,7 +186,6 @@
 <script setup lang="ts">
 import { useAllReportStore } from "@/shared/stores/allReport";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import ToggleSwitch from "@/shared/components/ToggleSwitch.vue";
@@ -356,7 +197,6 @@ import {
   startCalSync,
   startUploadJob,
   fetchAppConfig,
-  syncStatements,
   type CalSyncJob,
   type UploadJobResponse,
 } from "@/shared/api/client";
@@ -373,10 +213,7 @@ import { useHomeDataStore } from "@/features/home/stores/homeData";
 import { useReviewDataStore } from "@/features/merchants/stores/reviewData";
 import { goToSignIn } from "@/features/auth/utils/signIn";
 import { clearUploadJobId, readUploadJobId, saveUploadJobId } from "@/shared/utils/uploadJobSession";
-import { formatFxcnNavPrice, formatIls, formatKasUsdtPrice, formatRub, formatSp500, formatUsd, formatUsdt } from "@/shared/utils/format";
-import kaspaLogo from "@/assets/kaspa.png";
 import { resetDemoAndReload } from "@/shared/demo/reset";
-import { showToast } from "@/shared/composables/useToast";
 import { locale, setLocale, t, tr, type Locale } from "@/shared/i18n";
 
 /** The switch shows once every screen is translated. */
@@ -385,16 +222,6 @@ const LANGS: { value: Locale; label: string }[] = [
   { value: "en", label: "EN" },
   { value: "ru", label: "RU" },
 ];
-
-const SYNC_STEPS = [
-  "Scanning statements folder",
-  "Reading spreadsheets",
-  "Analysing expenses",
-  "Applying merchant rules",
-  "Saving updates",
-];
-
-
 
 /** Bottom tab bar: the five screens used most, one thumb-tap away. Everything else stays in the menu. */
 const HOME_TAB = { to: "/app/home", label: "Today", icon: "M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" };
@@ -420,7 +247,6 @@ function onLightModeChange(value: boolean) {
 }
 const auth = useAuthStore();
 const portfolio = usePortfolioStore();
-const { kaspaQuote, fxcnQuote, marketSnapshot } = storeToRefs(portfolio);
 const route = useRoute();
 const router = useRouter();
 const processing = ref(false);
@@ -451,56 +277,6 @@ const accountInitial = computed(() => {
   return label ? label.charAt(0).toUpperCase() : "?";
 });
 
-const sideMenuPortfolioVisible = computed(
-  () =>
-    !!kaspaQuote.value ||
-    !!fxcnQuote.value ||
-    portfolioCombinedUsd.value != null ||
-    !!marketSnapshot.value?.btc_usd ||
-    !!marketSnapshot.value?.sp500,
-);
-
-const portfolioCombinedUsd = computed(() => {
-  let total = 0;
-  if (kaspaQuote.value) total += kaspaQuote.value.portfolio_usdt;
-  if (fxcnQuote.value) total += fxcnQuote.value.portfolio_usd;
-  return total > 0 ? total : null;
-});
-
-const portfolioCombinedIls = computed(() => {
-  const usd = portfolioCombinedUsd.value;
-  const rate = marketSnapshot.value?.usd_ils;
-  return usd != null && rate ? Math.round(usd * rate) : null;
-});
-
-const portfolioCombinedRub = computed(() => {
-  const usd = portfolioCombinedUsd.value;
-  const rate = marketSnapshot.value?.usd_rub;
-  return usd != null && rate ? Math.round(usd * rate) : null;
-});
-
-const portfolioCombinedTitle = computed(() => {
-  const usd = portfolioCombinedUsd.value;
-  if (usd == null) return "";
-  const parts = [formatUsd(usd)];
-  if (portfolioCombinedIls.value != null) parts.push(formatIls(portfolioCombinedIls.value, 0));
-  if (portfolioCombinedRub.value != null) parts.push(formatRub(portfolioCombinedRub.value, 0));
-  return `${t("Combined portfolio")} · ${parts.join(" · ")}`;
-});
-
-const kasPortfolioTitle = computed(() => {
-  if (!kaspaQuote.value) return "";
-  const { price_usdt, balance_kas, portfolio_usdt, source, stale } = kaspaQuote.value;
-  const staleNote = stale ? ` · ${t("cached")}` : "";
-  return `Kaspa ${formatKasUsdtPrice(price_usdt)} · ${balance_kas.toLocaleString("en-US", { maximumFractionDigits: 3 })} KAS · ${formatUsdt(portfolio_usdt)} · ${source}${staleNote}`;
-});
-
-const fxcnPortfolioTitle = computed(() => {
-  if (!fxcnQuote.value) return "";
-  const { nav_usd, lots, portfolio_usd, source, stale } = fxcnQuote.value;
-  const staleNote = stale ? ` · ${t("cached")}` : "";
-  return `FXCN ${formatFxcnNavPrice(nav_usd)} · ${lots} shares · ${formatUsd(portfolio_usd)} · ${source}${staleNote}`;
-});
 
 function closeNav() {
   navOpen.value = false;
@@ -516,8 +292,6 @@ watch(
 watch(navOpen, (open) => {
   document.body.style.overflow = open ? "hidden" : "";
 });
-
-const showLocalSync = computed(() => !import.meta.env.VITE_API_URL);
 
 /** Quietly fetch what the Budget and Money tabs need while the first screen is being read, so they open with numbers in. */
 function warmTabs() {
@@ -550,31 +324,6 @@ function clearStepTimer() {
     clearInterval(stepTimer);
     stepTimer = null;
   }
-}
-
-function startStepTimer(maxStep: number) {
-  clearStepTimer();
-  stepTimer = setInterval(() => {
-    if (processStep.value < maxStep) processStep.value += 1;
-  }, 2200);
-}
-
-function beginProcess(title: string, subtitle: string, steps: string[]) {
-  processing.value = true;
-  processError.value = "";
-  processTitle.value = title;
-  processSubtitle.value = subtitle;
-  processSteps.value = steps;
-  processStep.value = 0;
-}
-
-function failProcess(title: string, message: string, retry?: () => void) {
-  processing.value = false;
-  clearStepTimer();
-  processErrorTitle.value = title;
-  processError.value = message;
-  canRetry.value = !!retry;
-  retryProcessFn.value = retry ?? null;
 }
 
 function dismissProcessError() {
@@ -873,24 +622,6 @@ async function syncCal() {
   }
 }
 
-async function sync() {
-  closeNav();
-  beginProcess(t("Syncing statements"), t("Reading files from your statements folder"), SYNC_STEPS.map((s) => t(s)));
-  try {
-    startStepTimer(SYNC_STEPS.length - 2);
-    await syncStatements(auth.token || undefined);
-    clearStepTimer();
-    processStep.value = SYNC_STEPS.length - 1;
-    processSubtitle.value = t("Done — refreshing your data…");
-    await new Promise((r) => setTimeout(r, 500));
-    processing.value = false;
-    emitSpendingRefresh();
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    failProcess(t("Sync failed"), message, sync);
-  }
-}
-
 function cancelUploadPrompt() {
   uploadPromptFile.value = null;
 }
@@ -915,20 +646,6 @@ function logout() {
   closeNav();
   auth.logout();
   router.push("/");
-}
-
-/** API address shown under "Copy access key" (not secret). */
-const apiHost = (import.meta.env.VITE_API_URL || window.location.origin).replace(/^https?:\/\//, "");
-
-/** Copies this device's sign-in key, e.g. to let Claude read the data for an analysis. */
-async function copyAccessKey() {
-  if (!auth.token) return;
-  try {
-    await navigator.clipboard.writeText(auth.token);
-    showToast(t("Access key copied — valid for 30 days. Paste it only into a secure form."));
-  } catch {
-    window.prompt(t("Copy the access key:"), auth.token);
-  }
 }
 
 function onResetDemo() {
