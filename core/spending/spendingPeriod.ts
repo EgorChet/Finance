@@ -4,6 +4,7 @@ import { formatIls, roundMoney } from "../utils/format.js";
 import { effectiveSpend } from "../utils/transaction.js";
 import { dateLocaleTag } from "../utils/displayLocale.js";
 import { spendingSplit } from "./budgetPlan.js";
+import { cycleStartForDate } from "./pace.js";
 
 export type SpendingPeriodMode = "ytd" | "rolling12";
 
@@ -13,7 +14,8 @@ export interface PeriodWindow {
   label: string;
 }
 
-export interface MonthlyPeriodTotal {
+/** One billing cycle inside a period; the key is the cycle's start date. */
+export interface CyclePeriodTotal {
   key: string;
   label: string;
   total: number;
@@ -36,14 +38,15 @@ export interface SpendingPeriodAnalysis {
   priorTotal: number;
   totalDelta: number;
   totalDeltaPct: number | null;
-  avgPerMonth: number;
-  priorAvgPerMonth: number;
-  monthlyTotals: MonthlyPeriodTotal[];
+  /** Average per billing cycle that has any charges. */
+  avgPerCycle: number;
+  priorAvgPerCycle: number;
+  cycleTotals: CyclePeriodTotal[];
   categories: CategoryPeriodRow[];
   transactionCount: number;
-  /** Calendar months in the window that have any charges (statements don't cover every month). */
-  monthsWithData: number;
-  priorMonthsWithData: number;
+  /** Billing cycles in the window that have any charges (statements don't cover every cycle). */
+  cyclesWithData: number;
+  priorCyclesWithData: number;
   /** The prior window has enough data for "vs before" to mean something. */
   priorComparable: boolean;
   /** Same split as the budget card. */
@@ -79,47 +82,36 @@ function deltaPct(current: number, prior: number): number | null {
   return roundMoney(((current - prior) / prior) * 100);
 }
 
-function periodWindows(mode: SpendingPeriodMode, refDate: Date): { current: PeriodWindow; prior: PeriodWindow } {
+/**
+ * Periods are whole billing cycles, not calendar months. A cycle starts on `cycleDay` and is named by
+ * the month it starts in. "This year" runs from the first cycle that started in January; "12 cycles"
+ * is the open cycle and the 11 before it. The comparison window is the same stretch one year earlier.
+ */
+function periodWindows(mode: SpendingPeriodMode, refDate: Date, cycleDay: number): { current: PeriodWindow; prior: PeriodWindow } {
   const end = normDate(refDate);
+  const openStart = parseIsoDate(cycleStartForDate(end, cycleDay));
+  const priorEnd = new Date(end.getFullYear() - 1, end.getMonth(), end.getDate());
+
   if (mode === "ytd") {
-    const start = new Date(end.getFullYear(), 0, 1);
-    const priorEnd = new Date(end.getFullYear() - 1, end.getMonth(), end.getDate());
-    const priorStart = new Date(end.getFullYear() - 1, 0, 1);
+    const jan = new Date(end.getFullYear(), 0, cycleDay);
+    // Early January, before the first cycle of the year has begun: show the cycle that is open.
+    const start = jan <= end ? jan : openStart;
     const year = end.getFullYear();
     return {
-      current: {
-        start: isoDate(start),
-        end: isoDate(end),
-        label: `${year} (YTD)`,
-      },
+      current: { start: isoDate(start), end: isoDate(end), label: `${year} (YTD)` },
       prior: {
-        start: isoDate(priorStart),
+        start: isoDate(new Date(start.getFullYear() - 1, start.getMonth(), start.getDate())),
         end: isoDate(priorEnd),
         label: `${year - 1} (same period)`,
       },
     };
   }
 
-  const start = new Date(end);
-  start.setFullYear(start.getFullYear() - 1);
-  start.setDate(start.getDate() + 1);
-  const priorEnd = new Date(start);
-  priorEnd.setDate(priorEnd.getDate() - 1);
-  const priorStart = new Date(priorEnd);
-  priorStart.setFullYear(priorStart.getFullYear() - 1);
-  priorStart.setDate(priorStart.getDate() + 1);
-
+  const start = new Date(openStart.getFullYear(), openStart.getMonth() - 11, cycleDay);
+  const priorStart = new Date(start.getFullYear() - 1, start.getMonth(), cycleDay);
   return {
-    current: {
-      start: isoDate(start),
-      end: isoDate(end),
-      label: "Last 12 months",
-    },
-    prior: {
-      start: isoDate(priorStart),
-      end: isoDate(priorEnd),
-      label: "Prior 12 months",
-    },
+    current: { start: isoDate(start), end: isoDate(end), label: "Last 12 cycles" },
+    prior: { start: isoDate(priorStart), end: isoDate(priorEnd), label: "Prior 12 cycles" },
   };
 }
 
@@ -145,23 +137,27 @@ function categoryMap(transactions: Transaction[]): Map<string, number> {
   return map;
 }
 
-function monthlyTotals(transactions: Transaction[], window: PeriodWindow): MonthlyPeriodTotal[] {
+function cycleTotals(transactions: Transaction[], window: PeriodWindow, cycleDay: number): CyclePeriodTotal[] {
   const map = new Map<string, number>();
   for (const tx of transactions) {
     if (!transactionInWindow(tx, window)) continue;
-    const key = tx.date.slice(0, 7);
+    const key = cycleStartForDate(parseIsoDate(tx.date), cycleDay);
     map.set(key, roundMoney((map.get(key) ?? 0) + effectiveSpend(tx)));
   }
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([key, total]) => ({ key, label: monthLabel(key), total }));
+    .map(([key, total]) => ({ key, label: monthLabel(key.slice(0, 7)), total }));
 }
 
-function monthsInWindow(window: PeriodWindow): number {
-  const start = parseIsoDate(window.start);
-  const end = parseIsoDate(window.end);
-  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
-  return Math.max(1, months);
+/** Billing cycles that touch the window, whether or not they have charges. */
+function cyclesInWindow(window: PeriodWindow, cycleDay: number): number {
+  const first = parseIsoDate(cycleStartForDate(parseIsoDate(window.start), cycleDay));
+  const last = parseIsoDate(cycleStartForDate(parseIsoDate(window.end), cycleDay));
+  return Math.max(1, (last.getFullYear() - first.getFullYear()) * 12 + (last.getMonth() - first.getMonth()) + 1);
+}
+
+function cycleKeys(transactions: Transaction[], cycleDay: number): Set<string> {
+  return new Set(transactions.map((tx) => cycleStartForDate(parseIsoDate(tx.date), cycleDay)));
 }
 
 function buildCategoryRows(
@@ -190,17 +186,18 @@ export function analyzeSpendingPeriod(
   transactions: Transaction[],
   mode: SpendingPeriodMode,
   refDate: Date,
+  cycleDay = 10,
 ): SpendingPeriodAnalysis {
-  const { current, prior } = periodWindows(mode, refDate);
+  const { current, prior } = periodWindows(mode, refDate, cycleDay);
   const currentTxs = filterWindow(transactions, current);
   const priorTxs = filterWindow(transactions, prior);
   const currentTotal = sumTransactions(currentTxs);
   const priorTotal = sumTransactions(priorTxs);
   const currentMap = categoryMap(currentTxs);
   const priorMap = categoryMap(priorTxs);
-  const monthsWithData = new Set(currentTxs.map((tx) => tx.date.slice(0, 7))).size;
-  const priorMonthsWithData = new Set(priorTxs.map((tx) => tx.date.slice(0, 7))).size;
-  const priorComparable = priorTotal > 0 && priorMonthsWithData >= Math.max(1, monthsWithData * 0.75);
+  const cyclesWithData = cycleKeys(currentTxs, cycleDay).size;
+  const priorCyclesWithData = cycleKeys(priorTxs, cycleDay).size;
+  const priorComparable = priorTotal > 0 && priorCyclesWithData >= Math.max(1, cyclesWithData * 0.75);
   const split = spendingSplit(currentTxs);
 
   return {
@@ -211,14 +208,14 @@ export function analyzeSpendingPeriod(
     priorTotal,
     totalDelta: roundMoney(currentTotal - priorTotal),
     totalDeltaPct: deltaPct(currentTotal, priorTotal),
-    // Per month with data: a window the statements only partly cover isn't padded with zeros.
-    avgPerMonth: roundMoney(currentTotal / Math.max(1, monthsWithData || monthsInWindow(current))),
-    priorAvgPerMonth: roundMoney(priorTotal / Math.max(1, priorMonthsWithData || monthsInWindow(prior))),
-    monthlyTotals: monthlyTotals(transactions, current),
+    // Per cycle with data: a window the statements only partly cover isn't padded with zeros.
+    avgPerCycle: roundMoney(currentTotal / Math.max(1, cyclesWithData || cyclesInWindow(current, cycleDay))),
+    priorAvgPerCycle: roundMoney(priorTotal / Math.max(1, priorCyclesWithData || cyclesInWindow(prior, cycleDay))),
+    cycleTotals: cycleTotals(transactions, current, cycleDay),
     categories: buildCategoryRows(currentMap, priorMap, currentTotal),
     transactionCount: currentTxs.length,
-    monthsWithData,
-    priorMonthsWithData,
+    cyclesWithData,
+    priorCyclesWithData,
     priorComparable,
     everyday: split.everyday,
     fixed: split.fixed,

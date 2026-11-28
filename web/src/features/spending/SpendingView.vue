@@ -15,44 +15,19 @@
     <DemoBanner />
     <header class="overview-page-header">
       <h2 class="overview-page-title">{{ t("Spending overview") }}</h2>
-      <div class="pill-row overview-page-periods">
-        <button
-          type="button"
-          class="pill pill-period"
-          :class="{ active: overviewPeriod === 'ytd' }"
-          :aria-label="t('This year')"
-          @click="togglePeriod('ytd')"
-        >
-          {{ t("YTD") }}
-        </button>
-        <button
-          type="button"
-          class="pill pill-period"
-          :class="{ active: overviewPeriod === 'rolling12' }"
-          :aria-label="t('Last 12 months')"
-          @click="togglePeriod('rolling12')"
-        >
-          {{ t("12M") }}
-        </button>
-        <button
-          type="button"
-          class="pill pill-period"
-          :class="{ active: selectedMonth === null && !overviewPeriod }"
-          :aria-label="t('All months')"
-          @click="onMonthSelected(null)"
-        >
-          {{ t("ALL") }}
-        </button>
-      </div>
     </header>
-    <MonthPicker
-      :model-value="overviewPeriod ? null : selectedMonth"
-      :months="displayMonths"
-      :allow-delete="!auth.readOnly"
-      omit-all-months
-      @update:model-value="onMonthSelected"
-      @delete-month="onDeleteStatementMonth"
-    />
+    <div class="seg overview-seg" role="tablist" :aria-label="t('Period')">
+      <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': !overviewPeriod }" :aria-selected="!overviewPeriod" @click="showCycles">
+        {{ t("Cycle") }}
+      </button>
+      <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': overviewPeriod === 'ytd' }" :aria-selected="overviewPeriod === 'ytd'" @click="selectPeriod('ytd')">
+        {{ t("Since January") }}
+      </button>
+      <button type="button" role="tab" class="seg-btn" :class="{ 'seg-btn--on': overviewPeriod === 'rolling12' }" :aria-selected="overviewPeriod === 'rolling12'" @click="selectPeriod('rolling12')">
+        {{ t("12 cycles") }}
+      </button>
+    </div>
+    <CyclePicker v-if="!overviewPeriod" :model-value="selectedMonth" :months="displayMonths" @update:model-value="onMonthSelected" />
     <AppLoader
       v-if="overviewPeriod && periodLoading"
       compact
@@ -108,6 +83,9 @@
     <p v-else-if="isCycleTabSelected && !report?.metadata?.provisional" class="pace-cycle-pending-note">
       {{ t("Category breakdown and transactions will appear once this cycle’s statement is uploaded.") }}
     </p>
+    <button v-if="canDeleteSelected" type="button" class="sheet-editor__delete sp-delete" @click="onDeleteStatementMonth(selectedMonth!)">
+      {{ t("Delete this statement") }}
+    </button>
     </template>
   </template>
 </template>
@@ -124,7 +102,7 @@ import CategoryAccordion from "@/features/spending/components/CategoryAccordion.
 import TransactionList from "@/shared/components/TransactionList.vue";
 import AppLoader from "@/shared/components/AppLoader.vue";
 import ErrorBanner from "@/shared/components/ErrorBanner.vue";
-import MonthPicker from "@/features/spending/components/MonthPicker.vue";
+import CyclePicker from "@/features/spending/components/CyclePicker.vue";
 import MonthBars from "@/features/spending/components/MonthBars.vue";
 import PendingCycleCard from "@/features/spending/components/PendingCycleCard.vue";
 import SpendingPeriodPanel from "@/features/spending/components/SpendingPeriodPanel.vue";
@@ -233,7 +211,7 @@ const refDate = computed(() => referenceDate(auth.isDemo, auth.demoAsOf));
 
 const periodAnalysis = computed(() => {
   if (!overviewPeriod.value || !paceReport.value) return null;
-  return analyzeSpendingPeriod(paceReport.value.transactions, overviewPeriod.value, refDate.value);
+  return analyzeSpendingPeriod(paceReport.value.transactions, overviewPeriod.value, refDate.value, cycleDay.value);
 });
 
 const displayMonths = computed(() => {
@@ -778,12 +756,15 @@ function defaultTxPeriod(month: string | null): TransactionPeriod {
   return "month";
 }
 
-function togglePeriod(mode: SpendingPeriodMode) {
-  if (overviewPeriod.value === mode) {
-    overviewPeriod.value = null;
-    expandedCategoryKeys.value = [];
-    return;
-  }
+/** Statements of a calendar month can be deleted; live cycles cannot. */
+const canDeleteSelected = computed(() => !auth.readOnly && !!selectedMonth.value && !isCycleMonthKey(selectedMonth.value));
+
+function showCycles() {
+  if (overviewPeriod.value) void onMonthSelected(selectedMonth.value);
+}
+
+function selectPeriod(mode: SpendingPeriodMode) {
+  if (overviewPeriod.value === mode) return;
   overviewPeriod.value = mode;
   expandedCategoryKeys.value = [];
   void loadFullPaceReport();

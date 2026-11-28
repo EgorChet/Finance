@@ -7,7 +7,7 @@
       </div>
       <p class="pd-hero-value">{{ whole(analysis.currentTotal) }}</p>
       <p class="pd-hero-sub">
-        {{ t("{amount} a month on average", { amount: whole(analysis.avgPerMonth) }) }} · {{ t("{n} {n|charge|charges}", { n: analysis.transactionCount }) }}
+        {{ t("{amount} a cycle on average", { amount: whole(analysis.avgPerCycle) }) }} · {{ t("{n} {n|charge|charges}", { n: analysis.transactionCount }) }}
       </p>
       <p v-if="analysis.priorComparable && totalTrend" class="pd-chip" :class="`pd-chip--${totalTrend.cls}`">
         {{ totalTrend.text }}
@@ -26,13 +26,13 @@
           <strong>{{ whole(analysis.fixed) }}</strong>
         </div>
         <div>
-          <span>{{ t("Months") }}</span>
-          <strong>{{ analysis.monthsWithData }}</strong>
+          <span>{{ t("Cycles") }}</span>
+          <strong>{{ analysis.cyclesWithData }}</strong>
         </div>
       </div>
     </div>
 
-    <MonthBars v-if="monthItems.length > 1" :items="monthItems" />
+    <MonthBars v-if="monthItems.length > 1" :items="monthItems" title="Cycle by cycle" />
 
     <section class="pd-card">
       <h3 class="pd-card-title">{{ t("Where it went") }}</h3>
@@ -95,7 +95,7 @@ const topCategories = computed(() => {
 });
 
 const monthItems = computed(() =>
-  props.analysis.monthlyTotals.map((m) => {
+  props.analysis.cycleTotals.map((m) => {
     const [y, mo] = m.key.split("-").map(Number);
     return { key: m.key, label: new Date(y, mo - 1, 1).toLocaleDateString(dateTag(), { month: "short" }), total: m.total };
   }),
