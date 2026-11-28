@@ -3675,12 +3675,34 @@ button.bx-row {
   color: var(--text-muted);
 }
 
-.bx-row--more {
-  min-height: 50px;
-  justify-content: center;
-  color: var(--accent);
+/* "Show all N" / "Show fewer": a small centred pill under the list, not a row or a wide button of its own. */
+.more-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  margin: 0.55rem auto 0.4rem;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
   font-weight: 600;
-  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.more-pill::after {
+  content: "›";
+  font-size: 1.15rem;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+
+.more-pill--open::after {
+  transform: rotate(-90deg);
 }
 
 .bx-chevron {
