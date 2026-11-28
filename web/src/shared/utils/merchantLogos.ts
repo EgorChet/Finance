@@ -20,6 +20,7 @@ const BUNDLED_LOGOS = new Set([
   "arcaffe.co.il",
   "aroma.co.il",
   "aws.amazon.com",
+  "be-pharm",
   "benedict.co.il",
   "bezeq.co.il",
   "biscotti.co.il",
@@ -130,6 +131,7 @@ const BRANDS: [RegExp, Mark][] = [
   [/victory|ויקטורי/i, { text: "V", bg: "#E30613", domain: "victoryonline.co.il" }],
   [/super-?pharm|סופר פארם/i, { text: "SP", bg: "#E4002B", domain: "super-pharm.co.il" }],
   [/good ?pharm|גוד פארם/i, { text: "GP", bg: "#6CB33F", domain: "good-pharm.co.il" }],
+  [/be\s*pharm|בי\s*פארם|piano city|פיאנו/i, { text: "Be", bg: "#DC1B34", domain: "be-pharm" }],
   [/iherb/i, { text: "iH", bg: "#458500", domain: "iherb.com" }],
   // Home & shopping
   [/ikea|איקאה/i, { icon: "ikea" }],
