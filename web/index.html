@@ -54,7 +54,7 @@
       .boot--out { opacity: 0; visibility: hidden; }
       .boot-inner { display: grid; justify-items: center; gap: 18px; animation: boot-in 0.5s ease-out both; }
       /* The same mark and drawn word as AppLogo.vue: frame, strokes and word are drawn in turn. */
-      .boot-lockup { width: min(280px, 76vw); height: auto; overflow: visible; color: var(--b-text); }
+      .boot-lockup { width: min(250px, 70vw); height: auto; overflow: visible; color: var(--b-text); }
       .boot-lockup .l-fill { fill: var(--b-fill); }
       .boot-lockup .l-frame { stroke: var(--b-fill); }
       .boot-lockup .l-ch { stroke: var(--b-on); }
@@ -88,14 +88,14 @@
   <body>
     <div id="boot" class="boot" role="status" aria-label="Ч-Банк">
         <div class="boot-inner">
-          <svg class="boot-lockup" viewBox="0 0 240 48" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
-            <rect class="l-fill" x="2" y="2" width="44" height="44" rx="13" />
-            <rect class="l-frame" x="2" y="2" width="44" height="44" rx="13" fill="none" stroke-width="2.5" pathLength="100"/>
-            <g class="l-ch" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <path class="l-s l-s1" pathLength="100" d="M15 12V26Q15 30 20 30H33"/>
-              <path class="l-s l-s2" pathLength="100" d="M33 12V38"/>
+          <svg class="boot-lockup" viewBox="0 0 195 60" role="img" aria-label="Ч-Банк" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <rect class="l-fill" x="0" y="0" width="60" height="60" rx="17" />
+            <rect class="l-frame" x="1.25" y="1.25" width="57.5" height="57.5" rx="16" fill="none" stroke-width="2.5" pathLength="100" />
+            <g class="l-ch" transform="translate(17 14)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path class="l-s l-s1" pathLength="100" d="M3 3V14Q3 19 8 19H23"/>
+              <path class="l-s l-s2" pathLength="100" d="M23 3V29"/>
             </g>
-            <g class="l-word" transform="translate(58 8)" stroke="currentColor" stroke-width="5.5" fill="none" stroke-linejoin="bevel" stroke-linecap="butt"><path d="M34 4H4V36H22Q34 36 34 28Q34 20 22 20H4" /><path transform="translate(46 0)" d="M4 36L20 4L36 36M10 26H30" /><path transform="translate(92 0)" d="M4 4V36M36 4V36M4 20H36" /><path transform="translate(138 0)" d="M4 4V36M34 4L4 21M12 16L36 36" /></g>
+            <g class="l-word" transform="translate(76 14)" stroke="currentColor" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round"><path d="M23 3H3V29H14Q23 29 23 23.5Q23 18 14 18H3" /><path transform="translate(30 0)" d="M3 29L13 3L23 29M6.2 21H19.8" /><path transform="translate(60 0)" d="M3 3V29M23 3V29M3 16H23" /><path transform="translate(93 0)" d="M3 3V29M23 3L3 17M9.5 12.5L23 29" /></g>
           </svg>
           <div class="boot-bar" aria-hidden="true"></div>
         </div>

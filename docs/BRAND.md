@@ -5,10 +5,15 @@ by CSS variables in `web/src/assets/theme.css`. Nothing in the app should hard-c
 
 ## Logo
 
-- **Mark**: a rounded square in the palette's fill colour with a **Ч** drawn in two round strokes
-  (`M15 12V26Q15 30 20 30H33` and `M33 12V38`, stroke 5, on a 48×48 grid).
-- **Lockup**: the mark followed by **БАНК** drawn with lines (stroke 5.5, bevel joins). The Ч is never
-  repeated in the word: the mark *is* the first letter of the name.
+**Letter construction (one system for all five letters):** cap height 32, stroke 6, round caps and round joins,
+outer width 26 for every letter, drawn with paths (no font). Optical kerning: diagonals (А) sit 4 units closer,
+straight-to-straight pairs have a gap of 7. The Ч inside the square has *exactly* the cap height and stroke of the
+letters in the word and sits on the same top and bottom lines, so it never looks smaller or from another font.
+Square 60×60, corner radius 17; the word is vertically centred on the square (cap lines 14 and 46).
+The Ч glyph: `M3 3V14Q3 19 8 19H23` + `M23 3V29`. БАНК: Б `M23 3H3V29H14Q23 29 23 23.5Q23 18 14 18H3`,
+А `M3 29L13 3L23 29M6.2 21H19.8`, Н `M3 3V29M23 3V29M3 16H23`, К `M3 3V29M23 3L3 17M9.5 12.5L23 29`.
+
+
 - Letters are drawn with paths, not a font, so the logo looks the same on every device.
 - Colours: the square uses `--accent-fill`, the Ч uses `--accent-contrast`, the word uses the text colour.
 - Minimum size: mark 24 px, lockup 120 px wide. Clear space around it: one quarter of the mark's width.
