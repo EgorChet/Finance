@@ -1,13 +1,21 @@
-/** BTC, S&P 500, and USD→ILS/RUB for the side menu market panel. */
-const MEXC_API = "https://api.mexc.com/api/v3/ticker/price";
-const YAHOO_SP500 = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1d&range=1d";
+/** BTC, KAS, S&P 500, ProShares Short Dow30 (DOG) and USD→ILS/RUB for the side menu market panel. */
+const MEXC_24H = "https://api.mexc.com/api/v3/ticker/24hr";
+const YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
 const FRANKFURTER = "https://api.frankfurter.dev/v2/rates?base=USD&quotes=ILS,RUB";
 const CACHE_MS = 600_000;
 const USER_AGENT = "Finance/1.0 (market-snapshot)";
 
+/** Last price and the change since the previous close (or 24 h ago for crypto), in percent. */
+type Quote = { price: number; changePct: number | null };
+
 export type MarketSnapshot = {
   btc_usd: number;
   sp500: number;
+  kas_usd?: number;
+  /** ProShares Short Dow30 (DOG). */
+  dog_usd?: number;
+  /** Day change in percent per ticker; a missing key means the source gave none. */
+  change_pct?: { btc?: number; kas?: number; sp500?: number; dog?: number };
   usd_ils: number;
   usd_rub: number;
   updated_at: string;
@@ -19,27 +27,32 @@ type MemoryCache = MarketSnapshot & { fetchedAt: number };
 let memoryCache: MemoryCache | null = null;
 let inflight: Promise<MarketSnapshot> | null = null;
 
-async function fetchBtcUsd(): Promise<number | null> {
-  const res = await fetch(`${MEXC_API}?symbol=BTCUSDT`, {
-    headers: { "User-Agent": USER_AGENT },
-  });
+async function fetchMexc(symbol: string): Promise<Quote | null> {
+  const res = await fetch(`${MEXC_24H}?symbol=${symbol}`, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return null;
-  const data = (await res.json()) as { price?: string };
-  const price = Number(data.price);
-  return Number.isFinite(price) && price > 0 ? price : null;
+  const data = (await res.json()) as { lastPrice?: string; openPrice?: string };
+  const price = Number(data.lastPrice);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const open = Number(data.openPrice);
+  return { price, changePct: Number.isFinite(open) && open > 0 ? ((price - open) / open) * 100 : null };
 }
 
-async function fetchSp500(): Promise<number | null> {
-  const res = await fetch(YAHOO_SP500, {
+async function fetchYahoo(symbol: string): Promise<Quote | null> {
+  const res = await fetch(`${YAHOO_CHART}/${encodeURIComponent(symbol)}?interval=1d&range=1d`, {
     headers: { "User-Agent": USER_AGENT },
   });
   if (!res.ok) return null;
   const data = (await res.json()) as {
-    chart?: { result?: { meta?: { regularMarketPrice?: number } }[] };
+    chart?: { result?: { meta?: { regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number } }[] };
   };
-  const price = data.chart?.result?.[0]?.meta?.regularMarketPrice;
-  return price != null && Number.isFinite(price) && price > 0 ? price : null;
+  const meta = data.chart?.result?.[0]?.meta;
+  const price = meta?.regularMarketPrice;
+  if (price == null || !Number.isFinite(price) || price <= 0) return null;
+  const prev = meta?.chartPreviousClose ?? meta?.previousClose;
+  return { price, changePct: prev != null && Number.isFinite(prev) && prev > 0 ? ((price - prev) / prev) * 100 : null };
 }
+
+const orNull = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
 
 async function fetchUsdFx(): Promise<{ usd_ils: number; usd_rub: number } | null> {
   const res = await fetch(FRANKFURTER, { headers: { "User-Agent": USER_AGENT } });
@@ -69,6 +82,9 @@ function snapshotFromCache(cache: MemoryCache, stale: boolean): MarketSnapshot {
   return {
     btc_usd: cache.btc_usd,
     sp500: cache.sp500,
+    kas_usd: cache.kas_usd,
+    dog_usd: cache.dog_usd,
+    change_pct: cache.change_pct,
     usd_ils: cache.usd_ils,
     usd_rub: cache.usd_rub,
     updated_at: cache.updated_at,
@@ -81,13 +97,27 @@ async function refreshSnapshot(): Promise<MarketSnapshot> {
 
   inflight = (async () => {
     try {
-      const [btc, sp500, fx] = await Promise.all([fetchBtcUsd(), fetchSp500(), fetchUsdFx()]);
+      const [btc, kas, sp500, dog, fx] = await Promise.all([
+        orNull(fetchMexc("BTCUSDT")),
+        orNull(fetchMexc("KASUSDT")),
+        orNull(fetchYahoo("^GSPC")),
+        orNull(fetchYahoo("DOG")),
+        orNull(fetchUsdFx()),
+      ]);
       const prev = memoryCache;
       const now = Date.now();
 
       const next: MemoryCache = {
-        btc_usd: btc ?? prev?.btc_usd ?? 0,
-        sp500: sp500 ?? prev?.sp500 ?? 0,
+        btc_usd: btc?.price ?? prev?.btc_usd ?? 0,
+        sp500: sp500?.price ?? prev?.sp500 ?? 0,
+        kas_usd: kas?.price ?? prev?.kas_usd,
+        dog_usd: dog?.price ?? prev?.dog_usd,
+        change_pct: {
+          btc: btc ? btc.changePct ?? undefined : prev?.change_pct?.btc,
+          kas: kas ? kas.changePct ?? undefined : prev?.change_pct?.kas,
+          sp500: sp500 ? sp500.changePct ?? undefined : prev?.change_pct?.sp500,
+          dog: dog ? dog.changePct ?? undefined : prev?.change_pct?.dog,
+        },
         usd_ils: fx?.usd_ils ?? prev?.usd_ils ?? 0,
         usd_rub: fx?.usd_rub ?? prev?.usd_rub ?? 0,
         updated_at: new Date(now).toISOString(),
@@ -100,7 +130,7 @@ async function refreshSnapshot(): Promise<MarketSnapshot> {
         throw new Error("Market snapshot unavailable");
       }
 
-      const partial = btc == null || sp500 == null || fx == null;
+      const partial = btc == null || kas == null || sp500 == null || dog == null || fx == null;
       memoryCache = next;
       return snapshotFromCache(next, partial);
     } finally {

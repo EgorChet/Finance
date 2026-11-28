@@ -339,7 +339,7 @@ const GET: Record<string, Handler> = {
   "/config": () => ({ analyzer_wake_url: null, analyzer_wake_from_browser: false }),
   "/kaspa": () => ({ enabled: true, price_usdt: 0.0812, balance_kas: 12500, portfolio_usdt: 1015, updated_at: new Date().toISOString(), source: "demo", year_open_usdt: 0.0722, year_change_pct: 12.5, all_time_pct: 18.4 }),
   "/fxcn": () => ({ enabled: true, nav_usd: 1.0412, lots: 2400, portfolio_usd: 2498.88, updated_at: new Date().toISOString(), source: "demo", all_time_pct: 7.2, year_open_nav_usd: 1.0, year_change_pct: 4.1, nav_date: new Date(Date.now() - 86_400_000 * 85).toISOString().slice(0, 10) }),
-  "/market-snapshot": () => ({ btc_usd: 98500, sp500: 6120, usd_ils: 3.68, usd_rub: 92.4, updated_at: new Date().toISOString() }),
+  "/market-snapshot": () => ({ btc_usd: 98500, kas_usd: 0.0812, sp500: 6120, dog_usd: 21.45, change_pct: { btc: 1.8, kas: -0.9, sp500: 0.4, dog: -0.5 }, usd_ils: 3.68, usd_rub: 92.4, updated_at: new Date().toISOString() }),
   "/review/queue": (s, q) => reviewQueue(s, q),
   "/review/suggest": (_s, q) => ({ english: knownMerchantName(q.get("hebrew") ?? "") ?? "" }),
   "/exclusions": (s) => {
@@ -438,7 +438,7 @@ const WRITE: Record<string, Handler> = {
   },
 };
 
-const NOT_IN_DEMO = /^\/(upload|sync|cal\/sync|warm-analyzer)/;
+const NOT_IN_DEMO = /^\/(upload|sync|warm-analyzer)/;
 
 /**
  * Answer an API call for the demo. `url` is the full request URL; `/api/demo/x` and `/api/x`

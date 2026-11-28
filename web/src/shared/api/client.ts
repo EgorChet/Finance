@@ -268,21 +268,6 @@ export async function syncStatements(token?: string, autoTranslate = true) {
   );
 }
 
-export type CalSyncJob = {
-  jobId: string;
-  status: "waking" | "starting" | "logging_in" | "exporting" | "uploading" | "done" | "error";
-  message: string;
-  error?: string;
-  result?: { key?: string; provisional?: boolean; skipped?: boolean };
-};
-
-export async function startCalSync(token?: string) {
-  return post<CalSyncJob>(`${prefix(false)}/cal/sync`, {}, token);
-}
-
-export async function fetchCalSyncJob(jobId: string, token?: string) {
-  return get<CalSyncJob>(`${prefix(false)}/cal/sync/${encodeURIComponent(jobId)}`, token);
-}
 
 export async function fetchAppConfig(token?: string) {
   return get<{
@@ -331,6 +316,11 @@ export async function fetchFxcnQuote(demo: boolean, token?: string, force = fals
 export type MarketSnapshot = {
   btc_usd: number;
   sp500: number;
+  kas_usd?: number;
+  /** ProShares Short Dow30 (DOG). */
+  dog_usd?: number;
+  /** Day change in percent per ticker; a missing key means the source gave none. */
+  change_pct?: { btc?: number; kas?: number; sp500?: number; dog?: number };
   usd_ils: number;
   usd_rub: number;
   updated_at: string;

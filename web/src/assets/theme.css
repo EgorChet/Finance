@@ -5051,14 +5051,62 @@ button.topup-item {
   color: var(--text-muted);
 }
 
-.acct-signout {
+.acct-group--bottom {
   margin-top: auto;
-  min-height: 48px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
+}
+
+.acct-row--danger,
+.acct-row--danger .acct-icon {
   color: var(--danger);
-  font: inherit;
-  font-weight: 650;
-  cursor: pointer;
+}
+
+.acct-row--danger .acct-label {
+  font-weight: 600;
+}
+
+/* Market tickers: one compact line each, price and day change on the right. */
+.acct-tick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 3.6rem;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.acct-tick + .acct-tick {
+  border-top: 1px solid var(--border);
+}
+
+.acct-tick-name {
+  display: grid;
+  min-width: 0;
+}
+
+.acct-tick-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+}
+
+.acct-tick-price {
+  font-weight: 600;
+}
+
+.acct-tick-change {
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.acct-tick-change--up {
+  color: var(--success);
+}
+
+.acct-tick-change--down {
+  color: var(--danger);
 }
